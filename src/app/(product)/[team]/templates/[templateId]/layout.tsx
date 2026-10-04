@@ -1,5 +1,4 @@
 import { Stream } from "@/components/primitives/stream";
-import { ResetCanvasScroll } from "@/components/workspace/reset-canvas-scroll";
 import { WorkspaceSessionProvider } from "@/components/workspace/session/workspace-session";
 import { WorkspaceHeader, WorkspaceHeaderSkeleton } from "@/components/workspace/workspace-header";
 import { WS } from "@/components/workspace/workspace-grid";
@@ -13,7 +12,6 @@ export default function TemplateWorkspaceLayout({
 }: LayoutProps<"/[team]/templates/[templateId]">) {
   return (
     <WorkspaceSessionProvider>
-      <ResetCanvasScroll />
       <div data-slot="workspace" className={WS.grid}>
         <Stream fallback={<WorkspaceHeaderSkeleton />}>
           <WorkspaceHeader params={params} />

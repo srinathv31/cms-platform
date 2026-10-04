@@ -39,7 +39,7 @@ export function ChipPopover(props: ChipPopoverProps) {
 function ChipPopoverPanel({ editor, root, chip, pos }: ChipPopoverProps & { pos: number }) {
   const node = editor.state.doc.nodeAt(pos);
   const key = node?.type.name === NODE.variable ? ((node.attrs.key as string | null) ?? null) : null;
-  const anchor = editor.view.nodeDOM(pos) as HTMLElement | null;
+  const anchor = editor.isDestroyed ? null : (editor.view.nodeDOM(pos) as HTMLElement | null);
   const variable = useStore(root.variables, (s) => (key ? s.byKey.get(key) : undefined));
   const usage = useStore(root.usage, (s) => (key ? s.byKey.get(key) : undefined));
   const setPopup = useCallback((element: HTMLElement | null) => chip.getState().setElement(element), [chip]);

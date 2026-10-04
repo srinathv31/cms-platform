@@ -734,6 +734,8 @@ test.describe("overlays", () => {
     await expect(dialog.getByRole("option", { name: "Library" })).toBeVisible();
     await expect(dialog.getByRole("option", { name: /Annual Fee Waiver/ })).toBeVisible();
     await expect(dialog.getByRole("option", { name: /Statement Insert/ })).toHaveCount(0);
+    // Base UI focuses the search a frame after the dialog shows; type once it has focus.
+    await expect(dialog.locator("input")).toBeFocused();
     await page.keyboard.type("balance");
     await expect(dialog.getByRole("option")).toHaveCount(1);
     await page.keyboard.press("Enter");

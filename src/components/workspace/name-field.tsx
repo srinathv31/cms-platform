@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { takeJustCreated } from "./just-created";
 import { useWorkspaceSession } from "./session/workspace-session";
 
 /** The most the server accepts (parse-patch.ts: 1 to 120 characters). */
@@ -20,8 +21,9 @@ const TYPE = "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[l
  * - Editable: a field that saves through the workspace's autosave session as the author types.
  *   Enter moves into the document, Esc puts the old name back, and clearing it never saves an empty
  *   name (it reverts on blur).
- * - Arriving with `?created=1` (a template just made from a starter): the name is focused with all of
- *   its text selected, so the first thing the author types replaces it. The param is then dropped.
+ * - Arriving at a template just made from a starter (`createTemplate` leaves a one-shot cookie, see
+ *   `just-created.ts`): the name is focused with all of its text selected, so the first thing the
+ *   author types replaces it. The address is already the template's own: nothing to drop from it.
  */
 export function NameField({ name, editable }: { name: string; editable: boolean }) {
   if (!editable) {
@@ -36,9 +38,7 @@ export function NameField({ name, editable }: { name: string; editable: boolean 
 
 function EditableName({ name }: { name: string }) {
   const session = useWorkspaceSession();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const created = searchParams.get("created") === "1";
+  const { templateId } = useParams<{ templateId?: string }>();
 
   const field = useRef<HTMLTextAreaElement>(null);
   // The textarea is uncontrolled: its DOM value is the source of truth for as long as the author is
@@ -51,31 +51,17 @@ function EditableName({ name }: { name: string }) {
   const startName = useRef(name);
   /** The last non-empty name handed to autosave: what an emptied field falls back to. */
   const lastGood = useRef(name);
-  const landed = useRef(false);
 
+  // A new template: focus the name with all of it selected. The flag is taken as it is read, so this
+  // happens once, on arrival; a re-run of the effect (Strict Mode, the page shown again after Back and
+  // Forward) finds nothing to take. Nothing here touches the address or the router.
   useEffect(() => {
-    if (!created) return;
-    if (!landed.current) {
-      landed.current = true;
-      const el = field.current;
-      if (el) {
-        el.focus({ preventScroll: true });
-        el.select();
-      }
-    }
-    // Drop the param with the browser's own history call, which Next folds into the router (the
-    // docs' "Native History API"). A router.replace would re-render the page in a transition, and a
-    // keystroke landing just before that commit could be overwritten.
-    //
-    // The navigation that brought the author here can still be finishing: its last commit pushes the
-    // address it was sent to, `?created=1` included, even after we have replaced it. Nothing here
-    // assumes it is done. This effect runs again whenever the router reports the param, so the
-    // address always ends up clean. Focus and selection happen once.
-    const rest = new URLSearchParams(searchParams.toString());
-    rest.delete("created");
-    const query = rest.toString();
-    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
-  }, [created, pathname, searchParams]);
+    if (!takeJustCreated(templateId)) return;
+    const el = field.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.select();
+  }, [templateId]);
 
   function show(next: string) {
     const el = field.current;

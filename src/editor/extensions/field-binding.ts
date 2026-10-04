@@ -129,7 +129,11 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
               }
               if (next.state.selection !== prev.selection) followSelection(next.state, chip);
             },
-            destroy: () => root.detachEditor(fieldId, editor),
+            destroy: () => {
+              // The view is going (destroy, or a hidden route torn down): nothing anchors a popover.
+              chip.getState().close();
+              root.detachEditor(fieldId, editor);
+            },
           };
         },
       }),

@@ -74,10 +74,12 @@ async function expectUses(page: Page, key: string, uses: "Unused" | "1 use" | "2
 }
 
 /**
- * A person needs a moment to see the new page before the first keystroke. Landing drops `?created=1`
- * from the address (a router.replace); wait for that, plus a beat, and check the name is still the
- * focused, fully selected field. (Typing before that moment can lose characters: see "keystrokes
- * during the page settling" below.)
+ * A person needs a moment to see the new page before the first keystroke: take a beat, and check the
+ * name is still the focused, fully selected field. Landing works by a one-shot cookie
+ * (`src/components/workspace/just-created.ts`): `createTemplate` redirects straight to the
+ * template's own address and the name field takes the cookie on arrival, so nothing is dropped from
+ * the address afterwards. The `not.toHaveURL(/created=/)` is a guard that no query comes back.
+ * (See also "keystrokes during the page settling" below.)
  */
 async function afterLanding(page: Page, text: string) {
   await expect(page).not.toHaveURL(/created=/);
@@ -248,7 +250,7 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       expect(clicks.count, "clicks made from the Library until the name is ready").toBe(2);
       expect(await mousePresses(page), "mouse presses the page saw").toBe(2);
       await expectNameSelected(page, "Card offer terms");
-      // The query that got us here is dropped from the address bar, and the name keeps its selection.
+      // The address is the template's own (no query), and the name keeps its selection.
       await afterLanding(page, "Card offer terms");
     });
 
@@ -640,11 +642,13 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 test.describe("scenario 2, step 1: the name is ready the moment the page lands", () => {
-  // Landing drops `?created=1` from the address with a router.replace. A keystroke that lands just
-  // before that commit has been seen to come back out of the field: the typing below starts the
-  // moment the name has focus and runs through the settle, on a slow connection (the first autosave
-  // is still in flight while the author keeps typing). The race is narrow, so a few new templates
-  // are tried; any lost character fails the test.
+  // The canary for the race the old landing had. Landing used to rewrite the address (`?created=1`
+  // dropped with a router.replace), and a keystroke that landed just before that commit was seen to
+  // come back out of the field. Landing now works by a one-shot cookie (`just-created.ts`) and
+  // `createTemplate` redirects straight to the clean address, so the page never touches the router
+  // on arrival. The typing below stays as the guard: it starts the moment the name has focus and
+  // runs through the settle, on a slow connection (the first autosave is still in flight while the
+  // author keeps typing). A few new templates are tried; any lost character fails the test.
   test("keystrokes during the page settling are not lost", async ({ page }) => {
     test.setTimeout(120_000);
     await asPersona(page, "maya");

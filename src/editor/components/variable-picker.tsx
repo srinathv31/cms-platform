@@ -23,6 +23,7 @@ import { cx } from "../lib/cx";
 import { newDraft } from "../model/draft";
 import type { Variable } from "../model/types";
 import type { EditorRootRuntime } from "../state/editor-root";
+import { viewDom } from "../lib/editor-view";
 import { makeRoomBelow, menuContainer } from "./menu-layer";
 import { TYPE_ICONS } from "./type-icon";
 import { VariableForm } from "./variable-form";
@@ -135,10 +136,11 @@ function VariablePickerPanel({ controller, editor, root }: PickerProps) {
   // Anchor to the `{{query` decoration; Suggestion's mount keeps it placed on scroll and resize.
   // Room below first (menu-layer.ts), then placed.
   useLayoutEffect(() => {
-    if (!element || !mount) return;
+    const dom = viewDom(editor);
+    if (!element || !mount || !dom) return;
     let unmount: (() => void) | null = null;
     const rect = store.getState().props?.clientRect?.() ?? null;
-    const cancel = makeRoomBelow(editor.view.dom, rect, element.offsetHeight, 6, () => {
+    const cancel = makeRoomBelow(dom, rect, element.offsetHeight, 6, () => {
       unmount = mount(element);
     });
     return () => {
@@ -188,8 +190,8 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
 
   // Screen readers: the document keeps focus, so point it at the active option.
   useEffect(() => {
-    if (!element || editor.isDestroyed) return;
-    const dom = editor.view.dom;
+    const dom = viewDom(editor);
+    if (!element || !dom) return;
     const list = element.querySelector<HTMLElement>("[cmdk-list]");
     const option = element.querySelector<HTMLElement>('[cmdk-item][data-selected="true"]');
     if (list && option && list.contains(option)) keepInView(list, option);

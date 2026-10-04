@@ -6,22 +6,28 @@ import type { SaveFields } from "./autosave/autosave-scheduler";
 import { createWorkspaceSession, type WorkspaceSession } from "./session/session-store";
 
 // The name field: what it hands to autosave, and how Enter, Esc, an emptied field and the arrival
-// from "New template" (?created=1) behave.
+// from "New template" (the one-shot "just created" cookie) behave.
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let session: WorkspaceSession;
-let search = "";
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/coral-offers/templates/UC-ABC123",
-  useSearchParams: () => new URLSearchParams(search),
+  useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }),
 }));
 vi.mock("./session/workspace-session", () => ({ useWorkspaceSession: () => session }));
 
 const { NameField } = await import("./name-field");
 
 const replaceState = vi.spyOn(window.history, "replaceState");
+const pushState = vi.spyOn(window.history, "pushState");
+
+/** What `createTemplate` leaves behind as it redirects. */
+const markJustCreated = (templateId: string) => {
+  document.cookie = `ucomp_created=${templateId}; path=/; max-age=60; samesite=lax`;
+};
+const justCreatedCookie = () =>
+  document.cookie.split("; ").find((part) => part.startsWith("ucomp_created=")) ?? null;
 
 let root: Root;
 let container: HTMLElement;
@@ -47,8 +53,9 @@ async function press(el: HTMLElement, key: string) {
 }
 
 beforeEach(() => {
-  search = "";
+  document.cookie = "ucomp_created=; path=/; max-age=0";
   replaceState.mockClear();
+  pushState.mockClear();
   save = vi.fn();
   session = createWorkspaceSession();
   session.attach(save);
@@ -122,16 +129,37 @@ describe("NameField", () => {
     expect(document.activeElement).not.toBe(field());
   });
 
-  it("arriving with ?created=1 selects the whole name and drops the param", async () => {
-    search = "created=1";
+  it("arriving just after creating the template selects the whole name, once, and leaves the address alone", async () => {
+    markJustCreated("UC-ABC123");
     await render(<NameField name="Card offer terms" editable />);
 
     expect(document.activeElement).toBe(field());
     expect(field().selectionStart).toBe(0);
     expect(field().selectionEnd).toBe("Card offer terms".length);
-    // Dropped with the native history call: no router transition to re-render the page mid-typing.
-    expect(replaceState).toHaveBeenCalledTimes(1);
-    expect(replaceState).toHaveBeenCalledWith(null, "", "/coral-offers/templates/UC-ABC123");
+    // The flag is taken as it is read: a reload or a later visit is an ordinary arrival.
+    expect(justCreatedCookie()).toBeNull();
+    // The redirect already went to the template's own address: no history call, nothing for Next's
+    // own history updates to race with.
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(pushState).not.toHaveBeenCalled();
+
+    await act(async () => field().blur());
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await render(<NameField name="Card offer terms" editable />);
+    expect(document.activeElement).not.toBe(field());
+  });
+
+  it("an ordinary arrival, or one at another template than the one just created, leaves the name alone", async () => {
+    await render(<NameField name="Card offer terms" editable />);
+    expect(document.activeElement).not.toBe(field());
+
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    markJustCreated("UC-ZZZ999");
+    await render(<NameField name="Card offer terms" editable />);
+    expect(document.activeElement).not.toBe(field());
+    expect(justCreatedCookie()).toBe("ucomp_created=UC-ZZZ999");
   });
 
   it("keeps what the author typed when the page re-renders around the field", async () => {
@@ -147,9 +175,10 @@ describe("NameField", () => {
     expect(field().value).toBe("Spring Travel");
   });
 
-  it("leaves the name alone on a page that isn't editable, even with ?created=1", async () => {
-    search = "created=1";
+  it("leaves the name alone on a page that isn't editable, even just after creating it", async () => {
+    markJustCreated("UC-ABC123");
     await render(<NameField name="Card offer terms" editable={false} />);
+    expect(container.querySelector("textarea")).toBeNull();
     expect(replaceState).not.toHaveBeenCalled();
   });
 });

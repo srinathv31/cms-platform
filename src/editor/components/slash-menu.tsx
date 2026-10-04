@@ -28,6 +28,7 @@ import { Command, CommandItem, CommandList, CommandShortcut } from "@/components
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import type { BlockItem, BlockItemId, ShortcutToken } from "../extensions/block-items";
 import type { SlashRender } from "../extensions/slash-command";
+import { viewDom } from "../lib/editor-view";
 import { makeRoomBelow, menuContainer } from "./menu-layer";
 
 const ICONS: Record<BlockItemId, LucideIcon> = {
@@ -169,10 +170,11 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
   // closes the menu on an outside click.
   // Room below first (menu-layer.ts), then placed.
   useLayoutEffect(() => {
-    if (!element || !mount) return;
+    const dom = viewDom(editor);
+    if (!element || !mount || !dom) return;
     let unmount: (() => void) | null = null;
     const rect = store.getState().props?.clientRect?.() ?? null;
-    const cancel = makeRoomBelow(editor.view.dom, rect, element.offsetHeight, 6, () => {
+    const cancel = makeRoomBelow(dom, rect, element.offsetHeight, 6, () => {
       unmount = mount(element);
     });
     return () => {
@@ -183,8 +185,8 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
 
   // Screen readers: the document keeps focus, so point it at the active option.
   useEffect(() => {
-    if (!element || editor.isDestroyed) return;
-    const dom = editor.view.dom;
+    const dom = viewDom(editor);
+    if (!element || !dom) return;
     const list = element.querySelector<HTMLElement>("[cmdk-list]");
     const option = element.querySelector<HTMLElement>('[cmdk-item][data-selected="true"]');
     if (list && option) keepInView(list, option);

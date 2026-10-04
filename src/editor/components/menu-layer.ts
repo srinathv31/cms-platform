@@ -9,13 +9,15 @@
 // only when scrolling can't make room does the menu flip above.
 
 import type { Editor } from "@tiptap/core";
+import { viewDom } from "../lib/editor-view";
 
 const VIEWPORT_PADDING = 8;
 const SCROLL_SETTLE_MS = 450;
 
 /** The element menus are portalled into. */
 export function menuContainer(editor: Editor): HTMLElement {
-  return editor.view.dom.closest<HTMLElement>(".ucomp-editor, .ucomp-field") ?? editor.view.dom.ownerDocument.body;
+  const dom = viewDom(editor);
+  return dom?.closest<HTMLElement>(".ucomp-editor, .ucomp-field") ?? document.body;
 }
 
 function scrollParent(el: Element): HTMLElement {

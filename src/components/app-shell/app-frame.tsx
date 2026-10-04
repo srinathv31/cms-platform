@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { DemoPillHole } from "@/components/demo/demo-pill-hole";
 import { Sidebar, SidebarHeader, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { CanvasScroll } from "./canvas-scroll";
 import { CanvasFade, PersonaSwitchProvider } from "./persona-switch";
 import { SidebarBodyHole, TeamSwitcherHole } from "./sidebar-holes";
 import { SidebarBodySkeleton, TeamSwitcherSkeleton, TopBarSkeleton } from "./skeletons";
@@ -42,6 +43,8 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
             <div className="mx-auto w-full max-w-[96rem]">{children}</div>
           </CanvasFade>
         </SidebarInset>
+        {/* After the canvas, so its layout effects run after the page's own. */}
+        <CanvasScroll />
         <DemoPillHole />
       </PersonaSwitchProvider>
     </SidebarProvider>

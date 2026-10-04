@@ -13,6 +13,7 @@ import type { Editor } from "@tiptap/react";
 import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { isRequiredHeading } from "../extensions/required-sections";
+import { useViewDom } from "../lib/editor-view";
 import { insertBlockBelow } from "../lib/insert-below";
 import type { SlashMenuController } from "./slash-menu";
 
@@ -46,9 +47,7 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
   // Typing hides the handle until the pointer really moves. (Chrome replays a synthetic
   // mousemove when layout shifts under a still pointer, which would otherwise pop the handle
   // back up mid-sentence; synthetic moves have no movement delta.)
-  useEffect(() => {
-    if (editor.isDestroyed) return; // a stale editor while a hidden <Activity> reconnects
-    const dom = editor.view.dom;
+  useViewDom(editor, (dom) => {
     const surface = dom.parentElement;
     const onKeyDown = () => bar.current?.setAttribute("data-typing", "");
     const onMouseMove = (event: MouseEvent) => {
@@ -60,7 +59,7 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
       dom.removeEventListener("keydown", onKeyDown);
       surface?.removeEventListener("mousemove", onMouseMove);
     };
-  }, [editor]);
+  });
 
   // The first line box of the hovered block, so the handle centers on line one of any block
   // (a heading, a list's first item, a table's header row, a callout's first paragraph).

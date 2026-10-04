@@ -20,7 +20,8 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useViewDom, viewDom } from "../lib/editor-view";
 import { Menu } from "@base-ui/react/menu";
 import {
   DropdownMenu,
@@ -70,7 +71,7 @@ function tableAt(editor: Editor): number | null {
 }
 
 export function TableMenu({ editor }: { editor: Editor }) {
-  const tablePos = useEditorState({ editor, selector: ({ editor: e }) => (e.isEditable ? tableAt(e) : null) });
+  const tablePos = useEditorState({ editor, selector: ({ editor: e }) => (e.isEditable && !e.isDestroyed ? tableAt(e) : null) });
   if (tablePos === null || editor.isDestroyed) return null;
   return <TableMenuButton key={tablePos} editor={editor} tablePos={tablePos} />;
 }
@@ -78,12 +79,11 @@ export function TableMenu({ editor }: { editor: Editor }) {
 function TableMenuButton({ editor, tablePos }: { editor: Editor; tablePos: number }) {
   const [style, setStyle] = useState<CSSProperties | null>(null);
   // Positioned in the editor's own wrapper (rendered by React, unlike EditorContent's element).
-  const frame = editor.view.dom.closest<HTMLElement>(".ucomp-editor");
+  const frame = viewDom(editor)?.closest<HTMLElement>(".ucomp-editor") ?? null;
   const trigger = useRef<HTMLButtonElement>(null);
 
   // Alt+F10 in the table moves focus to the button.
-  useEffect(() => {
-    const dom = editor.view.dom;
+  useViewDom(editor, (dom) => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "F10" || !event.altKey || event.metaKey || event.ctrlKey) return;
       event.preventDefault();
@@ -91,12 +91,13 @@ function TableMenuButton({ editor, tablePos }: { editor: Editor; tablePos: numbe
     };
     dom.addEventListener("keydown", onKeyDown);
     return () => dom.removeEventListener("keydown", onKeyDown);
-  }, [editor]);
+  });
 
   // Follows the table as it grows (rows, columns) and the page as it reflows.
   useLayoutEffect(() => {
+    if (editor.isDestroyed || !frame) return;
     const table = editor.view.nodeDOM(tablePos);
-    if (!(table instanceof HTMLElement) || !frame) return;
+    if (!(table instanceof HTMLElement)) return;
     const place = () => {
       const t = table.getBoundingClientRect();
       const f = frame.getBoundingClientRect();
@@ -138,7 +139,7 @@ function TableMenuButton({ editor, tablePos }: { editor: Editor; tablePos: numbe
         <DropdownMenuPortal container={frame}>
           <Menu.Positioner align="end" sideOffset={6} collisionBoundary={frame} collisionPadding={8} className="isolate z-50 outline-none">
             <Menu.Popup
-              finalFocus={() => editor.view.dom}
+              finalFocus={() => viewDom(editor) ?? false}
               className="z-50 w-52 origin-(--transform-origin) rounded-xl border border-hairline bg-surface p-1 text-sm text-text shadow-pop outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
             >
               {GROUPS.map((group, i) => (

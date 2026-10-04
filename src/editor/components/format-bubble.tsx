@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { Button } from "@/components/ui/button";
 import { headingsIn } from "../extensions/required-sections";
 import { cx } from "../lib/cx";
+import { useViewDom } from "../lib/editor-view";
 import { FOCUS_RING } from "./classes";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
@@ -29,6 +30,7 @@ const TOGGLE = cx(
 const ICON = { className: "size-4", strokeWidth: 1.75, "aria-hidden": true } as const;
 
 function shouldShow({ editor, state, element }: { editor: Editor; state: EditorState; element: HTMLElement }) {
+  if (editor.isDestroyed) return false;
   const { selection, doc } = state;
   if (!editor.isEditable || selection.empty) return false;
   // Text only: a selected chip or a dragged block range has nothing to format.
@@ -50,6 +52,7 @@ export function FormatBubble({ editor }: { editor: Editor }) {
   // letting the bar hover over the chip for the debounce window.
   useEffect(() => {
     const onSelection = () => {
+      if (editor.isDestroyed) return;
       const element = menuRef.current;
       if (!element?.isConnected || shouldShow({ editor, state: editor.state, element })) return;
       editor.view.dispatch(editor.state.tr.setMeta(bubbleKey, "hide"));
@@ -61,8 +64,7 @@ export function FormatBubble({ editor }: { editor: Editor }) {
   }, [editor]);
 
   // ⌘K / Ctrl+K on selected text opens the link field.
-  useEffect(() => {
-    const dom = editor.view.dom;
+  useViewDom(editor, (dom) => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
       const element = menuRef.current;
@@ -72,7 +74,7 @@ export function FormatBubble({ editor }: { editor: Editor }) {
     };
     dom.addEventListener("keydown", onKeyDown);
     return () => dom.removeEventListener("keydown", onKeyDown);
-  }, [editor]);
+  });
 
   const active = useEditorState({
     editor,

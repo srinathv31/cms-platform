@@ -3,6 +3,7 @@
 import { RedirectType, redirect } from "next/navigation";
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
@@ -12,6 +13,7 @@ import { getViewer } from "@/server/viewer";
 import { newId, newTemplateId } from "@/server/ids";
 import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
 import { assertCan } from "@/domain/permissions";
+import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
 import {
   createDraft,
   editActive,
@@ -88,8 +90,10 @@ const CreateTemplateInput = z.object({
 });
 
 /**
- * Creates a template and its first draft from a starter, then opens it in the workspace with
- * `?created=1` (the header selects the name so the author can rename it at once).
+ * Creates a template and its first draft from a starter, then opens it in the workspace. The name
+ * field selects the name on arrival so the author can rename it at once: it learns the template is
+ * new from a one-shot cookie (`just-created.ts`), so the redirect goes to the template's own address
+ * and the address bar never needs tidying (one history entry; Back returns to the Library).
  * Blank starts as "Untitled template"; an example keeps its own name.
  */
 export async function createTemplate(input: { teamSlug: string; starterKey: StarterKey }): Promise<void> {
@@ -141,8 +145,13 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
     });
   });
 
+  (await cookies()).set(JUST_CREATED_COOKIE, templateId, {
+    path: "/",
+    sameSite: "lax",
+    maxAge: JUST_CREATED_MAX_AGE,
+  });
   refreshLists();
-  redirect(`/${team.slug}/templates/${templateId}?created=1`);
+  redirect(`/${team.slug}/templates/${templateId}`);
 }
 
 // ── Edit an Active template ───────────────────────────────────
