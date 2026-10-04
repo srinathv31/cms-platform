@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# UCOMP local data (SQLite file + uploads)
+/data/
+
+# Playwright
+/test-results/
+/playwright-report/
+/e2e/__screens__/

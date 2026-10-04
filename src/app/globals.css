@@ -1,26 +1,211 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Light theme only (build plan). No dark variant. */
 
 @theme inline {
+  /* Fonts */
+  --font-sans: var(--ui-font-sans);
+  --font-display: var(--ui-font-display);
+  --font-heading: var(--ui-font-display);
+  --font-mono: var(--ui-font-mono);
+
+  /* shadcn colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* UCOMP semantic colors → bg-canvas, border-hairline, text-label, bg-brand … */
+  --color-app: var(--app-bg);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-tinted: var(--surface-tinted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-selected: var(--selected);
+  --color-hover: var(--hover);
+  --color-tan: var(--tan);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-label: var(--text-label);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-text);
+  --color-brand-1: var(--brand-1);
+  --color-brand-2: var(--brand-2);
+  --color-brand-3: var(--brand-3);
+  --color-brand-4: var(--brand-4);
+  --color-brand-soft: var(--brand-soft);
+  --color-heat-empty: var(--heat-empty);
+  --color-positive: var(--positive-text);
+  --color-positive-soft: var(--positive-bg);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-scrim: var(--scrim);
+  --color-chip: var(--chip-bg);
+  --color-chip-border: var(--chip-border);
+  --color-chip-text: var(--chip-text);
+  --color-chip-icon: var(--chip-icon);
+
+  --color-status-draft: var(--status-draft-bg);
+  --color-status-draft-text: var(--status-draft-text);
+  --color-status-draft-border: var(--status-draft-border);
+  --color-status-review: var(--status-review-bg);
+  --color-status-review-text: var(--status-review-text);
+  --color-status-review-border: var(--status-review-border);
+  --color-status-changes: var(--status-changes-bg);
+  --color-status-changes-text: var(--status-changes-text);
+  --color-status-changes-border: var(--status-changes-border);
+  --color-status-active: var(--status-active-bg);
+  --color-status-active-text: var(--status-active-text);
+  --color-status-active-border: var(--status-active-border);
+  --color-status-superseded: var(--status-superseded-bg);
+  --color-status-superseded-text: var(--status-superseded-text);
+  --color-status-superseded-border: var(--status-superseded-border);
+  --color-status-revoked: var(--status-revoked-bg);
+  --color-status-revoked-text: var(--status-revoked-text);
+  --color-status-revoked-border: var(--status-revoked-border);
+
+  /* Radius scale: sm/md chips, lg controls, xl cards, 2xl large cards, 3xl panel */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: var(--radius-chip);
+  --radius-lg: var(--radius-control);
+  --radius-xl: var(--radius-card);
+  --radius-2xl: var(--radius-card-lg);
+  --radius-3xl: var(--radius-modal);
+  --radius-4xl: var(--radius-panel);
+
+  --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
+
+  --ease-soft: var(--ease-out-soft);
+
+  --animate-stream-in: stream-in var(--dur-base) var(--ease-out-soft) both;
+
+  @keyframes stream-in {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--app-bg);
+    color: var(--text);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Tracked caps micro-labels ("RENDERS THIS MONTH") */
+  .caps-label {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 500;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--text-label);
+  }
+  /* Serif display titles */
+  .display-xl {
+    font-family: var(--ui-font-display);
+    font-size: 2.25rem;
+    line-height: 2.625rem;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+  }
+  .display-lg {
+    font-family: var(--ui-font-display);
+    font-size: 1.75rem;
+    line-height: 2.125rem;
+    letter-spacing: -0.005em;
+    font-weight: 400;
+  }
+  /* Big regular-weight numerals */
+  .numeral {
+    font-size: 2.5rem;
+    line-height: 1;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Streamed content reveal (React <ViewTransition> + CSS). */
+::view-transition-old(.stream-exit) {
+  animation: var(--dur-fast) ease-out both stream-fade-out;
+}
+::view-transition-new(.stream-enter) {
+  animation: var(--dur-base) var(--ease-out-soft) both stream-in;
+}
+@keyframes stream-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

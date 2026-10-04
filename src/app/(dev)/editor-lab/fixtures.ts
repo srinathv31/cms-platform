@@ -1,0 +1,174 @@
+// Fixture documents for /editor-lab. Deterministic (stable ids) so the server paint and the
+// client hydrate to identical markup.
+
+import type { JSONContent, Variable } from "@/editor";
+
+export const LAB_VARIABLES: Variable[] = [
+  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
+  { key: "last_name", label: "Last name", type: "text", required: true, sample: "Chen" },
+  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
+  { key: "home_state", label: "Home state", type: "us_state", required: false, sample: "NJ" },
+  { key: "offer_end_date", label: "Offer end date", type: "date", required: true, sample: "2027-03-04" },
+  { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" },
+];
+
+// ── tiny builders ────────────────────────────────────────────────
+
+type Inline = JSONContent;
+type Mark = NonNullable<JSONContent["marks"]>[number];
+
+const t = (text: string, ...marks: Mark[]): Inline => (marks.length ? { type: "text", text, marks } : { type: "text", text });
+const v = (key: string): Inline => ({ type: "variable", attrs: { key } });
+const bold: Mark = { type: "bold" };
+const link = (href: string): Mark => ({ type: "link", attrs: { href } });
+
+const p = (...content: Inline[]): JSONContent => ({ type: "paragraph", content });
+const h = (level: 1 | 2 | 3, text: string, requiredKey?: string): JSONContent => ({
+  type: "heading",
+  attrs: { level, ...(requiredKey ? { requiredKey } : {}) },
+  content: text ? [t(text)] : [],
+});
+const ul = (...items: Inline[][]): JSONContent => ({
+  type: "bulletList",
+  content: items.map((content) => ({ type: "listItem", content: [p(...content)] })),
+});
+const ol = (...items: Inline[][]): JSONContent => ({
+  type: "orderedList",
+  content: items.map((content) => ({ type: "listItem", content: [p(...content)] })),
+});
+const table = (header: string[], rows: Inline[][][]): JSONContent => ({
+  type: "table",
+  content: [
+    { type: "tableRow", content: header.map((cell) => ({ type: "tableHeader", content: [p(t(cell))] })) },
+    ...rows.map((row) => ({
+      type: "tableRow",
+      content: row.map((cell) => ({ type: "tableCell", content: [p(...cell)] })),
+    })),
+  ],
+});
+const callout = (...paragraphs: Inline[][]): JSONContent => ({
+  type: "callout",
+  content: paragraphs.map((content) => p(...content)),
+});
+const hr = (): JSONContent => ({ type: "horizontalRule" });
+
+const ID_TYPES = new Set(["paragraph", "heading", "bulletList", "orderedList", "listItem", "table", "callout", "horizontalRule"]);
+
+/** Gives every block a deterministic id (`<prefix>-<n>`), like the seed does with ensureBlockIds. */
+function withIds(prefix: string, blocks: JSONContent[]): JSONContent {
+  let n = 0;
+  const visit = (node: JSONContent): JSONContent => {
+    const next: JSONContent = { ...node };
+    if (node.type && ID_TYPES.has(node.type)) next.attrs = { id: `${prefix}-${++n}`, ...node.attrs };
+    if (node.content) next.content = node.content.map(visit);
+    return next;
+  };
+  return { type: "doc", content: blocks.map(visit) };
+}
+
+// ── documents ────────────────────────────────────────────────────
+
+export const LONG_DISCLOSURE = withIds("long", [
+  h(1, "Cash Rewards Card offer"),
+  p(
+    t("Hi "),
+    v("first_name"),
+    t(" "),
+    v("last_name"),
+    t(", you’re pre-approved for the Cash Rewards Card. Here is what the offer includes and the terms that come with it."),
+  ),
+
+  h(2, "Offer details", "offer_details"),
+  p(
+    t("Earn 2% cash back on every purchase, with no categories to track and no cap on what you can earn. Apply by "),
+    v("offer_end_date"),
+    t(" to lock in the terms below."),
+  ),
+  ul(
+    [t("A variable purchase APR of "), v("purchase_apr"), t(", based on the Prime Rate.")],
+    [t("An annual fee of "), v("annual_fee"), t(", billed on your first statement.")],
+    [t("Cash back that "), t("never expires", bold), t(" while your account is open.")],
+  ),
+  p(t("This offer is available to residents of "), v("home_state"), t(" with a valid U.S. mailing address.")),
+
+  h(2, "Rates and fees", "rates_and_fees"),
+  table(
+    ["Interest rates and fees", "Terms"],
+    [
+      [[t("Annual percentage rate (APR) for purchases")], [v("purchase_apr"), t(" — varies with the market based on the Prime Rate.")]],
+      [[t("APR for balance transfers")], [v("purchase_apr")]],
+      [[t("Annual fee")], [v("annual_fee")]],
+      [[t("Late payment fee")], [t("Up to $41")]],
+      [[t("Foreign transaction fee")], [t("None")]],
+    ],
+  ),
+  callout([
+    t("How we calculate your balance: ", bold),
+    t("we use a method called “average daily balance (including new purchases).” See your cardholder agreement for details."),
+  ]),
+  p(
+    t(
+      "Paying interest: your due date is at least 25 days after the close of each billing cycle. We will not charge you interest on purchases if you pay your entire balance by the due date each month.",
+    ),
+  ),
+  h(3, "Minimum interest charge"),
+  p(t("If you are charged interest, the charge will be no less than $1.00. Minimum interest charges do not apply in every state.")),
+
+  h(2, "Legal notices", "legal_notices"),
+  p(
+    t("This offer is not transferable and expires on "),
+    v("offer_end_date"),
+    t(". The terms above are accurate as of the date this notice was prepared and may change after that date."),
+  ),
+  ol(
+    [t("Credit approval is required. Terms may vary based on your creditworthiness.")],
+    [t("Cash back is earned on net purchases: purchases minus returns and credits.")],
+    [t("Your account must be open and in good standing to redeem rewards.")],
+  ),
+  hr(),
+  p(
+    t("Questions? Visit "),
+    t("our help center", link("https://example.com/help")),
+    t(" or call the number on the back of your card."),
+  ),
+  p(v("first_name"), t(", thank you for being a customer.")),
+]);
+
+export const BLANK_DISCLOSURE = withIds("blank", [
+  h(2, "Offer details", "offer_details"),
+  h(2, "Rates and fees", "rates_and_fees"),
+  h(2, "Legal notices", "legal_notices"),
+]);
+
+const STRESS_KEYS = LAB_VARIABLES.map((variable) => variable.key);
+
+export const CHIP_STRESS = withIds("stress", [
+  h(1, "Thirty chips"),
+  ...Array.from({ length: 6 }, (_, row) =>
+    p(
+      ...Array.from({ length: 5 }, (_, i) => {
+        const key = STRESS_KEYS[(row * 5 + i) % STRESS_KEYS.length];
+        return [t(i === 0 ? "Dear " : i % 2 ? ", then " : " and "), v(key)];
+      }).flat(),
+      t(". Line height must not move when a chip lands mid-sentence and the text wraps across lines."),
+    ),
+  ),
+  p(t("An unknown key keeps its place and shows the key: "), v("promo_code"), t(".")),
+]);
+
+export type FixtureId = "long" | "blank" | "stress" | "readonly" | "static";
+
+export interface Fixture {
+  id: FixtureId;
+  label: string;
+  content: JSONContent;
+  readOnly?: boolean;
+}
+
+export const FIXTURES: Fixture[] = [
+  { id: "long", label: "Long disclosure", content: LONG_DISCLOSURE },
+  { id: "blank", label: "Blank", content: BLANK_DISCLOSURE },
+  { id: "stress", label: "30 chips", content: CHIP_STRESS },
+  { id: "readonly", label: "Read-only", content: LONG_DISCLOSURE, readOnly: true },
+  { id: "static", label: "Server paint", content: LONG_DISCLOSURE, readOnly: true },
+];

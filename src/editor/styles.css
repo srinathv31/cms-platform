@@ -1,0 +1,385 @@
+/*
+ * UCOMP document styles. Tokens only (CSS variables from the host's tokens.css); no raw colors.
+ * Shared by <DocumentEditor> (the ProseMirror root) and <StaticDocument>, which both render
+ * `.ucomp-surface > .ucomp-doc`, so the server paint and the live editor are pixel-identical.
+ *
+ * TipTap's injected base CSS is turned off (injectCSS: false); the ProseMirror essentials are
+ * restated here and apply to the static render too.
+ */
+
+/* ── Document box ─────────────────────────────────────────────── */
+
+.ucomp-doc {
+  /* The gutter is part of the hover area, so the block handle appears while the pointer sits
+     beside a block, and it holds the handle itself. Text column = --doc-width. */
+  --ucomp-gutter: 3.5rem;
+
+  position: relative;
+  box-sizing: border-box;
+  max-width: calc(var(--doc-width) + 2 * var(--ucomp-gutter));
+  margin-inline: auto;
+  padding: 0.25rem var(--ucomp-gutter) 1.5rem;
+
+  font-family: var(--ui-font-sans);
+  font-size: 1rem;
+  line-height: 1.7;
+  font-weight: 400;
+  color: var(--text);
+  caret-color: var(--text);
+
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  font-variant-ligatures: none;
+  text-rendering: optimizeLegibility;
+  outline: none;
+}
+
+.ucomp-doc:focus,
+.ucomp-doc:focus-visible {
+  outline: none;
+}
+
+.ucomp-doc [contenteditable="false"] {
+  white-space: normal;
+}
+
+.ucomp-doc ::selection {
+  background: var(--brand-1);
+}
+
+/* ── Block rhythm ─────────────────────────────────────────────── */
+
+/* Zero-specificity reset so the rhythm below holds even in hosts without a CSS reset. */
+.ucomp-doc :where(p, h1, h2, h3, ul, ol, li, table, hr, div) {
+  margin: 0;
+}
+
+.ucomp-doc > * + * {
+  margin-top: 0.875rem;
+}
+
+.ucomp-doc > :is(h1, h2, h3) + * {
+  margin-top: 0.5rem;
+}
+
+/* Empty lines keep their height in the static render (the editor adds a trailing <br>). */
+.ucomp-doc :is(p, h1, h2, h3):empty::after {
+  content: "\00a0";
+}
+
+/* ── Headings (sans, quiet scale; required headings look like any other) ─ */
+
+.ucomp-doc h1,
+.ucomp-doc h2,
+.ucomp-doc h3 {
+  color: var(--text);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.ucomp-doc h1 {
+  font-size: 1.875rem;
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+}
+
+.ucomp-doc h2 {
+  font-size: 1.3125rem;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.ucomp-doc h3 {
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  letter-spacing: -0.004em;
+}
+
+.ucomp-doc > h1 + * {
+  margin-top: 0.875rem;
+}
+
+.ucomp-doc > * + h1 {
+  margin-top: 2.25rem;
+}
+
+.ucomp-doc > * + h2 {
+  margin-top: 2.25rem;
+}
+
+.ucomp-doc > * + h3 {
+  margin-top: 1.5rem;
+}
+
+/* ── Inline marks ─────────────────────────────────────────────── */
+
+.ucomp-doc strong {
+  font-weight: 600;
+}
+
+.ucomp-doc em {
+  font-style: italic;
+}
+
+.ucomp-doc u {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.ucomp-doc a {
+  color: var(--brand);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--brand) 35%, transparent);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color var(--dur-fast) ease-out;
+}
+
+.ucomp-doc a:hover {
+  text-decoration-color: var(--brand);
+}
+
+.ucomp-doc[contenteditable="false"] a,
+[data-static-document] .ucomp-doc a {
+  cursor: pointer;
+}
+
+/* ── Lists ────────────────────────────────────────────────────── */
+
+.ucomp-doc ul,
+.ucomp-doc ol {
+  padding-left: 1.5em;
+}
+
+.ucomp-doc ul {
+  list-style: disc;
+}
+
+.ucomp-doc ul ul {
+  list-style: circle;
+}
+
+.ucomp-doc ul ul ul {
+  list-style: square;
+}
+
+.ucomp-doc ol {
+  list-style: decimal;
+}
+
+.ucomp-doc ol ol {
+  list-style: lower-alpha;
+}
+
+.ucomp-doc li {
+  padding-left: 0.25em;
+}
+
+.ucomp-doc li + li {
+  margin-top: 0.25rem;
+}
+
+.ucomp-doc li > * + * {
+  margin-top: 0.25rem;
+}
+
+.ucomp-doc li > :is(ul, ol) {
+  margin-top: 0.25rem;
+}
+
+.ucomp-doc li::marker {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tables (hairlines, tinted header) ────────────────────────── */
+
+.ucomp-doc .tableWrapper {
+  overflow-x: auto;
+}
+
+.ucomp-doc table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.ucomp-doc th,
+.ucomp-doc td {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 1em;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ucomp-doc tr > :last-child {
+  border-right: 0;
+}
+
+.ucomp-doc tr:last-child > * {
+  border-bottom: 0;
+}
+
+.ucomp-doc th {
+  background: var(--surface-tinted);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ucomp-doc :is(th, td) > * + * {
+  margin-top: 0.375rem;
+}
+
+.ucomp-doc :is(th, td).selectedCell {
+  background: var(--brand-soft);
+}
+
+/* ── Callout (boxed notice with an info glyph) ────────────────── */
+
+.ucomp-doc [data-callout] {
+  position: relative;
+  padding: 0.75rem 1rem 0.75rem 2.625rem;
+  background: var(--surface-tinted);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+.ucomp-doc [data-callout]::before {
+  content: "";
+  position: absolute;
+  left: 0.9375rem;
+  top: calc(0.75rem + (1.65em - 1rem) / 2);
+  width: 1rem;
+  height: 1rem;
+  background-color: var(--text-muted);
+  /* lucide "info" glyph as a mask: the color comes from the token above. */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+.ucomp-doc [data-callout] > * + * {
+  margin-top: 0.5rem;
+}
+
+/* ── Divider ──────────────────────────────────────────────────── */
+
+.ucomp-doc hr {
+  box-sizing: content-box;
+  height: 1px;
+  padding-block: 0.625rem; /* a comfortable click target; the line is the 1px content box */
+  border: 0;
+  background-color: var(--hairline);
+  background-clip: content-box;
+  color: inherit;
+}
+
+.ucomp-doc > * + hr,
+.ucomp-doc > hr + * {
+  margin-top: 0.5rem;
+}
+
+/* ── Editor-only states ───────────────────────────────────────── */
+
+/* "Type / for blocks": the only placeholder, on the focused empty line. */
+.ucomp-doc.ProseMirror-focused > p.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--text-subtle);
+  pointer-events: none;
+}
+
+/* The live `/query` while the block menu is open. */
+.ucomp-doc .suggestion {
+  color: var(--text-muted);
+}
+
+/* Selected atoms and blocks (a divider, a whole table…). Chips draw their own ring. */
+.ucomp-doc > .ProseMirror-selectednode {
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px var(--brand-1);
+}
+
+.ucomp-doc > hr.ProseMirror-selectednode {
+  box-shadow: none;
+  background-color: var(--brand-3);
+}
+
+/* Blocks carried by the drag handle. */
+.ucomp-doc .ProseMirror-selectednoderange {
+  border-radius: 4px;
+  background-color: var(--brand-soft);
+  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+
+.ucomp-doc.has-block-range *::selection {
+  background: transparent;
+}
+
+.ucomp-dropcursor {
+  background-color: var(--brand-3);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* ProseMirror essentials (normally injected by TipTap). */
+.ucomp-doc img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.ucomp-doc .ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  margin: 0;
+}
+
+.ucomp-doc .ProseMirror-gapcursor::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--text);
+  animation: ucomp-gapcursor-blink 1.1s steps(2, start) infinite;
+}
+
+.ucomp-doc.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+@keyframes ucomp-gapcursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ucomp-doc.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ucomp-doc.ProseMirror-hideselection * {
+  caret-color: transparent;
+}

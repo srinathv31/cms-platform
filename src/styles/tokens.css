@@ -1,0 +1,186 @@
+/*
+ * UCOMP design tokens — the ONLY file with raw color values.
+ * Applying TD's style guide = editing this file (and src/styles/fonts.ts).
+ *
+ * Layers:
+ *   1. Primitives  — raw palette (never referenced by components)
+ *   2. Semantic    — what things are (canvas, hairline, brand, status…)
+ *   3. shadcn map  — feeds shadcn/ui's expected variables from the semantic layer
+ * Tailwind utilities are generated from these in globals.css (@theme inline).
+ */
+
+:root {
+  /* ── 1. Primitives ─────────────────────────────────────────── */
+  --stone-0: #ffffff;
+  --stone-25: #fcfbf9;
+  --stone-50: #f9f7f4;
+  --stone-100: #f5f3ef;
+  --stone-150: #efece6;
+  --stone-200: #ece9e3;
+  --stone-250: #e6e2db;
+  --stone-300: #d9d4cb;
+  --stone-400: #c9c3b8;
+  --stone-500: #a39d93;
+  --stone-600: #6f6b65;
+  --stone-700: #55524c;
+  --stone-800: #33312d;
+  --stone-900: #1b1b1b;
+  --ink: #161616;
+
+  /* Placeholder accent (TD green later) */
+  --teal-50: #eef6f4;
+  --teal-100: #d2ebe6;
+  --teal-200: #b0ddd3;
+  --teal-300: #8ccbbe;
+  --teal-400: #6bb3a6;
+  --teal-500: #4f9a8f;
+  --teal-600: #3c7a73;
+  --teal-700: #2d5a5c;
+  --teal-800: #234849;
+  --teal-900: #1a3536;
+
+  --amber-50: #fbf4e6;
+  --amber-100: #f4e3bf;
+  --amber-500: #c98a2b;
+  --amber-700: #8a5a12;
+
+  --red-50: #fbeeeb;
+  --red-100: #f3d3cc;
+  --red-500: #c4473a;
+  --red-700: #922e23;
+
+  --mint-100: #dff3ea;
+  --mint-700: #2f7d5b;
+
+  --lavender-100: #e6d9fa;
+  --lavender-700: #5b3a9e;
+
+  /* ── 2. Semantic ───────────────────────────────────────────── */
+  --app-bg: var(--stone-100);          /* window + sidebar */
+  --canvas: var(--stone-25);           /* the big rounded content panel */
+  --surface: var(--stone-0);           /* cards, popovers, inputs */
+  --surface-tinted: var(--stone-100);  /* tinted cards on the canvas (stat cards, row cards) */
+  --surface-sunken: var(--stone-50);   /* wells, the SHARE disc, keycaps */
+  --hairline: var(--stone-250);
+  --hairline-strong: var(--stone-300);
+  --selected: var(--stone-200);        /* active nav pill */
+  --hover: var(--stone-150);
+  --tan: var(--stone-150);             /* tertiary filled button */
+
+  --text: var(--stone-900);
+  --text-muted: var(--stone-600);
+  --text-subtle: var(--stone-500);
+  --text-label: var(--stone-700);      /* tracked caps labels */
+  --text-inverse: var(--stone-0);
+
+  --primary-fill: var(--ink);          /* the black pill: one primary action per screen */
+  --primary-text: var(--stone-0);
+
+  --brand: var(--teal-700);            /* data + active states */
+  --brand-text: var(--stone-0);
+  --brand-1: var(--teal-100);
+  --brand-2: var(--teal-300);
+  --brand-3: var(--teal-500);
+  --brand-4: var(--teal-700);
+  --brand-soft: var(--teal-50);
+  --heat-empty: var(--stone-300);
+
+  --positive-bg: var(--mint-100);
+  --positive-text: var(--mint-700);
+  --danger: var(--red-500);
+  --danger-text: var(--red-700);
+  --danger-soft: var(--red-50);
+  --focus-ring: var(--teal-500);
+  --scrim: rgb(120 117 112 / 0.32);
+
+  /* Variable chips (editor) */
+  --chip-bg: var(--teal-50);
+  --chip-border: var(--teal-100);
+  --chip-text: var(--teal-800);
+  --chip-icon: var(--teal-600);
+
+  /* Status — the same everywhere (see domain/status.ts) */
+  --status-draft-bg: var(--stone-150);
+  --status-draft-text: var(--stone-700);
+  --status-draft-border: var(--stone-250);
+  --status-review-bg: var(--amber-50);
+  --status-review-text: var(--amber-700);
+  --status-review-border: var(--amber-100);
+  --status-changes-bg: var(--stone-150);
+  --status-changes-text: var(--stone-700);
+  --status-changes-border: var(--stone-250);
+  --status-active-bg: var(--teal-50);
+  --status-active-text: var(--teal-700);
+  --status-active-border: var(--teal-100);
+  --status-superseded-bg: var(--stone-100);
+  --status-superseded-text: var(--stone-500);
+  --status-superseded-border: var(--stone-250);
+  --status-revoked-bg: var(--red-50);
+  --status-revoked-text: var(--red-700);
+  --status-revoked-border: var(--red-100);
+
+  /* Shape */
+  --radius-chip: 6px;
+  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-card-lg: 18px;
+  --radius-panel: 24px;
+  --radius-modal: 22px;
+
+  /* Elevation — borders, not shadows. Only modals get a real shadow. */
+  --shadow-pop: 0 10px 28px -10px rgb(27 27 27 / 0.14), 0 1px 2px rgb(27 27 27 / 0.05);
+  --shadow-modal: 0 28px 72px -16px rgb(27 27 27 / 0.22), 0 2px 8px rgb(27 27 27 / 0.06);
+
+  /* Layout */
+  --sidebar-w: 16.5rem;
+  --canvas-inset: 0.75rem;
+  --canvas-pad-x: 3rem;
+  --doc-width: 47.5rem;
+
+  /* Type — families are set by fonts.ts (next/font) */
+  --ui-font-sans: var(--ff-figtree), ui-sans-serif, system-ui, sans-serif;
+  --ui-font-display: var(--ff-newsreader), ui-serif, Georgia, serif;
+  --ui-font-mono: var(--ff-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --tracking-caps: 0.08em;
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+
+  /* ── 3. shadcn/ui mapping ──────────────────────────────────── */
+  --background: var(--canvas);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--primary-fill);
+  --primary-foreground: var(--primary-text);
+  --secondary: var(--tan);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-tinted);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--hover);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--focus-ring);
+  --chart-1: var(--teal-100);
+  --chart-2: var(--teal-300);
+  --chart-3: var(--teal-500);
+  --chart-4: var(--teal-700);
+  --chart-5: var(--teal-900);
+  --radius: var(--radius-control);
+  --sidebar: var(--app-bg);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--primary-fill);
+  --sidebar-primary-foreground: var(--primary-text);
+  --sidebar-accent: var(--selected);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--focus-ring);
+}
+
