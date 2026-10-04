@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import type { JSONContent, RequiredSection, Variable, VersionState } from "@/domain/types";
+import type { Channel, JSONContent, RequiredSection, Variable, VersionState } from "@/domain/types";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
 
@@ -16,11 +16,24 @@ export interface WorkspaceHeaderData {
   teamName: string;
   status: VersionState;
   sunsetAt: Date | null;
-  /** "v2" or "Draft of v3". */
-  versionLabel: string;
+  /**
+   * What sits beside the status badge. The badge already says the state, so the label never
+   * repeats it: "v2" on a version with a number, "Based on v2" on a draft of an earlier version,
+   * and null on a brand-new draft that has no earlier version.
+   */
+  versionLabel: string | null;
+  /** The number of the version an open draft was started from; null when it isn't based on one. */
+  basedOnNumber: number | null;
   /** Number of the Active version, if any (the SHARE ring shows only then). */
   activeNumber: number | null;
+  /** The number the shown version has, or will get at submit when it's a draft. */
+  versionNumber: number;
+  /** The viewer may edit this team's drafts (false = "View only"). */
   canEdit: boolean;
+  /** The shown version is an open draft and the viewer can edit it (the name is a field, autosave runs). */
+  editable: boolean;
+  /** "Edit" is offered: the latest version is Active, there's no open draft, and the viewer can edit. */
+  canStartDraft: boolean;
 }
 
 /** Header data for /{team}/templates/{templateId}. 404 when the template isn't visible here. */
@@ -48,9 +61,11 @@ export const getWorkspaceHeader = cache(
 
     const list = await db
       .select({
+        id: versions.id,
         number: versions.number,
         state: versions.state,
         sunsetAt: versions.sunsetAt,
+        basedOnVersionId: versions.basedOnVersionId,
       })
       .from(versions)
       .where(eq(versions.templateId, templateId));
@@ -59,8 +74,12 @@ export const getWorkspaceHeader = cache(
     const active = list.find((v) => v.state === "active");
     const highest = list.reduce((max, v) => Math.max(max, v.number ?? 0), 0);
 
-    const versionLabel =
-      !latest || latest.state === "draft" ? `Draft of v${highest + 1}` : `v${latest.number}`;
+    const isDraft = !latest || latest.state === "draft";
+    const versionNumber = isDraft ? highest + 1 : (latest.number ?? highest);
+    const basedOn = isDraft && latest?.basedOnVersionId ? list.find((v) => v.id === latest.basedOnVersionId) : undefined;
+    const basedOnNumber = basedOn?.number ?? null;
+    const versionLabel = isDraft ? (basedOnNumber !== null ? `Based on v${basedOnNumber}` : null) : `v${versionNumber}`;
+    const canEdit = can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok;
 
     return {
       id: tpl.id,
@@ -70,16 +89,29 @@ export const getWorkspaceHeader = cache(
       status: latest?.state ?? "draft",
       sunsetAt: latest?.sunsetAt ?? null,
       versionLabel,
+      basedOnNumber,
       activeNumber: active?.number ?? null,
-      canEdit: can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
+      versionNumber,
+      canEdit,
+      editable: canEdit && latest?.state === "draft",
+      canStartDraft: canEdit && latest?.state === "active",
     };
   },
 );
 
 export interface WorkspaceDocumentData {
   versionId: string;
+  /** Autosave ordering: the rev the client starts from. */
+  rev: number;
   body: JSONContent;
   variables: Variable[];
+  /** The Active version's variables when the shown version is a draft of a live template (contract flags). */
+  baseline: Variable[] | null;
+  channels: Channel[];
+  /** The channels the content type allows: what the Channels selector offers. */
+  allowedChannels: Channel[];
+  emailSubject: JSONContent | null;
+  emailPreheader: JSONContent | null;
   requiredSections: RequiredSection[];
   /** Only an open draft is editable, and only by an author on the template's team. */
   editable: boolean;
@@ -92,7 +124,11 @@ export const getWorkspaceDocument = cache(
     const space = await requireSpace(spaceSlug);
 
     const tpl = await db
-      .select({ teamId: templates.teamId, requiredSections: contentTypes.requiredSections })
+      .select({
+        teamId: templates.teamId,
+        requiredSections: contentTypes.requiredSections,
+        allowedChannels: contentTypes.allowedChannels,
+      })
       .from(templates)
       .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
       .where(eq(templates.id, header.id))
@@ -106,19 +142,30 @@ export const getWorkspaceDocument = cache(
         number: versions.number,
         state: versions.state,
         sunsetAt: versions.sunsetAt,
+        rev: versions.rev,
         body: versions.body,
         variables: versions.variables,
+        channels: versions.channels,
+        emailSubject: versions.emailSubject,
+        emailPreheader: versions.emailPreheader,
       })
       .from(versions)
       .where(eq(versions.templateId, header.id));
 
     const shown = pickLatest(list);
     if (!shown) notFound();
+    const active = list.find((v) => v.state === "active");
 
     return {
       versionId: shown.id,
+      rev: shown.rev,
       body: shown.body,
       variables: shown.variables,
+      baseline: shown.state === "draft" && active ? active.variables : null,
+      channels: shown.channels,
+      allowedChannels: tpl.allowedChannels,
+      emailSubject: shown.emailSubject,
+      emailPreheader: shown.emailPreheader,
       requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
     };

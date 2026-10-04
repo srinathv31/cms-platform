@@ -46,9 +46,10 @@ const NBSP = "\u00A0";
  * textLength = circumference the last gap (dot to first letter) comes out one tracking step
  * short. Shortening textLength by that step closes the ring with the same gap everywhere.
  * The step is (circumference / glyph count) minus the average semibold-caps advance in
- * viewBox units (about 7.64 at FONT_SIZE, measured for Inter; Figtree is within about 0.3).
+ * viewBox units: 7.34 at FONT_SIZE with 0.04em tracking, measured in the browser for Figtree
+ * ("SHARE · " × 3 = 176.08 units over 24 glyphs). Re-measure if the UI font changes.
  */
-const AVG_ADVANCE = 7.64;
+const AVG_ADVANCE = 7.34;
 /** Glyph advances are rounded to 1/64px per character, which makes the ring run ~0.4 units long. */
 const SEAM_BIAS = 0.45;
 

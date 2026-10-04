@@ -12,7 +12,7 @@ import { VariableChipView } from "./variable-chip";
 import { DOC_CLASS, SURFACE_CLASS } from "./classes";
 import "../styles.css";
 
-export function StaticDocument({ content, variables, className }: StaticDocumentProps) {
+export function StaticDocument({ content, variables, align = "center", className }: StaticDocumentProps) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
 
   const body = renderToReactElement({
@@ -29,7 +29,7 @@ export function StaticDocument({ content, variables, className }: StaticDocument
   });
 
   return (
-    <div className={cx(SURFACE_CLASS, className)} data-static-document="">
+    <div className={cx(SURFACE_CLASS, className)} data-static-document="" data-align={align === "start" ? "start" : undefined}>
       <div className={DOC_CLASS}>{body}</div>
     </div>
   );

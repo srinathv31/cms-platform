@@ -43,7 +43,10 @@ describe("StaticDocument", () => {
   it("shows an unknown key in the warning style", () => {
     expect(html).toMatch(/data-variable="promo_code"[^>]*data-unknown=""/);
     expect(html).toContain("promo_code</span>");
-    expect(html).toContain("bg-status-review");
+    expect(html).toContain("bg-warning-soft");
+    expect(html).toContain("border-warning-border");
+    expect(html).toContain("text-warning-text");
+    expect(html).not.toContain("status-review");
   });
 
   it("uses the editor's markup: block ids, data-required, callout, marks", () => {

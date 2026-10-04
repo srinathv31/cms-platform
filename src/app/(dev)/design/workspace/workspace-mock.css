@@ -1,0 +1,32 @@
+/*
+ * Workspace layout study: host-side overrides for the document.
+ *
+ * This file is unlayered on purpose. The editor's styles.css is unlayered, and an unlayered rule
+ * always beats a layered one (Tailwind utilities), so a utility class could not override it.
+ * Everything here is scoped to .wm-doc so nothing leaks into other pages.
+ */
+
+.wm-doc {
+  /* The handle gutter hangs into the canvas padding / page margin, so the TEXT edge sits on the
+     same line as the title and the tabs. Matches --canvas-pad-x (3rem). */
+  --wm-gutter: 3rem;
+  margin-left: calc(-1 * var(--wm-gutter));
+}
+
+.wm-doc .ucomp-doc {
+  --ucomp-gutter: var(--wm-gutter);
+  /* Left gutter only; the text column runs to the edge of its cell. */
+  max-width: calc(var(--doc-width) + var(--wm-gutter));
+  margin-inline: 0;
+  padding-right: 0;
+}
+
+/* ── Section heads: serif option (the document default is sans) ── */
+
+.wm-doc[data-heads="serif"] .ucomp-doc h2 {
+  font-family: var(--ui-font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}

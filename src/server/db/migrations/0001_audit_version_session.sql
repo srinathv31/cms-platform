@@ -1,0 +1,1 @@
+CREATE INDEX `audit_version_session` ON `audit_events` (`version_id`,`session_key`);

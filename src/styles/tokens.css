@@ -21,6 +21,7 @@
   --stone-300: #d9d4cb;
   --stone-400: #c9c3b8;
   --stone-500: #a39d93;
+  --stone-550: #736e68; /* lightest stone that still passes AA (4.5:1) on canvas and stone-100 */
   --stone-600: #6f6b65;
   --stone-700: #55524c;
   --stone-800: #33312d;
@@ -69,7 +70,7 @@
 
   --text: var(--stone-900);
   --text-muted: var(--stone-600);
-  --text-subtle: var(--stone-500);
+  --text-subtle: var(--stone-550);
   --text-label: var(--stone-700);      /* tracked caps labels */
   --text-inverse: var(--stone-0);
 
@@ -90,6 +91,13 @@
   --danger: var(--red-500);
   --danger-text: var(--red-700);
   --danger-soft: var(--red-50);
+  /* Needs attention but isn't an error: unknown variable chips, contract changes. */
+  --warning: var(--amber-500);
+  --warning-text: var(--amber-700);
+  --warning-soft: var(--amber-50);
+  --warning-border: var(--amber-100);
+  /* Toggle tracks: black when on, taupe when off (design-reference "Toggles"). */
+  --control-off: var(--stone-400);
   --focus-ring: var(--teal-500);
   --scrim: rgb(120 117 112 / 0.32);
 
@@ -113,7 +121,7 @@
   --status-active-text: var(--teal-700);
   --status-active-border: var(--teal-100);
   --status-superseded-bg: var(--stone-100);
-  --status-superseded-text: var(--stone-500);
+  --status-superseded-text: var(--stone-550);
   --status-superseded-border: var(--stone-250);
   --status-revoked-bg: var(--red-50);
   --status-revoked-text: var(--red-700);

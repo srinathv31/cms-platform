@@ -142,31 +142,65 @@ export const BLANK_DISCLOSURE = withIds("blank", [
 
 const STRESS_KEYS = LAB_VARIABLES.map((variable) => variable.key);
 
+// Thirty chips in wrapping sentences (line height must not move where a chip lands), plus one
+// unknown key.
 export const CHIP_STRESS = withIds("stress", [
-  h(1, "Thirty chips"),
+  h(1, "Account summary"),
   ...Array.from({ length: 6 }, (_, row) =>
     p(
       ...Array.from({ length: 5 }, (_, i) => {
         const key = STRESS_KEYS[(row * 5 + i) % STRESS_KEYS.length];
         return [t(i === 0 ? "Dear " : i % 2 ? ", then " : " and "), v(key)];
       }).flat(),
-      t(". Line height must not move when a chip lands mid-sentence and the text wraps across lines."),
+      t(". These terms apply to your account from the date of this notice until we tell you otherwise in writing."),
     ),
   ),
-  p(t("An unknown key keeps its place and shows the key: "), v("promo_code"), t(".")),
+  p(t("Use code "), v("promo_code"), t(" when you call.")),
 ]);
 
-export type FixtureId = "long" | "blank" | "stress" | "readonly" | "static";
+/** The Active version's list, for the contract-change fixture. Against LAB_VARIABLES:
+ *  purchase_apr was a Number (breaking) · home_state was required (now optional, non-breaking) ·
+ *  annual_fee is new and required (breaking) · promo_code was removed (breaking) ·
+ *  offer_end_date's label changed (not flagged). */
+export const LAB_BASELINE: Variable[] = [
+  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
+  { key: "last_name", label: "Last name", type: "text", required: true, sample: "Chen" },
+  { key: "purchase_apr", label: "Purchase APR", type: "number", required: true, sample: "21.99" },
+  { key: "home_state", label: "Home state", type: "us_state", required: true, sample: "NJ" },
+  { key: "offer_end_date", label: "Offer expiry", type: "date", required: true, sample: "2027-03-04" },
+  { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "SPRING" },
+];
+
+/** LAB_VARIABLES plus one the document never uses (its panel row is muted). */
+export const LAB_VARIABLES_WITH_UNUSED: Variable[] = [
+  ...LAB_VARIABLES,
+  { key: "bonus_points", label: "Bonus points", type: "number", required: false, sample: "20000" },
+];
+
+export const LAB_SUBJECT: JSONContent = {
+  type: "doc",
+  content: [{ type: "paragraph", content: [v("first_name"), t(", your Cash Rewards offer ends "), v("offer_end_date")] }],
+};
+
+export type FixtureId = "long" | "contract" | "unused" | "email" | "blank" | "stress" | "readonly" | "static";
 
 export interface Fixture {
   id: FixtureId;
   label: string;
   content: JSONContent;
+  variables?: Variable[];
+  /** The Active version's list (contract flags). */
+  baseline?: Variable[];
+  /** Shows an "Email subject" inline field above the document. */
+  subject?: JSONContent | null;
   readOnly?: boolean;
 }
 
 export const FIXTURES: Fixture[] = [
   { id: "long", label: "Long disclosure", content: LONG_DISCLOSURE },
+  { id: "contract", label: "Contract changes", content: LONG_DISCLOSURE, baseline: LAB_BASELINE },
+  { id: "unused", label: "Unused variable", content: LONG_DISCLOSURE, variables: LAB_VARIABLES_WITH_UNUSED },
+  { id: "email", label: "Email subject", content: LONG_DISCLOSURE, subject: LAB_SUBJECT },
   { id: "blank", label: "Blank", content: BLANK_DISCLOSURE },
   { id: "stress", label: "30 chips", content: CHIP_STRESS },
   { id: "readonly", label: "Read-only", content: LONG_DISCLOSURE, readOnly: true },

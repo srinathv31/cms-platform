@@ -6,6 +6,7 @@ import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import { Suggestion, type SuggestionOptions } from "@tiptap/suggestion";
 import { BLOCK_ITEMS, filterBlockItems, type BlockItem } from "./block-items";
+import { MENU_FLOATING_UI, showOnTyping } from "./menu-placement";
 
 export const slashCommandPluginKey = new PluginKey("slashCommand");
 
@@ -34,9 +35,9 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
         char: "/",
         placement: "bottom-start",
         offset: { mainAxis: 6 },
-        // Fixed: the menu is never outside the viewport, even before its first position lands,
-        // so focus/scroll-into-view inside it can never scroll the page.
-        floatingUi: { strategy: "fixed" },
+        // Fixed and sized to the room on its side of the caret (see menu-placement.ts).
+        floatingUi: MENU_FLOATING_UI,
+        shouldShow: showOnTyping(slashCommandPluginKey),
         items: ({ query, editor }) => filterBlockItems(items, query, editor),
         command: ({ editor, range, props: item }) => {
           item.apply(editor.chain().focus().deleteRange(range)).run();

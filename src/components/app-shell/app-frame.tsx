@@ -38,7 +38,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <TopBarHole />
             </Stream>
           </header>
-          <CanvasFade className="min-h-0 flex-1 overflow-y-auto px-(--canvas-pad-x) pb-14">
+          <CanvasFade className="@container/canvas min-h-0 flex-1 overflow-y-auto px-(--canvas-pad-x) pb-14">
             <div className="mx-auto w-full max-w-[96rem]">{children}</div>
           </CanvasFade>
         </SidebarInset>

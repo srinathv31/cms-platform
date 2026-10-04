@@ -9,10 +9,16 @@
 
 /* ── Document box ─────────────────────────────────────────────── */
 
+/* The live editor's wrapper: overlays (the table control) are placed inside it. */
+.ucomp-editor {
+  position: relative;
+}
+
 .ucomp-doc {
   /* The gutter is part of the hover area, so the block handle appears while the pointer sits
-     beside a block, and it holds the handle itself. Text column = --doc-width. */
-  --ucomp-gutter: 3.5rem;
+     beside a block, and it holds the handle itself. Text column = --doc-width.
+     Hosts size it with --ucomp-doc-gutter on any ancestor. */
+  --ucomp-gutter: var(--ucomp-doc-gutter, 3.5rem);
 
   position: relative;
   box-sizing: border-box;
@@ -39,6 +45,15 @@
 .ucomp-doc:focus,
 .ucomp-doc:focus-visible {
   outline: none;
+}
+
+/* align="start": the text's left edge sits on the column's left edge (lined up with a page title
+   above it) and the handle gutter hangs into the left margin. */
+.ucomp-editor[data-align="start"] .ucomp-doc,
+.ucomp-surface[data-align="start"] > .ucomp-doc {
+  max-width: calc(var(--doc-width) + var(--ucomp-gutter));
+  margin-inline: calc(-1 * var(--ucomp-gutter)) 0;
+  padding-right: 0;
 }
 
 .ucomp-doc [contenteditable="false"] {
@@ -69,30 +84,35 @@
   content: "\00a0";
 }
 
-/* ── Headings (sans, quiet scale; required headings look like any other) ─ */
+/* ── Headings (quiet scale; required headings look like any other) ───────
+   Section heads (H2) use the display serif, regular weight, like the app's page titles.
+   H3 drops to medium so it doesn't outweigh its serif parent. */
 
 .ucomp-doc h1,
 .ucomp-doc h2,
 .ucomp-doc h3 {
   color: var(--text);
-  font-weight: 600;
   text-wrap: balance;
 }
 
 .ucomp-doc h1 {
   font-size: 1.875rem;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.018em;
 }
 
 .ucomp-doc h2 {
-  font-size: 1.3125rem;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  font-family: var(--ui-font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
 }
 
 .ucomp-doc h3 {
   font-size: 1.0625rem;
+  font-weight: 500;
   line-height: 1.5;
   letter-spacing: -0.004em;
 }
@@ -307,8 +327,73 @@
   pointer-events: none;
 }
 
-/* The live `/query` while the block menu is open. */
-.ucomp-doc .suggestion {
+/* "Required for disclosures": shown for ~2s at a required heading when an edit to it is blocked.
+   The text comes from the decoration's attribute; the two cycles restart the animation when the
+   note shows again before it has faded (one note, never stacked). */
+.ucomp-doc [data-required-note]::after {
+  content: attr(data-required-note);
+  display: inline-block;
+  margin-left: 0.75rem;
+  padding: 0 0.5rem;
+  vertical-align: 0.25em;
+  font-family: var(--ui-font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.375rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--warning-text);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-chip);
+  pointer-events: none;
+  user-select: none;
+  animation: ucomp-required-note-a 2000ms var(--ease-out-soft) both;
+}
+
+.ucomp-doc [data-required-note][data-note-cycle="b"]::after {
+  animation-name: ucomp-required-note-b;
+}
+
+@keyframes ucomp-required-note-a {
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  8%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ucomp-required-note-b {
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  8%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ucomp-doc [data-required-note]::after {
+    animation: none;
+  }
+}
+
+/* The live `/query` or `{{query` while its menu is open. */
+.ucomp-doc .suggestion,
+.ucomp-field-input .suggestion {
   color: var(--text-muted);
 }
 
@@ -382,4 +467,40 @@
 
 .ucomp-doc.ProseMirror-hideselection * {
   caret-color: transparent;
+}
+
+/* ── One-line fields (InlineVariableField) ────────────────────── */
+
+.ucomp-field-input {
+  outline: none;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-variant-ligatures: none;
+  caret-color: var(--text);
+}
+
+.ucomp-field-input p {
+  margin: 0;
+}
+
+.ucomp-field-input p:empty::after {
+  content: "\00a0";
+}
+
+.ucomp-field-input [contenteditable="false"] {
+  white-space: normal;
+}
+
+.ucomp-field-input ::selection {
+  background: var(--brand-1);
+}
+
+.ucomp-field-input img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
 }

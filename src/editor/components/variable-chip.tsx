@@ -35,7 +35,7 @@ export function VariableChipView({ variableKey, variable, selected = false, clas
         BASE,
         known
           ? "border-chip-border bg-chip text-chip-text"
-          : "border-status-review-border bg-status-review text-status-review-text",
+          : "border-warning-border bg-warning-soft text-warning-text",
         selected && "ring-2 ring-ring/60",
         className,
       )}
@@ -43,7 +43,7 @@ export function VariableChipView({ variableKey, variable, selected = false, clas
       <Icon
         aria-hidden
         strokeWidth={1.75}
-        className={cx("mr-[0.3em] inline-block size-[0.95em] align-[-0.14em]", known && "text-chip-icon")}
+        className={cx("mr-[0.3em] inline-block size-[0.95em] align-[-0.14em]", known ? "text-chip-icon" : "text-warning")}
       />
       {known ? variable.label : <span className="font-mono text-[0.92em]">{variableKey || "unknown"}</span>}
     </span>

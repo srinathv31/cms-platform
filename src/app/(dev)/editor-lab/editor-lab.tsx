@@ -6,46 +6,80 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { DocumentEditor, type JSONContent } from "@/editor";
+import {
+  DocumentEditor,
+  EditorRoot,
+  InlineVariableField,
+  VariablesPanel,
+  type JSONContent,
+  type RequiredSection,
+  type Variable,
+} from "@/editor";
 import { FIXTURES, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
 
 const JSON_DEBOUNCE_MS = 250;
+
+const LAB_SECTIONS: RequiredSection[] = [
+  { key: "offer_details", title: "Offer details" },
+  { key: "rates_and_fees", title: "Rates and fees" },
+  { key: "legal_notices", title: "Legal notices" },
+];
+
+interface LabState {
+  doc: JSONContent;
+  variables: Variable[];
+}
 
 export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
   const [fixtureId, setFixtureId] = useState<FixtureId>("long");
   const [readOnlyToggle, setReadOnlyToggle] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
-  const [json, setJson] = useState<JSONContent>(FIXTURES[0].content);
+  const [json, setJson] = useState<LabState>({ doc: FIXTURES[0].content, variables: LAB_VARIABLES });
 
   const fixture = FIXTURES.find((f) => f.id === fixtureId) as Fixture;
   const forcedReadOnly = Boolean(fixture.readOnly);
   const readOnly = forcedReadOnly || readOnlyToggle;
 
-  // The latest document lives in a ref; the JSON panel catches up on a debounce, and only while
+  // The latest state lives in a ref; the JSON panel catches up on a debounce, and only while
   // it's open, so the lab never adds work to a keystroke.
-  const latest = useRef<JSONContent>(fixture.content);
+  const latest = useRef<LabState>({ doc: fixture.content, variables: fixture.variables ?? LAB_VARIABLES });
   const jsonOpenRef = useRef(false);
   const timer = useRef<number | undefined>(undefined);
 
-  const onChange = useCallback((doc: JSONContent) => {
-    latest.current = doc;
+  const refreshJson = useCallback(() => {
     if (!jsonOpenRef.current) return;
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setJson(doc), JSON_DEBOUNCE_MS);
+    timer.current = window.setTimeout(() => setJson({ ...latest.current }), JSON_DEBOUNCE_MS);
   }, []);
+
+  const onChange = useCallback(
+    (doc: JSONContent) => {
+      latest.current.doc = doc;
+      refreshJson();
+    },
+    [refreshJson],
+  );
+
+  const onVariablesChange = useCallback(
+    (variables: Variable[]) => {
+      latest.current.variables = variables;
+      refreshJson();
+    },
+    [refreshJson],
+  );
 
   const selectFixture = (id: FixtureId) => {
     const next = FIXTURES.find((f) => f.id === id);
     if (!next) return;
     window.clearTimeout(timer.current);
-    latest.current = next.content;
-    setJson(next.content);
+    latest.current = { doc: next.content, variables: next.variables ?? LAB_VARIABLES };
+    setJson({ ...latest.current });
     setFixtureId(id);
   };
 
   const toggleJson = (open: boolean) => {
     jsonOpenRef.current = open;
-    if (open) setJson(latest.current);
+    if (open) setJson({ ...latest.current });
     setJsonOpen(open);
   };
 
@@ -73,7 +107,7 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
               const id = value[0] as FixtureId | undefined;
               if (id) selectFixture(id);
             }}
-            className="bg-surface"
+            className="flex-wrap bg-surface"
           >
             {FIXTURES.map((f) => (
               <ToggleGroupItem
@@ -104,31 +138,49 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
           </CollapsibleTrigger>
         </header>
 
-        <div className="flex min-h-0 flex-1">
-          <section aria-label="Document" className="min-w-0 flex-1 px-6 pt-8 pb-32">
-            {fixtureId === "static" ? (
-              serverPaint
-            ) : (
-              <DocumentEditor
-                key={fixtureId}
-                content={fixture.content}
-                variables={LAB_VARIABLES}
-                readOnly={readOnly}
-                onChange={onChange}
-                autoFocus={fixtureId === "blank" ? "first-section" : false}
-              />
-            )}
-          </section>
+        {/* One root per fixture: the document, the inline field and the panel share its variable list. */}
+        <EditorRoot
+          key={fixtureId}
+          variables={fixture.variables ?? LAB_VARIABLES}
+          baseline={fixture.baseline ?? null}
+          requiredSections={LAB_SECTIONS}
+          readOnly={readOnly}
+          onVariablesChange={onVariablesChange}
+        >
+          <div className="flex min-h-0 flex-1">
+            {/* Deep bottom room, like the workspace: menus near the end of the document open below. */}
+            <section aria-label="Document" className="min-w-0 flex-1 px-6 pt-8 pb-[max(3.5rem,40svh)]">
+              {fixture.subject !== undefined ? (
+                <div className="mx-auto mb-10 grid max-w-(--doc-width) gap-2">
+                  <span className="caps-label">Email subject</span>
+                  <InlineVariableField label="Email subject" value={fixture.subject} />
+                </div>
+              ) : null}
+              {fixtureId === "static" ? (
+                serverPaint
+              ) : (
+                <DocumentEditor
+                  content={fixture.content}
+                  onChange={onChange}
+                  autoFocus={fixtureId === "blank" ? "first-section" : false}
+                />
+              )}
+            </section>
 
-          <CollapsibleContent
-            render={<aside aria-label="Document JSON" />}
-            className="w-[26rem] shrink-0 border-l border-hairline bg-surface-sunken"
-          >
-            <pre className="sticky top-0 max-h-[calc(100dvh-8rem)] overflow-auto px-5 py-6 font-mono text-[11.5px] leading-relaxed text-text-muted">
-              {JSON.stringify(json, null, 2)}
-            </pre>
-          </CollapsibleContent>
-        </div>
+            <aside aria-label="Variables" className="w-[300px] shrink-0 border-l border-hairline px-3 pt-8 pb-16">
+              <VariablesPanel className="sticky top-6" />
+            </aside>
+
+            <CollapsibleContent
+              render={<aside aria-label="Document JSON" />}
+              className="w-[26rem] shrink-0 border-l border-hairline bg-surface-sunken"
+            >
+              <pre className="sticky top-0 max-h-[calc(100dvh-8rem)] overflow-auto px-5 py-6 font-mono text-[11.5px] leading-relaxed text-text-muted">
+                {JSON.stringify(json, null, 2)}
+              </pre>
+            </CollapsibleContent>
+          </div>
+        </EditorRoot>
       </Collapsible>
     </div>
   );

@@ -1,15 +1,32 @@
 import { Eye } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/primitives/status-badge";
+import { TemplateId } from "@/components/primitives/template-id";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
-import { TemplateId } from "@/components/primitives/template-id";
+import { NameField } from "./name-field";
+import { SaveStatus } from "./save-status";
+import { WS } from "./workspace-grid";
 import { WorkspaceShare } from "./workspace-share";
 
-// Height is fixed at 6.5rem (the 5rem SHARE ring plus the 1.5rem gap below), so Active and
-// non-Active templates, and the skeleton, are all the same height.
-const HEADER = "flex min-h-26 items-start justify-between gap-8 pb-6";
+// The header is a small grid, so the name can run under the Template ID's column:
+//
+//   name ......................................  ┐
+//   status row .............   TEMPLATE ID       │ SHARE ring (Active only), 76px, spans both rows
+//
+// The ID sits on the status row's line, as in the layout study, rather than beside the name, so a long
+// name keeps nearly the whole width (the ring's column is the only thing it gives up) and wraps to a
+// second line only when it must. Draft and Active are the same height: the ring is shorter than the
+// two rows, and a wrapped name is the only thing that makes the header grow.
+const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
 
+/**
+ * Name, then the status row, with the Template ID and (on Active) the SHARE ring at the right.
+ * The badge carries the state, so the label beside it never repeats it:
+ *   Draft   [Draft] Based on v2 · Saved      Active  [Active] v2      Viewer  [Active] v3 [View only]
+ * A draft with nothing earlier to be based on reads [Draft] Saved.
+ */
 export async function WorkspaceHeader({
   params,
 }: {
@@ -19,44 +36,50 @@ export async function WorkspaceHeader({
   const t = await getWorkspaceHeader(team, templateId);
 
   return (
-    <header className={HEADER}>
-      <div className="min-w-0">
-        <h1 className="display-lg truncate text-text">{t.name}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <StatusBadge state={t.status} sunsetAt={t.sunsetAt} />
-          <span className="text-[14px] text-text-muted">{t.versionLabel}</span>
-          {!t.canEdit ? (
-            <Badge variant="outline" className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted">
-              <Eye aria-hidden strokeWidth={1.75} />
-              View only
-            </Badge>
-          ) : null}
-        </div>
+    <header className={cn(WS.header, HEADER)}>
+      <div className="col-span-2 col-start-1 row-start-1 min-w-0">
+        <NameField name={t.name} editable={t.editable} />
       </div>
-      <div className="flex shrink-0 items-center gap-8">
-        <TemplateId id={t.id} />
-        {t.activeNumber !== null ? (
-          // The SHARE signature: Active versions only.
-          <div data-slot="share" className="flex size-20 shrink-0 items-center justify-center">
-            <WorkspaceShare templateId={t.id} templateName={t.name} activeVersion={t.activeNumber} />
-          </div>
+      <div className="col-start-1 row-start-2 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end">
+        <StatusBadge state={t.status} sunsetAt={t.sunsetAt} />
+        {t.versionLabel ? <span className="text-[14px] leading-6 text-text-muted">{t.versionLabel}</span> : null}
+        {t.editable ? (
+          <>
+            {t.versionLabel ? (
+              <span aria-hidden className="-mx-1.5 text-text-subtle">
+                ·
+              </span>
+            ) : null}
+            <SaveStatus />
+          </>
+        ) : null}
+        {!t.canEdit ? (
+          <Badge variant="outline" className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted">
+            <Eye aria-hidden strokeWidth={1.75} />
+            View only
+          </Badge>
         ) : null}
       </div>
+      {/* The value row sits on the status row's line. */}
+      <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
+      {t.activeNumber !== null ? (
+        // The SHARE signature: Active versions only.
+        <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start">
+          <WorkspaceShare templateId={t.id} templateName={t.name} activeVersion={t.activeNumber} />
+        </div>
+      ) : null}
     </header>
   );
 }
 
-/** Title bar, then the ID / status / version row. Same rhythm as the header. */
+/** Name line and status row, same rows as the header. */
 export function WorkspaceHeaderSkeleton() {
   return (
-    <div aria-hidden className={HEADER}>
-      <div className="min-w-0">
-        <Skeleton className="my-[3px] h-7 w-72" />
-        <div className="mt-2 flex min-h-6 items-center gap-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-[22px] w-20 rounded-md" />
-          <Skeleton className="h-4 w-10" />
-        </div>
+    <div aria-hidden className={cn(WS.header, HEADER)}>
+      <Skeleton className="col-span-2 col-start-1 row-start-1 my-[3px] h-7 w-72" />
+      <div className="col-start-1 row-start-2 flex min-h-[2.625rem] items-end gap-3 pb-[3px]">
+        <Skeleton className="h-[22px] w-20 rounded-md" />
+        <Skeleton className="h-4 w-24" />
       </div>
     </div>
   );

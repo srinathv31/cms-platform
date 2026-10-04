@@ -73,6 +73,11 @@
   --color-danger: var(--danger);
   --color-danger-text: var(--danger-text);
   --color-danger-soft: var(--danger-soft);
+  --color-control-off: var(--control-off);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
   --color-scrim: var(--scrim);
   --color-chip: var(--chip-bg);
   --color-chip-border: var(--chip-border);

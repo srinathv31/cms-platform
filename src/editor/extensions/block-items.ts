@@ -1,4 +1,4 @@
-// The block catalogue behind the `/` menu (and, in Phase 2, the + button's menu).
+// The block catalogue behind the `/` menu (which the block handle's + opens too).
 // Pure data + TipTap commands; the React menu maps `icon` keys to lucide icons.
 
 import type { ChainedCommands, Editor } from "@tiptap/core";

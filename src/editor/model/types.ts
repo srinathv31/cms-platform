@@ -38,6 +38,33 @@ export interface SampleSet {
   values: VariableValues;
 }
 
+/**
+ * One difference between a variable list and the Active version's list (the consumer contract).
+ * Breaking: a required variable added, a variable removed, a key renamed, a type changed,
+ * optional made required. Non-breaking: an optional variable added, made optional, a label changed.
+ */
+export type ContractChangeKind =
+  | "added"
+  | "removed"
+  | "key_renamed"
+  | "type_changed"
+  | "made_required"
+  | "made_optional"
+  | "label_changed";
+
+export interface ContractChange {
+  kind: ContractChangeKind;
+  /** The variable's key in the new list (the old key for "removed"). */
+  key: string;
+  breaking: boolean;
+  /** Previous value: old key, old type, old label. */
+  from?: string;
+  /** New value: new key, new type, new label. */
+  to?: string;
+  type?: VariableType;
+  required?: boolean;
+}
+
 /** A content type's required section, e.g. { key: "legal_notices", title: "Legal notices" }. */
 export interface RequiredSection {
   key: string;

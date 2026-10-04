@@ -28,6 +28,7 @@ import { Command, CommandItem, CommandList, CommandShortcut } from "@/components
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import type { BlockItem, BlockItemId, ShortcutToken } from "../extensions/block-items";
 import type { SlashRender } from "../extensions/slash-command";
+import { makeRoomBelow, menuContainer } from "./menu-layer";
 
 const ICONS: Record<BlockItemId, LucideIcon> = {
   text: Text,
@@ -64,11 +65,28 @@ const CLOSED: Pick<SlashState, "props" | "mount" | "items" | "index"> = {
 export interface SlashMenuController {
   store: StoreApi<SlashState>;
   render: SlashRender;
+  /**
+   * The + button just inserted a "/" line: if the menu then closes with nothing chosen and nothing
+   * typed, undo that insertion so dismissing leaves the document as it was.
+   */
+  armUndo: (editor: Editor) => void;
 }
 
 /** One per editor. Pass `render` to editorExtensions() and `controller` to <SlashMenu>. */
 export function createSlashMenuController(): SlashMenuController {
   const store = createStore<SlashState>()(() => ({ ...CLOSED, session: 0 }));
+  let armed: { editor: Editor; doc: Editor["state"]["doc"] } | null = null;
+
+  const disarmOnExit = () => {
+    const pending = armed;
+    armed = null;
+    if (!pending) return;
+    // After the plugin's update settles; only if the document is exactly as the + left it.
+    setTimeout(() => {
+      const { editor, doc } = pending;
+      if (!editor.isDestroyed && editor.state.doc === doc) editor.commands.undo();
+    }, 0);
+  };
 
   const render: SlashRender = () => ({
     onStart: (props) => {
@@ -84,7 +102,10 @@ export function createSlashMenuController(): SlashMenuController {
       // While the next query's items resolve, keep showing the previous ones (no flicker).
       store.setState(props.loading ? { props } : { props, items: props.items, index: 0 });
     },
-    onExit: () => store.setState(CLOSED),
+    onExit: () => {
+      store.setState(CLOSED);
+      disarmOnExit();
+    },
     onKeyDown: ({ event }) => {
       const { props, items, index } = store.getState();
       if (!props || items.length === 0) return false;
@@ -102,7 +123,11 @@ export function createSlashMenuController(): SlashMenuController {
     },
   });
 
-  return { store, render };
+  const armUndo = (editor: Editor) => {
+    armed = { editor, doc: editor.state.doc };
+  };
+
+  return { store, render, armUndo };
 }
 
 const isApple = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -121,7 +146,7 @@ const KEYCAP =
   "h-5 min-w-5 rounded-md border border-hairline bg-surface-sunken px-1 font-sans text-[11px] font-medium text-text-muted";
 
 // Where the menu waits (invisible) until Suggestion's mount() places it at the caret.
-const PARKED = { position: "fixed", top: 0, left: 0 } as const;
+const PARKED = { position: "fixed", top: 0, left: 0, visibility: "hidden" } as const;
 
 const HIGHLIGHT_SPRING = { type: "spring", stiffness: 560, damping: 44, mass: 0.9 } as const;
 
@@ -142,10 +167,19 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
 
   // Anchor to the `/query` decoration; Suggestion's mount keeps it placed on scroll/resize and
   // closes the menu on an outside click.
+  // Room below first (menu-layer.ts), then placed.
   useLayoutEffect(() => {
     if (!element || !mount) return;
-    return mount(element);
-  }, [element, mount]);
+    let unmount: (() => void) | null = null;
+    const rect = store.getState().props?.clientRect?.() ?? null;
+    const cancel = makeRoomBelow(editor.view.dom, rect, element.offsetHeight, 6, () => {
+      unmount = mount(element);
+    });
+    return () => {
+      cancel();
+      unmount?.();
+    };
+  }, [element, mount, store, editor]);
 
   // Screen readers: the document keeps focus, so point it at the active option.
   useEffect(() => {
@@ -190,7 +224,7 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
             }}
             className="rounded-xl! bg-transparent p-1"
           >
-            <CommandList className="max-h-80 scroll-py-1">
+            <CommandList className="max-h-[min(22rem,calc(var(--ucomp-menu-max-h,22rem)-0.75rem))] scroll-py-1">
               {items.map((item) => {
                 const Icon = ICONS[item.id];
                 const isSelected = item.id === selected;
@@ -231,7 +265,7 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
         </m.div>
       </LazyMotion>
     </div>,
-    document.body,
+    menuContainer(editor),
   );
 }
 

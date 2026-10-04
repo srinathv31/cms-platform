@@ -3,6 +3,7 @@
 // Notion-style block handle on the OFFICIAL DragHandle (@tiptap/extension-drag-handle-react):
 // a + that inserts a block below and opens the `/` menu, and a ⋮⋮ grip that drags the block.
 // Centered on each block's first line. Never rendered in read-only mode.
+// Required section headings show the + only: they can't be dragged.
 
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import { isNodeRangeSelection } from "@tiptap/extension-node-range";
@@ -11,6 +12,9 @@ import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { isRequiredHeading } from "../extensions/required-sections";
+import { insertBlockBelow } from "../lib/insert-below";
+import type { SlashMenuController } from "./slash-menu";
 
 // Stable reference: the React DragHandle re-registers its plugin when this object changes.
 const POSITION = { placement: "left", strategy: "absolute" } as const;
@@ -20,9 +24,24 @@ const BUTTON =
 
 type Current = { node: PMNode | null; pos: number };
 
-export function BlockHandle({ editor }: { editor: Editor }) {
+export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMenuController }) {
   const current = useRef<Current>({ node: null, pos: -1 });
   const bar = useRef<HTMLDivElement>(null);
+
+  // A required heading can't be dragged: cancel the drag before the DragHandle starts it (capture
+  // on the handle's parent runs ahead of the handle's own listener).
+  useEffect(() => {
+    const handle = bar.current?.closest<HTMLElement>(".ucomp-block-handle");
+    const parent = handle?.parentElement;
+    if (!handle || !parent) return;
+    const onDragStart = (event: DragEvent) => {
+      if (event.target !== handle || !isRequiredHeading(current.current.node)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    parent.addEventListener("dragstart", onDragStart, true);
+    return () => parent.removeEventListener("dragstart", onDragStart, true);
+  }, [editor]);
 
   // Typing hides the handle until the pointer really moves. (Chrome replays a synthetic
   // mousemove when layout shifts under a still pointer, which would otherwise pop the handle
@@ -64,20 +83,12 @@ export function BlockHandle({ editor }: { editor: Editor }) {
     return { getBoundingClientRect: () => rect };
   };
 
+  // + opens the block menu on a new line below (lib/insert-below.ts). Dismissing the menu right
+  // away takes the line back out.
   const insertBelow = () => {
     const { node, pos } = current.current;
     if (!node || pos < 0 || editor.isDestroyed) return;
-    const chain = editor.chain().focus(undefined, { scrollIntoView: false });
-    if (node.type.name === "paragraph" && node.content.size === 0) {
-      // Reuse the empty line under the pointer instead of adding another.
-      chain.insertContentAt(pos + 1, "/").run();
-      return;
-    }
-    const after = pos + node.nodeSize;
-    chain
-      .insertContentAt(after, { type: "paragraph", content: [{ type: "text", text: "/" }] })
-      .setTextSelection(after + 2)
-      .run();
+    if (insertBlockBelow(editor, node, pos)) slash.armUndo(editor);
   };
 
   // After a drop (or a cancelled drag) the DragHandle leaves the moved blocks selected as a
@@ -107,10 +118,12 @@ export function BlockHandle({ editor }: { editor: Editor }) {
       getReferencedVirtualElement={firstLineRect}
       onNodeChange={({ node, pos }) => {
         current.current = { node, pos };
+        if (isRequiredHeading(node)) bar.current?.setAttribute("data-required", "");
+        else bar.current?.removeAttribute("data-required");
       }}
       onElementDragEnd={settleSelection}
     >
-      <div ref={bar} className="flex items-center gap-px pr-1.5 data-typing:invisible" onMouseLeave={hideWhenLeaving}>
+      <div ref={bar} className="group/handle flex items-center gap-px pr-1.5 data-typing:invisible" onMouseLeave={hideWhenLeaving}>
         <button
           type="button"
           tabIndex={-1}
@@ -121,7 +134,11 @@ export function BlockHandle({ editor }: { editor: Editor }) {
         >
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
         </button>
-        <div aria-label="Drag to move block" role="img" className={`${BUTTON} cursor-grab active:cursor-grabbing`}>
+        <div
+          aria-label="Drag to move block"
+          role="img"
+          className={`${BUTTON} cursor-grab active:cursor-grabbing group-data-required/handle:invisible`}
+        >
           <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
         </div>
       </div>

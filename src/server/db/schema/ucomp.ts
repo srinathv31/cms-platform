@@ -278,7 +278,12 @@ export const auditEvents = sqliteTable(
     details: json<Record<string, unknown>>("details"),
     sessionKey: text("session_key"), // groups draft saves per editing session
   },
-  (t) => [index("audit_at").on(t.at), index("audit_team").on(t.teamId)],
+  (t) => [
+    index("audit_at").on(t.at),
+    index("audit_team").on(t.teamId),
+    // Autosave merges every save of an editing session into one row: looked up on each save.
+    index("audit_version_session").on(t.versionId, t.sessionKey),
+  ],
 );
 
 export const notifications = sqliteTable(

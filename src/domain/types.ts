@@ -9,10 +9,12 @@ export type {
   SampleSet,
   RequiredSection,
   JSONContent,
+  ContractChange,
+  ContractChangeKind,
 } from "@/editor/model/types";
 export { VARIABLE_TYPES } from "@/editor/model/types";
 
-import type { VariableType } from "@/editor/model/types";
+import type { JSONContent, SampleSet, Variable } from "@/editor/model/types";
 
 // ── Channels ──────────────────────────────────────────────────
 export const CHANNELS = ["pdf", "web", "email"] as const;
@@ -35,25 +37,6 @@ export interface RevokeRecord {
   startedAt: string; // ISO
   confirmedBy?: string;
   confirmedAt?: string; // ISO
-}
-
-export type ContractChangeKind =
-  | "added"
-  | "removed"
-  | "key_renamed"
-  | "type_changed"
-  | "made_required"
-  | "made_optional"
-  | "label_changed";
-
-export interface ContractChange {
-  kind: ContractChangeKind;
-  key: string;
-  breaking: boolean;
-  from?: string;
-  to?: string;
-  type?: VariableType;
-  required?: boolean;
 }
 
 // ── People, teams, access ─────────────────────────────────────
@@ -121,3 +104,30 @@ export type PermissionResult = { ok: true } | { ok: false; reason: string };
 
 // ── Rendering ─────────────────────────────────────────────────
 export type RenderOutcome = "ok" | "error";
+
+// ── Drafts (autosave: PUT /api/drafts/[versionId]) ────────────
+/**
+ * Body of an autosave. Only the fields that changed since the last save are sent.
+ * The server checks `draft.edit`, accepts only versions in the `draft` state, and merges every
+ * save of one editing session (`sessionKey`) into a single `draft.edited` audit row.
+ */
+export interface DraftPatch {
+  /** The rev the client last saw. A stale rev gets a `conflict` response carrying the current rev. */
+  rev: number;
+  /** One per editing session (one page visit). */
+  sessionKey: string;
+  body?: JSONContent;
+  variables?: Variable[];
+  /** The template's name (lives on the template; editable only while a draft is open). */
+  name?: string;
+  channels?: Channel[];
+  emailSubject?: JSONContent | null;
+  emailPreheader?: JSONContent | null;
+  sampleSets?: SampleSet[];
+}
+
+export type DraftSaveError = "conflict" | "forbidden" | "not_draft" | "not_found" | "invalid";
+
+export type DraftSaveResponse =
+  | { ok: true; rev: number; savedAt: string /* ISO, demo clock */ }
+  | { ok: false; error: DraftSaveError; rev?: number; message: string };

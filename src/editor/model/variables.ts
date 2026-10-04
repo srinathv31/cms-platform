@@ -61,6 +61,12 @@ export function toKey(label: string): string {
   return /^[0-9]/.test(key) ? `v_${key}` : key;
 }
 
+/** A readable label for a key: "first_name" → "First name", "purchase_apr" → "Purchase apr". */
+export function labelFromKey(key: string): string {
+  const words = key.replace(/_+/g, " ").trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : key;
+}
+
 /** A valid key: lowercase snake_case, starts with a letter. */
 export function isValidKey(key: string): boolean {
   return key.length > 0 && key.length <= MAX_KEY_LENGTH && /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/.test(key);
@@ -184,4 +190,43 @@ function parseState(input: string): string | null {
   const lower = input.toLowerCase().replace(/\s+/g, " ");
   const found = Object.entries(US_STATES).find(([, name]) => name.toLowerCase() === lower);
   return found ? found[0] : null;
+}
+
+// ── Lists ───────────────────────────────────────────────────────
+
+/**
+ * `base`, or `base_2`, `base_3`… when it's taken. Stays within the key length limit.
+ * An empty base stays empty (the caller asks for a label first).
+ */
+export function uniqueKey(base: string, taken: ReadonlySet<string>): string {
+  if (!base || !taken.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const suffix = `_${n}`;
+    const candidate = `${base.slice(0, MAX_KEY_LENGTH - suffix.length).replace(/_+$/g, "")}${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/**
+ * Filters a variable list by a free-text query (the `{{` picker), best matches first:
+ * label starts with the query, then a label word does, then the key does, then either contains it.
+ * Spaces are allowed ("end date"); they match underscores in keys. List order breaks ties.
+ */
+export function filterVariables<V extends { key: string; label: string }>(variables: readonly V[], query: string): V[] {
+  const q = query.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!q) return [...variables];
+  const qKey = q.replace(/ /g, "_");
+
+  const scored: { variable: V; score: number; index: number }[] = [];
+  variables.forEach((variable, index) => {
+    const label = variable.label.toLowerCase();
+    const key = variable.key.toLowerCase();
+    let score = -1;
+    if (label.startsWith(q)) score = 0;
+    else if (label.includes(` ${q}`)) score = 1;
+    else if (key.startsWith(qKey)) score = 2;
+    else if (label.includes(q) || key.includes(qKey)) score = 3;
+    if (score >= 0) scored.push({ variable, score, index });
+  });
+  return scored.sort((a, b) => a.score - b.score || a.index - b.index).map((s) => s.variable);
 }
