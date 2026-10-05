@@ -1,55 +1,39 @@
 import { Stream } from "@/components/primitives/stream";
 import { PageHeader } from "@/components/primitives/page-header";
+import { RequestAccess } from "@/components/access/request-access";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TeamIcon } from "@/components/app-shell/team-icon";
-import { getAllTeams } from "@/server/queries/teams";
+import { getRequestAccessData } from "@/server/queries/access";
 
-const GRID = "grid grid-cols-3 gap-4";
-const CARD = "flex min-h-40 flex-col gap-4 rounded-2xl border border-hairline bg-surface-tinted p-6";
+const CARD = "rounded-2xl border border-hairline bg-surface-tinted p-6";
 
-async function TeamCards() {
-  const teams = await getAllTeams();
-  return (
-    <div className={GRID}>
-      {teams.map((team) => (
-        <div key={team.slug} className={CARD}>
-          <div className="grid size-10 place-items-center rounded-xl border border-hairline bg-surface">
-            <TeamIcon name={team.icon} className="size-5 text-text" />
-          </div>
-          <div>
-            <h2 className="text-[17px] leading-6 font-medium">{team.name}</h2>
-            <p className="mt-1 text-sm leading-5 text-text-muted">{team.description}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+async function Teams() {
+  return <RequestAccess data={await getRequestAccessData()} />;
 }
 
-function TeamCardsSkeleton() {
+function TeamsSkeleton() {
   return (
-    <div className={GRID} aria-hidden>
+    <div className="flex max-w-[40rem] flex-col gap-4" aria-hidden>
       {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className={CARD}>
-          <Skeleton className="size-10 rounded-xl" />
-          <div>
+        <div key={i} className={`${CARD} flex items-start gap-4`}>
+          <Skeleton className="size-10 shrink-0 rounded-xl" />
+          <div className="min-w-0 flex-1">
             <Skeleton className="h-4 w-32" />
             <Skeleton className="mt-2.5 h-3.5 w-full" />
-            <Skeleton className="mt-1.5 h-3.5 w-3/4" />
+            <Skeleton className="mt-3 h-3 w-40" />
           </div>
+          <Skeleton className="h-8 w-32 rounded-lg" />
         </div>
       ))}
     </div>
   );
 }
 
-// The request form is Phase 6. For now: the teams, as quiet cards.
 export default function RequestAccessPage() {
   return (
     <div>
       <PageHeader title="Request access" />
-      <Stream fallback={<TeamCardsSkeleton />}>
-        <TeamCards />
+      <Stream fallback={<TeamsSkeleton />}>
+        <Teams />
       </Stream>
     </div>
   );

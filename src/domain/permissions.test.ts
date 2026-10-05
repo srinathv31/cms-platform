@@ -296,6 +296,75 @@ describe("access requests", () => {
   });
 });
 
+describe("own access (Phase 6)", () => {
+  const OWN_ACCESS = "You can't change your own access.";
+
+  it("a Team Admin manages other members, never their own membership", () => {
+    expect(can(alex, "team.manageMembers", { ...coral, subjectUserId: "jordan" })).toEqual(allow);
+    expect(can(alex, "team.manageMembers", { ...coral, subjectUserId: "alex" })).toEqual(deny(OWN_ACCESS));
+    expect(REASONS.ownAccess).toBe(OWN_ACCESS);
+  });
+
+  it("without a subject it is the plain settings-access check", () => {
+    expect(can(alex, "team.manageMembers", coral)).toEqual(allow);
+    expect(can(jordan, "team.manageMembers", coral)).toEqual(deny(GENERIC));
+  });
+
+  it("a member without the role gets the generic reason for someone else", () => {
+    expect(can(jordan, "team.manageMembers", { ...coral, subjectUserId: "maya" })).toEqual(deny(GENERIC));
+  });
+});
+
+describe("named approvers (a stage that names a user)", () => {
+  // Dana Park: Coral Offers Viewer, named by the "Legal reviewer" stage.
+  const dana = person("dana", { memberships: [member("coral-offers", ["viewer"])] });
+  const legal = { ...coral, submittedBy: "maya", stageApproverIds: ["dana"] } satisfies PermissionResource;
+
+  it("may decide and comment on the version waiting on her stage", () => {
+    expect(can(dana, "version.decide", legal)).toEqual(allow);
+    expect(can(dana, "review.comment", legal)).toEqual(allow);
+  });
+
+  it("gets nothing else from it", () => {
+    for (const action of ["draft.edit", "version.submit", "version.setSunset", "version.revoke.start"] as Action[]) {
+      expect(can(dana, action, legal)).toEqual(deny(GENERIC));
+    }
+  });
+
+  it("only while the current stage names her", () => {
+    expect(can(dana, "version.decide", { ...coral, submittedBy: "maya" })).toEqual(deny(GENERIC));
+    expect(can(dana, "version.decide", { ...coral, submittedBy: "maya", stageApproverIds: ["jordan"] })).toEqual(
+      deny(GENERIC),
+    );
+  });
+
+  it("on any team, with no membership there (a Legal stage covers every team)", () => {
+    const depositsLegal = { ...deposits, submittedBy: "eli", stageApproverIds: ["dana"] } satisfies PermissionResource;
+    expect(can(dana, "template.view", depositsLegal)).toEqual(allow);
+    expect(can(dana, "version.decide", depositsLegal)).toEqual(allow);
+    expect(can(dana, "review.comment", depositsLegal)).toEqual(allow);
+    expect(can(dana, "template.view", deposits)).toEqual(deny(GENERIC));
+  });
+
+  it("not once she has no active access anywhere", () => {
+    const suspended = person("dana", { memberships: [member("coral-offers", ["viewer"], "suspended")] });
+    expect(can(suspended, "version.decide", legal)).toEqual(deny(GENERIC));
+    expect(can(person("dana"), "version.decide", legal)).toEqual(deny(GENERIC));
+  });
+
+  it("maker-checker still applies", () => {
+    expect(can(dana, "version.decide", { ...legal, submittedBy: "dana" })).toEqual(deny(OWN_VERSION));
+  });
+
+  it("an Auditor named on a stage stays read-only", () => {
+    const taylor = person("taylor", { platformRole: "auditor" });
+    const named = { ...legal, stageApproverIds: ["taylor"] };
+    expect(can(taylor, "version.decide", named)).toEqual(deny(GENERIC));
+    expect(can(taylor, "review.comment", named)).toEqual(deny(GENERIC));
+    expect(can(taylor, "template.view", named)).toEqual(allow); // an Auditor sees every team anyway
+  });
+});
+
 describe("membership status", () => {
   it.each<MembershipStatus>(["suspended", "lapsed"])("a %s membership grants nothing", (status) => {
     const v = person("maya", { memberships: [member("coral-offers", ["author", "approver"], status)] });

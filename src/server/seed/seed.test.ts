@@ -131,9 +131,9 @@ describe("ids", () => {
 });
 
 describe("people, teams and access", () => {
-  it("has the eight personas with the fixed ids", () => {
+  it("has the nine personas with the fixed ids (the build plan's eight, plus Dana Park in Phase 6)", () => {
     const personas = users.filter((u) => u.isPersona).map((u) => u.id).sort();
-    expect(personas).toEqual(["alex", "jordan", "maya", "morgan", "priya", "riley", "sam", "taylor"]);
+    expect(personas).toEqual(["alex", "dana", "jordan", "maya", "morgan", "priya", "riley", "sam", "taylor"]);
     expect(users.find((u) => u.id === "riley")?.platformRole).toBe("platform_admin");
     expect(users.find((u) => u.id === "taylor")?.platformRole).toBe("auditor");
     expect(users.find((u) => u.id === "maya")?.name).toBe("Maya Chen");
@@ -157,20 +157,32 @@ describe("people, teams and access", () => {
     expect(byUser.get("alex")).toEqual(["coral-offers:approver+team_admin"]);
     expect(byUser.get("priya")).toEqual(["coral-offers:author", "deposits:viewer"]);
     expect(byUser.get("sam")).toEqual(["coral-offers:viewer"]);
+    expect(byUser.get("dana")).toEqual(["coral-offers:viewer"]);
     for (const none of ["riley", "taylor", "morgan"]) expect(byUser.has(none)).toBe(false);
 
-    // Card Statements has no switchable persona; Coral Offers has 6 members.
+    // Card Statements has no switchable persona; Coral Offers has 7 members (Dana Park joined in Phase 6).
     const personaIds = new Set(users.filter((u) => u.isPersona).map((u) => u.id));
     expect(members.filter((m) => m.teamId === "card-statements").some((m) => personaIds.has(m.userId))).toBe(false);
-    expect(members.filter((m) => m.teamId === "coral-offers")).toHaveLength(6);
+    expect(members.filter((m) => m.teamId === "coral-offers")).toHaveLength(7);
   });
 
   it("seeds the inactivity story and the stretch persona", () => {
     const devon = users.find((u) => u.id === "devon");
     const lastActive = devon?.lastActiveAt?.getTime() ?? 0;
     expect(Math.abs(base.getTime() - lastActive - 95 * DAY)).toBeLessThan(2 * 3_600_000);
-    expect(users.find((u) => u.id === "dana")?.isPersona).toBe(false);
+    expect(users.find((u) => u.id === "dana")?.isPersona).toBe(true);
     expect(users.find((u) => u.id === "chris")?.name).toBe("Chris Morales");
+  });
+
+  it("flags Devon for inactivity 5 days ago, and nobody else", async () => {
+    const members = await db.select().from(ucomp.memberships);
+    const flagged = members.filter((m) => m.inactivityFlaggedAt !== null);
+    expect(flagged.map((m) => m.userId)).toEqual(["devon"]);
+    expect(flagged[0].inactivityFlaggedAt?.getTime()).toBe(base.getTime() - 5 * DAY);
+    for (const m of members) expect(m).toMatchObject({ status: "active", statusReason: null, inactivityKeptAt: null });
+    const events = (await db.select().from(ucomp.auditEvents)).filter((e) => e.action === "access.flagged_inactive");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ actorId: null, teamId: "coral-offers" });
   });
 
   it("configures the Disclosure content type and a single approval stage", async () => {
@@ -503,15 +515,16 @@ describe("notifications, access and audit", () => {
     expect(recert.label).toMatch(/^Q[1-4] \d{4}$/);
     expect(recert.completedAt).toBeNull();
 
+    // Everyone but the Team Admin: Jordan, Maya, Priya, Sam, Devon and Dana.
     const items = await db.select().from(ucomp.recertItems);
-    expect(items).toHaveLength(6);
+    expect(items.map((i) => i.userId).sort()).toEqual(["dana", "devon", "jordan", "maya", "priya", "sam"]);
     for (const i of items) expect(i.decision).toBeNull();
 
     const kinds = (await db.select().from(ucomp.notifications))
       .filter((n) => n.userId === "alex" && !n.readAt)
       .map((n) => n.kind)
       .sort();
-    expect(kinds).toEqual(["access_request", "recertification_due"]);
+    expect(kinds).toEqual(["access_requested", "recert_due"]);
   });
 
   it("gives Maya a changes-requested notification, and only Coral Offers people get any", async () => {

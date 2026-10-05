@@ -25,7 +25,7 @@ vi.mock("./channels/web", async (importOriginal) => {
   return { renderWeb: vi.fn(actual.renderWeb) };
 });
 
-const { renderLog, versions, contentTypes } = schema;
+const { approvalStages, renderLog, versions, contentTypes } = schema;
 const DAY = 86_400_000;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
@@ -202,6 +202,21 @@ describe("runRender: previews", () => {
   it("still names the newer version when previewing a Superseded one", async () => {
     const { result } = await render({ template: "balance-transfer", version: 1, preview: true, viewer: maya });
     expect(ok(result).newerVersion).toBe(2);
+  });
+
+  it("lets the person the waiting stage names preview that version from outside the team, and nothing else", async () => {
+    const naomi = viewer("naomi", [{ id: "deposits", roles: ["team_admin", "approver"] }]);
+    const [stage] = await db.select().from(approvalStages).where(eq(approvalStages.contentTypeId, "ct_disclosure"));
+    await db.update(approvalStages).set({ approverRule: { kind: "user", userId: "naomi" } }).where(eq(approvalStages.id, stage!.id));
+    try {
+      const values = { ...CUSTOMER, annual_fee: "95" };
+      expect(ok((await render({ template: "cash-back", version: 3, preview: true, viewer: naomi, values })).result).versionNumber).toBe(3);
+      expect(failed((await render({ template: "cash-back", version: 2, preview: true, viewer: naomi, values })).result).code).toBe(
+        "preview_forbidden",
+      );
+    } finally {
+      await db.update(approvalStages).set({ approverRule: stage!.approverRule }).where(eq(approvalStages.id, stage!.id));
+    }
   });
 
   it("forbids a preview to a persona who can't see the team (403), logged as a preview", async () => {

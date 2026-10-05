@@ -7,7 +7,8 @@ import { m } from "motion/react";
 import { Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fadeRise } from "@/components/motion/presets";
-import type { RecertCard } from "@/server/queries/spaces";
+import { ROLE_LABEL } from "@/domain/access";
+import type { SidebarCardModel } from "@/domain/access-types";
 
 const EVENT = "ucomp:card-dismissed";
 
@@ -28,14 +29,58 @@ function readDismissed(key: string): boolean {
   }
 }
 
+const dayFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+interface CardContent {
+  title: string;
+  /** One or two quiet lines. */
+  lines: string[];
+  action?: { label: string; href: string };
+}
+
+/** What each card says. Dates are demo-clock instants, shown in UTC like everywhere else. */
+function contentOf(card: SidebarCardModel): CardContent {
+  switch (card.kind) {
+    case "access_requests":
+      return {
+        title: card.count === 1 ? "Access request pending" : "Access requests pending",
+        lines: [
+          card.count === 1
+            ? `${card.firstName} asked for ${ROLE_LABEL[card.role]} access.`
+            : `${card.firstName} and ${card.count - 1} other${card.count === 2 ? "" : "s"} asked for access.`,
+        ],
+        action: { label: "Review", href: `/${card.teamSlug}/settings/access-requests` },
+      };
+    case "recert_due":
+      return {
+        title: "Recertification due",
+        lines: [`${card.label} · due ${dayFormat.format(new Date(card.dueAt))}`, card.progressLabel],
+        action: { label: "Review", href: `/${card.teamSlug}/settings/recertification` },
+      };
+    case "my_request":
+      return {
+        title: "Your request is waiting",
+        lines: [
+          `${ROLE_LABEL[card.role]} access to ${card.teamName}`,
+          card.adminName
+            ? `Sent ${dayFormat.format(new Date(card.createdAt))} · waiting on ${card.adminName}`
+            : `Sent ${dayFormat.format(new Date(card.createdAt))}`,
+        ],
+      };
+  }
+}
+
 /**
- * The one dismissible card above Settings and Help (Flow-style).
- * For a Team Admin with an open recertification. Dismissal is remembered in localStorage.
+ * The one dismissible card above Settings and Help (Flow-style). One per space, by priority: access
+ * requests waiting, then a recertification due (both for a Team Admin), then the viewer's own pending
+ * request when they have no space yet. Dismissal is remembered in localStorage by the card's id, which
+ * changes when its content does (a new request brings it back).
  * Until the client has read localStorage the card stays hidden. It floats in the free space
  * above the footer (absolutely positioned against it), so nothing moves when it appears.
  */
-export function SidebarCard({ recert, teamSlug }: { recert: RecertCard; teamSlug: string }) {
-  const key = `ucomp:dismissed:${recert.id}`;
+export function SidebarCard({ card }: { card: SidebarCardModel }) {
+  const key = `ucomp:dismissed:${card.id}`;
+  const { title, lines, action } = contentOf(card);
   const dismissed = useSyncExternalStore(
     subscribe,
     () => readDismissed(key),
@@ -51,7 +96,7 @@ export function SidebarCard({ recert, teamSlug }: { recert: RecertCard; teamSlug
       data-slot="sidebar-card"
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-[15px] leading-6 font-medium">Recertification due</h2>
+        <h2 className="text-[15px] leading-6 font-medium">{title}</h2>
         <Button
           variant="ghost"
           size="icon-xs"
@@ -69,18 +114,22 @@ export function SidebarCard({ recert, teamSlug }: { recert: RecertCard; teamSlug
           <Minus aria-hidden strokeWidth={1.75} />
         </Button>
       </div>
-      <p className="mt-0.5 text-sm leading-5 text-text-muted">
-        {recert.label} · due {recert.dueLabel}
-      </p>
-      <Button
-        variant="secondary"
-        size="lg"
-        className="mt-3 rounded-lg px-3.5 font-medium"
-        nativeButton={false}
-        render={<Link href={`/${teamSlug}/settings/recertification` as Route} />}
-      >
-        Review
-      </Button>
+      <div className="mt-0.5 text-sm leading-5 text-text-muted">
+        {lines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+      {action ? (
+        <Button
+          variant="secondary"
+          size="lg"
+          className="mt-3 rounded-lg px-3.5 font-medium"
+          nativeButton={false}
+          render={<Link href={action.href as Route} />}
+        >
+          {action.label}
+        </Button>
+      ) : null}
     </m.div>
   );
 }

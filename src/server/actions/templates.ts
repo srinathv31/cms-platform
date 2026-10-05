@@ -15,14 +15,18 @@ import { getViewer } from "@/server/viewer";
 import { newId, newTemplateId } from "@/server/ids";
 import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
 import { assertCan } from "@/domain/permissions";
+import { conformToSections } from "@/domain/platform-config";
 import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
 import {
+  DEFAULT_CHANNELS,
   createDraft,
   editActive,
   planDraftStart,
   type DraftFields,
+  type StarterContent,
   type VersionSnapshot,
 } from "@/domain/lifecycle";
+import type { Channel, RequiredSection } from "@/domain/types";
 
 // Template creation and editing. Every action checks permissions first, writes in one transaction,
 // refreshes what it changed, and redirects last. Submitting moved to `actions/review.ts`
@@ -99,7 +103,7 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
     templateId = newTemplateId();
   }
 
-  const starter = buildStarter(starterKey, { scope: templateId, now: at });
+  const starter = newTemplateStarter(buildStarter(starterKey, { scope: templateId, now: at }), contentType);
   const { changes, effects } = createDraft({ starter, createdBy: viewer.userId, now: at });
   const versionId = newId("v");
 
@@ -130,6 +134,24 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
   });
   refreshLists();
   redirect(`/${team.slug}/templates/${templateId}`);
+}
+
+/**
+ * A starter shaped to the content type as it is now (Platform settings): its required sections
+ * (removed ones become ordinary headings, renamed ones take the new title, new ones are appended) and
+ * only the channels the type allows. Existing templates are never reshaped.
+ */
+function newTemplateStarter(
+  starter: StarterContent,
+  type: { requiredSections: RequiredSection[]; allowedChannels: Channel[] },
+): StarterContent {
+  const wanted = starter.channels ?? DEFAULT_CHANNELS;
+  const allowed = wanted.filter((c) => type.allowedChannels.includes(c));
+  return {
+    ...starter,
+    body: conformToSections(starter.body, type.requiredSections, () => newId("b")),
+    channels: allowed.length > 0 ? allowed : type.allowedChannels.slice(0, 1),
+  };
 }
 
 // ── Edit an Active template ───────────────────────────────────

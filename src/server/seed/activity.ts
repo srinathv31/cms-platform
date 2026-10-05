@@ -1,5 +1,7 @@
+import type { AnyNotificationKind } from "@/domain/access-types";
+import { formatLongDate } from "@/domain/render/errors";
 import type { SeedCtx } from "./context";
-import { teamMemberIds } from "./teams";
+import { flaggedMembers, recertSubjectIds } from "./teams";
 import { userName } from "./people";
 
 // Access requests, recertification and notifications. Lifecycle audit events and consumer notices
@@ -50,7 +52,7 @@ export function seedActivity(ctx: SeedCtx) {
     dueAt,
     completedAt: null,
   });
-  const members = teamMemberIds(coral);
+  const members = recertSubjectIds(coral);
   for (const userId of members) {
     sink.recertItems.push({ recertId, userId, decision: null, decidedBy: null, decidedAt: null });
   }
@@ -63,7 +65,25 @@ export function seedActivity(ctx: SeedCtx) {
     details: { label, dueAt: dueAt.toISOString(), members: members.length },
   });
 
+  // ── Devon Lin: flagged for inactivity 5 days ago (90 days without a sign-in) ──
+  for (const m of flaggedMembers(coral)) {
+    sink.auditEvents.push({
+      id: ctx.id("ae"),
+      at: ctx.at(m.flaggedDaysAgo!),
+      actorId: null,
+      teamId: coral,
+      action: "access.flagged_inactive",
+      details: {
+        userId: m.user,
+        userName: userName(m.user),
+        lastActiveAt: ctx.at(m.flaggedDaysAgo! + 90).toISOString(),
+        suspendsAt: ctx.at(m.flaggedDaysAgo! - 30).toISOString(),
+      },
+    });
+  }
+
   // ── Notifications ──────────────────────────────────────────────
+  // Kinds are domain/access-types.ts `AnyNotificationKind`.
   const cashBack = ctx.template("cash-back");
   const waiver = ctx.template("annual-fee-waiver");
   const balanceTransfer = ctx.template("balance-transfer");
@@ -74,7 +94,7 @@ export function seedActivity(ctx: SeedCtx) {
 
   const note = (n: {
     user: string;
-    kind: string;
+    kind: AnyNotificationKind;
     title: string;
     body?: string;
     href?: string;
@@ -112,23 +132,34 @@ export function seedActivity(ctx: SeedCtx) {
   });
   note({
     user: "alex",
-    kind: "access_request",
-    title: `${userName("chris")} requested Author access to Coral Offers`,
+    kind: "access_requested",
+    title: `${userName("chris")} asked for Author access to Coral Offers.`,
     body: requestReason,
     href: `/${coral}/settings/access-requests`,
     at: 1.5,
   });
   note({
     user: "alex",
-    kind: "recertification_due",
+    kind: "recert_due",
     title: "Recertification due in 30 days",
     body: `${label} access review for Coral Offers: confirm ${members.length} members.`,
     href: `/${coral}/settings/recertification`,
     at: 4,
   });
+  for (const m of flaggedMembers(coral)) {
+    note({
+      user: "alex",
+      kind: "inactivity_flagged",
+      title: `${userName(m.user)} hasn't signed in for 90 days.`,
+      body: `Access to Coral Offers is suspended automatically on ${formatLongDate(ctx.at(m.flaggedDaysAgo! - 30))}.`,
+      href: `/${coral}/settings/inactivity`,
+      at: m.flaggedDaysAgo!,
+      read: true,
+    });
+  }
   note({
     user: "priya",
-    kind: "sunset_set",
+    kind: "sunset_scheduled",
     title: `Sunset set for ${balanceTransfer.name} v1`,
     body: "Coral still renders v1. It keeps working until the sunset date.",
     href: `/${coral}/templates/${balanceTransfer.id}`,
@@ -138,7 +169,7 @@ export function seedActivity(ctx: SeedCtx) {
   // Already read: a little history in the bell
   note({
     user: "maya",
-    kind: "version_active",
+    kind: "version_live",
     title: `${cashBack.name} v2 is now Active`,
     href: `/${coral}/templates/${cashBack.id}`,
     at: 86.5,
@@ -146,7 +177,7 @@ export function seedActivity(ctx: SeedCtx) {
   });
   note({
     user: "priya",
-    kind: "version_active",
+    kind: "version_live",
     title: `${balanceTransfer.name} v2 is now Active`,
     href: `/${coral}/templates/${balanceTransfer.id}`,
     at: 47.5,
@@ -154,7 +185,7 @@ export function seedActivity(ctx: SeedCtx) {
   });
   note({
     user: "priya",
-    kind: "revoke_confirmed",
+    kind: "version_revoked",
     title: `${holiday.name} v1 was revoked`,
     body: "Reason: Wrong bonus amount.",
     href: `/${coral}/templates/${holiday.id}`,

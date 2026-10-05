@@ -1,12 +1,18 @@
 import {
+  Briefcase,
   Building2,
+  Car,
   CreditCard,
   Gift,
+  Home,
   Landmark,
   Layers,
+  Megaphone,
   PiggyBank,
   Receipt,
   ReceiptText,
+  Scale,
+  ShieldCheck,
   Sparkles,
   Tag,
   Users,
@@ -31,6 +37,12 @@ const ICONS: Record<string, LucideIcon> = {
   "credit-card": CreditCard,
   receipt: Receipt,
   "receipt-text": ReceiptText,
+  home: Home,
+  car: Car,
+  briefcase: Briefcase,
+  "shield-check": ShieldCheck,
+  scale: Scale,
+  megaphone: Megaphone,
 };
 
 export function TeamIcon({

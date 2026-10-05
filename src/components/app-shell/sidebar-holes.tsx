@@ -11,7 +11,7 @@ export async function TeamSwitcherHole() {
 }
 
 export async function SidebarBodyHole() {
-  const { spaces } = await getShell();
+  const { spaces, homeCard } = await getShell();
   // The Review badge counts what waits on this viewer, space by space (so a team switch never refetches).
   // Nothing awaits it here: the nav paints at once and the badge streams in after it, into a slot that
   // is already there (the row's right edge), so nothing moves. A failed count just leaves the badge out.
@@ -21,5 +21,5 @@ export async function SidebarBodyHole() {
       await getReviewBadgeCount(space.slug).catch(() => 0),
     ]),
   ).then((entries) => Object.fromEntries(entries) as Record<string, number>);
-  return <SidebarBody spaces={spaces} reviewCounts={reviewCounts} />;
+  return <SidebarBody spaces={spaces} homeCard={homeCard} reviewCounts={reviewCounts} />;
 }

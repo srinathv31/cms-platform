@@ -1,11 +1,10 @@
 import "server-only";
 import { cache } from "react";
-import { notFound } from "next/navigation";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { stepperState } from "@/domain/approval-chain";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
-import { can } from "@/domain/permissions";
+import { can, canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { db } from "@/server/db/client";
@@ -19,10 +18,12 @@ import {
   getPeople,
   iso,
   isoOrUndefined,
+  loadApprovedBy,
   loadChain,
   loadConsumerUsage,
   personOf,
-  requireTemplate,
+  requireReviewVersion,
+  stageApproverIds,
   waitingStage,
   type People,
 } from "./review-shared";
@@ -106,20 +107,30 @@ function currentStageOf(chain: readonly ApprovalStage[], currentStage: number) {
 const newestSubmitted = (a: ReviewQueueRow, b: ReviewQueueRow) =>
   b.submittedAt.localeCompare(a.submittedAt) || a.templateName.localeCompare(b.templateName);
 
-/** In-review versions in the space, and the ones the viewer may decide now. Cached: the badge and the queue share it. */
+/**
+ * In-review versions in the space, and the ones the viewer may decide now. Cached: the badge and the
+ * queue share it. A version on a team the viewer can't see joins `waiting` when its current stage
+ * names them (Phase 6: a Legal reviewer covers every team), so they find it from their own space.
+ */
 const loadInReview = cache(async (spaceSlug: string) => {
   const space = await requireSpace(spaceSlug);
-  const [rows, chains, people] = await Promise.all([
+  const [all, chains, people] = await Promise.all([
     db
       .select(queueColumns)
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .innerJoin(teams, eq(teams.id, templates.teamId))
-      .where(and(eq(versions.state, "in_review"), inScope(space))),
+      .where(eq(versions.state, "in_review")),
     getChains(),
     getPeople(),
   ]);
   const viewer = space.viewer;
+  const inSpace = (v: QueueVersion) => space.isAll || v.teamId === space.teamId;
+  const namedElsewhere = (v: QueueVersion) =>
+    !canSeeSpace(viewer, v.teamSlug) &&
+    stageApproverIds(waitingStage(chainFor(chains, v.contentTypeId), v.currentStage)).includes(viewer.userId);
+  const rows = all.filter((v) => inSpace(v) || namedElsewhere(v));
+  const approvedBy = await loadApprovedBy(db, rows.map((v) => v.versionId));
 
   const waiting: ReviewQueueRow[] = [];
   const submitted: ReviewQueueRow[] = [];
@@ -127,13 +138,14 @@ const loadInReview = cache(async (spaceSlug: string) => {
     const chain = chainFor(chains, v.contentTypeId);
     const row = queueRow(v, people, currentStageOf(chain, v.currentStage));
     if (v.submittedBy === viewer.userId) {
-      submitted.push(row);
+      if (inSpace(v)) submitted.push(row);
       continue;
     }
     const check = decideCheck(viewer, {
       teamId: v.teamId,
       submittedBy: v.submittedBy,
       stage: waitingStage(chain, v.currentStage),
+      approvedBy: approvedBy.get(v.versionId) ?? [],
     });
     if (check.ok) waiting.push(row);
   }
@@ -203,13 +215,8 @@ function decideOnScreen(check: PermissionResult, state: string): PermissionResul
 /** Everything `/{team}/review/{templateId}/{n}` shows. 404 when the version doesn't exist or isn't visible. */
 export const getReviewScreen = cache(
   async (spaceSlug: string, templateId: string, versionNumber: number): Promise<ReviewScreenData> => {
-    const { space, template } = await requireTemplate(spaceSlug, templateId);
-    if (!Number.isInteger(versionNumber) || versionNumber < 1) notFound();
-
-    const version = await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)),
-    });
-    if (!version || version.number === null) notFound();
+    const { space, template, version } = await requireReviewVersion(spaceSlug, templateId, versionNumber);
+    const number = version.number!;
 
     const nowDate = await demoNow();
     const [active, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
@@ -225,19 +232,20 @@ export const getReviewScreen = cache(
         .where(eq(approvals.versionId, version.id))
         .orderBy(asc(approvals.decidedAt), asc(approvals.id)),
       // A submitted version is a record: the threads that began after it are not part of it.
-      loadThreads(template.id, version.body, { throughVersion: version.number }),
+      loadThreads(template.id, version.body, { throughVersion: number }),
       loadConsumerUsage(db, template.id, nowDate),
     ]);
 
     const submittedBy = version.submittedBy ?? version.createdBy;
-    const decide = decideOnScreen(
-      decideCheck(space.viewer, {
-        teamId: template.teamId,
-        submittedBy: version.submittedBy,
-        stage: waitingStage(chain, version.currentStage),
-      }),
-      version.state,
-    );
+    const stage = waitingStage(chain, version.currentStage);
+    const decideInput = { teamId: template.teamId, submittedBy: version.submittedBy, stage };
+    const decide = decideOnScreen(decideCheck(space.viewer, decideInput), version.state);
+    const inReview = version.state === "in_review";
+    // Two stages need two people: someone who approved an earlier stage can't approve this one.
+    const approvedBy = inReview ? decisionRows.filter((d) => d.decision === "approved").map((d) => d.actorId) : [];
+    const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
+    // Named on the stage the version waits on: may comment too (any team).
+    const namedIds = inReview ? stageApproverIds(stage) : [];
     const contractChanges = version.contractChanges ?? [];
 
     return {
@@ -250,7 +258,7 @@ export const getReviewScreen = cache(
       },
       version: {
         id: version.id,
-        number: version.number,
+        number,
         state: version.state,
         body: version.body,
         variables: version.variables,
@@ -263,7 +271,7 @@ export const getReviewScreen = cache(
         submitNote: version.submitNote,
         sunsetAt: isoOrUndefined(version.sunsetAt) ?? null,
         contractChanges,
-        contractLines: describeChanges(contractChanges, version.number),
+        contractLines: describeChanges(contractChanges, number),
       },
       baseline:
         active && active.id !== version.id && active.number !== null
@@ -281,9 +289,9 @@ export const getReviewScreen = cache(
       ),
       threads,
       can: {
-        approve: decide,
+        approve,
         requestChanges: decide,
-        comment: can(space.viewer, "review.comment", { teamId: template.teamId }),
+        comment: can(space.viewer, "review.comment", { teamId: template.teamId, stageApproverIds: namedIds }),
       },
       consumerUsage,
       today: dayOf(nowDate),

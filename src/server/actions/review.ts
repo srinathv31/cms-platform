@@ -24,7 +24,7 @@ import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { loadChain } from "@/server/queries/review-shared";
+import { loadApprovedBy, loadChain, stageApproverIds, waitingStage } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke.
@@ -118,12 +118,25 @@ async function findVersion(templateId: string, number: number) {
       contentTypeId: templates.contentTypeId,
       submittedBy: versions.submittedBy,
       revoke: versions.revoke,
+      state: versions.state,
+      currentStage: versions.currentStage,
     })
     .from(versions)
     .innerJoin(templates, eq(templates.id, versions.templateId))
     .where(and(eq(versions.templateId, templateId), eq(versions.number, number)))
     .limit(1)
     .then((rows) => rows[0]);
+}
+
+/**
+ * The decide check's resource: the team, the submitter (maker-checker) and the users the stage the
+ * version waits on names (they decide it on any team). The stage is read again in the transaction.
+ */
+async function decideResource(found: FoundVersion | undefined): Promise<PermissionResource> {
+  if (!found) return { teamId: null };
+  const named =
+    found.state === "in_review" ? stageApproverIds(waitingStage(await loadChain(db, found.contentTypeId), found.currentStage)) : [];
+  return { teamId: found.teamId, submittedBy: found.submittedBy, stageApproverIds: named };
 }
 
 type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
@@ -352,7 +365,7 @@ export async function requestChanges(input: {
   const viewer = await getViewer();
   const parsed = RequestChangesInput.safeParse(input);
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.decide", { teamId: found?.teamId ?? null, submittedBy: found?.submittedBy });
+  const refused = check(viewer, "version.decide", await decideResource(found));
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
   if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, reason: REASONS.reasonTooLong };
@@ -436,7 +449,7 @@ export async function approveVersion(input: {
   const viewer = await getViewer();
   const parsed = ApproveInput.safeParse(input);
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.decide", { teamId: found?.teamId ?? null, submittedBy: found?.submittedBy });
+  const refused = check(viewer, "version.decide", await decideResource(found));
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
 
@@ -460,6 +473,7 @@ export async function approveVersion(input: {
       sunsetPrevious,
       sampleSetsSeen: parsed.data.sampleSetsSeen,
       templateName: await templateName(tx, found.templateId),
+      approvedBy: (await loadApprovedBy(tx, [version.id])).get(version.id) ?? [],
     });
     if (!outcome.ok) refuse(outcome.reason);
 

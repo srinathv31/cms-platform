@@ -26,6 +26,7 @@ export const REASONS = {
   ownVersion: "You submitted this version.",
   ownRevoke: "You started this revoke. Another approver must confirm it.",
   ownRequest: "You can't decide your own access request.",
+  ownAccess: "You can't change your own access.",
 } as const;
 
 // ── Grants ────────────────────────────────────────────────────
@@ -54,6 +55,16 @@ const PLATFORM_GRANTS: Record<PlatformRole, readonly Action[]> = {
 
 const EVERYONE: readonly Action[] = ["access.request"];
 
+/**
+ * What a user named by a version's current approval stage may do on that version (Phase 6: Dana
+ * Park's "Legal reviewer" stage): open it, decide it and comment on it, on ANY team, with no
+ * membership there (a Legal stage covers every team's disclosures; otherwise a Deposits submission
+ * would wait forever on someone who can't see it). The person needs some active access (a team or a
+ * platform role): a suspended or lapsed person with nowhere to sign in to acts on nothing. An Auditor
+ * stays read-only even when named.
+ */
+const NAMED_APPROVER: readonly Action[] = ["template.view", "version.decide", "review.comment"];
+
 // ── Guards ────────────────────────────────────────────────────
 
 type Guard = (viewer: Viewer, resource: PermissionResource) => string | null;
@@ -64,6 +75,8 @@ const GUARDS: Partial<Record<Action, Guard>> = {
   // Two-person revoke: the confirmer must be a different approver.
   "version.revoke.confirm": (v, r) => (r.revokeStartedBy === v.userId ? REASONS.ownRevoke : null),
   "team.decideAccessRequest": (v, r) => (r.requesterId === v.userId ? REASONS.ownRequest : null),
+  // Nobody changes their own roles, removes, suspends, keeps, reinstates or recertifies themselves.
+  "team.manageMembers": (v, r) => (r.subjectUserId === v.userId ? REASONS.ownAccess : null),
 };
 
 // ── The check ─────────────────────────────────────────────────
@@ -74,7 +87,9 @@ export function can(viewer: Viewer, action: Action, resource: PermissionResource
   // A self-block explains itself to anyone who can see the item, role or not:
   // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker).
   if (blocked && granted(viewer, "template.view", teamId)) return { ok: false, reason: blocked };
-  if (!granted(viewer, action, teamId)) return { ok: false, reason: REASONS.generic };
+  if (!granted(viewer, action, teamId) && !namedApprover(viewer, action, resource, teamId)) {
+    return { ok: false, reason: REASONS.generic };
+  }
   return blocked ? { ok: false, reason: blocked } : { ok: true };
 }
 
@@ -101,6 +116,25 @@ function granted(viewer: Viewer, action: Action, teamId: string | null): boolean
   if (viewer.platformRole && PLATFORM_GRANTS[viewer.platformRole].includes(action)) return true;
   if (teamId === null) return false; // cross-team context: platform roles only
   return rolesOn(viewer, teamId).some((role) => TEAM_GRANTS[role].includes(action));
+}
+
+/** A user the version's current stage names, opening, deciding or commenting on it (any team). */
+function namedApprover(
+  viewer: Viewer,
+  action: Action,
+  resource: PermissionResource,
+  teamId: string | null,
+): boolean {
+  if (!NAMED_APPROVER.includes(action) || teamId === null) return false;
+  if (!resource.stageApproverIds?.includes(viewer.userId)) return false;
+  // The Auditor role is read-only everywhere: being named on a stage gives an Auditor nothing.
+  if (viewer.platformRole === "auditor") return false;
+  return hasActiveAccess(viewer);
+}
+
+/** An active membership with a role somewhere, or a platform role. */
+function hasActiveAccess(viewer: Viewer): boolean {
+  return viewer.platformRole !== null || viewer.memberships.some((m) => m.status === "active" && m.roles.length > 0);
 }
 
 /** null, undefined and "all" all mean the cross-team context. */

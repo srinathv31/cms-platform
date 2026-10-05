@@ -18,7 +18,8 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       style={{ "--sidebar-width": "var(--sidebar-w)" } as CSSProperties}
       className="h-svh min-h-0 overflow-hidden bg-app"
     >
-      <Sidebar variant="inset" collapsible="none" className="shrink-0">
+      {/* One landmark for the whole sidebar: the switcher, the space's pages, its card, Settings and Help. */}
+      <Sidebar variant="inset" collapsible="none" role="navigation" aria-label="Sidebar" className="shrink-0">
         <SidebarHeader className="gap-0 px-3 pt-4 pb-2">
           <Stream fallback={<TeamSwitcherSkeleton />}>
             <TeamSwitcherHole />

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "24e76817-31a3-43b1-8b3e-53af4e8e22f3",
+  "id": "e57a32ec-8154-47fa-bd02-18aca2f2a44e",
   "prevId": "781fb1cd-82bd-4bb5-9412-788bb9a97c81",
   "tables": {
     "access_requests": {
@@ -79,7 +79,23 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "access_requests_team_status": {
+          "name": "access_requests_team_status",
+          "columns": [
+            "team_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "access_requests_user": {
+          "name": "access_requests_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "access_requests_user_id_users_id_fk": {
           "name": "access_requests_user_id_users_id_fk",
@@ -854,6 +870,27 @@
         },
         "status_changed_at": {
           "name": "status_changed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status_reason": {
+          "name": "status_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "inactivity_flagged_at": {
+          "name": "inactivity_flagged_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "inactivity_kept_at": {
+          "name": "inactivity_kept_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

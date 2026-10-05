@@ -36,6 +36,24 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 /**
+ * A reset brings the seeded sidebar cards back: forget every card dismissal (`sidebar-card.tsx`
+ * remembers them in localStorage as `ucomp:dismissed:<card id>`), and tell mounted cards.
+ */
+function clearCardDismissals() {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith("ucomp:dismissed:")) keys.push(key);
+    }
+    for (const key of keys) window.localStorage.removeItem(key);
+  } catch {
+    /* storage blocked: nothing was remembered */
+  }
+  window.dispatchEvent(new Event("ucomp:card-dismissed"));
+}
+
+/**
  * Demo-only tools: a dashed pill, deliberately unlike the product's own controls.
  * `clock` is a server-rendered readout passed in as a slot.
  */
@@ -91,6 +109,8 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
                 <AlertDialogAction
                   disabled={pending}
                   onClick={() => {
+                    // Before the action: it redirects, so nothing after it is sure to run.
+                    clearCardDismissals();
                     startTransition(async () => {
                       await resetDemoAction();
                     });

@@ -2,7 +2,8 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
+import { runAccessSweep } from "@/server/access-sweep";
 import { advanceClock } from "@/server/clock";
 import { resetDemo } from "@/server/reset";
 import { DEFAULT_PERSONA, PERSONA_COOKIE } from "@/server/viewer";
@@ -21,9 +22,14 @@ export async function resetDemoAction(): Promise<void> {
   redirect("/coral-offers/library");
 }
 
-/** Move the demo clock forward by whole days. */
+/**
+ * Move the demo clock forward by whole days, then apply every access deadline the jump crossed
+ * (recertification lapses, the 90-day flag, the 120-day suspension), backdated to when each was due.
+ */
 export async function advanceClockAction(days: number): Promise<void> {
   if (!Number.isInteger(days) || days < 1 || days > 3650) throw new Error("Enter 1 to 3650 days");
   await advanceClock(days);
+  await runAccessSweep();
   revalidatePath("/", "layout");
+  refresh();
 }

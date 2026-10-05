@@ -1,5 +1,6 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { stageAt } from "@/domain/approval-chain";
 import { can } from "@/domain/permissions";
 import {
   BAD_REQUEST_MESSAGES,
@@ -21,7 +22,7 @@ import type { EmailRender, RenderDoc, RenderError, ResolveContext } from "@/doma
 import type { Channel, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db as appDb, type Db } from "@/server/db/client";
-import { consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import { approvalStages, approvals, consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
 import { renderEmail } from "./channels/email";
 import { renderPdf } from "./channels/pdf";
 import { renderWeb } from "./channels/web";
@@ -89,6 +90,7 @@ type TemplateRow = {
   id: string;
   name: string;
   teamId: string;
+  contentTypeId: string;
   contentTypeName: string;
   allowedChannels: Channel[];
 };
@@ -111,6 +113,7 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
       id: templates.id,
       name: templates.name,
       teamId: templates.teamId,
+      contentTypeId: templates.contentTypeId,
       contentTypeName: contentTypes.name,
       allowedChannels: contentTypes.allowedChannels,
     })
@@ -150,6 +153,30 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
   return result;
 }
 
+/**
+ * The viewer sees the template's team; or, as on the review screen (`requireReviewVersion`), the
+ * stage this version waits on names them (a Legal reviewer outside the team), or they decided it.
+ */
+async function previewAllowed(db: Db, viewer: Viewer, template: TemplateRow, version: VersionRow): Promise<boolean> {
+  if (can(viewer, "template.view", { teamId: template.teamId }).ok) return true;
+  if (version.state === "in_review") {
+    const chain = await db
+      .select({ position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+      .from(approvalStages)
+      .where(eq(approvalStages.contentTypeId, template.contentTypeId))
+      .orderBy(asc(approvalStages.position));
+    const rule = stageAt(chain, version.currentStage)?.rule;
+    const named = rule?.kind === "user" ? [rule.userId] : [];
+    if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: named }).ok) return true;
+  }
+  const [decided] = await db
+    .select({ id: approvals.id })
+    .from(approvals)
+    .where(and(eq(approvals.versionId, version.id), eq(approvals.actorId, viewer.userId)))
+    .limit(1);
+  return decided !== undefined;
+}
+
 async function activeNumber(db: Db, templateId: string): Promise<number | null> {
   const [row] = await db
     .select({ number: versions.number })
@@ -170,7 +197,7 @@ async function renderVersion(
 
   if (input.preview) {
     // 3. The CMS's own preview: the persona must be able to see the template's team.
-    if (!input.viewer || !can(input.viewer, "template.view", { teamId: template.teamId }).ok) {
+    if (!input.viewer || !(await previewAllowed(db, input.viewer, template, version))) {
       return fail(previewForbidden());
     }
     // 4 is skipped (any state previews), but a Superseded version still names its successor.

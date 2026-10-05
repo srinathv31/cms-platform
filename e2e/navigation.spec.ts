@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
+import { resetDemoData } from "./helpers/access";
 import {
   asPersona,
   caret,
@@ -40,8 +39,7 @@ const TYPED = "qz";
 
 test.afterAll(() => {
   test.setTimeout(90_000);
-  const root = path.dirname(test.info().config.configFile ?? path.join(process.cwd(), "playwright.config.ts"));
-  execFileSync("npm", ["run", "db:reset"], { cwd: root, stdio: "pipe" });
+  resetDemoData();
 });
 
 // ── Finding things ───────────────────────────────────────────────────────────

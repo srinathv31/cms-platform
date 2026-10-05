@@ -5,6 +5,7 @@ import { requireSpaceFromParams, settingsAccessFor } from "@/server/queries/spac
 import { SettingsDialog } from "./settings-dialog";
 import { SettingsNavList } from "./settings-nav-list";
 import { visibleGroups } from "./sections";
+import { getTeamNavTrails } from "./team/nav-counts";
 
 type TeamParams = Promise<{ team: string }>;
 
@@ -13,7 +14,8 @@ async function SettingsNav({ params }: { params: TeamParams }) {
   const space = await requireSpaceFromParams(params);
   const access = settingsAccessFor(space.viewer, space.slug);
   if (visibleGroups(access).length === 0) redirect(`/${space.slug}/library`);
-  return <SettingsNavList teamSlug={space.slug} access={access} />;
+  const trails = access.team ? await getTeamNavTrails(space.slug) : {};
+  return <SettingsNavList teamSlug={space.slug} access={access} trails={trails} />;
 }
 
 function SettingsNavSkeleton() {

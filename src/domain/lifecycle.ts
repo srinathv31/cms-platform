@@ -393,6 +393,7 @@ export const REFUSALS = {
   alreadyRevoked: "This version is already revoked.",
   revokePending: "A revoke is already waiting for confirmation.",
   noRevokePending: "There's no revoke waiting for confirmation.",
+  approvedEarlierStage: "You approved an earlier stage.",
 } as const;
 
 /**
@@ -537,8 +538,9 @@ export type ApproveResult = Outcome<Approved>;
  * keep rendering it), with an optional sunset date for it in the same step.
  *
  * The caller checks who may act on the stage (`canActOnStage`); this refuses the submitter
- * (maker-checker), a version no longer in review, a missing stage, and a sunset date that isn't after
- * today. `sampleSetsSeen` records which sample sets the approver previewed.
+ * (maker-checker), a version no longer in review, a missing stage, someone who already approved an
+ * earlier stage of this round (`approvedBy`: two stages need two people), and a sunset date that
+ * isn't after today. `sampleSetsSeen` records which sample sets the approver previewed.
  */
 export function approve(input: {
   version: ReviewVersion;
@@ -551,11 +553,17 @@ export function approve(input: {
   sunsetPrevious: Date | null;
   sampleSetsSeen: readonly string[];
   templateName: string;
+  /**
+   * Who approved a stage of this version already (its `approved` decisions; a version is reviewed in
+   * one round, since a change request sends the next one in as a new number).
+   */
+  approvedBy?: readonly string[];
 }): ApproveResult {
   const { version, chain, actorId, actorName, now, active, sunsetPrevious, templateName } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
   if (version.submittedBy === actorId) return refuse(REASONS.ownVersion);
+  if (input.approvedBy?.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
   const stages = orderedStages(chain);
   const index = version.currentStage;
   const stage = stages[index];

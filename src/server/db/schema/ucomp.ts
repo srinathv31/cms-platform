@@ -16,6 +16,7 @@ import type {
   ContractChange,
   JSONContent,
   MembershipStatus,
+  MembershipStatusReason,
   PlatformRole,
   RequiredSection,
   RevokeRecord,
@@ -67,6 +68,12 @@ export const memberships = sqliteTable(
     addedAt: ts("added_at").notNull(),
     addedBy: text("added_by").references(() => users.id),
     statusChangedAt: ts("status_changed_at"),
+    /** Why the membership is suspended or lapsed; null while active (Phase 6). */
+    statusReason: text("status_reason").$type<MembershipStatusReason>(),
+    /** When the 90-day inactivity flag was raised (and its notification sent); null when not flagged. */
+    inactivityFlaggedAt: ts("inactivity_flagged_at"),
+    /** A Team Admin's last Keep (or reinstatement): the inactivity clock restarts from it. */
+    inactivityKeptAt: ts("inactivity_kept_at"),
   },
   (t) => [uniqueIndex("memberships_user_team").on(t.userId, t.teamId)],
 );
@@ -304,22 +311,26 @@ export const notifications = sqliteTable(
   (t) => [index("notifications_user").on(t.userId)],
 );
 
-export const accessRequests = sqliteTable("access_requests", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id),
-  teamId: text("team_id")
-    .notNull()
-    .references(() => teams.id),
-  role: text("role").$type<TeamRole>().notNull(),
-  reason: text("reason").notNull(),
-  status: text("status").$type<"pending" | "approved" | "denied">().notNull().default("pending"),
-  decidedBy: text("decided_by").references(() => users.id),
-  decidedAt: ts("decided_at"),
-  decisionNote: text("decision_note"),
-  createdAt: ts("created_at").notNull(),
-});
+export const accessRequests = sqliteTable(
+  "access_requests",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
+    role: text("role").$type<TeamRole>().notNull(),
+    reason: text("reason").notNull(),
+    status: text("status").$type<"pending" | "approved" | "denied">().notNull().default("pending"),
+    decidedBy: text("decided_by").references(() => users.id),
+    decidedAt: ts("decided_at"),
+    decisionNote: text("decision_note"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [index("access_requests_team_status").on(t.teamId, t.status), index("access_requests_user").on(t.userId)],
+);
 
 export const recertifications = sqliteTable("recertifications", {
   id: text("id").primaryKey(),

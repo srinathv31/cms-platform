@@ -404,12 +404,12 @@ async function switchVia(page: Page, personaName: string) {
 }
 
 test.describe("persona switcher", () => {
-  test("lists all eight personas with a one-line role summary", async ({ page }) => {
+  test("lists all nine personas with a one-line role summary", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
     await profileButton(page).click();
     const items = page.getByRole("menuitemradio");
-    await expect(items).toHaveCount(8);
+    await expect(items).toHaveCount(9); // the build plan's eight, plus Dana Park (Legal, Phase 6)
     await expect(items.nth(0)).toContainText("Maya Chen");
     await expect(items.nth(0)).toContainText("Coral Offers · Author");
     await expect(items.nth(0)).toBeChecked();
@@ -776,12 +776,13 @@ test.describe("overlays", () => {
     await expect(profileButton(page)).toHaveAccessibleName(/^Alex Kim,/);
   });
 
-  test("alex sees the recertification card and can dismiss it", async ({ page }) => {
+  test("alex sees the access request card and can dismiss it", async ({ page }) => {
     await asPersona(page, "alex");
     await page.goto("/coral-offers/library");
     const card = page.locator("[data-slot='sidebar-card']");
     await expect(card).toBeVisible();
-    await expect(card).toContainText("Recertification due");
+    // One card per space, by priority: Chris's pending request outranks the recertification (Phase 6).
+    await expect(card).toContainText("Access request pending");
     await card.getByRole("button", { name: "Dismiss" }).click();
     await expect(card).toHaveCount(0);
     await page.reload();
@@ -969,8 +970,12 @@ test.describe("router prefetch", () => {
     page.on("request", (r) => {
       if (r.url().includes("_rsc=")) rsc++;
     });
-    // Template ids are deterministic across resets (seeded RNG); the heading check fails loudly if that changes.
-    await page.goto("/coral-offers/templates/UC-6X2XWN");
+    // Template ids depend on the seed's order of draws, so take this one from the library instead of hardcoding it.
+    await page.goto("/coral-offers/library");
+    const href = await page.getByRole("link", { name: /^Balance Transfer Intro — Terms/ }).first().getAttribute("href");
+    expect(href, "the Balance Transfer template's link").toMatch(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}$/);
+    rsc = 0;
+    await page.goto(href!);
     await expect(page.getByRole("heading", { level: 1, name: "Balance Transfer Intro — Terms" })).toBeVisible();
     await expect(ring(page)).toBeVisible();
     await page.waitForTimeout(3000);

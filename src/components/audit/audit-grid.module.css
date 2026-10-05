@@ -1,0 +1,83 @@
+/*
+ * The audit table's grid, shared by the table and its skeleton so nothing moves when rows stream in.
+ * Wide: one line per event, Action sized for its longest label, Template and Details with a floor.
+ * Narrow (the table under the width those need, about a 1100px window): Who stacks under When and
+ * Details under Template, so no column collapses. Narrowest: Action stacks under Template too.
+ */
+.table {
+  container-type: inline-size;
+}
+
+.grid {
+  display: grid;
+  column-gap: 0.75rem;
+  row-gap: 0.125rem;
+}
+
+/* Narrowest (a small window with the sidebar): two columns; Action goes under Template. */
+.withTeam {
+  grid-template-columns: 9.75rem minmax(0, 1fr);
+  grid-template-areas:
+    "when tpl"
+    "who act"
+    "team det";
+}
+
+.noTeam {
+  grid-template-columns: 9.75rem minmax(0, 1fr);
+  grid-template-areas:
+    "when tpl"
+    "who act"
+    ". det";
+}
+
+@container (min-width: 36rem) {
+  .withTeam {
+    grid-template-columns: 9.75rem 6.5rem minmax(0, 1fr) 10rem;
+    grid-template-areas:
+      "when team tpl act"
+      "who team det act";
+  }
+}
+
+@container (min-width: 29rem) {
+  .noTeam {
+    grid-template-columns: 9.75rem minmax(0, 1fr) 10rem;
+    grid-template-areas:
+      "when tpl act"
+      "who det act";
+  }
+}
+
+@container (min-width: 56rem) {
+  .withTeam {
+    grid-template-columns: 9.75rem 8rem 6.5rem minmax(8rem, 1.3fr) 10rem minmax(10rem, 1.5fr);
+    grid-template-areas: "when who team tpl act det";
+  }
+}
+
+@container (min-width: 49rem) {
+  .noTeam {
+    grid-template-columns: 9.75rem 8rem minmax(8rem, 1.3fr) 10rem minmax(10rem, 1.5fr);
+    grid-template-areas: "when who tpl act det";
+  }
+}
+
+.when {
+  grid-area: when;
+}
+.who {
+  grid-area: who;
+}
+.team {
+  grid-area: team;
+}
+.tpl {
+  grid-area: tpl;
+}
+.act {
+  grid-area: act;
+}
+.det {
+  grid-area: det;
+}

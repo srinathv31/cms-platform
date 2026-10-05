@@ -35,16 +35,21 @@ interface Member {
   roles: TeamRole[];
   addedDaysAgo: number;
   addedBy: string;
+  /** Days ago the 90-day inactivity flag was raised (people.ts sets their last sign-in). */
+  flaggedDaysAgo?: number;
 }
 
-// Matches the persona table in the build plan. Morgan has no membership on purpose.
+// Matches the persona table in the build plan. Morgan has no membership on purpose. Dana Park (Legal)
+// views Coral Offers so a "Legal reviewer" stage that names her can be demoed (Phase 6).
 export const MEMBERS: Member[] = [
   { user: "alex", team: "coral-offers", roles: ["team_admin", "approver"], addedDaysAgo: 400, addedBy: "riley" },
   { user: "jordan", team: "coral-offers", roles: ["approver"], addedDaysAgo: 380, addedBy: "alex" },
   { user: "maya", team: "coral-offers", roles: ["author"], addedDaysAgo: 370, addedBy: "alex" },
   { user: "priya", team: "coral-offers", roles: ["author"], addedDaysAgo: 340, addedBy: "alex" },
   { user: "sam", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 300, addedBy: "alex" },
-  { user: "devon", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 250, addedBy: "alex" },
+  // Last signed in 95 days ago: flagged 5 days ago, suspended automatically 25 days from now.
+  { user: "devon", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 250, addedBy: "alex", flaggedDaysAgo: 5 },
+  { user: "dana", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 60, addedBy: "alex" },
 
   { user: "naomi", team: "deposits", roles: ["team_admin", "approver"], addedDaysAgo: 380, addedBy: "riley" },
   { user: "eli", team: "deposits", roles: ["author"], addedDaysAgo: 370, addedBy: "naomi" },
@@ -84,6 +89,9 @@ export function seedTeams(ctx: SeedCtx) {
       addedAt: ctx.at(m.addedDaysAgo),
       addedBy: m.addedBy,
       statusChangedAt: null,
+      statusReason: null,
+      inactivityFlaggedAt: m.flaggedDaysAgo === undefined ? null : ctx.at(m.flaggedDaysAgo),
+      inactivityKeptAt: null,
     });
     for (const role of m.roles) ctx.sink.membershipRoles.push({ membershipId: id, role });
     ctx.sink.auditEvents.push({
@@ -98,3 +106,11 @@ export function seedTeams(ctx: SeedCtx) {
 }
 
 export const teamMemberIds = (team: TeamId) => MEMBERS.filter((m) => m.team === team).map((m) => m.user);
+
+/** Who a recertification covers: the team's members, Team Admins aside (domain/access.ts `recertSubjects`). */
+export const recertSubjectIds = (team: TeamId) =>
+  MEMBERS.filter((m) => m.team === team && !m.roles.includes("team_admin"))
+    .map((m) => m.user)
+    .sort();
+
+export const flaggedMembers = (team: TeamId) => MEMBERS.filter((m) => m.team === team && m.flaggedDaysAgo !== undefined);

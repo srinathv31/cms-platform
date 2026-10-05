@@ -11,16 +11,21 @@ import { DialogOverlay, DialogPortal } from "@/components/ui/dialog";
 export function ScrimDialogContent({
   className,
   children,
+  instant = false,
   ...props
-}: DialogPrimitive.Popup.Props) {
+}: DialogPrimitive.Popup.Props & {
+  /** Skip the enter animation (one dialog replacing another in place). */
+  instant?: boolean;
+}) {
   return (
     <DialogPortal>
-      <DialogOverlay className="bg-scrim supports-backdrop-filter:backdrop-blur-none" />
+      <DialogOverlay className={cn("bg-scrim supports-backdrop-filter:backdrop-blur-none", instant && "data-open:animate-none!")} />
       <DialogPrimitive.Popup
         data-slot="scrim-dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 overflow-hidden bg-surface text-text shadow-modal outline-none",
           "duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-98 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-98",
+          instant && "data-open:animate-none!",
           className,
         )}
         {...props}

@@ -1,7 +1,7 @@
 import { getViewer } from "@/server/viewer";
 import { getShell } from "@/server/queries/spaces";
 import { getPersonaSummaries } from "@/server/queries/personas";
-import { getNotifications } from "@/server/queries/notifications";
+import { getNotificationsData } from "@/server/queries/notifications";
 import { getPaletteTemplates } from "@/server/queries/palette";
 import { CommandPalette } from "./command-palette";
 import { NotificationsPopover } from "./notifications-popover";
@@ -13,7 +13,7 @@ export async function TopBarHole() {
     getViewer(),
     getShell(),
     getPersonaSummaries(),
-    getNotifications(),
+    getNotificationsData(),
     getPaletteTemplates(),
   ]);
   const me = personas.find((p) => p.id === viewer.userId) ?? {
@@ -27,7 +27,7 @@ export async function TopBarHole() {
   return (
     <div className="flex items-center gap-2">
       {shell.spaces.length > 0 ? <CommandPalette templates={templates} spaces={shell.spaces} /> : null}
-      <NotificationsPopover items={notifications} />
+      <NotificationsPopover data={notifications} />
       <ProfileMenu me={me} personas={personas} />
     </div>
   );
