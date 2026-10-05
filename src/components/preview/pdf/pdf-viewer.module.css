@@ -1,0 +1,105 @@
+/*
+ * The PDF viewer's page layers. The page box (paper, hairline, gap) is Tailwind in the components;
+ * this file is only what pdf.js's text layer needs, copied from pdfjs-dist/web/pdf_viewer.css
+ * (6.4.299) and trimmed to the rules this viewer uses.
+ *
+ * Scaling: each page sets --scale-factor = (page CSS width) / (page width in PDF units), derived from
+ * --pdf-px (the column width, set by the viewer as the container resizes). The text layer sizes and
+ * places everything in terms of it, so it follows a resize live while the canvas re-renders.
+ */
+
+.page {
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  direction: ltr;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.textLayer {
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+
+  color-scheme: only light;
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(:global(.markedContent)),
+.textLayer :global(.markedContent) span:not(:global(.markedContent)) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer :global(.markedContent) {
+  display: contents;
+}
+
+/* The selection tints the canvas text underneath, so it must stay translucent. */
+.textLayer ::selection {
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  color: transparent;
+}
+
+.textLayer br::selection {
+  background: transparent;
+}
+
+/* pdf.js's selection aid: while dragging, this block covers the page so the selection doesn't
+   jump to the page's first line when the pointer crosses a gap between text runs. */
+.textLayer :global(.endOfContent) {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.textLayer.selecting :global(.endOfContent) {
+  top: 0;
+}
+
+.textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}

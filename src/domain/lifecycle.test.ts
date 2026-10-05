@@ -8,7 +8,9 @@ import {
   editActive,
   initialTemplateName,
   planDraftStart,
+  submit,
   type StarterContent,
+  type SubmitDraft,
   type VersionSnapshot,
 } from "./lifecycle";
 import type { JSONContent, SampleSet, Variable, VersionState } from "./types";
@@ -253,4 +255,187 @@ describe("editActive", () => {
       );
     },
   );
+});
+
+describe("submit", () => {
+  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+  const oneLine = (...inline: JSONContent[]): JSONContent => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: inline }],
+  });
+  const text = (value: string): JSONContent => ({ type: "text", text: value });
+
+  const draft: SubmitDraft = {
+    state: "draft",
+    variables: VARIABLES,
+    body: BODY,
+    emailSubject: null,
+    emailPreheader: null,
+    channels: ["pdf", "web"],
+  };
+  const SUBMITTER = "maya";
+  const run = (over: Partial<SubmitDraft> = {}, extra: { highestNumber?: number; baseline?: Variable[] | null } = {}) =>
+    submit({
+      draft: { ...draft, ...over },
+      highestNumber: extra.highestNumber ?? 0,
+      baseline: extra.baseline ?? null,
+      now: NOW,
+      submittedBy: SUBMITTER,
+    });
+
+  it("makes a first draft v1, in review, at the first approval stage", () => {
+    const result = run();
+    expect(result).toEqual({
+      ok: true,
+      changes: {
+        state: "in_review",
+        number: 1,
+        submittedBy: "maya",
+        submittedAt: NOW,
+        currentStage: 0,
+        contractChanges: null,
+      },
+      effects: [{ kind: "audit", action: "version.submitted", details: { number: 1 } }],
+    });
+  });
+
+  it("numbers the version one above the template's highest", () => {
+    const result = run({}, { highestNumber: 4 });
+    expect(result.ok && result.changes.number).toBe(5);
+    expect(result.ok && result.effects).toEqual([
+      { kind: "audit", action: "version.submitted", details: { number: 5 } },
+    ]);
+  });
+
+  it("records no contract changes when there is no Active version to compare with", () => {
+    const result = run({ variables: [...VARIABLES, { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" }] });
+    expect(result.ok && result.changes.contractChanges).toBeNull();
+  });
+
+  it("records the contract changes against the Active version's variables", () => {
+    const annualFee: Variable = { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" };
+    const result = run({ variables: [...VARIABLES, annualFee] }, { baseline: VARIABLES });
+    expect(result.ok && result.changes.contractChanges).toEqual([
+      { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+    ]);
+
+    const unchanged = run({}, { baseline: VARIABLES });
+    expect(unchanged.ok && unchanged.changes.contractChanges).toEqual([]);
+  });
+
+  it.each(["in_review", "changes_requested", "active", "superseded", "revoked"] as const)(
+    "refuses a %s version",
+    (state) => {
+      const result = run({ state });
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.reason).toBe(
+        state === "in_review" ? "This version is already in review." : "Only a draft can be submitted.",
+      );
+    },
+  );
+
+  it("names a chip in the document whose key isn't in the variable list", () => {
+    const body: JSONContent = {
+      type: "doc",
+      content: [
+        heading("b_one", "offer_details", "Offer details"),
+        { type: "paragraph", attrs: { id: "b_two" }, content: [text("Use code "), chip("promo_code")] },
+      ],
+    };
+    expect(run({ body })).toEqual({ ok: false, reason: "Define or remove {{promo_code}} before submitting." });
+  });
+
+  it("names every missing key once, in order of first use", () => {
+    const body: JSONContent = {
+      type: "doc",
+      content: [
+        { type: "paragraph", attrs: { id: "b_one" }, content: [chip("promo_code"), chip("first_name"), chip("promo_code")] },
+        { type: "paragraph", attrs: { id: "b_two" }, content: [chip("gift_name")] },
+      ],
+    };
+    expect(run({ body })).toEqual({
+      ok: false,
+      reason: "Define or remove {{promo_code}} and {{gift_name}} before submitting.",
+    });
+
+    const more: JSONContent = {
+      type: "doc",
+      content: [{ type: "paragraph", attrs: { id: "b_one" }, content: [chip("a_one"), chip("b_two"), chip("c_three")] }],
+    };
+    expect(run({ body: more })).toEqual({
+      ok: false,
+      reason: "Define or remove {{a_one}}, {{b_two}} and {{c_three}} before submitting.",
+    });
+  });
+
+  it("finds a missing key in a table cell, a list or a callout", () => {
+    const nested: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          attrs: { id: "t" },
+          content: [
+            {
+              type: "tableRow",
+              content: [{ type: "tableCell", content: [{ type: "paragraph", content: [chip("in_table")] }] }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(run({ body: nested })).toEqual({ ok: false, reason: "Define or remove {{in_table}} before submitting." });
+  });
+
+  it("checks the email subject and preheader while Email is on", () => {
+    const channels = ["pdf", "web", "email"] as const;
+    const subject = oneLine(text("Hi "), chip("first_name"));
+
+    expect(run({ channels: [...channels], emailSubject: oneLine(text("Offer "), chip("promo_code")) })).toEqual({
+      ok: false,
+      reason: "Define or remove {{promo_code}} before submitting.",
+    });
+    expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("gift_name")) })).toEqual({
+      ok: false,
+      reason: "Define or remove {{gift_name}} before submitting.",
+    });
+    expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("purchase_apr")) }).ok).toBe(true);
+  });
+
+  it("ignores the email fields while Email is off: they are not part of the output", () => {
+    const result = run({ channels: ["pdf", "web"], emailSubject: oneLine(chip("promo_code")) });
+    expect(result.ok).toBe(true);
+  });
+
+  it("asks for an email subject when Email is on and the subject is empty", () => {
+    const reason = "Add an email subject before submitting.";
+    const email = ["pdf", "web", "email"] as const;
+    expect(run({ channels: [...email], emailSubject: null })).toEqual({ ok: false, reason });
+    expect(run({ channels: [...email], emailSubject: oneLine() })).toEqual({ ok: false, reason });
+    expect(run({ channels: [...email], emailSubject: { type: "doc", content: [{ type: "paragraph" }] } })).toEqual({
+      ok: false,
+      reason,
+    });
+    expect(run({ channels: [...email], emailSubject: oneLine(text("   ")) })).toEqual({ ok: false, reason });
+  });
+
+  it("accepts an email subject that is only a chip, and needs no preheader", () => {
+    const result = run({ channels: ["email"], emailSubject: oneLine(chip("first_name")), emailPreheader: null });
+    expect(result.ok).toBe(true);
+  });
+
+  it("doesn't need a subject when Email is off", () => {
+    expect(run({ channels: ["pdf"], emailSubject: null }).ok).toBe(true);
+  });
+
+  it("reports an unknown key before the missing subject", () => {
+    const body: JSONContent = {
+      type: "doc",
+      content: [{ type: "paragraph", attrs: { id: "b_one" }, content: [chip("promo_code")] }],
+    };
+    expect(run({ body, channels: ["email"], emailSubject: null })).toEqual({
+      ok: false,
+      reason: "Define or remove {{promo_code}} before submitting.",
+    });
+  });
 });

@@ -7,10 +7,13 @@
 // the server layer writes in the same transaction.
 //
 // Phase 2.2 covers the two ways a draft comes to exist: `createDraft` (a new template from a
-// starter) and `editActive` (a new draft copied from the Active version). Submit, request
-// changes, approve, sunset and revoke arrive with the review phase.
+// starter) and `editActive` (a new draft copied from the Active version). Phase 3 adds the minimal
+// `submit` (Draft → In review). Request changes, approve, sunset and revoke arrive with the review
+// phase.
 
-import type { Channel, JSONContent, SampleSet, Variable, VersionState } from "./types";
+import { diffVariables } from "@/editor/model/contract";
+import { usageFromJSON } from "@/editor/model/usage";
+import type { Channel, ContractChange, JSONContent, SampleSet, Variable, VersionState } from "./types";
 
 // ── Defaults ──────────────────────────────────────────────────
 
@@ -28,7 +31,7 @@ export const DEFAULT_CHANNELS: readonly Channel[] = ["pdf", "web"];
 /** The audit event a transition asks the server layer to record. */
 export interface AuditEffect {
   kind: "audit";
-  action: "template.created" | "draft.started";
+  action: "template.created" | "draft.started" | "version.submitted";
   details: Record<string, unknown>;
 }
 
@@ -221,6 +224,111 @@ export function editActive(input: {
     },
     effects: [{ kind: "audit", action: "draft.started", details: { basedOn: active.number } }],
   };
+}
+
+// ── Submit for review ─────────────────────────────────────────
+
+/** What `submit` reads from the draft. The caller loads it from the version row. */
+export interface SubmitDraft {
+  state: VersionState;
+  variables: readonly Variable[];
+  body: JSONContent;
+  emailSubject: JSONContent | null;
+  emailPreheader: JSONContent | null;
+  channels: readonly Channel[];
+}
+
+export interface SubmitChanges {
+  state: "in_review";
+  /** Assigned here and then frozen: one above the template's highest existing version number. */
+  number: number;
+  submittedBy: string;
+  submittedAt: Date;
+  /** The approval chain starts at its first stage. */
+  currentStage: 0;
+  /** How the variable list differs from the Active version's; null when there is no Active version. */
+  contractChanges: ContractChange[] | null;
+}
+
+/** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
+export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | { ok: false; reason: string };
+
+/**
+ * Draft → In review, as the template's next version. This is the minimal submit of Phase 3 (the plan's
+ * §12 Q3 default): a version number, the contract changes and an audit event. The full dialog with the
+ * contract diff, the note and the approval chain arrive with the review phase.
+ *
+ * Refuses, with the sentence the author reads, when
+ *   - the version isn't a draft (a second tab, a double click);
+ *   - a chip names a key the variable list doesn't have: in the document, and in the email subject
+ *     and preheader while Email is on (they are not part of the output otherwise);
+ *   - Email is on and the subject is empty.
+ *
+ * `highestNumber` is the highest version number the template has (0 when it has none) and `baseline` is
+ * the Active version's variable list, or null. Renamed keys read as "removed" plus "added" here: the
+ * rename history lives in the editor session, and the review phase's dialog can bring it in.
+ */
+export function submit(input: {
+  draft: SubmitDraft;
+  highestNumber: number;
+  baseline: readonly Variable[] | null;
+  now: Date;
+  submittedBy: string;
+}): SubmitResult {
+  const { draft, highestNumber, baseline, now, submittedBy } = input;
+
+  if (draft.state === "in_review") return { ok: false, reason: "This version is already in review." };
+  if (draft.state !== "draft") return { ok: false, reason: "Only a draft can be submitted." };
+
+  const emailOn = draft.channels.includes("email");
+
+  const defined = new Set(draft.variables.map((v) => v.key));
+  const fields = emailOn ? [draft.body, draft.emailSubject, draft.emailPreheader] : [draft.body];
+  const undefinedKeys = unique(fields.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
+  if (undefinedKeys.length > 0) {
+    return { ok: false, reason: `Define or remove ${listKeys(undefinedKeys)} before submitting.` };
+  }
+
+  if (emailOn && isBlankField(draft.emailSubject)) {
+    return { ok: false, reason: "Add an email subject before submitting." };
+  }
+
+  const number = highestNumber + 1;
+  return {
+    ok: true,
+    changes: {
+      state: "in_review",
+      number,
+      submittedBy,
+      submittedAt: now,
+      currentStage: 0,
+      contractChanges: baseline ? diffVariables(baseline, draft.variables) : null,
+    },
+    effects: [{ kind: "audit", action: "version.submitted", details: { number } }],
+  };
+}
+
+/** The keys of the chips in a document, in order of first use. */
+function chipKeys(doc: JSONContent | null): string[] {
+  return doc ? [...usageFromJSON(doc, { sections: false }).keys()] : [];
+}
+
+/** `{{a}}`, `{{a}} and {{b}}`, `{{a}}, {{b}} and {{c}}`. */
+function listKeys(keys: readonly string[]): string {
+  const named = keys.map((key) => `{{${key}}}`);
+  return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
+}
+
+/** True when a one-line field has no text (spaces don't count) and no chip. */
+function isBlankField(doc: JSONContent | null): boolean {
+  if (!doc) return true;
+  if (doc.type === "variable") return false;
+  if (typeof doc.text === "string" && doc.text.trim() !== "") return false;
+  return (doc.content ?? []).every(isBlankField);
+}
+
+function unique<T>(items: readonly T[]): T[] {
+  return [...new Set(items)];
 }
 
 // ── Helpers ───────────────────────────────────────────────────

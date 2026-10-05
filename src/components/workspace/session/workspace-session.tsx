@@ -4,7 +4,9 @@ import { createContext, use, useLayoutEffect, useState, useSyncExternalStore } f
 import { useDraftAutosave } from "../autosave/use-draft-autosave";
 import {
   createWorkspaceSession,
+  INITIAL_PREVIEW,
   type DraftBinding,
+  type PreviewState,
   type SessionStatus,
   type WorkspaceSession,
 } from "./session-store";
@@ -34,15 +36,15 @@ function SessionHostSlot({ session }: { session: WorkspaceSession }) {
   return binding ? <DraftSessionHost key={binding.versionId} session={session} binding={binding} /> : null;
 }
 
-/** Runs the autosave hook for one draft and hands its `save` and status to the store. Renders nothing. */
+/** Runs the autosave hook for one draft and hands its `save`, `flush` and status to the store. Renders nothing. */
 function DraftSessionHost({ session, binding }: { session: WorkspaceSession; binding: DraftBinding }) {
-  const { save, status, error } = useDraftAutosave({ versionId: binding.versionId, initialRev: binding.rev });
+  const { save, flush, status, error } = useDraftAutosave({ versionId: binding.versionId, initialRev: binding.rev });
 
   // Layout effect: changes held while this host was mounting go out before the browser paints.
   useLayoutEffect(() => {
-    session.attach(save);
+    session.attach(save, flush);
     return () => session.attach(null);
-  }, [session, save]);
+  }, [session, save, flush]);
 
   useLayoutEffect(() => {
     session.publishStatus(error === undefined ? { status } : { status, error });
@@ -68,4 +70,16 @@ export function useSaveStatus(): SessionStatus {
 export function useRailOpen(): boolean {
   const session = useWorkspaceSession();
   return useSyncExternalStore(session.subscribe, session.getRailOpen, () => false);
+}
+
+/** The preview's state (open, view, channel, sample set, device), shared by the tab bar and the rail. */
+export function usePreviewState(): PreviewState {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getPreview, () => INITIAL_PREVIEW);
+}
+
+/** Counts the saves that have landed; a change means the saved draft is different now. */
+export function useSaveTick(): number {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getSaveTick, () => 0);
 }

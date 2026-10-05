@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
-import { EditButton, RailToggle } from "./workspace-actions";
+import { EditButton, PreviewToggle, RailToggle, SubmitButton } from "./workspace-actions";
 import { WS } from "./workspace-grid";
 import { WorkspaceTabs, WorkspaceTabsSkeleton } from "./workspace-tabs";
 
@@ -35,12 +35,19 @@ export function WorkspaceTabBar({ params }: { params: Params }) {
 }
 
 /**
- * The one black button the state calls for. Today only Edit, on an Active template the viewer can
- * edit. A draft has none until Submit for review (Phase 4), and Preview comes in Phase 3, so a
- * viewer, or a draft, shows no button rather than a dead one.
+ * The outline Preview toggle (any version the viewer can see; it shows on the Content tab only), then
+ * the one black button the state calls for: Submit for review on a draft the viewer can submit, Edit
+ * on an Active template the viewer can edit. Anyone else, and every other state, shows no black
+ * button rather than a dead one. They stream in together, so Preview doesn't shift when the black
+ * button arrives.
  */
 async function TemplateActions({ params }: { params: Params }) {
   const { team, templateId } = await params;
   const t = await getWorkspaceHeader(team, templateId);
-  return t.canStartDraft ? <EditButton templateId={t.id} /> : null;
+  return (
+    <>
+      <PreviewToggle />
+      {t.canSubmit ? <SubmitButton templateId={t.id} /> : t.canStartDraft ? <EditButton templateId={t.id} /> : null}
+    </>
+  );
 }

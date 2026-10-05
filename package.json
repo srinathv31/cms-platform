@@ -18,8 +18,10 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@expo-google-fonts/newsreader": "^0.4.1",
     "@floating-ui/dom": "^1.8.0",
     "@libsql/client": "^0.18.0",
+    "@react-pdf/renderer": "^4.9.0",
     "@tiptap/core": "^3.31.4",
     "@tiptap/extension-drag-handle": "^3.31.4",
     "@tiptap/extension-drag-handle-react": "^3.31.4",
@@ -44,6 +46,7 @@
     "motion": "^14.0.0",
     "next": "16.3.8",
     "next-themes": "^0.4.6",
+    "pdfjs-dist": "^6.4.299",
     "react": "19.2.8",
     "react-day-picker": "^10.0.2",
     "react-dom": "19.2.8",

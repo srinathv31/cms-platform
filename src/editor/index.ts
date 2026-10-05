@@ -53,6 +53,13 @@ export {
   type VariableIconKey,
   type VariableTypeMeta,
 } from "./model/variables";
+// Phase 3 additions
+export {
+  DEFAULT_SAMPLE_SETS,
+  defaultSampleSets,
+  sampleSetValues,
+  type DefaultSampleSetId,
+} from "./model/sample-sets";
 
 // ── Server: render, import, seeds ────────────────────────────────
 export { baseExtensions, ensureBlockIds, type BaseExtensionOptions } from "./schema";

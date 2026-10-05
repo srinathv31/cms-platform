@@ -11,9 +11,14 @@ export async function WorkspaceContent({
   const doc = await getWorkspaceDocument(team, templateId);
   return (
     <ContentWorkspace
-      // A different version is a different document, editor and autosave session.
-      key={doc.versionId}
+      // A different version is a different document, editor and autosave session. So is the same
+      // version once it can't be edited any more (submitted, or the viewer changed): the key then
+      // changes with `editable`, and the new workspace mounts read-only and unbinds the session.
+      key={`${doc.versionId}:${doc.editable ? "edit" : "view"}`}
+      templateId={doc.templateId}
+      teamName={doc.teamName}
       versionId={doc.versionId}
+      versionNumber={doc.versionNumber}
       rev={doc.rev}
       body={doc.body}
       variables={doc.variables}
@@ -21,6 +26,10 @@ export async function WorkspaceContent({
       requiredSections={doc.requiredSections}
       channels={doc.channels}
       allowedChannels={doc.allowedChannels}
+      emailSubject={doc.emailSubject}
+      emailPreheader={doc.emailPreheader}
+      sampleSets={doc.sampleSets}
+      today={doc.today}
       editable={doc.editable}
     />
   );

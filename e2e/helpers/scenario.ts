@@ -272,3 +272,45 @@ export async function expectVisibleFocus(target: Locator, what: string) {
 }
 
 export const NAME = "Spring Travel Rewards — Terms";
+
+// ── Pacing and waiting (shared by the scenario specs) ──
+
+/** Types the way a person does: a little slower than the machine can. */
+export const typeSlowly = (page: Page, text: string) => page.keyboard.type(text, { delay: 18 });
+
+/**
+ * The document itself. With Email on, the subject and the preheader are editors too (also
+ * `.ProseMirror`), so `editor(page)` stops being one element: use this to mean "the body".
+ */
+export const documentEditor = (page: Page): Locator => page.getByRole("textbox", { name: "Document" });
+
+/**
+ * Waits until the point on `target` (its centre, or `at` from its top left) is not covered by another
+ * element. A page change runs a view transition for a few hundred milliseconds, and while it does the
+ * root element takes the pointer: a click then would be retried by Playwright with the target scrolled
+ * into view a different way. A person waits for the screen to settle, and so does this.
+ */
+export async function untilUncovered(target: Locator, at?: { x: number; y: number }) {
+  await expect
+    .poll(
+      () =>
+        target.evaluate((el, offset) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + (offset?.x ?? r.width / 2), r.top + (offset?.y ?? r.height / 2));
+          return !!hit && (hit === el || el.contains(hit));
+        }, at),
+      { message: "the target is not covered (a page transition is still running)" },
+    )
+    .toBe(true);
+}
+
+/** A counted, human-paced click, once the target can take it. */
+export async function press(clicks: ClickCounter, target: Locator) {
+  await untilUncovered(target);
+  await clicks.click(target);
+}
+
+/** A field that is an editor (the email subject, the preheader): its live ProseMirror view is attached. */
+export async function liveField(field: Locator) {
+  await expect.poll(() => field.evaluate((el) => "pmViewDesc" in el), { message: "the field is a live editor" }).toBe(true);
+}

@@ -1,4 +1,5 @@
 import type { Channel } from "@/domain/types";
+import type { RenderErrorCode } from "@/domain/render/types";
 import { DAY, HOUR, type SeedCtx, type VersionRef } from "./context";
 import type { ConsumerId } from "./platform";
 import { int, type Rng } from "./rng";
@@ -58,12 +59,12 @@ const PREVIEWS: { tpl: string; ver: string; from: number; to: number; count: num
 ];
 
 /** A handful of failures, so the Usage page has something honest to show. */
-const ERRORS: { tpl: string; ver: string; consumer: ConsumerId; at: number; count: number; code: string; channel: Channel }[] = [
-  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 22.3, count: 6, code: "MISSING_VARIABLE", channel: "pdf" },
-  { tpl: "balance-transfer", ver: "v1", consumer: "coral", at: 31.1, count: 2, code: "INVALID_VALUE", channel: "web" },
-  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 14.6, count: 1, code: "CHANNEL_NOT_ENABLED", channel: "email" },
-  { tpl: "rate-change-notice", ver: "v1", consumer: "coral", at: 9.4, count: 1, code: "RENDER_TIMEOUT", channel: "pdf" },
-  { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", at: 18.2, count: 2, code: "MISSING_VARIABLE", channel: "web" },
+const ERRORS: { tpl: string; ver: string; consumer: ConsumerId; at: number; count: number; code: RenderErrorCode; channel: Channel }[] = [
+  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 22.3, count: 6, code: "missing_variables", channel: "pdf" },
+  { tpl: "balance-transfer", ver: "v1", consumer: "coral", at: 31.1, count: 2, code: "invalid_values", channel: "web" },
+  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 14.6, count: 1, code: "channel_not_enabled", channel: "email" },
+  { tpl: "rate-change-notice", ver: "v1", consumer: "coral", at: 9.4, count: 1, code: "render_failed", channel: "pdf" },
+  { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", at: 18.2, count: 2, code: "missing_variables", channel: "web" },
 ];
 
 /** The latest render of each Active/Superseded version that Coral or Deposits Online still uses. */
@@ -226,7 +227,7 @@ export function seedHistory(ctx: SeedCtx) {
         channel: e.channel,
         outcome: "error",
         code: e.code,
-        durationMs: e.code === "RENDER_TIMEOUT" ? 30_000 : int(rng, 6, 24),
+        durationMs: e.code === "render_failed" ? 30_000 : int(rng, 6, 24),
       });
     }
   }

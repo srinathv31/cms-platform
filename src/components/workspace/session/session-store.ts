@@ -7,11 +7,15 @@
 //   - the autosave session for that draft, once the provider has mounted it (`attach`).
 //   - the document editor's handle, so the name field can move the caret into the document.
 //   - whether the rail overlay is open (narrow canvas).
+//   - the preview's state (open, which view the widened rail shows, channel, sample set, device), so the
+//     tab bar's Preview button and the rail agree.
+//   - a save "tick" that counts the saves that have landed, so an open preview knows when to re-render.
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
 
 import type { DocumentEditorHandle } from "@/editor";
+import type { Channel } from "@/domain/types";
 import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
 
 /** The draft the Content page is editing. `rev` is where autosave starts; it is read once per version. */
@@ -25,16 +29,52 @@ export interface SessionStatus {
   error?: string;
 }
 
+/** What the widened rail shows: the rendered output, or the normal rail (Channels, Email details, Variables). */
+export type PreviewView = "preview" | "variables";
+export type PreviewDevice = "desktop" | "mobile";
+
+/**
+ * The preview, as the tab bar and the rail share it. `channel` is the one the author last picked; the
+ * preview shows it only while that channel is on for the version, otherwise the first one that is.
+ * `setId` is the selected sample set ("typical" until another is picked; a set that no longer exists
+ * falls back to "typical" in the preview).
+ */
+export interface PreviewState {
+  open: boolean;
+  view: PreviewView;
+  channel: Channel;
+  setId: string;
+  device: PreviewDevice;
+}
+
+export const INITIAL_PREVIEW: PreviewState = {
+  open: false,
+  view: "preview",
+  channel: "pdf",
+  setId: "typical",
+  device: "desktop",
+};
+
 export interface WorkspaceSession {
   subscribe: (listener: () => void) => () => void;
   getBinding: () => DraftBinding | null;
   getStatus: () => SessionStatus;
   getRailOpen: () => boolean;
+  /** The same object until something changes, so it works as a store snapshot. */
+  getPreview: () => PreviewState;
+  /**
+   * How many saves have landed (the status went from saving to saved) since this session began.
+   * An open preview re-renders when it changes, because the saved draft is what the route renders.
+   */
+  getSaveTick: () => number;
 
   /** The Content page says which draft is editable, or null when the page is read-only. Idempotent per version. */
   bind: (binding: DraftBinding | null) => void;
-  /** The provider's autosave host connects (and, with null, disconnects) the live `save`. */
-  attach: (save: ((fields: SaveFields) => void) | null) => void;
+  /**
+   * The provider's autosave host connects (and, with null, disconnects) the live `save` and its
+   * `flush`. Changes held until now are handed to `save`, and anyone waiting in `flush` carries on.
+   */
+  attach: (save: ((fields: SaveFields) => void) | null, flush?: () => Promise<void>) => void;
   publishStatus: (status: SessionStatus) => void;
 
   /**
@@ -42,6 +82,13 @@ export interface WorkspaceSession {
    * first moments after a page loads) are held and handed over when it does.
    */
   save: (fields: SaveFields) => void;
+  /**
+   * Sends whatever is pending now, including changes held before the autosave host connected, and
+   * resolves once it is saved or has failed (the status says which). With no draft bound, or nothing
+   * to send and no host, it resolves at once. Call it before anything that reads the saved draft:
+   * submitting, previewing.
+   */
+  flush: () => Promise<void>;
 
   /** Ref callback for the document editor. */
   setEditor: (handle: DocumentEditorHandle | null) => void;
@@ -49,6 +96,12 @@ export interface WorkspaceSession {
   focusDocument: () => void;
 
   setRailOpen: (open: boolean) => void;
+
+  /** Opens the preview, on its Preview view. */
+  openPreview: () => void;
+  closePreview: () => void;
+  /** Changes any of the preview's fields; a change that changes nothing notifies nobody. */
+  setPreview: (patch: Partial<PreviewState>) => void;
 }
 
 const SAVED: SessionStatus = { status: "saved" };
@@ -57,13 +110,29 @@ export function createWorkspaceSession(): WorkspaceSession {
   let binding: DraftBinding | null = null;
   let status: SessionStatus = SAVED;
   let railOpen = false;
+  let preview: PreviewState = INITIAL_PREVIEW;
+  let saveTick = 0;
   let sink: ((fields: SaveFields) => void) | null = null;
+  let flusher: (() => Promise<void>) | null = null;
   let held: SaveFields | null = null;
+  // Flushes asked for while changes are held for a host that hasn't connected yet.
+  let waiting: (() => void)[] = [];
   let editor: DocumentEditorHandle | null = null;
   const listeners = new Set<() => void>();
 
   const emit = () => {
     for (const listener of [...listeners]) listener();
+  };
+  const setPreview = (patch: Partial<PreviewState>) => {
+    const next = { ...preview, ...patch };
+    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => next[key] === preview[key])) return;
+    preview = next;
+    emit();
+  };
+  const releaseWaiting = () => {
+    const release = waiting;
+    waiting = [];
+    for (const resolve of release) resolve();
   };
 
   return {
@@ -76,6 +145,8 @@ export function createWorkspaceSession(): WorkspaceSession {
     getBinding: () => binding,
     getStatus: () => status,
     getRailOpen: () => railOpen,
+    getPreview: () => preview,
+    getSaveTick: () => saveTick,
 
     bind(next) {
       if (next === null) {
@@ -83,6 +154,7 @@ export function createWorkspaceSession(): WorkspaceSession {
         binding = null;
         status = SAVED;
         held = null;
+        releaseWaiting();
         emit();
         return;
       }
@@ -93,17 +165,28 @@ export function createWorkspaceSession(): WorkspaceSession {
       emit();
     },
 
-    attach(save) {
+    attach(save, flush) {
       sink = save;
-      if (save && held) {
+      flusher = save ? (flush ?? null) : null;
+      if (!save) return;
+      if (held) {
         const pending = held;
         held = null;
         save(pending);
+      }
+      const release = waiting;
+      waiting = [];
+      if (release.length > 0) {
+        const done = flusher ? flusher() : Promise.resolve();
+        // A failed flush is the status's to report; the waiting callers just carry on.
+        void done.catch(() => undefined).then(() => release.forEach((resolve) => resolve()));
       }
     },
 
     publishStatus(next) {
       if (status.status === next.status && status.error === next.error) return;
+      // A save landing: the one transition a preview cares about. (A save that fails goes to "error".)
+      if (status.status === "saving" && next.status === "saved") saveTick += 1;
       status = next;
       emit();
     },
@@ -111,6 +194,17 @@ export function createWorkspaceSession(): WorkspaceSession {
     save(fields) {
       if (sink) sink(fields);
       else held = mergeFields(held, fields);
+    },
+
+    flush() {
+      if (sink) return flusher ? flusher() : Promise.resolve();
+      // Changes are held for a host that is about to connect: wait for it to take and send them.
+      if (binding !== null && held !== null) {
+        return new Promise<void>((resolve) => {
+          waiting.push(resolve);
+        });
+      }
+      return Promise.resolve();
     },
 
     setEditor(handle) {
@@ -125,5 +219,9 @@ export function createWorkspaceSession(): WorkspaceSession {
       railOpen = open;
       emit();
     },
+
+    openPreview: () => setPreview({ open: true, view: "preview" }),
+    closePreview: () => setPreview({ open: false }),
+    setPreview,
   };
 }

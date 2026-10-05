@@ -12,13 +12,15 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 [Document contract](#document-contract-tiptap-json) · [Behavior](#behavior) ·
 [Keyboard](#keyboard) · [Paste](#paste) · [Alignment](#alignment) ·
 [Performance](#performance) · [Lifting it into another app](#lifting-it-into-another-app) ·
-[Changes since Phase 1](#changes-since-phase-1) · [How it's built](#how-its-built)
+[Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
+[How it's built](#how-its-built)
 
 ## Public API (frozen for Phase 2)
 
 Everything a host needs comes from `@/editor` (the folder's `index.ts`). Code that must not load
 React or TipTap (domain rules, server validation) may import the pure model directly:
-`@/editor/model/types`, `@/editor/model/variables`, `@/editor/model/contract`.
+`@/editor/model/types`, `@/editor/model/variables`, `@/editor/model/contract`,
+`@/editor/model/sample-sets`.
 
 ### Components
 
@@ -85,6 +87,7 @@ without a target it returns the caret to where it was.
 | `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE` | The model. |
 | `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` | The consumer contract (Submit and review dialogs). |
 | `formatValue`, `validateValue`, `ValidationResult`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). |
+| `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)` | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day. |
 | `baseExtensions(opts)`, `BaseExtensionOptions` | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render. |
 | `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
@@ -317,6 +320,25 @@ For anyone who wired the Phase 1 editor:
   use the display serif and H3 is medium weight; Home/End move along the visual line; pasted Word
   and Google Docs content is normalized; bare-domain text no longer turns into links on its own.
 
+## Changes since Phase 2
+
+Phase 3 additions (additive only; nothing above changed or went away):
+
+- **New exports**: `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets`,
+  `sampleSetValues` (`model/sample-sets.ts`, pure TS).
+  - `DEFAULT_SAMPLE_SETS`: `typical` "Typical customer", `long` "Long name and maximum values",
+    `minimum` "Minimum values" (the same ids and names the seed uses).
+  - `defaultSampleSets(variables, today)`: those three sets with a canonical value for every
+    variable. Typical uses each variable's sample when it's valid for its type. Long stresses layout:
+    long names ("Alexandria-Marguerite", "Featherstonehaugh-Villiers"), a ~60-character phrase for
+    other text, 1,000,000 for amounts and numbers, 99.99%, the next September 30, the longest state
+    name. Minimum: short names ("Al", "Li"), zeros, the next May 1, the shortest state name. Text
+    defaults follow the key, then the label (first, last or full name, company, email, city, street
+    address; anything else uses its label for typical).
+  - `sampleSetValues(set, variables, today)`: the set's value for each variable when it has one,
+    otherwise the default for the set's kind (custom sets fall back to typical). Keys that aren't in
+    the list are dropped; values pass through as given (the render route validates them).
+
 ## How it's built
 
 | Need | Piece |
@@ -342,7 +364,8 @@ index.ts                  public API (frozen for Phase 2)
 types.ts                  component contract
 schema.ts                 the one extension list (+ the one-line field list, ensureBlockIds)
 styles.css                document typography and editor states (tokens only)
-model/                    pure TS: Variable types, values and keys, contract diff, usage, form rules
+model/                    pure TS: Variable types, values and keys, contract diff, usage, form rules,
+                          default sample sets
 state/                    zustand stores: variable list (renames, tombstones), root runtime, chip popover
 extensions/               TipTap extensions (server-safe, except variable-view.ts)
 components/               React: EditorRoot, DocumentEditor, VariablesPanel, InlineVariableField,

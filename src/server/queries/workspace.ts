@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import type { Channel, JSONContent, RequiredSection, Variable, VersionState } from "@/domain/types";
+import type { Channel, JSONContent, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
+import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
 
@@ -34,6 +35,8 @@ export interface WorkspaceHeaderData {
   editable: boolean;
   /** "Edit" is offered: the latest version is Active, there's no open draft, and the viewer can edit. */
   canStartDraft: boolean;
+  /** "Submit for review" is offered: the shown version is an open draft and the viewer may submit it. */
+  canSubmit: boolean;
 }
 
 /** Header data for /{team}/templates/{templateId}. 404 when the template isn't visible here. */
@@ -95,12 +98,19 @@ export const getWorkspaceHeader = cache(
       canEdit,
       editable: canEdit && latest?.state === "draft",
       canStartDraft: canEdit && latest?.state === "active",
+      canSubmit: latest?.state === "draft" && can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
     };
   },
 );
 
 export interface WorkspaceDocumentData {
+  /** The template's id (the render route is addressed by it). */
+  templateId: string;
+  /** The team the template belongs to; the email preview's sender line is made from it. */
+  teamName: string;
   versionId: string;
+  /** The shown version's number, or null for an open draft (the preview asks the route for "draft"). */
+  versionNumber: number | null;
   /** Autosave ordering: the rev the client starts from. */
   rev: number;
   body: JSONContent;
@@ -112,6 +122,10 @@ export interface WorkspaceDocumentData {
   allowedChannels: Channel[];
   emailSubject: JSONContent | null;
   emailPreheader: JSONContent | null;
+  /** The version's named sample data sets, as saved. The preview's switcher fills in any default that is missing. */
+  sampleSets: SampleSet[];
+  /** The demo clock's date, YYYY-MM-DD: date samples are generated from it. */
+  today: string;
   requiredSections: RequiredSection[];
   /** Only an open draft is editable, and only by an author on the template's team. */
   editable: boolean;
@@ -148,6 +162,7 @@ export const getWorkspaceDocument = cache(
         channels: versions.channels,
         emailSubject: versions.emailSubject,
         emailPreheader: versions.emailPreheader,
+        sampleSets: versions.sampleSets,
       })
       .from(versions)
       .where(eq(versions.templateId, header.id));
@@ -155,9 +170,13 @@ export const getWorkspaceDocument = cache(
     const shown = pickLatest(list);
     if (!shown) notFound();
     const active = list.find((v) => v.state === "active");
+    const today = (await now()).toISOString().slice(0, 10);
 
     return {
+      templateId: header.id,
+      teamName: header.teamName,
       versionId: shown.id,
+      versionNumber: shown.state === "draft" ? null : shown.number,
       rev: shown.rev,
       body: shown.body,
       variables: shown.variables,
@@ -166,6 +185,8 @@ export const getWorkspaceDocument = cache(
       allowedChannels: tpl.allowedChannels,
       emailSubject: shown.emailSubject,
       emailPreheader: shown.emailPreheader,
+      sampleSets: shown.sampleSets,
+      today,
       requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
     };
