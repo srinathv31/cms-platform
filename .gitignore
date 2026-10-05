@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Git worktrees for parallel tracks (docs/tracks/README.md)
 /.claude/worktrees/
+
+# third-party reference screenshots (kept locally, not published)
+/reference-images/
