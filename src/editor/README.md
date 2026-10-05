@@ -14,14 +14,15 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 [Keyboard](#keyboard) · [Paste](#paste) · [Alignment](#alignment) ·
 [Performance](#performance) · [Lifting it into another app](#lifting-it-into-another-app) ·
 [Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
-[Changes since Phase 3](#changes-since-phase-3) · [How it's built](#how-its-built)
+[Changes since Phase 3](#changes-since-phase-3) · [Changes since Phase 4](#changes-since-phase-4) ·
+[How it's built](#how-its-built)
 
 ## Public API (frozen for Phase 2)
 
 Everything a host needs comes from `@/editor` (the folder's `index.ts`). Code that must not load
 React or TipTap (domain rules, server validation) may import the pure model directly:
 `@/editor/model/types`, `@/editor/model/variables`, `@/editor/model/contract`,
-`@/editor/model/sample-sets`.
+`@/editor/model/sample-sets`, `@/editor/model/section-title` (Phase 7a).
 
 ### Components
 
@@ -110,12 +111,14 @@ interface DocumentEditorHandle {
 | --- | --- |
 | `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE` | The model. |
 | `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` | The consumer contract (Submit and review dialogs). |
-| `formatValue`, `validateValue`, `ValidationResult`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). |
+| `formatValue`, `validateValue`, `ValidationResult`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). `labelFromKey` keeps whole-word acronyms in capitals ("purchase_apr" → "Purchase APR"). |
 | `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)` | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day. |
 | `baseExtensions(opts)`, `BaseExtensionOptions` | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render. |
 | `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
 | `chipsInJSON(doc)`, `variableKeys(doc)` | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses. |
+| `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
+| `looksLikeMarkdown(text)`, `markdownToHtml(markdown)` | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import. |
 | Component types | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`. |
 
 ## Composition
@@ -300,8 +303,24 @@ through the host (`requestComment(blockId)` from a control of its own).
   **optional** Text variables labelled from the key (`promo_code` → "Promo code"), so a paste
   never silently adds a breaking change; a deleted variable pasted back returns as it was. Invalid
   `{{…}}` stays text. The paste is one undo step; created variables stay.
+- **Markdown** (Phase 7a): in the document, plain text with no HTML on the clipboard that looks like
+  Markdown (a `#` heading, a list, a pipe table, a rule, a code fence, `**bold**` or a
+  `[link](https://…)`) pastes as structure: `#`–`###` headings (deeper ones become H3), `-`/`*`/`+`
+  and `1.` lists nested by indent, pipe tables with a header row, `---` rules, blank-line
+  paragraphs, bold, italic and http/https/mailto links. Code, quotes, strikethrough and images keep
+  their text only. `{{key}}` still becomes a chip. Other text pastes line by line as before, and so
+  does a paste as plain text (⇧⌘V).
+- **Required sections** (Phase 7a): a pasted top-level heading that matches one of the document's
+  required headings (`matchesSectionTitle`) merges into it instead of adding a second one. Blocks
+  before the first match paste at the caret (below the heading when the caret is in a required
+  heading); each match's blocks go to the end of its section (a section runs to the next H2), after
+  its last line with something in it, replacing it when it holds only empty lines; headings that
+  match nothing stay headings, and so does a copied required heading (it pastes as a plain heading,
+  as above). Over a selection spanning required headings (select-all) the range
+  rule runs first, so an answer pasted over the whole draft replaces it section by section. One
+  undo step, and still a paste: chips and created variables as above. Works for HTML pastes too.
 - Links only form on their own from URLs with a protocol (`https://…`).
-- **One-line fields** join pasted lines with spaces.
+- **One-line fields** join pasted lines with spaces (no Markdown, no section merging).
 
 ## Alignment
 
@@ -436,6 +455,19 @@ Phase 4 additions: review-comment mechanics (additive only; nothing above change
 - No new exports or dependencies (`ThreadAnchor` and `CommentRequest` were exported already; the
   tooltip uses `@base-ui/react/tooltip` directly so it renders inside the editor).
 
+## Changes since Phase 4
+
+Phase 7a additions: Markdown paste and section-merging paste for Copilot's answers (additive only;
+nothing above changed or went away).
+
+- **New exports**: `sectionTitleKey`, `matchesSectionTitle` (`model/section-title.ts`, pure TS),
+  `looksLikeMarkdown`, `markdownToHtml` (`paste/markdown.ts`, pure strings).
+- **Behavior** (document editor only; one-line fields unchanged): plain-text Markdown pastes as
+  structure, and pasted headings that match required sections merge into them (see Paste).
+- **New internals**: `extensions/section-paste.ts` (`SectionPaste`, in the client extension list at
+  priority 1001, just ahead of the required-section guard); the field binding's
+  `clipboardTextParser` for the document. No new props, handle methods or dependencies.
+
 ## How it's built
 
 | Need | Piece |
@@ -453,8 +485,9 @@ Phase 4 additions: review-comment mechanics (additive only; nothing above change
 | Review-thread highlights | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute |
 | Thread placement for hosts | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container) |
 | Placeholder | `Placeholder` from `@tiptap/extensions` |
+| Markdown paste | Our parser (`paste/markdown.ts`): Markdown → schema HTML → ProseMirror's clipboard parser (no Markdown dependency) |
 | Server first paint | `@tiptap/static-renderer` (`components/static-document.tsx`) |
-| *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields; Home/End; the paste normalizer |
+| *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields; Home/End; the paste normalizer; the Markdown parser and the section-merging paste |
 
 ### Files
 
@@ -469,7 +502,7 @@ state/                    zustand stores: variable list (renames, tombstones), r
 extensions/               TipTap extensions (server-safe, except variable-view.ts)
 components/               React: EditorRoot, DocumentEditor, VariablesPanel, InlineVariableField,
                           StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus
-paste/                    clipboard HTML normalizer, `{{key}}` → chips;
+paste/                    clipboard HTML normalizer, Markdown → HTML, `{{key}}` → chips;
                           __fixtures__/ Word (Windows, Mac) and Google Docs clipboard HTML
 lib/                      small helpers (chip transforms, section positions, + insert, hooks,
                           thread anchors and quotes, block rects, platform keys)

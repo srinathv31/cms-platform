@@ -60,6 +60,12 @@
   isolation: isolate;
 }
 
+/* Inserted text: the positive green on its own tint is 4.3:1, short of AA, so the text steps toward the
+   ink (the underline keeps the token's green). */
+.ucomp-redline {
+  --rl-ins-text: color-mix(in oklab, var(--positive-text) 70%, var(--text));
+}
+
 .ucomp-redline .rl-item::before {
   content: "";
   position: absolute;

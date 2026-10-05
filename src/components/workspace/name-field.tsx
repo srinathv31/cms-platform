@@ -19,8 +19,8 @@ const TYPE = "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[l
  *
  * - Not editable (the version isn't an open draft, or the viewer can't edit): plain text.
  * - Editable: a field that saves through the workspace's autosave session as the author types.
- *   Enter moves into the document, Esc puts the old name back, and clearing it never saves an empty
- *   name (it reverts on blur).
+ *   Enter moves into the document, Esc puts the old name back and leaves the field (unless the rail is open:
+ *   that Esc closes the rail and focus stays), and clearing it never saves an empty name (it reverts on blur).
  * - Arriving at a template just made from a starter (`createTemplate` leaves a one-shot cookie, see
  *   `just-created.ts`): the name is focused with all of its text selected, so the first thing the
  *   author types replaces it. The address is already the template's own: nothing to drop from it.
@@ -102,7 +102,9 @@ function EditableName({ name }: { name: string }) {
     } else if (event.key === "Escape") {
       event.preventDefault();
       revert();
-      event.currentTarget.blur();
+      // With the rail open (the Original view after an import, the preview) the same Esc puts it away
+      // (content/rail.tsx), and the author stays in the name; otherwise Esc is the way out of the field.
+      if (!session.getPreview().open && !session.getRailOpen()) event.currentTarget.blur();
     }
   }
 

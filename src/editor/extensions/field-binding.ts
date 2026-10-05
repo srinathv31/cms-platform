@@ -3,7 +3,8 @@
 //   • focus: the root remembers the last-focused field for click-to-insert
 //   • drop:  a variable dragged from the panel (our own MIME type) lands as a chip, one transaction
 //   • chips: click, or Enter/Space on a selected chip, opens its popover; Esc closes it
-//   • paste: Word / Google Docs / web HTML is normalized (paste/normalize-html.ts) and `{{key}}` in
+//   • paste: Word / Google Docs / web HTML is normalized (paste/normalize-html.ts); in the document,
+//     plain text that looks like Markdown is parsed as Markdown (paste/markdown.ts); `{{key}}` in
 //     pasted or dropped text becomes chips; a key the list doesn't have is created as an optional
 //     Text variable (or comes back from its tombstone), in the same step
 //   • consistency: a chip that comes back with a renamed key is re-pointed at the current key, and
@@ -12,13 +13,14 @@
 
 import { Extension, type KeyboardShortcutCommand } from "@tiptap/core";
 import { isHistoryTransaction } from "@tiptap/pm/history";
-import { Fragment, Slice } from "@tiptap/pm/model";
+import { DOMParser, Fragment, Slice, type ResolvedPos } from "@tiptap/pm/model";
 import { NodeSelection, Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { AttrStep, ReplaceAroundStep, ReplaceStep, dropPoint, type Step } from "@tiptap/pm/transform";
-import type { EditorView } from "@tiptap/pm/view";
+import type { EditorProps, EditorView } from "@tiptap/pm/view";
 import { NODE } from "../model/types";
 import { labelFromKey } from "../model/variables";
 import { chipsFromText } from "../paste/chips";
+import { looksLikeMarkdown, markdownToHtml } from "../paste/markdown";
 import { normalizePastedHtml } from "../paste/normalize-html";
 import type { ChipPopoverStore } from "../state/chip-popover";
 import type { EditorRootRuntime, FieldKind } from "../state/editor-root";
@@ -81,6 +83,7 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
 
         props: {
           transformPastedHTML: (html) => normalizePastedHtml(html),
+          ...(binding.kind === "body" ? { clipboardTextParser: parseMarkdownText } : {}),
           transformPasted: (slice, view) => chipsFromText(slice, view.state.schema),
 
           handleDrop: (view, event) => {
@@ -140,6 +143,18 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
     ];
   },
 });
+
+/**
+ * Plain text that looks like Markdown, parsed as Markdown (the document only). Anything else, and a
+ * paste as plain text (Shift), returns nothing: ProseMirror then splits the text into lines itself.
+ */
+const parseMarkdownText = ((text: string, $context: ResolvedPos, plain: boolean, view: EditorView): Slice | null => {
+  if (plain || !looksLikeMarkdown(text)) return null;
+  const template = view.dom.ownerDocument.createElement("template");
+  template.innerHTML = markdownToHtml(text);
+  const parser = view.someProp("clipboardParser") ?? view.someProp("domParser") ?? DOMParser.fromSchema(view.state.schema);
+  return parser.parseSlice(template.content, { context: $context });
+}) as NonNullable<EditorProps["clipboardTextParser"]>; // typed as returning a Slice; a null falls back
 
 function selectedChipPos(state: EditorState): number | null {
   const { selection } = state;

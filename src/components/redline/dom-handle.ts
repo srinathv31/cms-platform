@@ -2,7 +2,9 @@
 // "Comments"), answered from the redline's own DOM. The editor isn't there while Show changes is on, so the
 // comment markers in the gutter, the scroll to a thread's block and the block-level comment path all need
 // this stand-in. A redline block is found by `data-block-id` on its frame (RedlineDocument). A thread has
-// no highlight of its own here, so a thread's box is its block's.
+// no highlight of its own here, so a thread's box is its block's. With Changes only, a block may be
+// hidden in a caption or a "4 unchanged blocks" count: its box is then that line's (`redlineAnchorElement`),
+// and the count's own key (`data-collapsed`, from blocks.ts `hostKey`) answers as a block id too.
 //
 // Plain DOM, no React: the review screen puts it behind a ref (review/redline-view.tsx).
 
@@ -24,6 +26,19 @@ const attr = (value: string) => value.replace(/["\\]/g, "\\$&");
 export function redlineBlockElement(root: HTMLElement | null, blockId: string): HTMLElement | null {
   if (!root || !blockId) return null;
   return root.querySelector<HTMLElement>(`.ucomp-doc > [data-block-id="${attr(blockId)}"]`);
+}
+
+/**
+ * Where a block is on screen: its frame; else, with Changes only, the caption or count it is hidden in
+ * (found by the block's id in `data-hidden-blocks`, or by the line's own `data-collapsed` key).
+ */
+export function redlineAnchorElement(root: HTMLElement | null, blockId: string): HTMLElement | null {
+  if (!root || !blockId) return null;
+  return (
+    redlineBlockElement(root, blockId) ??
+    root.querySelector<HTMLElement>(`.ucomp-doc > [data-collapsed="${attr(blockId)}"]`) ??
+    root.querySelector<HTMLElement>(`.ucomp-doc > [data-hidden-blocks~="${attr(blockId)}"]`)
+  );
 }
 
 /** A rendered element's box, or null when it isn't laid out (missing, `display: none`, a hidden route). */
@@ -66,14 +81,14 @@ export function revealInContainer(element: HTMLElement): void {
 }
 
 export function createRedlineHandle(source: RedlineHandleSource): DocumentEditorHandle {
-  const blockRect = (blockId: string) => rectOf(redlineBlockElement(source.root(), blockId));
+  const blockRect = (blockId: string) => rectOf(redlineAnchorElement(source.root(), blockId));
 
   return {
     // Nothing in the redline takes a caret.
     focus: () => {},
     focusThread: (threadId) => {
       const blockId = source.blockOfThread(threadId);
-      const element = blockId ? redlineBlockElement(source.root(), blockId) : null;
+      const element = blockId ? redlineAnchorElement(source.root(), blockId) : null;
       if (element && rectOf(element)) revealInContainer(element);
     },
     getBlockRect: blockRect,

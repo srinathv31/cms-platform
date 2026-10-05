@@ -7,26 +7,28 @@ import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { teams, templates, versions } from "@/server/db/schema/ucomp";
 import { now } from "@/server/clock";
 import { writeEffects } from "@/server/effects";
 import { submitVersion } from "@/server/actions/review";
 import { getViewer } from "@/server/viewer";
-import { newId, newTemplateId } from "@/server/ids";
+import { newId } from "@/server/ids";
+import {
+  conformToContentType,
+  disclosureContentType,
+  draftRow,
+  freshTemplateId,
+  insertNewTemplate,
+} from "@/server/templates/create";
 import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
 import { assertCan } from "@/domain/permissions";
-import { conformToSections } from "@/domain/platform-config";
 import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
 import {
-  DEFAULT_CHANNELS,
   createDraft,
   editActive,
   planDraftStart,
-  type DraftFields,
-  type StarterContent,
   type VersionSnapshot,
 } from "@/domain/lifecycle";
-import type { Channel, RequiredSection } from "@/domain/types";
 
 // Template creation and editing. Every action checks permissions first, writes in one transaction,
 // refreshes what it changed, and redirects last. Submitting moved to `actions/review.ts`
@@ -35,28 +37,6 @@ import type { Channel, RequiredSection } from "@/domain/types";
 // A "use server" file may export only async functions: the helpers below stay private.
 
 // ── Shared helpers ────────────────────────────────────────────
-
-function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
-  return {
-    id: ids.id,
-    templateId: ids.templateId,
-    number: draft.number,
-    state: draft.state,
-    basedOnVersionId: draft.basedOnVersionId,
-    body: draft.body,
-    emailSubject: draft.emailSubject,
-    emailPreheader: draft.emailPreheader,
-    channels: draft.channels,
-    variables: draft.variables,
-    sampleSets: draft.sampleSets,
-    contractChanges: draft.contractChanges,
-    currentStage: draft.currentStage,
-    rev: draft.rev,
-    createdBy: draft.createdBy,
-    createdAt: draft.createdAt,
-    updatedAt: draft.updatedAt,
-  };
-}
 
 /** The library lists, and the workspace of one template, may now read differently. */
 function refreshLists(templateId?: string) {
@@ -94,36 +74,22 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
   const starterKey = parsed.data.starterKey;
 
   const at = await now();
-  const contentType = await db.query.contentTypes.findFirst({ where: eq(contentTypes.key, "disclosure") });
-  if (!contentType) throw new Error("The Disclosure content type is missing");
+  const contentType = await disclosureContentType();
+  const templateId = await freshTemplateId();
 
-  // A collision on 6 Crockford characters is one in a billion; check anyway rather than fail the author.
-  let templateId = newTemplateId();
-  for (let i = 0; i < 4 && (await db.query.templates.findFirst({ where: eq(templates.id, templateId) })); i++) {
-    templateId = newTemplateId();
-  }
-
-  const starter = newTemplateStarter(buildStarter(starterKey, { scope: templateId, now: at }), contentType);
-  const { changes, effects } = createDraft({ starter, createdBy: viewer.userId, now: at });
+  const starter = conformToContentType(buildStarter(starterKey, { scope: templateId, now: at }), contentType);
+  const created = createDraft({ starter, createdBy: viewer.userId, now: at });
   const versionId = newId("v");
 
   await db.transaction(async (tx) => {
-    await tx.insert(templates).values({
-      id: templateId,
+    await insertNewTemplate(tx, {
+      templateId,
       teamId: team.id,
       contentTypeId: contentType.id,
-      name: changes.template.name,
-      createdBy: changes.template.createdBy,
-      createdAt: changes.template.createdAt,
-      starterKey: changes.template.starterKey,
-    });
-    await tx.insert(versions).values(draftRow(changes.draft, { id: versionId, templateId }));
-    await writeEffects(tx, effects, {
+      versionId,
+      created,
       at,
       actorId: viewer.userId,
-      teamId: team.id,
-      templateId,
-      versionId,
     });
   });
 
@@ -134,24 +100,6 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
   });
   refreshLists();
   redirect(`/${team.slug}/templates/${templateId}`);
-}
-
-/**
- * A starter shaped to the content type as it is now (Platform settings): its required sections
- * (removed ones become ordinary headings, renamed ones take the new title, new ones are appended) and
- * only the channels the type allows. Existing templates are never reshaped.
- */
-function newTemplateStarter(
-  starter: StarterContent,
-  type: { requiredSections: RequiredSection[]; allowedChannels: Channel[] },
-): StarterContent {
-  const wanted = starter.channels ?? DEFAULT_CHANNELS;
-  const allowed = wanted.filter((c) => type.allowedChannels.includes(c));
-  return {
-    ...starter,
-    body: conformToSections(starter.body, type.requiredSections, () => newId("b")),
-    channels: allowed.length > 0 ? allowed : type.allowedChannels.slice(0, 1),
-  };
 }
 
 // ── Edit an Active template ───────────────────────────────────

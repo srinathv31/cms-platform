@@ -334,7 +334,6 @@ function LinkField({
         type="text"
         inputMode="url"
         aria-label="Link address"
-        placeholder="https://"
         value={href}
         onChange={(event) => setHref(event.target.value)}
         onKeyDown={onKeyDown}

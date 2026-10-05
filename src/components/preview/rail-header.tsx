@@ -21,10 +21,22 @@ const VIEWS: readonly RailHeaderView[] = [
   { value: "variables", label: "Variables" },
 ];
 
-/** The tabs for a rail that has review comments: Preview (while the preview is open), Comments with its count, Variables. */
-export function railHeaderViews({ preview, comments }: { preview: boolean; comments: number | null }): RailHeaderView[] {
+/**
+ * The tabs for a rail that has more than Variables: Preview (while the rail is widened), Original
+ * (when the template was imported), Comments with its count (when it has review comments), Variables.
+ */
+export function railHeaderViews({
+  preview,
+  comments,
+  original = false,
+}: {
+  preview: boolean;
+  comments: number | null;
+  original?: boolean;
+}): RailHeaderView[] {
   return [
     ...(preview ? [VIEWS[0]] : []),
+    ...(original ? [{ value: "original" as const, label: "Original" }] : []),
     ...(comments === null ? [] : [{ value: "comments" as const, label: "Comments", count: comments }]),
     VIEWS[1],
   ];

@@ -25,8 +25,13 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
   const v = n === null ? "the draft" : `v${n}`;
 
   switch (e.action) {
-    case "template.created":
-      return `${who} created the template.`;
+    case "template.created": {
+      // Phase 7a: an import names the file it came from ("Maya Chen imported Spring offer.docx.").
+      const file = text(d.filename);
+      return typeof d.source === "string" && d.source.startsWith("import:") && file
+        ? `${who} imported ${file}${/[.!?]$/.test(file) ? "" : "."}`
+        : `${who} created the template.`;
+    }
     case "draft.started": {
       const from = numberOr(d.basedOn);
       return from === null ? `${who} started a draft.` : `${who} started a draft from v${from}.`;

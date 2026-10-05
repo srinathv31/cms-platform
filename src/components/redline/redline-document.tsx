@@ -11,7 +11,10 @@
 //   changed       a neutral bar
 //   moved         a small "Moved" label in the gutter
 //   changesOnly   an unchanged heading becomes a caps caption over the changes under it (OFFER DETAILS),
-//                 and each run of unchanged blocks collapses into one quiet "4 unchanged blocks" line
+//                 and each run of unchanged blocks collapses into one quiet "4 unchanged blocks" line.
+//                 The active block is shown in place even when it didn't change (a thread on it is
+//                 being read). A caption or count carries the blocks it hides (`data-hidden-blocks`)
+//                 and a key (`data-collapsed`), so a comment on a hidden block gets a marker there
 //   data-block-id every top-level block's frame carries its id (the review screen scrolls to a block
 //                 and places comment markers beside it from these); `activeBlockId` tints one of them
 //
@@ -27,7 +30,7 @@ import { baseExtensions, VariableChipView, type DocumentAlign, type JSONContent,
 import "@/editor/styles.css";
 import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
-import { BLOCK_LABEL, blockKind, gapLabel, groupBlocks, markAllDeleted, type RedlineItem } from "./blocks";
+import { BLOCK_LABEL, blockKind, gapLabel, groupBlocks, hostKey, markAllDeleted, type RedlineItem } from "./blocks";
 import { RedlineMark } from "./redline-mark";
 import "./redline.css";
 
@@ -37,7 +40,10 @@ export interface RedlineDocumentProps {
   variables: readonly Variable[];
   /** Show only what changed: unchanged headings become captions, runs of unchanged blocks one "N unchanged blocks" line. */
   changesOnly?: boolean;
-  /** A block to mark as the one in focus (a tint behind it): the block of the comment thread being read. */
+  /**
+   * A block to mark as the one in focus (a tint behind it): the block of the comment thread being read.
+   * With Changes only it is shown even when it didn't change.
+   */
   activeBlockId?: string | null;
   /** Match the live editor's `align` (the gutter hangs into the left margin with "start"). Default "center". */
   align?: DocumentAlign;
@@ -72,7 +78,18 @@ function Gutter({ status }: { status: Exclude<RedlineStatus, "unchanged"> }) {
   );
 }
 
-function Frame({ block, active, children }: { block: RedlineBlock; active: boolean; children: ReactNode }) {
+/** What a caption, count or block stands in for (Changes only): the hidden blocks a comment marker can sit beside it for. */
+function collapsedAttrs(item: RedlineItem) {
+  const hidden = item.hidden ?? [];
+  if (hidden.length === 0) return {};
+  return {
+    "data-hidden-blocks": hidden.join(" "),
+    ...(item.type === "block" ? {} : { "data-collapsed": hostKey(item) ?? undefined }),
+  };
+}
+
+function Frame({ item, active, children }: { item: Extract<RedlineItem, { type: "block" }>; active: boolean; children: ReactNode }) {
+  const { block } = item;
   const { status } = block;
   // `data-id` is what the document's hover comment button looks for on a top-level block (a removed
   // block isn't in the version, so it can't be commented on).
@@ -80,6 +97,7 @@ function Frame({ block, active, children }: { block: RedlineBlock; active: boole
     "data-block-id": block.id,
     "data-id": status === "removed" ? undefined : block.id,
     "data-active": active ? "" : undefined,
+    ...collapsedAttrs(item),
   };
   if (status === "unchanged") {
     return (
@@ -104,19 +122,19 @@ function Frame({ block, active, children }: { block: RedlineBlock; active: boole
 }
 
 /** The section an unchanged heading names, over the changes below it (Changes only). */
-function Caption({ text }: { text: string }) {
+function Caption({ item }: { item: Extract<RedlineItem, { type: "caption" }> }) {
   return (
-    <div className="rl-item caps-label" data-kind="caption" data-redline-caption="">
-      {text}
+    <div className="rl-item caps-label" data-kind="caption" data-redline-caption="" {...collapsedAttrs(item)}>
+      {item.text}
     </div>
   );
 }
 
 /** A run of unchanged blocks: a quiet count, where they were. */
-function Gap({ count }: { count: number }) {
+function Gap({ item }: { item: Extract<RedlineItem, { type: "gap" }> }) {
   return (
-    <div className="rl-item text-[12px] leading-5 text-text-subtle" data-kind="gap" data-redline-gap="">
-      {gapLabel(count)}
+    <div className="rl-item text-[12px] leading-5 text-text-subtle" data-kind="gap" data-redline-gap="" {...collapsedAttrs(item)}>
+      {gapLabel(item.count)}
     </div>
   );
 }
@@ -128,12 +146,12 @@ function paintedNode(block: RedlineBlock): JSONContent {
 
 export function RedlineDocument({ doc, variables, changesOnly = false, activeBlockId = null, align = "center", className }: RedlineDocumentProps) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
-  const items: RedlineItem[] = groupBlocks(doc, changesOnly, new Map(variables.map((v) => [v.key, v.label])));
+  const items: RedlineItem[] = groupBlocks(doc, changesOnly, new Map(variables.map((v) => [v.key, v.label])), activeBlockId);
   const blocks = items.flatMap((item) => (item.type === "block" ? [item.block] : []));
 
   /** Everything but a block: the captions and the counts. */
   const aside = (item: RedlineItem, i: number): ReactNode =>
-    item.type === "caption" ? <Caption key={`caption-${i}`} text={item.text} /> : item.type === "gap" ? <Gap key={`gap-${i}`} count={item.count} /> : null;
+    item.type === "caption" ? <Caption key={`caption-${i}`} item={item} /> : item.type === "gap" ? <Gap key={`gap-${i}`} item={item} /> : null;
 
   // One render of all the blocks the document shows; the doc mapping puts each in its frame.
   const body: ReactNode =
@@ -155,7 +173,7 @@ export function RedlineDocument({ doc, variables, changesOnly = false, activeBlo
                   <>
                     {items.map((item, i) =>
                       item.type === "block" ? (
-                        <Frame key={`${i}-${item.block.id}`} block={item.block} active={item.block.id === activeBlockId}>
+                        <Frame key={`${i}-${item.block.id}`} item={item} active={item.block.id === activeBlockId}>
                           {rendered[at++]}
                         </Frame>
                       ) : (

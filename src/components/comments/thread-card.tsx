@@ -125,7 +125,6 @@ export function ComposerBox({
         rows={2}
         value={value}
         aria-label={label}
-        placeholder={label}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         className={cn(FIELD, "min-h-16")}

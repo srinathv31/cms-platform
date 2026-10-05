@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createRedlineHandle, redlineBlockElement, revealInContainer } from "./dom-handle";
+import { createRedlineHandle, redlineAnchorElement, redlineBlockElement, revealInContainer } from "./dom-handle";
 import { RedlineDocument } from "./redline-document";
 import { REDLINE_DOC, REDLINE_VARIABLES } from "./redline-fixtures";
 
-function mount() {
+function mount(changesOnly = false) {
   const host = document.createElement("div");
-  host.innerHTML = renderToStaticMarkup(<RedlineDocument doc={REDLINE_DOC} variables={REDLINE_VARIABLES} />);
+  host.innerHTML = renderToStaticMarkup(<RedlineDocument doc={REDLINE_DOC} variables={REDLINE_VARIABLES} changesOnly={changesOnly} />);
   document.body.append(host);
   return host;
 }
@@ -35,6 +35,18 @@ describe("redlineBlockElement", () => {
   });
 });
 
+describe("redlineAnchorElement", () => {
+  it("finds a hidden block's caption or count line with Changes only, and the line by its own key", () => {
+    const host = mount(true);
+    expect(redlineBlockElement(host, "p-2")).toBeNull();
+    expect(redlineAnchorElement(host, "p-2")?.hasAttribute("data-redline-gap")).toBe(true);
+    expect(redlineAnchorElement(host, "collapsed:p-1")).toBe(redlineAnchorElement(host, "p-2"));
+    expect(redlineAnchorElement(host, "h-1")?.hasAttribute("data-redline-caption")).toBe(true);
+    expect(redlineAnchorElement(host, "p-3")?.getAttribute("data-redline")).toBe("changed");
+    expect(redlineAnchorElement(host, "nope")).toBeNull();
+  });
+});
+
 describe("createRedlineHandle", () => {
   const handle = (host: HTMLElement, onRequestComment = vi.fn()) =>
     ({
@@ -57,6 +69,14 @@ describe("createRedlineHandle", () => {
     expect(h.getThreadRect("t2")).toBeNull(); // its block isn't in the redline
     expect(h.getThreadRect("unknown")).toBeNull();
     expect(h.getBlockRect("missing")).toBeNull();
+  });
+
+  it("places a thread on a block hidden by Changes only on the line it is collapsed into", () => {
+    const host = mount(true);
+    layOut(redlineAnchorElement(host, "p-1"), { top: 120, height: 20 });
+    const { handle: h } = handle(host);
+    expect(h.getThreadRect("composer")?.top).toBe(120); // p-1 is in the "2 unchanged blocks" line
+    expect(h.getBlockRect("collapsed:p-1")?.top).toBe(120);
   });
 
   it("asks for a comment on a block through the host's callback, and ignores an empty id", () => {

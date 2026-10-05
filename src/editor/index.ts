@@ -60,8 +60,12 @@ export {
   sampleSetValues,
   type DefaultSampleSetId,
 } from "./model/sample-sets";
+// Phase 7a additions
+export { matchesSectionTitle, sectionTitleKey } from "./model/section-title";
 
 // ── Server: render, import, seeds ────────────────────────────────
 export { baseExtensions, ensureBlockIds, type BaseExtensionOptions } from "./schema";
 export { normalizePastedHtml, type NormalizeHtmlOptions } from "./paste/normalize-html";
 export { chipsInJSON, variableKeys } from "./paste/chips";
+// Phase 7a additions
+export { looksLikeMarkdown, markdownToHtml } from "./paste/markdown";

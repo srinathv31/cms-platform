@@ -61,10 +61,18 @@ export function toKey(label: string): string {
   return /^[0-9]/.test(key) ? `v_${key}` : key;
 }
 
-/** A readable label for a key: "first_name" → "First name", "purchase_apr" → "Purchase apr". */
+/** Words a label keeps in capitals (keys are lowercase, so "purchase_apr" would otherwise read "Purchase apr"). */
+const ACRONYMS = new Set(["apr", "apy", "fdic", "id", "url", "atm", "ach", "ssn"]);
+
+/** A readable label for a key: "first_name" → "First name", "purchase_apr" → "Purchase APR". */
 export function labelFromKey(key: string): string {
-  const words = key.replace(/_+/g, " ").trim();
-  return words ? words[0].toUpperCase() + words.slice(1) : key;
+  const words = key
+    .split(/_+/)
+    .filter(Boolean)
+    .map((word) => (ACRONYMS.has(word) ? word.toUpperCase() : word));
+  if (words.length === 0) return key;
+  const label = words.join(" ");
+  return label[0].toUpperCase() + label.slice(1);
 }
 
 /** A valid key: lowercase snake_case, starts with a letter. */

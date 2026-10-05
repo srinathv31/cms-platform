@@ -331,7 +331,12 @@ export const LONG_DOC: RenderDoc = {
  * fees set where the table meets the page break. Tuned against the layout: if spacing or type
  * changes, re-tune `lead` so each case below still lands where its comment says.
  */
-function tableAtBreak(id: string, lead: number, fees: readonly (readonly [string, string])[]): RenderDoc {
+function tableAtBreak(
+  id: string,
+  lead: number,
+  fees: readonly (readonly [string, string])[],
+  intro: RenderInline[] = [t("The following fees may apply to your account.")],
+): RenderDoc {
   return {
     templateId: "UC-7H2W5R",
     templateName: "Fee schedule",
@@ -340,7 +345,7 @@ function tableAtBreak(id: string, lead: number, fees: readonly (readonly [string
       h(`${id}_title`, 1, "Your fee schedule"),
       p(`${id}_lead`, ...prose(3, lead)),
       h(`${id}_h_rates`, 2, "Rates and fees", "rates_and_fees"),
-      p(`${id}_intro`, t("The following fees may apply to your account.")),
+      p(`${id}_intro`, ...intro),
       table(`${id}_fees`, feeRows(fees)),
       p(`${id}_end`, t("Coral Bank, N.A. Member FDIC.", { italic: true })),
     ],
@@ -358,3 +363,13 @@ export const TABLE_ORPHAN_DOC = tableAtBreak("to", 25, FEES.slice(0, 8));
 
 /** Three fees at the same spot: the table split one row and two before; it must never split. */
 export const TABLE_SHORT_DOC = tableAtBreak("ts", 25, FEES.slice(0, 3));
+
+/**
+ * Keep-with-next chain: the "Rates and fees" heading and its one-line intro land near the bottom of
+ * page 1 with no room for the table's header and first rows. Without the chain they stayed behind,
+ * stranded above a table that started page 2. The table is long, so it must still split.
+ */
+export const HEADING_CHAIN_DOC = tableAtBreak("hc", 25, FEES);
+
+/** The same spot with a long intro: the intro may split, so it never drags the heading off page 1. */
+export const LONG_INTRO_DOC = tableAtBreak("li", 25, FEES.slice(0, 8), prose(4, 6));

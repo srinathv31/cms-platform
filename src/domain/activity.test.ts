@@ -17,6 +17,18 @@ const event = (action: string, versionNumber: number | null, details: Record<str
 describe("describeActivity: one sentence per audit action", () => {
   it.each<[string, ActivityEvent, Person | null, string]>([
     ["template.created", event("template.created", null, { name: "Spring", source: "blank" }), MAYA, "Maya Chen created the template."],
+    [
+      "template.created by an import",
+      event("template.created", null, { name: "Spring", source: "import:docx", filename: "Spring offer.docx" }),
+      MAYA,
+      "Maya Chen imported Spring offer.docx.",
+    ],
+    [
+      "template.created by an import with no file name",
+      event("template.created", null, { name: "Spring", source: "import:txt" }),
+      MAYA,
+      "Maya Chen created the template.",
+    ],
     ["draft.started", event("draft.started", null, { basedOn: 2 }), MAYA, "Maya Chen started a draft from v2."],
     ["draft.edited", event("draft.edited", null, { saves: 12, basedOn: 2 }), MAYA, "Maya Chen edited the draft."],
     [

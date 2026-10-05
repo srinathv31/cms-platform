@@ -15,7 +15,10 @@ import { prepareText, type PreparedInline } from "./pdf-text";
 //     that meets a page break splits into "the rest of this page" and nothing, so every page
 //     starts flush with the top margin (a block's own margin would travel with it, and a bottom
 //     margin would push a block that fits onto the next page).
-//   - A heading reserves room for the unbreakable start of what follows it (keep with next).
+//   - A heading reserves room for the unbreakable start of what follows it (keep with next). A
+//     heading with a short intro (3 lines or fewer) before a table, list or callout is one
+//     unbreakable group that reserves the start of that block: heading, intro and table head
+//     (or first item) land on the same page.
 //   - Paragraphs keep at least 2 lines on each side of a break.
 //   - Table rows never split, and a table's header row repeats on every page the table spans.
 //     Rows have widow and orphan control: at least 2 body rows on each side of a page break, so a
@@ -87,26 +90,64 @@ const MAX_KEEP = 0.45 * CONTENT_AREA;
 function flow(blocks: readonly RenderBlock[]): ReactNode[] {
   const laid = blocks.map((block) => lay(block, PAGE_CTX));
   const out: ReactNode[] = [];
-  laid.forEach((item, i) => {
+  for (let i = 0; i < laid.length; i += 1) {
+    const item = laid[i];
+    const key = item.block.id ?? `b${i}`;
+    if (item.block.type === "heading" && introduces(laid, i + 1)) {
+      // Keep-with-next chain: the heading and its short intro never part, and the pair reserves
+      // the start of what the intro introduces, so neither is stranded above a block that moved.
+      const intro = laid[i + 1];
+      out.push(
+        <View key={key} wrap={false} minPresenceAhead={keepAheadOf(laid, i + 1)}>
+          {item.render(0, 0)}
+          {intro.render(gapBetween(item.block, intro.block), 0)}
+        </View>,
+      );
+      i += 1;
+    } else {
+      out.push(<Fragment key={key}>{item.render(0, keepAheadOf(laid, i))}</Fragment>);
+    }
+    const prev = laid[i];
     const next = laid[i + 1];
-    out.push(<Fragment key={item.block.id ?? `b${i}`}>{item.render(0, keepAheadOf(laid, i))}</Fragment>);
-    if (!next) return;
-    out.push(<View key={`gap${i}`} style={{ paddingTop: gapBetween(item.block, next.block) }} />);
+    if (!next) continue;
+    out.push(<View key={`gap${i}`} style={{ paddingTop: gapBetween(prev.block, next.block) }} />);
     if (next.block.type === "table" && repeatsHeader(next.block.rows)) {
       // Never leave a table's (repeating) header row alone at a page bottom.
       out.push(<View key={`keep${i}`} minPresenceAhead={Math.min(MAX_KEEP, next.head + 2)} />);
     }
-  });
+  }
   return out;
 }
 
-/** Keep with next: a heading reserves the gap and head of what follows (through a run of headings). */
+/** An intro this short (it moves whole anyway) keeps with the table, list or callout it leads into. */
+const INTRO_LINES = 3;
+
+/**
+ * Block j is a short intro: a paragraph that never splits, followed by a table, list or callout.
+ * A longer intro breaks the chain, so a long lead-in never drags the block after it along.
+ */
+function introduces(laid: readonly Laid[], j: number): boolean {
+  const intro = laid[j];
+  const next = laid[j + 1];
+  if (!intro || !next || intro.block.type !== "paragraph") return false;
+  if (intro.height > INTRO_LINES * lineBox(TYPE.body) + 1 || intro.head < intro.height) return false;
+  return next.block.type === "table" || next.block.type === "list" || next.block.type === "callout";
+}
+
+/**
+ * Keep with next: a heading reserves the gap and head of what follows (through a run of headings,
+ * and through a short intro to the start of the table, list or callout it introduces). A short
+ * intro reserves the start of what it introduces.
+ */
 function keepAheadOf(laid: readonly Laid[], i: number): number {
-  if (laid[i].block.type !== "heading" || !laid[i + 1]) return 0;
+  const type = laid[i].block.type;
+  if (!laid[i + 1] || !(type === "heading" || (type === "paragraph" && introduces(laid, i)))) return 0;
   let ahead = 0;
   for (let j = i + 1; j < laid.length; j += 1) {
     ahead += gapBetween(laid[j - 1].block, laid[j].block) + laid[j].head;
-    if (laid[j].block.type !== "heading") break;
+    if (laid[j].block.type === "heading") continue;
+    if (introduces(laid, j)) ahead += gapBetween(laid[j].block, laid[j + 1].block) + laid[j + 1].head;
+    break;
   }
   return Math.min(MAX_KEEP, ahead + lineBox(TYPE.body)); // a line of slack for estimate error
 }

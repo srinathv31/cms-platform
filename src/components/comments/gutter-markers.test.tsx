@@ -109,6 +109,31 @@ describe("GutterMarkers", () => {
     expect(markers()[0].textContent).toBe("3");
   });
 
+  it("says 'in unchanged blocks' for a marker that stands for collapsed blocks, with the count in the right number", () => {
+    render({ collapsedKeys: new Set(["b1", "b3"]) });
+    expect(markers()[0].getAttribute("aria-label")).toBe("3 comments in unchanged blocks");
+    expect(markers()[1].getAttribute("aria-label")).toBe("1 comment in unchanged blocks");
+    expect(markers()[2].getAttribute("aria-label")).toBe("1 comment on this block");
+  });
+
+  it("puts focus back on the thread's marker when choosing it re-keys the marker", () => {
+    const h = handle();
+    const onActivate = vi.fn();
+    const show = (threads: ThreadView[], activeThreadId: string | null) =>
+      act(() => root.render(<div style={{ position: "relative" }}><GutterMarkers editor={h.ref} threads={threads} activeThreadId={activeThreadId} onActivate={onActivate} /></div>));
+    // t3 is hidden at first (its marker is on the line "collapsed:x"); activating reveals it on its own block.
+    const hidden = THREADS.map((t) => (t.id === "t3" ? { ...t, blockId: "collapsed:x" } : t));
+    show(hidden, null);
+    const marker = markers().find((m) => m.dataset.marker === "collapsed:x")!;
+    act(() => marker.focus());
+    expect(document.activeElement).toBe(marker);
+    act(() => marker.click());
+    expect(onActivate).toHaveBeenCalledWith("t3");
+    show(THREADS, "t3"); // the marker is now keyed "b3": the focused button is gone
+    const moved = markers().find((m) => m.dataset.marker === "b3")!;
+    expect(document.activeElement).toBe(moved);
+  });
+
   it("puts a marker at the height of the thread's first line", () => {
     render();
     // t1 sits at 120 and is 20 tall: its line's centre is 130, and the 24px marker is centred on it.

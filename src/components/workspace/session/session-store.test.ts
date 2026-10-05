@@ -335,3 +335,34 @@ describe("the rail's comments view", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe("the imported original", () => {
+  it("widens the rail on the Original view, keeping the preview's picks", () => {
+    const session = createWorkspaceSession();
+    session.setPreview({ channel: "web", setId: "edge" });
+    session.openOriginal();
+    expect(session.getPreview()).toMatchObject({ open: true, view: "original", channel: "web", setId: "edge" });
+    session.closePreview();
+    expect(session.getPreview().open).toBe(false);
+  });
+
+  it("switches between Original and the other views while widened, and isn't a plain-rail tab", () => {
+    const session = createWorkspaceSession();
+    session.selectRailView("variables");
+    session.openOriginal();
+    session.selectRailView("preview");
+    expect(session.getPreview().view).toBe("preview");
+    session.selectRailView("original");
+    expect(session.getPreview().view).toBe("original");
+    expect(session.getRailTab()).toBe("variables");
+  });
+
+  it("notifies nobody when it is already open on the Original view", () => {
+    const session = createWorkspaceSession();
+    session.openOriginal();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.openOriginal();
+    expect(listener).not.toHaveBeenCalled();
+  });
+});

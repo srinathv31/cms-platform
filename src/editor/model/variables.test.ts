@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VARIABLE_TYPES } from "./types";
-import { TYPE_META, US_STATES, formatValue, isValidKey, toKey, validateValue } from "./variables";
+import { TYPE_META, US_STATES, formatValue, isValidKey, labelFromKey, toKey, validateValue } from "./variables";
 
 describe("toKey", () => {
   it.each([
@@ -21,6 +21,20 @@ describe("toKey", () => {
     for (const label of ["Offer end date", "Purchase APR (%)", "2nd payment", "A".repeat(100)]) {
       expect(isValidKey(toKey(label))).toBe(true);
     }
+  });
+});
+
+describe("labelFromKey", () => {
+  it.each([
+    ["first_name", "First name"],
+    ["purchase_apr", "Purchase APR"],
+    ["apy", "APY"],
+    ["card_id", "Card ID"],
+    ["fdic_notice_url", "FDIC notice URL"],
+    ["identity", "Identity"], // only whole words are acronyms
+    ["", ""],
+  ])("%s → %s", (key, label) => {
+    expect(labelFromKey(key)).toBe(label);
   });
 });
 

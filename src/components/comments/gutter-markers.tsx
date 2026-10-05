@@ -51,6 +51,11 @@ export interface GutterMarkersProps {
   onActivate: (threadId: string) => void;
   /** Turns on the hover marker that starts a comment on a whole block. */
   onRequestBlockComment?: (blockId: string) => void;
+  /**
+   * Marker keys (a block id, or the key of a line the redline collapses blocks into) that stand for
+   * blocks the screen isn't showing: their label says "in unchanged blocks" rather than "on this block".
+   */
+  collapsedKeys?: ReadonlySet<string>;
   /** The widened rail leaves a 24px gutter instead of 40px: smaller markers, closer to the text. */
   compact?: boolean;
   /** For the layer (the workspace hides it where there is no gutter). */
@@ -174,6 +179,7 @@ export function GutterMarkers({
   activeThreadId,
   onActivate,
   onRequestBlockComment,
+  collapsedKeys,
   compact = false,
   className,
 }: GutterMarkersProps) {
@@ -255,10 +261,38 @@ export function GutterMarkers({
     if (next !== current) buttons.current.get(markers[next].blockId)?.focus();
   };
 
+  // Choosing a marker can move it (the redline reveals a hidden block and the marker is re-keyed onto
+  // it, so the focused button is replaced): the thread is remembered and its marker is focused again.
+  const refocus = useRef<{ threadId: string; timer: number } | null>(null);
+  const forget = () => {
+    if (refocus.current) window.clearTimeout(refocus.current.timer);
+    refocus.current = null;
+  };
+  useEffect(() => forget, []);
+  useLayoutEffect(() => {
+    const want = refocus.current;
+    if (!want) return;
+    const marker = markers.find((m) => m.threadIds.includes(want.threadId));
+    const button = marker ? buttons.current.get(marker.blockId) : undefined;
+    if (!button) return;
+    const at = document.activeElement;
+    // Focus was lost with the replaced button: take it back. While a marker (the old one, still there
+    // for this render) holds it, wait; focus elsewhere was a choice, so leave it. The timer ends the wait.
+    if (!at || at === document.body) {
+      button.focus();
+      forget();
+    } else if (!layer.current?.contains(at)) {
+      forget();
+    }
+  }, [markers, activeThreadId]);
+
   const choose = (marker: Marker) => {
     // A block with several threads: each press goes on to the next.
     const at = activeThreadId === null ? -1 : marker.threadIds.indexOf(activeThreadId);
-    onActivate(marker.threadIds[(at + 1) % marker.threadIds.length]);
+    const next = marker.threadIds[(at + 1) % marker.threadIds.length];
+    forget();
+    refocus.current = { threadId: next, timer: window.setTimeout(() => (refocus.current = null), 1000) };
+    onActivate(next);
   };
 
   const hasMarker = ghost ? groups.some((g) => g.blockId === ghost.blockId) : false;
@@ -302,7 +336,7 @@ export function GutterMarkers({
                 }}
                 type="button"
                 data-marker={marker.blockId}
-                aria-label={`${marker.count} ${marker.count === 1 ? "comment" : "comments"} on this block`}
+                aria-label={`${marker.count} ${marker.count === 1 ? "comment" : "comments"} ${collapsedKeys?.has(marker.blockId) ? "in unchanged blocks" : "on this block"}`}
                 aria-pressed={active}
                 tabIndex={marker.blockId === stop ? 0 : -1}
                 onFocus={() => setFocused(marker.blockId)}
