@@ -1,6 +1,7 @@
 import { Archive, Ban, Check, Clock, CornerUpLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { formatShortDate } from "@/domain/render/errors";
 import { STATUS_META, type StatusMeta } from "@/domain/status";
 import type { VersionState } from "@/domain/types";
 
@@ -32,15 +33,13 @@ function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
   }
 }
 
-const sunsetFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-
 export function StatusBadge({
   state,
   sunsetAt,
   className,
 }: {
   state: VersionState;
-  /** Superseded versions show "Sunset Mar 1" when a sunset date is set. */
+  /** Superseded versions show "Sunset Mar 1" when a sunset date is set. A sunset is a calendar day (midnight UTC), shown as that day in every time zone. */
   sunsetAt?: Date | null;
   className?: string;
 }) {
@@ -54,7 +53,7 @@ export function StatusBadge({
       <StatusIcon icon={meta.icon} />
       {meta.label}
       {state === "superseded" && sunsetAt ? (
-        <span className="font-normal opacity-80">· Sunset {sunsetFormat.format(sunsetAt)}</span>
+        <span className="font-normal opacity-80">· Sunset {formatShortDate(sunsetAt)}</span>
       ) : null}
     </Badge>
   );

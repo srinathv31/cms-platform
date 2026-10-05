@@ -180,10 +180,17 @@ export function ShareRing({
       }}
       {...props}
     >
+      {/*
+        `overflow-clip`: the turning text layer is a square at some angle, and its corners (up to 1.41x
+        the ring) lie outside the disc. Nothing shows there, but a rotated box still counts as scrollable
+        overflow, and the workspace header sets this ring flush against the canvas's right edge when the
+        rail is closed, so the canvas scrolled sideways by about 16px. Clip is not a scroll container
+        and cuts nothing that is visible: the text sits inside the disc.
+      */}
       <m.span
         layoutId={layoutId}
         className={cn(
-          "absolute inset-0 grid place-items-center rounded-full bg-surface-sunken text-text",
+          "absolute inset-0 grid place-items-center overflow-clip rounded-full bg-surface-sunken text-text",
           "transition-transform duration-(--dur-slow) ease-(--ease-out-soft)",
           "motion-safe:group-hover/ring:scale-[1.04] motion-safe:group-focus-visible/ring:scale-[1.04]",
         )}

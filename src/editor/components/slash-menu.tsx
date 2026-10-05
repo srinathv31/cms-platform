@@ -29,6 +29,7 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import type { BlockItem, BlockItemId, ShortcutToken } from "../extensions/block-items";
 import type { SlashRender } from "../extensions/slash-command";
 import { viewDom } from "../lib/editor-view";
+import { isApple } from "../lib/platform";
 import { makeRoomBelow, menuContainer } from "./menu-layer";
 
 const ICONS: Record<BlockItemId, LucideIcon> = {
@@ -130,8 +131,6 @@ export function createSlashMenuController(): SlashMenuController {
 
   return { store, render, armUndo };
 }
-
-const isApple = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
 function keyLabels(tokens: readonly ShortcutToken[]): string[] {
   const apple = isApple();

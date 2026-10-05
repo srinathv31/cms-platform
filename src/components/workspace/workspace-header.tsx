@@ -40,7 +40,14 @@ export async function WorkspaceHeader({
       <div className="col-span-2 col-start-1 row-start-1 min-w-0">
         <NameField name={t.name} editable={t.editable} />
       </div>
-      <div className="col-start-1 row-start-2 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end">
+      {/* tabIndex -1: after a submit, focus lands here (workspace-actions.tsx), where the new state reads. */}
+      <div
+        data-slot="status-row"
+        role="group"
+        aria-label="Status"
+        tabIndex={-1}
+        className="col-start-1 row-start-2 -mx-1.5 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end justify-self-start rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <StatusBadge state={t.status} sunsetAt={t.sunsetAt} />
         {t.versionLabel ? <span className="text-[14px] leading-6 text-text-muted">{t.versionLabel}</span> : null}
         {t.editable ? (

@@ -7,6 +7,7 @@
 //   - the autosave session for that draft, once the provider has mounted it (`attach`).
 //   - the document editor's handle, so the name field can move the caret into the document.
 //   - whether the rail overlay is open (narrow canvas).
+//   - which tab the rail shows when it has comments (Comments | Variables), until the author picks one.
 //   - the preview's state (open, which view the widened rail shows, channel, sample set, device), so the
 //     tab bar's Preview button and the rail agree.
 //   - a save "tick" that counts the saves that have landed, so an open preview knows when to re-render.
@@ -29,8 +30,14 @@ export interface SessionStatus {
   error?: string;
 }
 
-/** What the widened rail shows: the rendered output, or the normal rail (Channels, Email details, Variables). */
-export type PreviewView = "preview" | "variables";
+/**
+ * What the widened rail shows: the rendered output, the template's review comments (only when it has
+ * some), or the normal rail (Channels, Email details, Variables).
+ */
+export type PreviewView = "preview" | "comments" | "variables";
+
+/** What the plain rail shows when the template has review comments: the thread list, or the normal rail. */
+export type RailTab = "comments" | "variables";
 export type PreviewDevice = "desktop" | "mobile";
 
 /**
@@ -60,6 +67,8 @@ export interface WorkspaceSession {
   getBinding: () => DraftBinding | null;
   getStatus: () => SessionStatus;
   getRailOpen: () => boolean;
+  /** The tab the author picked, or null until they do (the rail then opens on Comments when something is waiting there). */
+  getRailTab: () => RailTab | null;
   /** The same object until something changes, so it works as a store snapshot. */
   getPreview: () => PreviewState;
   /**
@@ -97,6 +106,17 @@ export interface WorkspaceSession {
 
   setRailOpen: (open: boolean) => void;
 
+  /**
+   * The rail's view switch. "comments" and "variables" are also what the plain rail shows once the
+   * preview is put away; "preview" only changes the widened rail.
+   */
+  selectRailView: (view: PreviewView) => void;
+  /**
+   * Brings the comments into sight: the rail's Comments tab (the widened rail's too, while the preview
+   * is open) and, where the rail is an overlay, the overlay.
+   */
+  showComments: () => void;
+
   /** Opens the preview, on its Preview view. */
   openPreview: () => void;
   closePreview: () => void;
@@ -110,6 +130,7 @@ export function createWorkspaceSession(): WorkspaceSession {
   let binding: DraftBinding | null = null;
   let status: SessionStatus = SAVED;
   let railOpen = false;
+  let railTab: RailTab | null = null;
   let preview: PreviewState = INITIAL_PREVIEW;
   let saveTick = 0;
   let sink: ((fields: SaveFields) => void) | null = null;
@@ -145,6 +166,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     getBinding: () => binding,
     getStatus: () => status,
     getRailOpen: () => railOpen,
+    getRailTab: () => railTab,
     getPreview: () => preview,
     getSaveTick: () => saveTick,
 
@@ -218,6 +240,35 @@ export function createWorkspaceSession(): WorkspaceSession {
       if (railOpen === open) return;
       railOpen = open;
       emit();
+    },
+
+    selectRailView(view) {
+      let changed = false;
+      if (view !== "preview" && railTab !== view) {
+        railTab = view;
+        changed = true;
+      }
+      if (preview.open && preview.view !== view) {
+        preview = { ...preview, view };
+        changed = true;
+      }
+      if (changed) emit();
+    },
+    showComments() {
+      let changed = false;
+      if (railTab !== "comments") {
+        railTab = "comments";
+        changed = true;
+      }
+      if (preview.open && preview.view !== "comments") {
+        preview = { ...preview, view: "comments" };
+        changed = true;
+      }
+      if (!railOpen) {
+        railOpen = true;
+        changed = true;
+      }
+      if (changed) emit();
     },
 
     openPreview: () => setPreview({ open: true, view: "preview" }),

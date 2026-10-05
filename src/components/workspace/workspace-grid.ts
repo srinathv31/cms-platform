@@ -23,6 +23,14 @@
 // scroll area: 100svh minus the panel's chrome (the 4rem top bar, the panel's 0.75rem margins above
 // and below, and its two 1px borders). Keep 5.5rem + 2px and 96rem in step with app-frame.tsx.
 //
+// The bleed is for the rail. Below the rail's breakpoint there is none beside the main pane, so the
+// pane must not run flush to the panel's right edge: the grid gives the canvas's padding back
+// (`pr-(--canvas-pad-x)`, 48px, the same inset as the left, less the 20px that `pl-5` adds), and the
+// rail, which opens as an overlay there, takes the bleed on itself (`-mr`) so it is still flush with the
+// panel. The grid cannot ask about its own width (a container query matches an ancestor), so that
+// padding is keyed to the canvas: the grid is 28px wider than the canvas's content box (its 48px bleed
+// less its 20px `pl-5`), so 53rem of grid is 820px = 51.25rem of canvas. Keep the two in step.
+//
 // The block handle (+ and the grip, about 55px) hangs left of the document's text edge. The canvas
 // pad alone (3rem) would put it against the panel's border, so the whole main pane starts 1.25rem
 // further in (`pl-5` on the grid; the title, the tabs and the text still share one left edge) and the
@@ -57,23 +65,27 @@
 // which inside the tab bar (`@container/bar`) would be the bar.
 //
 // The tab bar always fits its box, which is what keeps the canvas from scrolling sideways. It is
-// `@container/bar` and its buttons compact in two steps (workspace-actions.tsx): the Preview label gives
-// way to the icon, then "Submit for review" to "Submit". A bar narrower than what it holds spills its
-// right end out of the grid, and the canvas, which has overflow-y: auto and so scrolls sideways too,
-// grows by the same amount (measured: 56px on a 900px window, with the rail closed). What the bar needs
-// (tabs, 24px gap, buttons) depends on the rail toggle, which shows only below the breakpoint:
+// `@container/bar` and its buttons compact in three steps (workspace-actions.tsx): the Preview label gives
+// way to the icon, then "Submit for review" to "Submit", and last, below the breakpoint only, the tabs
+// and the button tighten (14px labels, 12px between them, 12px padding in the button). A bar narrower
+// than what it holds spills its right end out of the grid, and the canvas, which has overflow-y: auto and
+// so scrolls sideways too, grows by the same amount. What the bar needs (tabs, the gap, buttons) depends
+// on the rail toggle, which shows only below the breakpoint, and the gap, which is 24px beside the rail
+// and 12px below it:
 //
-//                      full   step 1   step 2     steps start at (bar width, beside the rail)
-//   beside the rail    566    470      403        34rem, 28rem
-//   with the toggle    610    514      447        39rem, 33rem   (`@max-[53rem]/ws:@max-[39rem]/bar:`)
+//                      full   step 1   step 2   step 3     steps start at (bar width)
+//   beside the rail    566    470      403      -          34rem, 28rem
+//   with the toggle    598    502      435      402        39rem, 33rem, 28rem   (`@max-[53rem]/ws:@max-[39rem]/bar:`)
 //
 // Beside the rail the steps stay where they were, so the wide layouts do not move (there the bar can
 // still run a few pixels over its right end, into the gap before the rail, and never as far as the
-// canvas). With the toggle, a bar under 447px (a window under about 790px) cannot fit its tabs and
-// buttons at all.
+// canvas). Below the breakpoint the bar is the grid less its 48px right inset (a window's width minus
+// about 394px), which is what these steps are measured against: 800px fits at step 3 with 4px to spare
+// (draft, "Submit") and a bar under 402px, a window under about 796px, cannot fit its tabs and buttons.
+// The figures are for the draft's Submit button; the Active template's Edit button is 2px narrower.
 
 export const WS = {
-  grid: "@container/ws relative pl-5 mr-[calc(-1*(var(--canvas-pad-x)+max(0px,(100cqw-96rem)/2)))] -mb-14 grid min-h-(--ws-h) grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_2.75rem_1fr] [--ws-h:calc(100svh-5.5rem-2px)] [--rail-preview-w:min(calc((100cqw+68px)*0.52),calc(100cqw-424px),60rem)]",
+  grid: "@container/ws relative pl-5 mr-[calc(-1*(var(--canvas-pad-x)+max(0px,(100cqw-96rem)/2)))] @max-[51.25rem]/canvas:pr-(--canvas-pad-x) -mb-14 grid min-h-(--ws-h) grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_2.75rem_1fr] [--ws-h:calc(100svh-5.5rem-2px)] [--rail-preview-w:min(calc((100cqw+68px)*0.52),calc(100cqw-424px),60rem)]",
 
   /** Holds the rail column's width on tabs without a rail (same size and breakpoint as `rail`). */
   railSpace: "pointer-events-none invisible col-start-2 row-start-1 hidden h-px w-80 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block",
@@ -82,7 +94,7 @@ export const WS = {
   header: "col-start-1 row-start-1 w-full max-w-(--doc-width) justify-self-center pt-2 pb-6",
 
   /** Tabs and the template's actions. Spans rows 2 and 3 so it can stay stuck to the top while the document scrolls. */
-  tabs: "@container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 self-start justify-self-center border-b border-hairline bg-canvas @max-[34rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[39rem]/bar:[&_nav]:gap-4",
+  tabs: "@container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 @max-[53rem]/ws:gap-3 self-start justify-self-center border-b border-hairline bg-canvas @max-[34rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[39rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav]:gap-3 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav_a]:text-[14px]",
 
   /**
    * The tab's main node: the document, or another tab's placeholder. The deep bottom padding lets the
@@ -101,7 +113,7 @@ export const WS = {
    * padding, to the panel's edge, and drops its border there). `rail` is also the group name its contents key on (`group/rail`).
    * Widened, it pads its sides 20px (`data-[preview]:px-5`), the normal rail's content edge: 12px of padding and the 8px inside it.
    */
-  rail: "group/rail sticky top-0 z-30 col-start-1 col-end-3 row-start-1 row-end-4 hidden h-(--ws-h) w-80 self-start justify-self-end overflow-x-hidden overflow-y-auto border-l border-hairline bg-canvas px-3 pt-[17px] pb-14 shadow-pop transition-[width,margin-left] duration-(--dur-base) ease-(--ease-out-soft) data-[open]:block data-[preview]:w-[calc(100%+1.25rem+var(--canvas-pad-x))] data-[preview]:border-l-0 data-[preview]:px-5 data-[preview]:pb-3 @min-[53rem]/ws:col-start-2 @min-[53rem]/ws:col-end-auto @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block @min-[53rem]/ws:z-auto @min-[53rem]/ws:shadow-none @min-[53rem]/ws:data-[preview]:ml-6 @min-[53rem]/ws:data-[preview]:w-(--rail-preview-w) @min-[53rem]/ws:data-[preview]:border-l",
+  rail: "group/rail sticky top-0 z-30 col-start-1 col-end-3 row-start-1 row-end-4 hidden h-(--ws-h) w-80 self-start justify-self-end overflow-x-hidden overflow-y-auto border-l border-hairline bg-canvas px-3 pt-[17px] pb-14 shadow-pop -mr-(--canvas-pad-x) transition-[width,margin-left] duration-(--dur-base) ease-(--ease-out-soft) data-[open]:block data-[preview]:w-[calc(100%+1.25rem+2*var(--canvas-pad-x))] data-[preview]:border-l-0 data-[preview]:px-5 data-[preview]:pb-3 @min-[53rem]/ws:col-start-2 @min-[53rem]/ws:col-end-auto @min-[53rem]/ws:mr-0 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block @min-[53rem]/ws:z-auto @min-[53rem]/ws:shadow-none @min-[53rem]/ws:data-[preview]:ml-6 @min-[53rem]/ws:data-[preview]:w-(--rail-preview-w) @min-[53rem]/ws:data-[preview]:border-l",
 
   /**
    * The box inside the rail that holds everything. Its width is the rail's final width in each state

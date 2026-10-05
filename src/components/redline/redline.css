@@ -1,0 +1,100 @@
+/*
+ * The redline's layout, on top of the editor's document styles (src/editor/styles.css), which give
+ * the typography, lists, tables, callouts and chips. Tokens only.
+ *
+ * <RedlineDocument> wraps every top-level block in an `.rl-item` frame (to hang the gutter bar and
+ * label on it), so the editor's `.ucomp-doc > * + *` block rhythm no longer reaches the blocks
+ * themselves. The rules below restate that rhythm on the frames, in the same order, so a redline
+ * lays out exactly like the document: keep them in step with "Block rhythm" in the editor's styles.
+ */
+
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item {
+  margin-top: 0.875rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="h2"] + .rl-item,
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="h3"] + .rl-item {
+  margin-top: 0.5rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="h1"] + .rl-item {
+  margin-top: 0.875rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="h1"],
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="h2"] {
+  margin-top: 2.25rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="h3"] {
+  margin-top: 1.5rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="hr"],
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="hr"] + .rl-item {
+  margin-top: 0.5rem;
+}
+
+/* The quiet "4 unchanged blocks" count sits a little apart from the blocks on both sides. */
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="gap"],
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="gap"] + .rl-item {
+  margin-top: 0.75rem;
+}
+
+/* Changes only: a caption (the section's name, from an unchanged heading) stands apart from what is
+   above it, like a section head, and the first change sits right under it. */
+.ucomp-redline .ucomp-doc > .rl-item + .rl-item[data-kind="caption"] {
+  margin-top: 2.25rem;
+}
+
+.ucomp-redline .ucomp-doc > .rl-item[data-kind="caption"] + .rl-item {
+  margin-top: 0.5rem;
+}
+
+/* ── The block in focus ───────────────────────────────────────────
+   The block of the comment thread being read: a soft amber tint behind it, a little wider than the
+   text, short of the comment markers beside it (the colour the thread's highlight and its marker are painted in). It sits behind the block,
+   so the inline marks keep their own tints on top. */
+
+.ucomp-redline .rl-item {
+  isolation: isolate;
+}
+
+.ucomp-redline .rl-item::before {
+  content: "";
+  position: absolute;
+  inset: -0.25rem -0.375rem -0.25rem -0.5rem;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  background-color: transparent;
+  transition: background-color var(--dur-base) var(--ease-out-soft);
+  pointer-events: none;
+}
+
+.ucomp-redline .rl-item[data-active]::before {
+  background-color: var(--warning-soft);
+  box-shadow: 0 0 0 1px var(--warning-border);
+}
+
+/* ── Chips inside a mark ──────────────────────────────────────────
+   A chip is an inline box, so the mark's underline or strike doesn't reach it: it gets its own. */
+
+.ucomp-redline ins [data-variable] {
+  border-color: var(--positive-text);
+  text-decoration: underline;
+  text-decoration-color: var(--positive-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.ucomp-redline del [data-variable] {
+  border-color: var(--danger-text);
+  background-color: var(--danger-soft);
+  color: var(--danger-text);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.ucomp-redline del [data-variable] svg {
+  color: var(--danger-text);
+}

@@ -316,6 +316,67 @@
   margin-top: 0.5rem;
 }
 
+/* ── Review threads (live decorations and the static paint) ───────
+   The warning family, kept apart from the teal of selection and dragged blocks (brand-1,
+   brand-soft): an open thread's quote is a soft wash with a hairline underline; the active
+   thread's is one step stronger. Backgrounds and inset shadows only, so nothing moves. */
+
+.ucomp-doc mark.ucomp-thread {
+  color: inherit;
+  background-color: var(--warning-soft);
+  box-shadow: inset 0 -2px 0 var(--warning-border);
+  border-radius: 2px;
+  transition:
+    background-color var(--dur-fast) ease-out,
+    box-shadow var(--dur-fast) ease-out;
+}
+
+.ucomp-doc mark.ucomp-thread[data-active] {
+  background-color: var(--warning-border);
+  box-shadow: inset 0 -2px 0 var(--warning);
+}
+
+/* A thread about the whole block (no quote, or its quote is gone): the block, washed. The ring
+   is a shadow, so the text doesn't move. */
+.ucomp-doc .ucomp-thread-block {
+  border-radius: 4px;
+  background-color: var(--warning-soft);
+  box-shadow: 0 0 0 4px var(--warning-soft);
+  transition:
+    background-color var(--dur-fast) ease-out,
+    box-shadow var(--dur-fast) ease-out;
+}
+
+.ucomp-doc .ucomp-thread-block[data-active] {
+  background-color: var(--warning-border);
+  box-shadow: 0 0 0 4px var(--warning-border);
+}
+
+/* Tables: the live editor marks the scrolling wrapper, the static paint the table; both paint the
+   table's cells (the wrapper's overflow would clip a ring). */
+.ucomp-doc .tableWrapper.ucomp-thread-block {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.ucomp-doc .ucomp-thread-block > table,
+.ucomp-doc table.ucomp-thread-block {
+  background-color: var(--warning-soft);
+  box-shadow: none;
+}
+
+.ucomp-doc .ucomp-thread-block[data-active] > table,
+.ucomp-doc table.ucomp-thread-block[data-active] {
+  background-color: var(--warning-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ucomp-doc mark.ucomp-thread,
+  .ucomp-doc .ucomp-thread-block {
+    transition: none;
+  }
+}
+
 /* ── Editor-only states ───────────────────────────────────────── */
 
 /* "Type / for blocks": the only placeholder, on the focused empty line. */

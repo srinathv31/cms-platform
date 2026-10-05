@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, use, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import type { Route } from "next";
@@ -42,7 +42,33 @@ function activeFromPath(pathname: string, slug: string | undefined): NavKey | nu
   }
 }
 
-export function SidebarBody({ spaces }: { spaces: SpaceNav[] }) {
+/**
+ * The count of versions waiting on the viewer, at the row's right edge. Hidden at zero. It is an image
+ * with a name ("3 waiting") rather than a plain span with an `aria-label`, which no screen reader is
+ * bound to read; the link then reads "Review 3 waiting". The digits stay in the DOM as its text.
+ */
+function ReviewCount({ counts, slug }: { counts: Promise<Record<string, number>>; slug: string }) {
+  const count = use(counts)[slug] ?? 0;
+  if (count <= 0) return null;
+  return (
+    <span
+      role="img"
+      aria-label={`${count} waiting`}
+      className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] leading-none font-medium text-brand-foreground tabular-nums"
+    >
+      {count}
+    </span>
+  );
+}
+
+export function SidebarBody({
+  spaces,
+  reviewCounts,
+}: {
+  spaces: SpaceNav[];
+  /** Review badge counts by space slug. A promise: the badge streams in after the nav. */
+  reviewCounts: Promise<Record<string, number>>;
+}) {
   const { team } = useParams<{ team?: string }>();
   const pathname = usePathname();
   const space = spaces.find((s) => s.slug === team) ?? spaces[0];
@@ -62,7 +88,6 @@ export function SidebarBody({ spaces }: { spaces: SpaceNav[] }) {
           <SidebarMenu className="gap-1">
             {items.map((item) => {
               const isActive = item.key === active;
-              const count = item.key === "review" ? space.reviewCount : 0;
               return (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
@@ -84,13 +109,10 @@ export function SidebarBody({ spaces }: { spaces: SpaceNav[] }) {
                       className={cn("relative", isActive && "text-text")}
                     />
                     <span className="relative">{item.label}</span>
-                    {count > 0 ? (
-                      <span
-                        aria-label={`${count} waiting`}
-                        className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] leading-none font-medium text-brand-foreground tabular-nums"
-                      >
-                        {count}
-                      </span>
+                    {item.key === "review" ? (
+                      <Suspense fallback={null}>
+                        <ReviewCount counts={reviewCounts} slug={space.slug} />
+                      </Suspense>
                     ) : null}
                   </SidebarMenuButton>
                 </SidebarMenuItem>

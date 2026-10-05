@@ -120,7 +120,14 @@ describe("NameField", () => {
 
   it("Enter leaves the field and moves into the document", async () => {
     const focus = vi.fn();
-    session.setEditor({ focus });
+    session.setEditor({
+      focus,
+      focusThread: () => {},
+      getBlockRect: () => null,
+      getThreadRect: () => null,
+      subscribeBlockRects: () => () => {},
+      requestComment: () => {},
+    });
     await render(<NameField name="Rate Change Notice" editable />);
     await act(async () => field().focus());
 

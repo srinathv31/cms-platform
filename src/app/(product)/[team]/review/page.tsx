@@ -1,5 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell/page-placeholder";
+import { ReviewQueueView } from "@/components/review-queue/review-queue-view";
 
 export default function ReviewPage({ params }: PageProps<"/[team]/review">) {
-  return <PagePlaceholder title="Review" params={params} />;
+  return <ReviewQueueView params={params} />;
 }

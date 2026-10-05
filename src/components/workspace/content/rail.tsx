@@ -6,6 +6,9 @@ import { m } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { duration, ease } from "@/components/motion/presets";
 import { closePreview } from "@/components/preview/close-preview";
+import { RailHeader, railHeaderViews } from "@/components/preview/rail-header";
+import { cn } from "@/lib/utils";
+import { useRailView } from "../session/rail-view";
 import { usePreviewState, useRailOpen, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 
@@ -56,6 +59,13 @@ function escapeIsSpokenFor(event: KeyboardEvent, nameAtFocus: string | null): bo
  * otherwise leave it lost (it was in the rail, or on nothing); an Esc in the document leaves the
  * caret where it is.
  *
+ * A template with review comments gets a Comments view in the rail, beside Variables: the same header
+ * row as the preview's (`RailHeader`: Comments | Variables, and Preview | Comments | Variables while
+ * the preview is open), with the thread list under it. Without comments the rail is exactly what it
+ * was. Like the normal rail, the thread list stays mounted while hidden, so a half-written reply
+ * survives a trip to Variables. It opens on Comments while something is waiting there, until the
+ * author picks a tab.
+ *
  * `emailDetails` sits directly under Channels (it renders nothing while Email is off, and brings its
  * own top margin); `children` are the sections after it (Variables); `preview` is the preview's
  * surface, which draws the header row and the Preview view while the preview is open (it comes first
@@ -65,19 +75,30 @@ export function Rail({
   channels,
   emailDetails,
   preview,
+  comments,
   children,
 }: {
   channels: React.ReactNode;
   emailDetails?: React.ReactNode;
   preview?: React.ReactNode;
+  /**
+   * The template's review comments, when it has any (or a new comment is being written): `count` is
+   * the number open, `preferred` says the rail should open on them, `panel` is the thread list.
+   */
+  comments?: { count: number; preferred: boolean; panel: React.ReactNode } | null;
   children: React.ReactNode;
 }) {
   const session = useWorkspaceSession();
   const railOpen = useRailOpen();
-  const { open: previewOpen, view } = usePreviewState();
+  const { open: previewOpen } = usePreviewState();
   const open = railOpen || previewOpen;
-  // The normal rail (Channels, Email details, Variables) is what shows, unless the preview view is.
-  const showRail = !(previewOpen && view === "preview");
+  // One of three views is on screen: the preview's output, the comments, or the normal rail (Channels, Email details, Variables).
+  const hasComments = comments != null;
+  const view = useRailView({ has: hasComments, preferred: comments?.preferred ?? false });
+  const showComments = view === "comments";
+  const showRail = view === "variables";
+  // With the preview closed, the comments bring their own header row (the preview draws its own, with its tabs).
+  const plainHeader = hasComments && !previewOpen;
 
   const aside = useRef<HTMLElement>(null);
   // What the name field said when it last got focus: an Esc there with the same text has no edit to put back.
@@ -126,7 +147,7 @@ export function Rail({
   return (
     <aside
       ref={aside}
-      aria-label={previewOpen ? "Preview" : "Channels and variables"}
+      aria-label={previewOpen ? "Preview" : hasComments ? "Comments and variables" : "Channels and variables"}
       data-slot="rail"
       data-open={open ? "" : undefined}
       data-preview={previewOpen ? "" : undefined}
@@ -135,6 +156,29 @@ export function Rail({
     >
       <div className={WS.railInner}>
         {preview}
+        {plainHeader ? (
+          // 8px in from the rail's 12px: the header's text starts on the same 20px edge as the rest of the rail's content.
+          <div className="px-2">
+            <RailHeader
+              value={showComments ? "comments" : "variables"}
+              views={railHeaderViews({ preview: false, comments: comments.count })}
+              onChange={(next) => session.selectRailView(next)}
+              onClose={close}
+            />
+          </div>
+        ) : null}
+        {hasComments ? (
+          <m.div
+            hidden={!showComments}
+            initial={false}
+            animate={{ opacity: showComments ? 1 : 0 }}
+            transition={{ duration: duration.fast, ease: ease.outSoft }}
+            // The list sits on the rail's 20px content edge. Widened, it is left-aligned at a comfortable width, like the Variables view.
+            className="mt-6 px-2 group-data-[preview]/rail:max-w-92 group-data-[preview]/rail:px-0"
+          >
+            {comments.panel}
+          </m.div>
+        ) : null}
         <m.div
           hidden={!showRail}
           // Switching to this view fades it in, as the Preview view does when it comes back. It
@@ -144,19 +188,24 @@ export function Rail({
           transition={{ duration: duration.fast, ease: ease.outSoft }}
           // On the Variables view: left-aligned, 22rem of content. Its 8px inner padding (px-2 below)
           // is pulled out (-mx-2) so its text starts on the header row's edge.
-          className="group-data-[preview]/rail:-mx-2 group-data-[preview]/rail:mt-6 group-data-[preview]/rail:max-w-92"
+          className={cn(
+            "group-data-[preview]/rail:-mx-2 group-data-[preview]/rail:mt-6 group-data-[preview]/rail:max-w-92",
+            plainHeader && "mt-6",
+          )}
         >
           <div className="flex h-6 items-center justify-between px-2">
             <div className="caps-label">Channels</div>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close"
-              className="-mr-1.5 @min-[53rem]/ws:hidden group-data-[preview]/rail:hidden"
-              onClick={close}
-            >
-              <X strokeWidth={1.75} />
-            </Button>
+            {plainHeader ? null : (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Close"
+                className="-mr-1.5 @min-[53rem]/ws:hidden group-data-[preview]/rail:hidden"
+                onClick={close}
+              >
+                <X strokeWidth={1.75} />
+              </Button>
+            )}
           </div>
           <div className="mt-3 px-2">{channels}</div>
           {emailDetails}

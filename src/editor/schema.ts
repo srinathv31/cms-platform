@@ -4,7 +4,7 @@
 // baseExtensions()         server-safe: node/mark specs + behavior plugins, no React NodeViews.
 // editorExtensions()       client: base + chip NodeView, placeholder, `/` and `{{` menus, the
 //                          required-section guard, block moves, the field binding (usage, drop,
-//                          chip popover) and Home/End.
+//                          chip popover), Home/End and review-thread highlights.
 // inlineFieldExtensions()  a one-line field (email subject, preheader): text + chips only.
 
 import { Node, type Extensions, type JSONContent } from "@tiptap/core";
@@ -19,12 +19,14 @@ import { BlockRangeHighlight } from "./extensions/block-range-highlight";
 import { Callout } from "./extensions/callout";
 import { FieldBindingExtension, type FieldBinding } from "./extensions/field-binding";
 import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
+import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
 import { Variable } from "./extensions/variable";
 import { variableSuggestion, type VariablePickerRender, type VariableSuggestion } from "./extensions/variable-picker";
 import { VariableWithChip } from "./extensions/variable-view";
+import { variableLeafText } from "./lib/threads";
 
 /** Node types that get a stable `attrs.id` (comment anchors, redline, margin threads). */
 export const BLOCK_ID_TYPES = [
@@ -119,6 +121,8 @@ export interface EditorExtensionOptions {
   binding?: FieldBinding | null;
   /** The note shown when the required-section guard steps in. Default "Required for disclosures". */
   requiredNote?: () => string;
+  /** Review threads: where they come from and where clicks and the caret's thread go. */
+  reviewThreads?: Omit<Partial<ReviewThreadsOptions>, "leafText"> | null;
 }
 
 function clientVariableOptions({ store, pickerRender }: EditorExtensionOptions): InternalBaseOptions {
@@ -148,6 +152,10 @@ export function editorExtensions(options: EditorExtensionOptions): Extensions {
     BlockMove,
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
+    ReviewThreads.configure({
+      ...Object.fromEntries(Object.entries(options.reviewThreads ?? {}).filter(([, value]) => value !== undefined)),
+      leafText: variableLeafText((key) => options.store.getState().byKey.get(key)),
+    }),
   ];
 }
 

@@ -7,6 +7,7 @@ import {
   INITIAL_PREVIEW,
   type DraftBinding,
   type PreviewState,
+  type RailTab,
   type SessionStatus,
   type WorkspaceSession,
 } from "./session-store";
@@ -70,6 +71,12 @@ export function useSaveStatus(): SessionStatus {
 export function useRailOpen(): boolean {
   const session = useWorkspaceSession();
   return useSyncExternalStore(session.subscribe, session.getRailOpen, () => false);
+}
+
+/** The tab the author picked in the rail (Comments | Variables), or null until they pick one. */
+export function useRailTab(): RailTab | null {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getRailTab, () => null);
 }
 
 /** The preview's state (open, view, channel, sample set, device), shared by the tab bar and the rail. */

@@ -1,6 +1,6 @@
 # Agent brief — shared rules for every UCOMP subagent
 
-Read this file first, then read your task. Source documents:
+Read this file first, then read your task. Any task that builds or changes UI also follows `docs/ui-checklist.md` (lessons from Phase 3's QA): check your screens against it before you report. Source documents:
 - `docs/UCOMP Prototype — Build Plan for Claude Code.md` sets the scope. Read the sections your task names.
 - `docs/UCOMP-Implementation-Plan.md` is the architecture and the phases.
 - `docs/design-reference.md` covers look and feel. The source images are in `reference-images/`; open them only if your task is visual.
@@ -94,6 +94,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before you use any Nex
   - If your task is visual, you may take screenshots of localhost:3000 with a small Playwright script (`chromium` from `@playwright/test`, viewport 1440×900).
   - Save them under `e2e/__screens__/` and look at them at reduced size. Take only what you need.
 - **Don't** commit, push, install packages or change config without saying so in your report.
+- **Temp files.** Put scratch scripts and outputs in a subfolder of the scratch directory named after your task (for example `<scratchpad>/u2-versions/`). Delete only files you created; never `rm` by wildcard in a shared folder.
 - **Report back in text:**
   - What you built, as file paths.
   - Decisions you made.

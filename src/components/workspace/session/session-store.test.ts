@@ -46,7 +46,14 @@ describe("workspace session", () => {
     expect(() => session.focusDocument()).not.toThrow();
 
     const focus = vi.fn();
-    session.setEditor({ focus });
+    session.setEditor({
+      focus,
+      focusThread: () => {},
+      getBlockRect: () => null,
+      getThreadRect: () => null,
+      subscribeBlockRects: () => () => {},
+      requestComment: () => {},
+    });
     session.focusDocument();
     expect(focus).toHaveBeenCalledWith("first-section");
 
@@ -272,5 +279,59 @@ describe("workspace session", () => {
       session.publishStatus({ status: "saved" });
       expect(seen).toEqual([1]);
     });
+  });
+});
+
+describe("the rail's comments view", () => {
+  it("starts with no tab picked, so the rail can open on what is waiting", () => {
+    expect(createWorkspaceSession().getRailTab()).toBeNull();
+  });
+
+  it("remembers the tab the author picks, and tells subscribers once", () => {
+    const session = createWorkspaceSession();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.selectRailView("variables");
+    session.selectRailView("variables");
+    expect(session.getRailTab()).toBe("variables");
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("changes the widened rail's view only while the preview is open, and Preview isn't a plain-rail tab", () => {
+    const session = createWorkspaceSession();
+    session.selectRailView("comments");
+    expect(session.getPreview().view).toBe(INITIAL_PREVIEW.view);
+
+    session.openPreview();
+    session.selectRailView("variables");
+    expect(session.getPreview().view).toBe("variables");
+    expect(session.getRailTab()).toBe("variables");
+
+    // Back to the output: the plain rail keeps the tab it had.
+    session.selectRailView("preview");
+    expect(session.getPreview().view).toBe("preview");
+    expect(session.getRailTab()).toBe("variables");
+  });
+
+  it("shows the comments: the Comments tab, the widened rail's too, and the overlay where the rail is one", () => {
+    const session = createWorkspaceSession();
+    session.selectRailView("variables");
+    session.showComments();
+    expect(session.getRailTab()).toBe("comments");
+    expect(session.getRailOpen()).toBe(true);
+
+    session.openPreview();
+    expect(session.getPreview().view).toBe("preview");
+    session.showComments();
+    expect(session.getPreview().view).toBe("comments");
+  });
+
+  it("notifies nobody when the comments are already showing", () => {
+    const session = createWorkspaceSession();
+    session.showComments();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.showComments();
+    expect(listener).not.toHaveBeenCalled();
   });
 });

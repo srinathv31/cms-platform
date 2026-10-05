@@ -1,4 +1,8 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { demoCursor, glide, isDemo, moveTo } from "../media/demo";
+
+// Gate media (recording, stills, pacing) lives in ../media/demo.ts; the specs get it from here.
+export { beat, demoCursor, demoTimeout, isDemo, isShooting, moveTo, shoot } from "../media/demo";
 
 // Shared by the scenario specs that drive the workspace as a person would: a test that fails on any
 // console or page error, the live-editor wait, caret and chip readers, and a click counter.
@@ -8,6 +12,8 @@ export const PERSONA_COOKIE = "ucomp_persona";
 interface Fixtures {
   /** Uncaught page errors and console errors collected during the test; the test fails if any. */
   problems: string[];
+  /** In the `demo` project: demo mode on and the cursor on the page. In `stills-1280`: shooting on. Nothing otherwise. */
+  demoStage: void;
 }
 
 export const test = base.extend<Fixtures>({
@@ -22,6 +28,20 @@ export const test = base.extend<Fixtures>({
       await page.addInitScript(countPointerPresses);
       await use(problems);
       expect(problems, "console errors and page errors").toEqual([]);
+    },
+    { auto: true },
+  ],
+  demoStage: [
+    async ({ page }, use, testInfo) => {
+      const before = { UCOMP_DEMO: process.env.UCOMP_DEMO, UCOMP_STILLS: process.env.UCOMP_STILLS };
+      if (testInfo.project.metadata?.demo) process.env.UCOMP_DEMO = "1";
+      if (testInfo.project.metadata?.stills) process.env.UCOMP_STILLS = "1";
+      await demoCursor(page);
+      await use();
+      for (const [key, value] of Object.entries(before)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     },
     { auto: true },
   ],
@@ -61,6 +81,15 @@ export async function asPersona(page: Page, id: string) {
 
 // ── The click counter ──
 
+/**
+ * A human-paced click: a real press and release, about 90ms apart (longer in demo mode, so the press
+ * shows in the recording). In demo mode the mouse first glides to the target.
+ */
+export async function tap(target: Locator, options?: Parameters<Locator["click"]>[0]) {
+  await moveTo(target.page(), target, options?.position);
+  await target.click({ delay: isDemo() ? 140 : 90, ...options });
+}
+
 export interface ClickCounter {
   readonly count: number;
   /** A natural press-and-release (Playwright's default releases within ~1ms), counted. */
@@ -75,7 +104,7 @@ export function clickCounter(): ClickCounter {
     },
     async click(target, options) {
       count++;
-      await target.click({ delay: 90, ...options });
+      await tap(target, options);
     },
   };
 }
@@ -247,6 +276,17 @@ export async function pointInText(block: Locator, offset: number) {
 export async function dragRowTo(page: Page, row: Locator, target: { x: number; y: number }) {
   const box = (await row.boundingBox())!;
   const from = { x: box.x + 64, y: box.y + box.height / 2 };
+  if (isDemo()) {
+    // The same gesture, slowly enough to watch: glide to the row, lift off, glide over the target.
+    await glide(page, from);
+    await page.mouse.down();
+    await page.waitForTimeout(160);
+    await page.mouse.move(from.x - 12, from.y - 8, { steps: 6 });
+    await glide(page, target);
+    await page.waitForTimeout(240);
+    await page.mouse.up();
+    return;
+  }
   await page.mouse.move(from.x, from.y, { steps: 4 });
   await page.mouse.down();
   await page.waitForTimeout(60);
@@ -276,7 +316,7 @@ export const NAME = "Spring Travel Rewards — Terms";
 // ── Pacing and waiting (shared by the scenario specs) ──
 
 /** Types the way a person does: a little slower than the machine can. */
-export const typeSlowly = (page: Page, text: string) => page.keyboard.type(text, { delay: 18 });
+export const typeSlowly = (page: Page, text: string) => page.keyboard.type(text, { delay: isDemo() ? 45 : 18 });
 
 /**
  * The document itself. With Email on, the subject and the preheader are editors too (also

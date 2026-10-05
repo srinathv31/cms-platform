@@ -3,19 +3,41 @@ import {
   BLANK_STARTER_KEY,
   DEFAULT_CHANNELS,
   LifecycleError,
+  REFUSALS,
   UNTITLED_TEMPLATE_NAME,
+  approve,
+  cancelRevoke,
+  confirmRevoke,
   createDraft,
   editActive,
   initialTemplateName,
+  isAfterToday,
   planDraftStart,
+  requestChanges,
+  revokePending,
+  setSunset,
+  startRevoke,
   submit,
+  type ReviewVersion,
   type StarterContent,
   type SubmitDraft,
   type VersionSnapshot,
 } from "./lifecycle";
-import type { JSONContent, SampleSet, Variable, VersionState } from "./types";
+import { REASONS } from "./permissions";
+import type { ApprovalStage, Recipients } from "./review-types";
+import {
+  VERSION_STATES,
+  type ContractChange,
+  type JSONContent,
+  type RevokeRecord,
+  type SampleSet,
+  type Variable,
+  type VersionState,
+} from "./types";
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
+const TEMPLATE = { id: "UC-4F7K2Q", name: "Spring Travel Rewards — Terms" };
+const CHAIN_1: ApprovalStage[] = [{ position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }];
 
 const heading = (id: string, requiredKey: string, text: string): JSONContent => ({
   type: "heading",
@@ -274,14 +296,46 @@ describe("submit", () => {
     channels: ["pdf", "web"],
   };
   const SUBMITTER = "maya";
-  const run = (over: Partial<SubmitDraft> = {}, extra: { highestNumber?: number; baseline?: Variable[] | null } = {}) =>
+  const run = (
+    over: Partial<SubmitDraft> = {},
+    extra: {
+      highestNumber?: number;
+      baseline?: Variable[] | null;
+      note?: string | null;
+      chain?: ApprovalStage[];
+    } = {},
+  ) =>
     submit({
       draft: { ...draft, ...over },
       highestNumber: extra.highestNumber ?? 0,
       baseline: extra.baseline ?? null,
       now: NOW,
       submittedBy: SUBMITTER,
+      submitterName: "Maya Chen",
+      templateId: TEMPLATE.id,
+      templateName: TEMPLATE.name,
+      note: extra.note,
+      chain: extra.chain,
     });
+
+  const reviewRequested = (number: number, extra: { body?: string; to?: Recipients } = {}) => ({
+    kind: "notification",
+    notification: "review_requested",
+    to: extra.to ?? { kind: "team_role", role: "approver", exceptUserIds: ["maya"] },
+    title: `Maya Chen submitted Spring Travel Rewards — Terms v${number} for review.`,
+    ...(extra.body ? { body: extra.body } : {}),
+    link: { to: "review", templateId: TEMPLATE.id, versionNumber: number },
+  });
+  const submitted = (number: number, extra: { note?: string | null; contractChanges?: number; breaking?: boolean } = {}) => ({
+    kind: "audit",
+    action: "version.submitted",
+    details: {
+      number,
+      note: extra.note ?? null,
+      contractChanges: extra.contractChanges ?? 0,
+      breaking: extra.breaking ?? false,
+    },
+  });
 
   it("makes a first draft v1, in review, at the first approval stage", () => {
     const result = run();
@@ -292,19 +346,58 @@ describe("submit", () => {
         number: 1,
         submittedBy: "maya",
         submittedAt: NOW,
+        submitNote: null,
         currentStage: 0,
         contractChanges: null,
       },
-      effects: [{ kind: "audit", action: "version.submitted", details: { number: 1 } }],
+      effects: [submitted(1), reviewRequested(1)],
     });
   });
 
   it("numbers the version one above the template's highest", () => {
     const result = run({}, { highestNumber: 4 });
     expect(result.ok && result.changes.number).toBe(5);
+    expect(result.ok && result.effects).toEqual([submitted(5), reviewRequested(5)]);
+  });
+
+  it("keeps the note to reviewers, trimmed, and passes it on to them", () => {
+    const result = run({}, { note: "  Adds the annual fee for the spring launch.\n" });
+    expect(result.ok && result.changes.submitNote).toBe("Adds the annual fee for the spring launch.");
     expect(result.ok && result.effects).toEqual([
-      { kind: "audit", action: "version.submitted", details: { number: 5 } },
+      submitted(1, { note: "Adds the annual fee for the spring launch." }),
+      reviewRequested(1, { body: "Adds the annual fee for the spring launch." }),
     ]);
+  });
+
+  it.each([undefined, null, "", "   \n "])("stores no note when it is %j", (note) => {
+    const result = run({}, { note });
+    expect(result.ok && result.changes.submitNote).toBeNull();
+    expect(result.ok && result.effects[1]).toEqual(reviewRequested(1));
+  });
+
+  it("asks the team's approvers to review, never the submitter", () => {
+    const result = run();
+    expect(result.ok && result.effects.filter((e) => e.kind === "notification")).toEqual([reviewRequested(1)]);
+  });
+
+  it("asks whoever the chain's first stage names, when the chain is given", () => {
+    const legalFirst: ApprovalStage[] = [
+      { position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+      { position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+    ];
+    expect(run({}, { chain: legalFirst })).toMatchObject({
+      effects: [submitted(1), reviewRequested(1, { to: { kind: "user", userId: "dana" } })],
+    });
+    expect(run({}, { chain: CHAIN_1 })).toMatchObject({ effects: [submitted(1), reviewRequested(1)] });
+  });
+
+  it("records how many contract changes there are, and whether any breaks", () => {
+    const annualFee: Variable = { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" };
+    const breaking = run({ variables: [...VARIABLES, annualFee] }, { baseline: VARIABLES });
+    expect(breaking.ok && breaking.effects[0]).toEqual(submitted(1, { contractChanges: 1, breaking: true }));
+
+    const relabelled = run({ variables: [{ ...VARIABLES[0]!, label: "Given name" }, VARIABLES[1]!] }, { baseline: VARIABLES });
+    expect(relabelled.ok && relabelled.effects[0]).toEqual(submitted(1, { contractChanges: 1, breaking: false }));
   });
 
   it("records no contract changes when there is no Active version to compare with", () => {
@@ -437,5 +530,828 @@ describe("submit", () => {
       ok: false,
       reason: "Define or remove {{promo_code}} before submitting.",
     });
+  });
+});
+
+// ── Review transitions ────────────────────────────────────────
+
+const CHAIN_2: ApprovalStage[] = [
+  ...CHAIN_1,
+  { position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+];
+const TOMORROW = new Date("2026-10-05T00:00:00.000Z");
+const MARCH_1 = new Date("2027-03-01T00:00:00.000Z");
+const REASON = "The APR in Rates and fees doesn't match the offer sheet.";
+const REVOKE_REASON = "Wrong APR in legal notices";
+const EMAIL_SUBJECT: JSONContent = {
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text: "Your offer" }] }],
+};
+const ANNUAL_FEE_ADDED: ContractChange = {
+  kind: "added",
+  key: "annual_fee",
+  breaking: true,
+  type: "currency",
+  required: true,
+};
+const PENDING: RevokeRecord = { reason: REVOKE_REASON, startedBy: "jordan", startedAt: "2026-10-03T09:00:00.000Z" };
+const CONFIRMED: RevokeRecord = { ...PENDING, confirmedBy: "alex", confirmedAt: "2026-10-03T10:00:00.000Z" };
+
+const APPROVERS_BUT = (userId: string): Recipients => ({ kind: "team_role", role: "approver", exceptUserIds: [userId] });
+
+function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
+  return {
+    id: "v_1",
+    templateId: TEMPLATE.id,
+    number: 1,
+    state: "in_review",
+    body: BODY,
+    emailSubject: EMAIL_SUBJECT,
+    emailPreheader: null,
+    channels: ["pdf", "web", "email"],
+    variables: VARIABLES,
+    sampleSets: SAMPLE_SETS,
+    submittedBy: "maya",
+    currentStage: 0,
+    contractChanges: null,
+    sunsetAt: null,
+    revoke: null,
+    ...over,
+  };
+}
+
+/** A version as it would be in a state: drafts have no number, a revoked one has a confirmed revoke. */
+function inState(state: VersionState, over: Partial<ReviewVersion> = {}): ReviewVersion {
+  return reviewVersion({
+    state,
+    number: state === "draft" ? null : 1,
+    submittedBy: state === "draft" ? null : "maya",
+    revoke: state === "revoked" ? CONFIRMED : null,
+    ...over,
+  });
+}
+
+const tryRequestChanges = (version: ReviewVersion) =>
+  requestChanges({
+    version,
+    chain: CHAIN_1,
+    actorId: "jordan",
+    actorName: "Jordan Ellis",
+    reason: REASON,
+    now: NOW,
+    templateName: TEMPLATE.name,
+  });
+const tryApprove = (version: ReviewVersion) =>
+  approve({
+    version,
+    chain: CHAIN_1,
+    actorId: "jordan",
+    actorName: "Jordan Ellis",
+    now: NOW,
+    active: null,
+    sunsetPrevious: null,
+    sampleSetsSeen: ["typical"],
+    templateName: TEMPLATE.name,
+  });
+const trySetSunset = (version: ReviewVersion) =>
+  setSunset({ version, actorId: "jordan", now: NOW, sunsetAt: MARCH_1, activeNumber: 2, templateName: TEMPLATE.name });
+const tryStartRevoke = (version: ReviewVersion) =>
+  startRevoke({
+    version,
+    actorId: "jordan",
+    actorName: "Jordan Ellis",
+    reason: REVOKE_REASON,
+    now: NOW,
+    templateName: TEMPLATE.name,
+  });
+const tryConfirmRevoke = (version: ReviewVersion) =>
+  confirmRevoke({ version, actorId: "alex", actorName: "Alex Kim", now: NOW, activeNumber: 2, templateName: TEMPLATE.name });
+const tryCancelRevoke = (version: ReviewVersion) => cancelRevoke({ version, actorId: "alex", now: NOW });
+
+describe("the transitions table: every review move from every state", () => {
+  // `true` = allowed; otherwise the exact refusal. Confirm and cancel are tried with a revoke pending.
+  const { notInReview, sunsetNotSuperseded, notRevocable, alreadyRevoked, noRevokePending } = REFUSALS;
+  const TABLE: Record<string, { attempt: (v: ReviewVersion) => { ok: boolean }; pending?: true; to: Record<VersionState, true | string> }> = {
+    "request changes": {
+      attempt: tryRequestChanges,
+      to: { draft: notInReview, in_review: true, changes_requested: notInReview, active: notInReview, superseded: notInReview, revoked: notInReview },
+    },
+    approve: {
+      attempt: tryApprove,
+      to: { draft: notInReview, in_review: true, changes_requested: notInReview, active: notInReview, superseded: notInReview, revoked: notInReview },
+    },
+    "set sunset": {
+      attempt: trySetSunset,
+      to: {
+        draft: sunsetNotSuperseded,
+        in_review: sunsetNotSuperseded,
+        changes_requested: sunsetNotSuperseded,
+        active: sunsetNotSuperseded,
+        superseded: true,
+        revoked: sunsetNotSuperseded,
+      },
+    },
+    "start revoke": {
+      attempt: tryStartRevoke,
+      to: { draft: notRevocable, in_review: notRevocable, changes_requested: notRevocable, active: true, superseded: true, revoked: alreadyRevoked },
+    },
+    "confirm revoke": {
+      attempt: tryConfirmRevoke,
+      pending: true,
+      to: { draft: noRevokePending, in_review: noRevokePending, changes_requested: noRevokePending, active: true, superseded: true, revoked: alreadyRevoked },
+    },
+    "cancel revoke": {
+      attempt: tryCancelRevoke,
+      pending: true,
+      to: { draft: noRevokePending, in_review: noRevokePending, changes_requested: noRevokePending, active: true, superseded: true, revoked: alreadyRevoked },
+    },
+  };
+
+  const cases = Object.entries(TABLE).flatMap(([move, row]) =>
+    VERSION_STATES.map((state) => ({ move, state, row, expected: row.to[state] })),
+  );
+
+  it.each(cases)("$move from $state", ({ state, row, expected }) => {
+    const version = inState(state, row.pending && state !== "revoked" ? { revoke: PENDING } : {});
+    const result = row.attempt(version);
+    if (expected === true) expect(result.ok).toBe(true);
+    else expect(result).toEqual({ ok: false, reason: expected });
+  });
+});
+
+describe("requestChanges", () => {
+  const run = (over: Partial<Parameters<typeof requestChanges>[0]> = {}) =>
+    requestChanges({
+      version: reviewVersion(),
+      chain: CHAIN_1,
+      actorId: "jordan",
+      actorName: "Jordan Ellis",
+      reason: REASON,
+      now: NOW,
+      templateName: TEMPLATE.name,
+      ...over,
+    });
+
+  it("sends the version back, records the decision, and leaves the author a new draft", () => {
+    expect(run()).toEqual({
+      ok: true,
+      changes: { state: "changes_requested" },
+      approval: {
+        versionId: "v_1",
+        stagePosition: 0,
+        stageName: "Team approver",
+        actorId: "jordan",
+        decision: "changes_requested",
+        reason: REASON,
+        sampleSetsSeen: null,
+        decidedAt: NOW,
+      },
+      newDraft: {
+        state: "draft",
+        number: null,
+        basedOnVersionId: "v_1",
+        body: BODY,
+        emailSubject: EMAIL_SUBJECT,
+        emailPreheader: null,
+        channels: ["pdf", "web", "email"],
+        variables: VARIABLES,
+        sampleSets: SAMPLE_SETS,
+        contractChanges: null,
+        currentStage: 0,
+        rev: 0,
+        createdBy: "maya",
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      reasonComment: { blockId: "doc", body: REASON, kind: "change_request" },
+      effects: [
+        {
+          kind: "audit",
+          action: "version.changes_requested",
+          details: { number: 1, stage: "Team approver", reason: REASON },
+        },
+        {
+          kind: "notification",
+          notification: "changes_requested",
+          to: { kind: "user", userId: "maya" },
+          title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1.",
+          body: REASON,
+          link: { to: "template", templateId: TEMPLATE.id },
+        },
+      ],
+    });
+  });
+
+  it("keeps every block id in the new draft, so the review threads re-anchor in the editor", () => {
+    const result = run();
+    const ids = (result.ok ? (result.newDraft.body.content ?? []) : []).map((b) => b.attrs?.id);
+    expect(ids).toEqual(["b_one", "b_two", "b_three", "b_four"]);
+  });
+
+  it("copies, so editing the new draft never changes the version under review", () => {
+    const result = run();
+    if (!result.ok) throw new Error(result.reason);
+    result.newDraft.body.content![1]!.content![0]!.text = "Changed";
+    result.newDraft.variables[0]!.label = "Changed";
+    result.newDraft.sampleSets[0]!.values.first_name = "Changed";
+    result.newDraft.emailSubject!.content![0]!.content![0]!.text = "Changed";
+    expect(BODY.content![1]!.content![0]!.text).toBe("Hi ");
+    expect(VARIABLES[0]!.label).toBe("First name");
+    expect(SAMPLE_SETS[0]!.values.first_name).toBe("Maya");
+    expect(EMAIL_SUBJECT.content![0]!.content![0]!.text).toBe("Your offer");
+  });
+
+  it("trims the reason before it becomes the comment", () => {
+    const result = run({ reason: `  ${REASON}\n` });
+    expect(result.ok && result.reasonComment.body).toBe(REASON);
+    expect(result.ok && result.approval.reason).toBe(REASON);
+  });
+
+  it.each(["", "   ", "\n\t"])("refuses an empty reason (%j)", (reason) => {
+    expect(run({ reason })).toEqual({ ok: false, reason: "Give a reason." });
+  });
+
+  it("refuses the submitter: nobody decides their own version", () => {
+    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: REASONS.ownVersion });
+  });
+
+  it("checks the state before who is asking", () => {
+    expect(run({ version: reviewVersion({ state: "active" }), actorId: "maya" })).toEqual({
+      ok: false,
+      reason: "This version isn't in review.",
+    });
+  });
+
+  it("records the stage that sent it back", () => {
+    const result = run({ version: reviewVersion({ currentStage: 1 }), chain: CHAIN_2, actorId: "dana", actorName: "Dana Park" });
+    expect(result.ok && result.approval).toMatchObject({ stagePosition: 1, stageName: "Legal reviewer", actorId: "dana" });
+    expect(result.ok && result.effects[0]).toEqual({
+      kind: "audit",
+      action: "version.changes_requested",
+      details: { number: 1, stage: "Legal reviewer", reason: REASON },
+    });
+  });
+
+  it("refuses when the chain has no stage for the version", () => {
+    expect(run({ chain: [] })).toEqual({ ok: false, reason: "This version's approval stage no longer exists." });
+    expect(run({ version: reviewVersion({ currentStage: 1 }) })).toEqual({
+      ok: false,
+      reason: "This version's approval stage no longer exists.",
+    });
+  });
+
+  it("gives the draft to the approver, and notifies nobody, when no submitter is on record", () => {
+    const result = run({ version: reviewVersion({ submittedBy: null }) });
+    expect(result.ok && result.newDraft.createdBy).toBe("jordan");
+    expect(result.ok && result.effects.map((e) => e.kind)).toEqual(["audit"]);
+  });
+});
+
+describe("approve", () => {
+  const v2 = reviewVersion({ id: "v_2", number: 2, contractChanges: [ANNUAL_FEE_ADDED] });
+  const run = (over: Partial<Parameters<typeof approve>[0]> = {}) =>
+    approve({
+      version: v2,
+      chain: CHAIN_1,
+      actorId: "jordan",
+      actorName: "Jordan Ellis",
+      now: NOW,
+      active: { id: "v_1", number: 1 },
+      sunsetPrevious: null,
+      sampleSetsSeen: ["typical", "long"],
+      templateName: TEMPLATE.name,
+      ...over,
+    });
+
+  const activated = (supersedes: number | null, stage = "Team approver") => ({
+    kind: "audit",
+    action: "version.activated",
+    details: { number: 2, supersedes, stage },
+  });
+  const superseded = { kind: "audit", action: "version.superseded", versionId: "v_1", details: { number: 1, supersededBy: 2 } };
+  const live = {
+    kind: "notification",
+    notification: "version_live",
+    to: { kind: "user", userId: "maya" },
+    title: "Spring Travel Rewards — Terms v2 is now Active.",
+    body: "Jordan Ellis approved it.",
+    link: { to: "template", templateId: TEMPLATE.id },
+  };
+  const newVersion = {
+    kind: "consumer_notice",
+    notice: "new_version",
+    versionId: "v_2",
+    payload: {
+      versionNumber: 2,
+      activeVersion: 2,
+      contractChanges: [ANNUAL_FEE_ADDED],
+      contractLines: ["v2 adds required `annual_fee` (Currency)."],
+    },
+  };
+
+  it("makes the last stage's approval go live, and supersedes the previous Active version", () => {
+    expect(run()).toEqual({
+      ok: true,
+      changes: { state: "active", currentStage: 0, activatedAt: NOW },
+      approval: {
+        versionId: "v_2",
+        stagePosition: 0,
+        stageName: "Team approver",
+        actorId: "jordan",
+        decision: "approved",
+        reason: null,
+        sampleSetsSeen: ["typical", "long"],
+        decidedAt: NOW,
+      },
+      previous: { id: "v_1", changes: { state: "superseded", supersededAt: NOW } },
+      wentLive: true,
+      effects: [activated(1), superseded, live, newVersion],
+    });
+  });
+
+  it("sets the previous version's sunset in the same step, and tells its consumers", () => {
+    const result = run({ sunsetPrevious: MARCH_1 });
+    expect(result.ok && result.previous).toEqual({
+      id: "v_1",
+      changes: { state: "superseded", supersededAt: NOW, sunsetAt: MARCH_1, sunsetSetBy: "jordan" },
+    });
+    expect(result.ok && result.effects).toEqual([
+      activated(1),
+      superseded,
+      {
+        kind: "audit",
+        action: "version.sunset_set",
+        versionId: "v_1",
+        details: { number: 1, sunsetAt: "2027-03-01T00:00:00.000Z", previousSunsetAt: null },
+      },
+      live,
+      newVersion,
+      {
+        kind: "consumer_notice",
+        notice: "sunset_scheduled",
+        versionId: "v_1",
+        payload: {
+          versionNumber: 1,
+          activeVersion: 2,
+          sunsetAt: "2027-03-01T00:00:00.000Z",
+          contractChanges: [ANNUAL_FEE_ADDED],
+          contractLines: ["v2 adds required `annual_fee` (Currency)."],
+        },
+      },
+    ]);
+  });
+
+  it("goes live with nothing to supersede when no version is Active", () => {
+    const result = run({ active: null });
+    expect(result.ok && "previous" in result).toBe(false);
+    expect(result.ok && result.effects).toEqual([activated(null), live, newVersion]);
+  });
+
+  it("has nothing to sunset when no version is Active", () => {
+    const result = run({ active: null, sunsetPrevious: MARCH_1 });
+    expect(result.ok && "previous" in result).toBe(false);
+    expect(result.ok && result.effects.map((e) => (e.kind === "audit" ? e.action : e.kind))).toEqual([
+      "version.activated",
+      "notification",
+      "consumer_notice",
+    ]);
+  });
+
+  it.each([
+    ["later today", new Date("2026-10-04T23:00:00.000Z")],
+    ["earlier today", new Date("2026-10-04T00:00:00.000Z")],
+    ["in the past", new Date("2026-09-01T00:00:00.000Z")],
+  ])("refuses a sunset date %s", (_, date) => {
+    expect(run({ sunsetPrevious: date })).toEqual({ ok: false, reason: "Pick a date after today." });
+  });
+
+  it("accepts a sunset date of tomorrow", () => {
+    expect(run({ sunsetPrevious: TOMORROW }).ok).toBe(true);
+  });
+
+  it("refuses the submitter: nobody approves their own version", () => {
+    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: "You submitted this version." });
+  });
+
+  it("records each sample set the approver saw once", () => {
+    const result = run({ sampleSetsSeen: ["typical", "long", "typical"] });
+    expect(result.ok && result.approval.sampleSetsSeen).toEqual(["typical", "long"]);
+  });
+
+  it("says nothing to a submitter who isn't on record", () => {
+    const result = run({ version: { ...v2, submittedBy: null } });
+    expect(result.ok && result.effects).toEqual([activated(1), superseded, newVersion]);
+  });
+
+  describe("with two stages", () => {
+    it("moves the first stage's approval on to the next stage, and asks it to review", () => {
+      expect(run({ chain: CHAIN_2 })).toEqual({
+        ok: true,
+        changes: { state: "in_review", currentStage: 1, activatedAt: null },
+        approval: {
+          versionId: "v_2",
+          stagePosition: 0,
+          stageName: "Team approver",
+          actorId: "jordan",
+          decision: "approved",
+          reason: null,
+          sampleSetsSeen: ["typical", "long"],
+          decidedAt: NOW,
+        },
+        wentLive: false,
+        effects: [
+          {
+            kind: "audit",
+            action: "version.stage_approved",
+            details: { number: 2, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
+          },
+          {
+            kind: "notification",
+            notification: "review_requested",
+            to: { kind: "user", userId: "dana" },
+            title: "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+            link: { to: "review", templateId: TEMPLATE.id, versionNumber: 2 },
+          },
+          {
+            kind: "notification",
+            notification: "stage_approved",
+            to: { kind: "user", userId: "maya" },
+            title: "Jordan Ellis approved Spring Travel Rewards — Terms v2 for Team approver.",
+            body: "Next: Legal reviewer.",
+            link: { to: "review", templateId: TEMPLATE.id, versionNumber: 2 },
+          },
+        ],
+      });
+    });
+
+    it("doesn't supersede or sunset anything before the last stage", () => {
+      const result = run({ chain: CHAIN_2, sunsetPrevious: MARCH_1 });
+      expect(result.ok && result.wentLive).toBe(false);
+      expect(result.ok && "previous" in result).toBe(false);
+      expect(result.ok && result.effects.some((e) => e.kind === "consumer_notice")).toBe(false);
+    });
+
+    it("goes live at the second stage", () => {
+      const result = run({ chain: CHAIN_2, version: { ...v2, currentStage: 1 }, actorId: "dana", actorName: "Dana Park" });
+      expect(result.ok && result.wentLive).toBe(true);
+      expect(result.ok && result.changes).toEqual({ state: "active", currentStage: 1, activatedAt: NOW });
+      expect(result.ok && result.approval).toMatchObject({ stagePosition: 1, stageName: "Legal reviewer", actorId: "dana" });
+      expect(result.ok && result.effects[0]).toEqual(activated(1, "Legal reviewer"));
+    });
+
+    it("follows the stages' positions, whatever order the chain arrives in", () => {
+      const result = run({ chain: [...CHAIN_2].reverse() });
+      expect(result.ok && result.approval.stageName).toBe("Team approver");
+      expect(result.ok && result.changes.currentStage).toBe(1);
+    });
+
+    it("asks a team-role stage's approvers, never the submitter", () => {
+      const teamSecond: ApprovalStage[] = [
+        { position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+        { position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+      ];
+      const result = run({ chain: teamSecond, actorId: "dana", actorName: "Dana Park" });
+      expect(result.ok && result.effects[1]).toMatchObject({
+        notification: "review_requested",
+        to: APPROVERS_BUT("maya"),
+        title: "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
+      });
+    });
+  });
+
+  it("refuses when the chain has no stage for the version", () => {
+    expect(run({ version: { ...v2, currentStage: 1 } })).toEqual({
+      ok: false,
+      reason: "This version's approval stage no longer exists.",
+    });
+  });
+});
+
+describe("setSunset", () => {
+  const v1 = reviewVersion({ state: "superseded", submittedBy: "priya" });
+  const run = (over: Partial<Parameters<typeof setSunset>[0]> = {}) =>
+    setSunset({
+      version: v1,
+      actorId: "jordan",
+      now: NOW,
+      sunsetAt: MARCH_1,
+      activeNumber: 2,
+      templateName: "Balance Transfer Intro",
+      ...over,
+    });
+
+  it("schedules the sunset and tells the consumers and the version's author", () => {
+    expect(run()).toEqual({
+      ok: true,
+      changes: { sunsetAt: MARCH_1, sunsetSetBy: "jordan" },
+      effects: [
+        {
+          kind: "audit",
+          action: "version.sunset_set",
+          details: { number: 1, sunsetAt: "2027-03-01T00:00:00.000Z", previousSunsetAt: null },
+        },
+        {
+          kind: "consumer_notice",
+          notice: "sunset_scheduled",
+          versionId: "v_1",
+          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T00:00:00.000Z" },
+        },
+        {
+          kind: "notification",
+          notification: "sunset_scheduled",
+          to: { kind: "user", userId: "priya" },
+          title: "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+          link: { to: "versions", templateId: TEMPLATE.id },
+        },
+      ],
+    });
+  });
+
+  it("moves an existing sunset, earlier or later, and records the old date", () => {
+    const scheduled = { ...v1, sunsetAt: new Date("2026-10-25T00:00:00.000Z") };
+    for (const sunsetAt of [TOMORROW, MARCH_1]) {
+      const result = run({ version: scheduled, sunsetAt });
+      expect(result.ok && result.changes.sunsetAt).toEqual(sunsetAt);
+      expect(result.ok && result.effects[0]).toEqual({
+        kind: "audit",
+        action: "version.sunset_set",
+        details: { number: 1, sunsetAt: sunsetAt.toISOString(), previousSunsetAt: "2026-10-25T00:00:00.000Z" },
+      });
+    }
+  });
+
+  it.each([
+    ["today", new Date("2026-10-04T00:00:00.000Z")],
+    ["later today", new Date("2026-10-04T18:00:00.000Z")],
+    ["in the past", new Date("2026-01-01T00:00:00.000Z")],
+  ])("refuses a date %s", (_, sunsetAt) => {
+    expect(run({ sunsetAt })).toEqual({ ok: false, reason: "Pick a date after today." });
+  });
+
+  it("sends the contract changes consumers will meet on the Active version, when given", () => {
+    const result = run({ contractChanges: [ANNUAL_FEE_ADDED] });
+    expect(result.ok && result.effects[1]).toEqual({
+      kind: "consumer_notice",
+      notice: "sunset_scheduled",
+      versionId: "v_1",
+      payload: {
+        versionNumber: 1,
+        activeVersion: 2,
+        sunsetAt: "2027-03-01T00:00:00.000Z",
+        contractChanges: [ANNUAL_FEE_ADDED],
+        contractLines: ["v2 adds required `annual_fee` (Currency)."],
+      },
+    });
+  });
+
+  it("doesn't notify the author when they set it", () => {
+    const result = run({ actorId: "priya" });
+    expect(result.ok && result.effects.map((e) => e.kind)).toEqual(["audit", "consumer_notice"]);
+  });
+});
+
+describe("startRevoke", () => {
+  const run = (over: Partial<Parameters<typeof startRevoke>[0]> = {}) =>
+    startRevoke({
+      version: reviewVersion({ state: "superseded", submittedBy: "priya" }),
+      actorId: "jordan",
+      actorName: "Jordan Ellis",
+      reason: REVOKE_REASON,
+      now: NOW,
+      templateName: "Balance Transfer Intro",
+      ...over,
+    });
+
+  it("starts a revoke that waits for a second approver", () => {
+    expect(run()).toEqual({
+      ok: true,
+      changes: { revoke: { reason: REVOKE_REASON, startedBy: "jordan", startedAt: "2026-10-04T12:00:00.000Z" } },
+      effects: [
+        { kind: "audit", action: "version.revoke_started", details: { number: 1, reason: REVOKE_REASON } },
+        {
+          kind: "notification",
+          notification: "revoke_started",
+          to: APPROVERS_BUT("jordan"),
+          title: "Jordan Ellis started revoking Balance Transfer Intro v1. Confirm or cancel.",
+          body: REVOKE_REASON,
+          link: { to: "versions", templateId: TEMPLATE.id },
+        },
+      ],
+    });
+  });
+
+  it("works on the Active version too", () => {
+    expect(run({ version: reviewVersion({ state: "active" }) }).ok).toBe(true);
+  });
+
+  it("refuses while another revoke is waiting for confirmation", () => {
+    expect(run({ version: reviewVersion({ state: "superseded", revoke: PENDING }), actorId: "alex" })).toEqual({
+      ok: false,
+      reason: "A revoke is already waiting for confirmation.",
+    });
+  });
+
+  it.each(["", "  ", "\n"])("refuses an empty reason (%j)", (reason) => {
+    expect(run({ reason })).toEqual({ ok: false, reason: "Give a reason." });
+  });
+
+  it("trims the reason", () => {
+    const result = run({ reason: `  ${REVOKE_REASON} ` });
+    expect(result.ok && result.changes.revoke.reason).toBe(REVOKE_REASON);
+  });
+});
+
+describe("confirmRevoke", () => {
+  const superseded = reviewVersion({ state: "superseded", submittedBy: "priya", revoke: PENDING });
+  const run = (over: Partial<Parameters<typeof confirmRevoke>[0]> = {}) =>
+    confirmRevoke({
+      version: superseded,
+      actorId: "alex",
+      actorName: "Alex Kim",
+      now: NOW,
+      activeNumber: 2,
+      templateName: "Balance Transfer Intro",
+      ...over,
+    });
+  const notice = (activeVersion: number | null) => ({
+    kind: "consumer_notice",
+    notice: "revoked",
+    versionId: "v_1",
+    payload: { versionNumber: 1, activeVersion, reason: REVOKE_REASON },
+  });
+  const revoked = (to: Recipients) => ({
+    kind: "notification",
+    notification: "version_revoked",
+    to,
+    title: "Alex Kim confirmed the revoke of Balance Transfer Intro v1.",
+    body: REVOKE_REASON,
+    link: { to: "versions", templateId: TEMPLATE.id },
+  });
+
+  it("revokes, filling in who confirmed it and when, and tells consumers and the team", () => {
+    expect(run()).toEqual({
+      ok: true,
+      changes: {
+        state: "revoked",
+        revoke: { ...PENDING, confirmedBy: "alex", confirmedAt: "2026-10-04T12:00:00.000Z" },
+      },
+      effects: [
+        {
+          kind: "audit",
+          action: "version.revoked",
+          details: { number: 1, reason: REVOKE_REASON, startedBy: "jordan", wasActive: false },
+        },
+        notice(2),
+        revoked(APPROVERS_BUT("alex")),
+        revoked({ kind: "user", userId: "priya" }),
+      ],
+    });
+  });
+
+  it("refuses the approver who started it: a different approver must confirm", () => {
+    expect(run({ actorId: "jordan", actorName: "Jordan Ellis" })).toEqual({
+      ok: false,
+      reason: "You started this revoke. Another approver must confirm it.",
+    });
+  });
+
+  it("leaves no Active version when it revokes the Active one: nothing is reinstated", () => {
+    const result = run({ version: { ...superseded, state: "active" }, activeNumber: 1 });
+    expect(result.ok && Object.keys(result).sort()).toEqual(["changes", "effects", "ok"]);
+    expect(result.ok && result.changes.state).toBe("revoked");
+    expect(result.ok && result.effects[0]).toMatchObject({ details: { wasActive: true } });
+    expect(result.ok && result.effects[1]).toEqual(notice(null));
+  });
+
+  it("refuses when nothing is waiting for confirmation", () => {
+    expect(run({ version: { ...superseded, revoke: null } })).toEqual({
+      ok: false,
+      reason: "There's no revoke waiting for confirmation.",
+    });
+    expect(run({ version: { ...superseded, state: "revoked", revoke: CONFIRMED } })).toEqual({
+      ok: false,
+      reason: "This version is already revoked.",
+    });
+  });
+
+  it("notifies only the approvers when no author is on record", () => {
+    const result = run({ version: { ...superseded, submittedBy: null } });
+    expect(result.ok && result.effects.filter((e) => e.kind === "notification")).toEqual([revoked(APPROVERS_BUT("alex"))]);
+  });
+});
+
+describe("cancelRevoke", () => {
+  const pending = reviewVersion({ state: "superseded", revoke: PENDING });
+  const cancelled = (ownRevoke: boolean) => ({
+    ok: true,
+    changes: { revoke: null },
+    effects: [
+      {
+        kind: "audit",
+        action: "version.revoke_cancelled",
+        details: { number: 1, reason: REVOKE_REASON, startedBy: "jordan", ownRevoke },
+      },
+    ],
+  });
+
+  // Any approver may cancel: the starter (a mistake) or another one (the "Confirm or cancel" they were
+  // sent). Cancelling keeps the version rendering, so it needs no second person.
+  it("lets the approver who started it cancel", () => {
+    expect(cancelRevoke({ version: pending, actorId: "jordan", now: NOW })).toEqual(cancelled(true));
+  });
+
+  it("lets another approver cancel", () => {
+    expect(cancelRevoke({ version: pending, actorId: "alex", now: NOW })).toEqual(cancelled(false));
+  });
+
+  it("refuses when nothing is waiting, or the revoke is already confirmed", () => {
+    expect(cancelRevoke({ version: { ...pending, revoke: null }, actorId: "alex", now: NOW })).toEqual({
+      ok: false,
+      reason: "There's no revoke waiting for confirmation.",
+    });
+    expect(cancelRevoke({ version: { ...pending, state: "revoked", revoke: CONFIRMED }, actorId: "alex", now: NOW })).toEqual({
+      ok: false,
+      reason: "This version is already revoked.",
+    });
+  });
+
+  it("allows a new revoke afterwards", () => {
+    const result = cancelRevoke({ version: pending, actorId: "alex", now: NOW });
+    if (!result.ok) throw new Error(result.reason);
+    expect(tryStartRevoke({ ...pending, ...result.changes }).ok).toBe(true);
+  });
+});
+
+describe("review helpers", () => {
+  it("revokePending: started and not yet confirmed", () => {
+    expect(revokePending({ revoke: null })).toBe(false);
+    expect(revokePending({ revoke: PENDING })).toBe(true);
+    expect(revokePending({ revoke: CONFIRMED })).toBe(false);
+  });
+
+  it("isAfterToday: a later UTC day than now", () => {
+    expect(isAfterToday(TOMORROW, NOW)).toBe(true);
+    expect(isAfterToday(new Date("2026-10-04T23:59:59.000Z"), NOW)).toBe(false);
+    expect(isAfterToday(new Date("2026-10-03T00:00:00.000Z"), NOW)).toBe(false);
+  });
+
+  it("throws, rather than refuses, on a reviewed version with no number (a data bug)", () => {
+    expect(() => tryApprove(reviewVersion({ number: null }))).toThrow(LifecycleError);
+  });
+});
+
+// ── The demo scenarios, end to end through the rules ─────────
+
+describe("scenario 3: the review loop", () => {
+  it("submit v1, changes requested, resubmit as v2, approve: v2 is Active", () => {
+    const draft: SubmitDraft = { state: "draft", variables: VARIABLES, body: BODY, emailSubject: null, emailPreheader: null, channels: ["pdf", "web"] };
+    const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name };
+
+    const first = submit({ ...base, draft, highestNumber: 0, baseline: null });
+    if (!first.ok) throw new Error(first.reason);
+    const v1 = reviewVersion({ ...first.changes, id: "v_1" });
+
+    // Maya can't approve her own version; Jordan sends it back.
+    expect(approve({ ...approveArgs(v1), actorId: "maya" })).toEqual({ ok: false, reason: REASONS.ownVersion });
+    const returned = tryRequestChanges(v1);
+    if (!returned.ok) throw new Error(returned.reason);
+    expect(returned.newDraft.basedOnVersionId).toBe("v_1");
+
+    const second = submit({ ...base, draft: { ...returned.newDraft }, highestNumber: 1, baseline: null });
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.changes.number).toBe(2);
+
+    const approved = approve(approveArgs(reviewVersion({ ...second.changes, id: "v_2" })));
+    expect(approved).toMatchObject({ ok: true, wentLive: true, changes: { state: "active" } });
+  });
+
+  function approveArgs(version: ReviewVersion): Parameters<typeof approve>[0] {
+    return {
+      version,
+      chain: CHAIN_1,
+      actorId: "jordan",
+      actorName: "Jordan Ellis",
+      now: NOW,
+      active: null,
+      sunsetPrevious: null,
+      sampleSetsSeen: ["typical"],
+      templateName: TEMPLATE.name,
+    };
+  }
+});
+
+describe("scenario 6: two-person revoke", () => {
+  it("Jordan starts, can't confirm; Alex confirms", () => {
+    const v1 = reviewVersion({ state: "superseded", submittedBy: "priya" });
+    const started = tryStartRevoke(v1);
+    if (!started.ok) throw new Error(started.reason);
+    const pending = { ...v1, ...started.changes };
+
+    expect(confirmRevoke({ version: pending, actorId: "jordan", actorName: "Jordan Ellis", now: NOW, activeNumber: 2, templateName: "x" })).toEqual({
+      ok: false,
+      reason: REASONS.ownRevoke,
+    });
+    const confirmed = tryConfirmRevoke(pending);
+    expect(confirmed).toMatchObject({ ok: true, changes: { state: "revoked", revoke: { startedBy: "jordan", confirmedBy: "alex" } } });
   });
 });

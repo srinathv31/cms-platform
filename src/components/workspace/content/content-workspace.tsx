@@ -1,9 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { blockTextOf } from "@/components/comments/block-text";
+import { GutterMarkers } from "@/components/comments/gutter-markers";
+import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-list";
+import { openCount } from "@/components/comments/thread-state";
+import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
-import { useWorkspaceSession } from "../session/workspace-session";
+import type { Person, ThreadView } from "@/domain/review-types";
+import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
+import type { CommentRequest, DocumentEditorHandle } from "@/editor";
+import { cn } from "@/lib/utils";
+import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
 import { DocumentBody, EditorScope, VariablesSection } from "./editor-adapter";
@@ -32,6 +40,14 @@ export interface ContentWorkspaceProps {
   today: string;
   /** An open draft the viewer can edit. Otherwise everything is read-only and nothing autosaves. */
   editable: boolean;
+  /** The template's review threads against the shown version (change requests, comments, resolved ones). */
+  threads: ThreadView[];
+  /** The viewer may comment: reply, resolve, reopen, and start a thread (the Comment button). */
+  canComment: boolean;
+  /** The viewer, for the comments they write before the server confirms them. */
+  viewer: Person;
+  /** The demo clock's now (ISO): "3h ago" is measured from it. */
+  now: string;
 }
 
 /**
@@ -41,6 +57,12 @@ export interface ContentWorkspaceProps {
  * renders with the live variable list. The server component that renders this passes a key made of the version
  * and whether it is editable, so a different version, or the same one turning read-only (submitted),
  * is a fresh editor and a fresh session.
+ *
+ * Review comments (src/components/comments) live here too: the document gets highlights and markers
+ * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
+ * preview's header), and one `useReviewThreads` state ties them: the active thread, and the composer
+ * the editor's Comment button opens. A click on a highlight or a marker brings the thread's card into
+ * the rail (switching it to Comments); choosing a card scrolls the document to the quote.
  */
 export function ContentWorkspace({
   templateId,
@@ -59,8 +81,13 @@ export function ContentWorkspace({
   sampleSets,
   today,
   editable,
+  threads,
+  canComment,
+  viewer,
+  now,
 }: ContentWorkspaceProps) {
   const session = useWorkspaceSession();
+  const { open: previewOpen } = usePreviewState();
 
   // Tell the workspace which draft is being edited. It starts autosave for it, and the header's name
   // field and save indicator follow. A read-only page binds nothing.
@@ -70,7 +97,21 @@ export function ContentWorkspace({
 
   const [channels, setChannels] = useState(initialChannels);
 
-  const onBodyChange = useCallback((doc: JSONContent) => session.save({ body: doc }), [session]);
+  // ── Review comments: the state the document's highlights and markers, and the rail's list, share.
+  const review = useReviewThreads(threads);
+  const { setActive, openComposer, closeComposer, activeThreadId, trackDocument } = review;
+
+  // The document as it is now: what the blocks say (a card about a whole block quotes the start of its text).
+  const liveBody = useRef(body);
+  const onBodyChange = useCallback(
+    (doc: JSONContent) => {
+      session.save({ body: doc });
+      liveBody.current = doc;
+      // A thread whose block was deleted moves to "On removed content" now, and back if undo restores the block.
+      trackDocument(doc);
+    },
+    [session, trackDocument],
+  );
   const onVariablesChange = useCallback(
     (next: Variable[]) => {
       if (editable) session.save({ variables: next });
@@ -85,6 +126,70 @@ export function ContentWorkspace({
     [session],
   );
 
+  const open = openCount(review.threads);
+  const hasComments = review.threads.length > 0 || review.composer !== null;
+
+  // The document's handle: the session keeps one for the name field, the markers and the list read this one.
+  const editorHandle = useRef<DocumentEditorHandle | null>(null);
+  const setEditor = useCallback(
+    (handle: DocumentEditorHandle | null) => {
+      editorHandle.current = handle;
+      session.setEditor(handle);
+    },
+    [session],
+  );
+
+  // A thread became active (a marker, a quote, a card, the caret): the document shows it. The handle leaves it alone when it is in view.
+  useEffect(() => {
+    if (activeThreadId) editorHandle.current?.focusThread(activeThreadId);
+  }, [activeThreadId]);
+
+  const showThread = useCallback(
+    (id: string) => {
+      setActive(id);
+      session.showComments();
+    },
+    [setActive, session],
+  );
+  const onThreadClick = useCallback((id: string) => id !== COMPOSER_THREAD_ID && showThread(id), [showThread]);
+  // The caret moving through quotes follows along without taking the rail away from Variables.
+  const onCaretThreadChange = useCallback(
+    (id: string | null) => {
+      if (id !== COMPOSER_THREAD_ID) setActive(id);
+    },
+    [setActive],
+  );
+  const requestComment = useCallback(
+    (anchor: CommentRequest) => {
+      openComposer(anchor);
+      session.showComments();
+    },
+    [openComposer, session],
+  );
+  // The composer came from the document. Cancelled, it puts the caret back there, at the end of the text it was about
+  // (the selection would bring the format bubble straight back). Posted, focus goes to the new thread's card instead
+  // (the list does that), so the caret stays out of it.
+  const onComposerClose = useCallback(
+    (outcome?: ComposerOutcome) => {
+      closeComposer();
+      if (outcome === "posted") return;
+      editorHandle.current?.focus();
+      // The editor puts its selection back a frame later (TipTap focuses on the next animation frame): collapse it after that.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const selection = window.getSelection();
+          if (selection && !selection.isCollapsed && selection.anchorNode?.parentElement?.closest(".ProseMirror")) {
+            selection.collapseToEnd();
+          }
+        }),
+      );
+    },
+    [closeComposer],
+  );
+  const blockPosition = useCallback((blockId: string) => editorHandle.current?.getBlockRect(blockId)?.top ?? null, []);
+  const labels = useMemo(() => new Map(variables.map((v) => [v.key, v.label])), [variables]);
+  const blockText = useCallback((blockId: string) => blockTextOf(liveBody.current, blockId, labels), [labels]);
+
   return (
     <EditorScope
       variables={variables}
@@ -93,10 +198,56 @@ export function ContentWorkspace({
       readOnly={!editable}
       onVariablesChange={onVariablesChange}
     >
-      <div data-slot="editor" className={WS.doc}>
-        <DocumentBody content={body} onChange={editable ? onBodyChange : undefined} editorRef={session.setEditor} />
+      <div data-slot="editor" className={cn(WS.doc, "relative")}>
+        <DocumentBody
+          content={body}
+          onChange={editable ? onBodyChange : undefined}
+          editorRef={setEditor}
+          comments={{
+            threads: review.threadsForEditor,
+            activeThreadId: review.editorActiveThreadId,
+            onThreadClick,
+            onCaretThreadChange,
+            onRequestComment: canComment ? requestComment : undefined,
+          }}
+        />
+        <GutterMarkers
+          editor={editorHandle}
+          threads={review.threads}
+          activeThreadId={activeThreadId}
+          onActivate={showThread}
+          onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+          compact={previewOpen}
+          // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
+          className="hidden @min-[53rem]/ws:block"
+        />
       </div>
       <Rail
+        comments={
+          hasComments
+            ? {
+                count: open,
+                preferred: open > 0 || review.composer !== null,
+                panel: (
+                  <ThreadList
+                    threads={review.threads}
+                    activeThreadId={activeThreadId}
+                    onActivate={setActive}
+                    canComment={canComment}
+                    composer={review.composer}
+                    onComposerClose={onComposerClose}
+                    templateId={templateId}
+                    versionId={versionId}
+                    viewer={viewer}
+                    now={now}
+                    blockText={blockText}
+                    blockPosition={blockPosition}
+                    onMutate={review.mutate}
+                  />
+                ),
+              }
+            : null
+        }
         channels={
           <ChannelSelector channels={channels} allowed={allowedChannels} editable={editable} onChange={onChannels} />
         }
@@ -117,6 +268,7 @@ export function ContentWorkspace({
             editable={editable}
             sampleSets={sampleSets}
             today={today}
+            commentsCount={hasComments ? open : null}
           />
         }
       >

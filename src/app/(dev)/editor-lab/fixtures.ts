@@ -1,7 +1,7 @@
 // Fixture documents for /editor-lab. Deterministic (stable ids) so the server paint and the
 // client hydrate to identical markup.
 
-import type { JSONContent, Variable } from "@/editor";
+import type { JSONContent, ThreadAnchor, Variable } from "@/editor";
 
 export const LAB_VARIABLES: Variable[] = [
   { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
@@ -205,4 +205,21 @@ export const FIXTURES: Fixture[] = [
   { id: "stress", label: "30 chips", content: CHIP_STRESS },
   { id: "readonly", label: "Read-only", content: LONG_DISCLOSURE, readOnly: true },
   { id: "static", label: "Server paint", content: LONG_DISCLOSURE, readOnly: true },
+];
+
+// ── review threads (the Comments toggle) ─────────────────────────
+
+const plain = (node: JSONContent): string => (node.text ?? "") + (node.content ?? []).map(plain).join("");
+
+/** The id of the long disclosure's first top-level block whose text starts with `prefix`. */
+function blockStarting(prefix: string): string {
+  const block = LONG_DISCLOSURE.content?.find((b) => plain(b).startsWith(prefix));
+  return String(block?.attrs?.id ?? "");
+}
+
+/** Two quoted threads and one about a whole block, on the long disclosure. */
+export const LAB_THREADS: ThreadAnchor[] = [
+  { id: "lab-earn", blockId: blockStarting("Earn 2% cash back"), quote: "2% cash back on every purchase", status: "open" },
+  { id: "lab-balance", blockId: blockStarting("How we calculate"), quote: "average daily balance", status: "open" },
+  { id: "lab-minimum", blockId: blockStarting("If you are charged interest"), quote: null, status: "open" },
 ];

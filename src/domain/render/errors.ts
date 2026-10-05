@@ -31,6 +31,23 @@ export function formatLongDate(date: Date): string {
   return longDate.format(date);
 }
 
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const shortDateYear = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/**
+ * "Mar 1", or "Mar 1, 2027" when `now` is given and the date isn't in its year. UTC, like
+ * `formatLongDate`: a sunset is a calendar day stored as that day's midnight UTC, so it reads as
+ * the same day in every time zone.
+ */
+export function formatShortDate(date: Date, now?: Date): string {
+  return (!now || date.getUTCFullYear() === now.getUTCFullYear() ? shortDate : shortDateYear).format(date);
+}
+
 /** How a channel is named in messages. */
 export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = { pdf: "PDF", web: "Web", email: "Email" };
 

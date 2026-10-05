@@ -1,0 +1,192 @@
+import "server-only";
+import { cache } from "react";
+import { notFound } from "next/navigation";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { canActOnStage } from "@/domain/approval-chain";
+import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
+import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
+import type { Db } from "@/server/db/client";
+import { db } from "@/server/db/client";
+import { approvalStages, consumers, renderLog, teams, templates, users } from "@/server/db/schema/ucomp";
+import { requireSpace, type SpaceContext } from "./spaces";
+
+// Helpers the Phase 4 read models (review, versions, activity, threads) and the review actions
+// share: people, template access, the approval chain, the decide check and the render-log usage.
+
+const DAY_MS = 86_400_000;
+
+// ── People ────────────────────────────────────────────────────
+
+export type People = ReadonlyMap<string, Person>;
+
+/** Every user as a `Person` (the table is small: personas plus a few seeded colleagues). */
+export const getPeople = cache(async (): Promise<People> => {
+  const rows = await db
+    .select({ id: users.id, name: users.name, initials: users.initials, hue: users.avatarHue })
+    .from(users);
+  return new Map(rows.map((r) => [r.id, r]));
+});
+
+/** The person, or a stand-in built from the id when the user row is gone. */
+export function personOf(people: People, id: string): Person {
+  return people.get(id) ?? { id, name: id, initials: id.slice(0, 2).toUpperCase(), hue: 0 };
+}
+
+// ── Dates ─────────────────────────────────────────────────────
+
+export function iso(date: Date): string {
+  return date.toISOString();
+}
+
+export function isoOrUndefined(date: Date | null | undefined): string | undefined {
+  return date ? date.toISOString() : undefined;
+}
+
+/** YYYY-MM-DD of a demo-clock instant (UTC, as the workspace's `today`). */
+export function dayOf(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+// ── Template access ───────────────────────────────────────────
+
+export interface TemplateAccess {
+  space: SpaceContext;
+  template: { id: string; name: string; teamId: string; teamSlug: string; teamName: string; contentTypeId: string };
+}
+
+/**
+ * The template, as seen from a space: 404 when it doesn't exist, belongs to another team's space, or
+ * sits on a team the viewer can't see (the same rule as the workspace header).
+ */
+export const requireTemplate = cache(async (spaceSlug: string, templateId: string): Promise<TemplateAccess> => {
+  const space = await requireSpace(spaceSlug);
+  const template = await db
+    .select({
+      id: templates.id,
+      name: templates.name,
+      teamId: templates.teamId,
+      teamSlug: teams.slug,
+      teamName: teams.name,
+      contentTypeId: templates.contentTypeId,
+    })
+    .from(templates)
+    .innerJoin(teams, eq(teams.id, templates.teamId))
+    .where(eq(templates.id, templateId))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!template) notFound();
+  if (spaceSlug !== ALL_SPACE && template.teamSlug !== spaceSlug) notFound();
+  if (!canSeeSpace(space.viewer, template.teamSlug)) notFound();
+  return { space, template };
+});
+
+// ── The approval chain ────────────────────────────────────────
+
+/** Release 1's chain, used if a content type has no stages configured. */
+export const DEFAULT_CHAIN: readonly ApprovalStage[] = [
+  { position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+];
+
+type Reader = Pick<Db, "select">;
+
+/** The content type's stages in order (configuration, not code). Never empty. */
+export async function loadChain(reader: Reader, contentTypeId: string): Promise<ApprovalStage[]> {
+  const rows = await reader
+    .select({ position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+    .from(approvalStages)
+    .where(eq(approvalStages.contentTypeId, contentTypeId))
+    .orderBy(asc(approvalStages.position));
+  return rows.length > 0 ? rows : DEFAULT_CHAIN.map((stage) => ({ ...stage }));
+}
+
+/** Every content type's chain at once (the queue spans templates of several types). */
+export const getChains = cache(async (): Promise<ReadonlyMap<string, ApprovalStage[]>> => {
+  const rows = await db
+    .select({
+      contentTypeId: approvalStages.contentTypeId,
+      position: approvalStages.position,
+      name: approvalStages.name,
+      rule: approvalStages.approverRule,
+    })
+    .from(approvalStages)
+    .orderBy(asc(approvalStages.position));
+  const chains = new Map<string, ApprovalStage[]>();
+  for (const { contentTypeId, ...stage } of rows) {
+    const chain = chains.get(contentTypeId);
+    if (chain) chain.push(stage);
+    else chains.set(contentTypeId, [stage]);
+  }
+  return chains;
+});
+
+export function chainFor(chains: ReadonlyMap<string, ApprovalStage[]>, contentTypeId: string): ApprovalStage[] {
+  return chains.get(contentTypeId) ?? DEFAULT_CHAIN.map((stage) => ({ ...stage }));
+}
+
+/** The stage a version waits on. A stage index past the end (a chain shortened mid-review) reads as the last. */
+export function waitingStage(chain: readonly ApprovalStage[], currentStage: number): ApprovalStage {
+  return chain[Math.min(Math.max(currentStage, 0), chain.length - 1)]!;
+}
+
+/**
+ * May the viewer approve, or request changes on, a version at its current stage? The role grant and
+ * maker-checker come from `can("version.decide")`; the stage's own rule from `canActOnStage`. The
+ * queue, the review screen and the actions all ask this one question.
+ */
+export function decideCheck(
+  viewer: Viewer,
+  input: { teamId: string; submittedBy: string | null; stage: ApprovalStage },
+): PermissionResult {
+  const permitted = can(viewer, "version.decide", { teamId: input.teamId, submittedBy: input.submittedBy });
+  if (!permitted.ok) return permitted;
+  return canActOnStage(viewer, input.stage, input.teamId);
+}
+
+// ── Render-log usage ──────────────────────────────────────────
+
+/**
+ * Per consumer and version: the last render and the renders in the last 30 days. Registered consumers
+ * only, previews excluded, failed renders included (they still show the consumer is on that version).
+ * Newest version first, then by consumer name.
+ */
+export async function loadConsumerUsage(reader: Reader, templateId: string, nowDate: Date): Promise<ConsumerUsage[]> {
+  const since = nowDate.getTime() - 30 * DAY_MS;
+  const rows = await reader
+    .select({
+      consumerId: consumers.id,
+      consumerName: consumers.name,
+      versionNumber: renderLog.versionNumber,
+      lastRenderAt: sql<number>`max(${renderLog.at})`,
+      renders30d: sql<number>`sum(case when ${renderLog.at} >= ${since} then 1 else 0 end)`,
+    })
+    .from(renderLog)
+    .innerJoin(consumers, eq(consumers.id, renderLog.consumerId))
+    .where(and(eq(renderLog.templateId, templateId), eq(renderLog.isPreview, false), isNotNull(renderLog.versionNumber)))
+    .groupBy(consumers.id, renderLog.versionNumber);
+
+  return rows
+    .map((r) => ({
+      consumerId: r.consumerId,
+      consumerName: r.consumerName,
+      versionNumber: r.versionNumber!,
+      lastRenderAt: new Date(Number(r.lastRenderAt)).toISOString(),
+      renders30d: Number(r.renders30d ?? 0),
+    }))
+    .sort((a, b) => b.versionNumber - a.versionNumber || a.consumerName.localeCompare(b.consumerName));
+}
+
+// ── Documents ─────────────────────────────────────────────────
+
+/** Every block id in a document, in reading order (top-level blocks and any nested ones that carry an id). */
+export function blockIdsOf(doc: JSONContent | null | undefined): string[] {
+  const ids: string[] = [];
+  const walk = (node: JSONContent) => {
+    const id = node.attrs?.id;
+    if (typeof id === "string" && id !== "") ids.push(id);
+    for (const child of node.content ?? []) walk(child);
+  };
+  if (doc) for (const block of doc.content ?? []) walk(block);
+  return ids;
+}

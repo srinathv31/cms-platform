@@ -20,9 +20,11 @@ import {
   DocumentEditor,
   EditorRoot,
   VariablesPanel,
+  type CommentRequest,
   type DocumentEditorHandle,
   type JSONContent,
   type RequiredSection,
+  type ThreadAnchor,
   type Variable,
 } from "@/editor";
 
@@ -65,11 +67,32 @@ export interface DocumentBodyProps {
   onChange?: (doc: JSONContent) => void;
   /** Receives the editor's handle (`focus("first-section")`); safe to call before the editor is live. */
   editorRef: Ref<DocumentEditorHandle>;
+  /** Review comments on the document: the highlights, and what a click, the caret or the Comment button reports. */
+  comments?: {
+    threads: readonly ThreadAnchor[];
+    activeThreadId: string | null;
+    onThreadClick: (threadId: string) => void;
+    onCaretThreadChange: (threadId: string | null) => void;
+    /** Offers the Comment button (and ⌘⌥M). Omit when the viewer can't comment. */
+    onRequestComment?: (anchor: CommentRequest) => void;
+  };
 }
 
 /** The document. Its text edge sits on the column's left edge and the block-handle gutter hangs into the margin. */
-export function DocumentBody({ content, onChange, editorRef }: DocumentBodyProps) {
-  return <DocumentEditor content={content} onChange={onChange} ref={editorRef} align="start" />;
+export function DocumentBody({ content, onChange, editorRef, comments }: DocumentBodyProps) {
+  return (
+    <DocumentEditor
+      content={content}
+      onChange={onChange}
+      ref={editorRef}
+      align="start"
+      threads={comments?.threads}
+      activeThreadId={comments?.activeThreadId}
+      onThreadClick={comments?.onThreadClick}
+      onCaretThreadChange={comments?.onCaretThreadChange}
+      onRequestComment={comments?.onRequestComment}
+    />
+  );
 }
 
 /** The variables panel, in the rail. */

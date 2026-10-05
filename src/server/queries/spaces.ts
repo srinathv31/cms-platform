@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { recertifications, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { recertifications, teams } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { getViewer } from "@/server/viewer";
 import {
@@ -48,8 +48,6 @@ export interface SpaceNav {
   icon: string;
   showAudit: boolean;
   settings: SettingsAccess;
-  /** Versions waiting on this viewer's decision. */
-  reviewCount: number;
   recert: RecertCard | null;
 }
 
@@ -70,20 +68,6 @@ export const getShell = cache(async (): Promise<ShellData> => {
   if (spaces.length === 0) return { viewer: { userId: viewer.userId, name: viewer.name }, spaces: [] };
 
   const iconBySlug = new Map(teamRows.map((t) => [t.slug, t.icon]));
-
-  // Review queue: in-review versions this viewer is allowed to decide (approver, not the submitter).
-  const inReview = await db
-    .select({ teamId: templates.teamId, submittedBy: versions.submittedBy })
-    .from(versions)
-    .innerJoin(templates, eq(templates.id, versions.templateId))
-    .where(eq(versions.state, "in_review"));
-  const reviewByTeam = new Map<string, number>();
-  for (const row of inReview) {
-    if (can(viewer, "version.decide", { teamId: row.teamId, submittedBy: row.submittedBy }).ok) {
-      reviewByTeam.set(row.teamId, (reviewByTeam.get(row.teamId) ?? 0) + 1);
-    }
-  }
-  const reviewTotal = [...reviewByTeam.values()].reduce((a, b) => a + b, 0);
 
   // Open recertification (Team Admins only).
   const nowDate = await demoNow();
@@ -112,7 +96,6 @@ export const getShell = cache(async (): Promise<ShellData> => {
         icon: isAll ? "layers" : (iconBySlug.get(s.slug) ?? "users"),
         showAudit: can(viewer, "audit.view", { teamId }).ok,
         settings: settingsAccessFor(viewer, s.slug),
-        reviewCount: isAll ? reviewTotal : (reviewByTeam.get(s.slug) ?? 0),
         recert: isAll ? null : (recertByTeam.get(s.slug) ?? null),
       };
     }),

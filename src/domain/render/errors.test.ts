@@ -7,6 +7,7 @@ import {
   channelNotEnabled,
   consumerRequired,
   formatLongDate,
+  formatShortDate,
   invalidValues,
   joinWithAnd,
   missingVariables,
@@ -45,6 +46,19 @@ describe("formatLongDate", () => {
 
   it("matches formatValue's dates", () => {
     expect(formatLongDate(MARCH_1)).toBe(formatValue("date", "2027-03-01"));
+  });
+});
+
+describe("formatShortDate", () => {
+  it("reads a sunset's midnight UTC as that day, whatever the machine's time zone", () => {
+    expect(formatShortDate(new Date("2026-10-17T00:00:00.000Z"))).toBe("Oct 17");
+    expect(formatShortDate(new Date("2027-03-01T23:59:59.999Z"))).toBe("Mar 1");
+  });
+
+  it("adds the year when it isn't `now`'s year", () => {
+    const now = new Date("2026-10-04T12:00:00.000Z");
+    expect(formatShortDate(new Date("2026-10-17T00:00:00.000Z"), now)).toBe("Oct 17");
+    expect(formatShortDate(new Date("2027-03-01T00:00:00.000Z"), now)).toBe("Mar 1, 2027");
   });
 });
 

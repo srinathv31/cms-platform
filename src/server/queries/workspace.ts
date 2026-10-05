@@ -9,6 +9,8 @@ import type { Channel, JSONContent, RequiredSection, SampleSet, Variable, Versio
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
+import { loadThreads } from "./threads";
+import type { ThreadView } from "@/domain/review-types";
 
 export interface WorkspaceHeaderData {
   id: string;
@@ -129,6 +131,8 @@ export interface WorkspaceDocumentData {
   requiredSections: RequiredSection[];
   /** Only an open draft is editable, and only by an author on the template's team. */
   editable: boolean;
+  /** The template's review threads, anchored against the shown version's blocks (the editor margin). */
+  threads: ThreadView[];
 }
 
 /** The document shown on the Content tab: the open draft if there is one, otherwise the latest version. */
@@ -171,6 +175,7 @@ export const getWorkspaceDocument = cache(
     if (!shown) notFound();
     const active = list.find((v) => v.state === "active");
     const today = (await now()).toISOString().slice(0, 10);
+    const threads = await loadThreads(header.id, shown.body);
 
     return {
       templateId: header.id,
@@ -189,6 +194,7 @@ export const getWorkspaceDocument = cache(
       today,
       requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
+      threads,
     };
   },
 );

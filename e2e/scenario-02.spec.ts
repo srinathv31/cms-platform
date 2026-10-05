@@ -4,8 +4,10 @@ import { allVersions, correlation, expectError, openDb, render, validValues } fr
 import {
   NAME,
   asPersona,
+  beat,
   caret,
   clickCounter,
+  demoTimeout,
   documentEditor,
   dragRowTo,
   expect,
@@ -18,6 +20,8 @@ import {
   panelRow,
   pointInText,
   requiredHeading,
+  shoot,
+  tap,
   test,
   typeSlowly,
   untilUncovered,
@@ -31,8 +35,8 @@ import {
 //   4. Preview. Email on, with {{first_name}} in the subject and a preheader. PDF, Web and Email with the
 //      "Typical customer" and "Long name and maximum values" sets; Download PDF; a value edited in the
 //      sample-set editor; a word typed into the document while previewing.
-//   5. Submit: v1, In review, read-only. Then the render API: a consumer is refused, a preview is not,
-//      and render_log tags the previews.
+//   5. Submit through the dialog, with a note to reviewers: v1, In review, read-only. Then the render
+//      API: a consumer is refused, a preview is not, and render_log tags the previews.
 //
 // Steps 1–3 are the Phase 2 gate (scenario-02a.spec.ts) in short form; this spec carries on from there.
 // Runs against a fresh reset (`npm run db:reset`), as Maya. Console and page errors fail it.
@@ -63,12 +67,6 @@ const LONG_APR = "29.99%";
 type ChannelLabel = "PDF" | "Web" | "Email";
 
 // ── Small things ─────────────────────────────────────────────────────────────
-
-/** A human-paced click: a real press and release, about 90ms apart. */
-const tap = (target: Locator, options?: Parameters<Locator["click"]>[0]) => target.click({ delay: 90, ...options });
-
-/** A beat: the time a person takes to see what happened before the next move. */
-const beat = (page: Page, ms = 150) => page.waitForTimeout(ms);
 
 /** Text compared without any whitespace: a PDF breaks lines and splits runs wherever it likes. */
 const compact = (text: string) => text.replace(/\s+/g, "");
@@ -126,6 +124,7 @@ async function create(page: Page) {
     await clicks.click(page.getByRole("button", { name: "New template" }));
     const gallery = page.getByRole("dialog");
     await expect(gallery).toBeVisible();
+    await beat(page);
     await clicks.click(gallery.getByRole("button", { name: /Card offer terms/ }));
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
     await expectNameSelected(page, "Card offer terms");
@@ -134,15 +133,18 @@ async function create(page: Page) {
 
     // A beat to see the new page, then typing replaces the selected name; Enter goes to the document.
     await expect(page).not.toHaveURL(/created=/);
-    await beat(page, 300);
+    await page.waitForTimeout(300);
+    await beat(page, 900);
     await expectNameSelected(page, "Card offer terms");
     await typeSlowly(page, NAME);
     await expect(nameField(page)).toHaveValue(NAME);
+    await beat(page);
     await page.keyboard.press("Enter");
     await liveEditor(page);
     await expect(nameField(page)).not.toBeFocused();
     await expectEditorCaret(page, "Offer details");
     await expect(nameField(page)).toHaveValue(NAME);
+    await beat(page);
   });
 
   await test.step("2. Write the offer text: drag first_name, {{ for purchase_apr, create offer_end_date", async () => {
@@ -150,6 +152,7 @@ async function create(page: Page) {
     await page.keyboard.press("Enter");
     await typeSlowly(page, GREETING);
     await expect(greetingBlock(page)).toHaveText(GREETING);
+    await beat(page);
 
     // Drag first_name in from the panel, after "Hello".
     await expect(panelRow(page, "first_name")).toContainText("Unused");
@@ -157,21 +160,25 @@ async function create(page: Page) {
     await expect(docChip(page, "first_name")).toHaveCount(1);
     await expect(greetingBlock(page).locator('[data-variable="first_name"]'), "it landed where it was dropped").toHaveCount(1);
     await expect(panelRow(page, "first_name")).toContainText("1 use");
+    await beat(page);
 
     // {{pur → Purchase APR, with Enter.
     await page.keyboard.press("End");
     await typeSlowly(page, " Your purchase APR is {{pur");
     const picker = page.getByRole("option");
     await expect(picker.filter({ hasText: "Purchase APR" })).toBeVisible();
+    await beat(page);
     await page.keyboard.press("Enter");
     await expect(picker).toHaveCount(0);
     await expect(docChip(page, "purchase_apr")).toHaveCount(1);
     await expect(panelRow(page, "purchase_apr")).toContainText("1 use");
+    await beat(page, 400);
 
     // {{Offer end date → Create → Type: Date → Enter saves it.
     await typeSlowly(page, " until {{Offer end date");
     const createOption = page.getByRole("option", { name: /Create/ });
     await expect(createOption).toContainText("Offer end date");
+    await beat(page);
     await page.keyboard.press("Enter");
     const form = page.getByRole("form", { name: "New variable" });
     await expect(form).toBeVisible();
@@ -180,6 +187,7 @@ async function create(page: Page) {
     await tap(form.getByRole("combobox"));
     await tap(page.getByRole("option", { name: "Date" }));
     await expect(form.getByRole("combobox")).toHaveText(/Date/);
+    await beat(page, 500);
     await expect(page.getByRole("option")).toHaveCount(0);
     await expect(form.getByRole("combobox")).toBeFocused();
     await page.keyboard.press("Enter");
@@ -190,17 +198,20 @@ async function create(page: Page) {
     await expectEditorCaret(page, "Offer details");
     await typeSlowly(page, ".");
     expect(await docText(page)).not.toContain("{{");
+    await beat(page);
+    await shoot(page, "editing");
   });
 
   await test.step("3. Deleting Legal notices is blocked inline", async () => {
     const before = await docText(page);
     const legal = requiredHeading(page, "legal_notices");
-    await legal.click({ clickCount: 3, delay: 60 });
+    await tap(legal, { clickCount: 3, delay: 60 });
     const selected = await caret(page);
     expect(selected.section).toBe("Legal notices");
     expect(selected.empty, "the heading text is selected").toBe(false);
     await page.keyboard.press("Backspace");
     await expectBlocked(page);
+    await beat(page, 900);
     expect(await docText(page), "nothing was deleted").toBe(before);
     for (const key of CHIPS) await expect(docChip(page, key)).toHaveCount(1);
     await expect(requiredHeading(page, "legal_notices")).not.toHaveAttribute("data-required-note", /./, { timeout: 5_000 });
@@ -240,6 +251,7 @@ async function editValue(page: Page, setName: string, label: string, value: stri
   await page.keyboard.press("ControlOrMeta+a");
   await typeSlowly(page, value);
   await expect(field).toHaveValue(value);
+  await beat(page);
   await page.keyboard.press("Enter"); // commits; the preview re-renders from it
   await page.keyboard.press("Escape"); // closes the popover, not the preview
   await expect(popup).toBeHidden();
@@ -369,9 +381,10 @@ test.describe("scenario 2: create, preview, submit", () => {
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(demoTimeout(120_000));
     await asPersona(page, "maya");
     await openLibrary(page);
+    await beat(page, 1000);
 
     await create(page);
     const templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
@@ -384,6 +397,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(email).toHaveAttribute("aria-pressed", "false");
       await tap(email);
       await expect(email).toHaveAttribute("aria-pressed", "true");
+      await beat(page);
 
       await expect(page.getByRole("heading", { name: "Email details" })).toBeVisible();
       const subject = page.getByRole("textbox", { name: "Email subject" });
@@ -396,6 +410,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       await typeSlowly(page, "{{");
       const option = page.getByRole("option", { name: /First name/ });
       await expect(option).toBeVisible();
+      await beat(page, 500);
       await tap(option);
       await expect(page.getByRole("option")).toHaveCount(0);
       await expect(subject.locator('[data-variable="first_name"]')).toHaveCount(1);
@@ -406,6 +421,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(preheader).toBeFocused();
       await typeSlowly(page, PREHEADER);
       await expect(preheader).toHaveText(PREHEADER);
+      await beat(page, 900);
 
       // The subject's chip counts like any other: first_name is used twice now.
       await expect(panelRow(page, "first_name")).toContainText("2 uses");
@@ -420,6 +436,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(rail(page)).toBeVisible();
       await expect(channelTab(page, "PDF")).toHaveAttribute("aria-pressed", "true");
       await expect(setTrigger(page)).toHaveAccessibleName(`Sample set: ${TYPICAL}`);
+      await beat(page);
     });
 
     await test.step("4.3 PDF, Typical: pages, the name, the APR formatted, the offer text", async () => {
@@ -434,6 +451,8 @@ test.describe("scenario 2: create, preview, submit", () => {
       expect(text.indexOf("Offerdetails")).toBeGreaterThanOrEqual(0);
       expect(text.indexOf("Ratesandfees")).toBeGreaterThan(text.indexOf("Offerdetails"));
       expect(text.indexOf("Legalnotices")).toBeGreaterThan(text.indexOf("Ratesandfees"));
+      await beat(page, 1200);
+      await shoot(page, "pdf-typical");
     });
 
     await test.step("4.4 PDF, Long name: the name, a layout that holds, and Download PDF", async () => {
@@ -447,6 +466,8 @@ test.describe("scenario 2: create, preview, submit", () => {
       expect(runs, "text runs measured").toBeGreaterThan(10);
       expect(outside, "every text run lies inside its page").toEqual([]);
       await pdfPages(page).first().scrollIntoViewIfNeeded();
+      await beat(page);
+      await shoot(page, "pdf-long");
 
       // Download PDF: the exact bytes, named for the draft.
       const downloadButton = rail(page).getByRole("button", { name: "Download PDF" });
@@ -457,6 +478,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       const bytes = await readFile((await download.path())!);
       expect(bytes.subarray(0, 4).toString("latin1"), "the file is a PDF").toBe("%PDF");
       expect(bytes.byteLength, "and not an empty one").toBeGreaterThan(2_000);
+      await beat(page);
     });
 
     await test.step("4.5 Web, both sets: the name; no sideways scroll on Mobile", async () => {
@@ -464,18 +486,24 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(webFrame(page)).toBeVisible();
       // Long name first (the set is still selected), desktop then mobile.
       await expectFrameText(webFrame(page), LONG_NAME, "the Web preview");
+      await beat(page, 900);
       await showDevice(page, "Mobile");
       await expectFrameText(webFrame(page), LONG_NAME, "the Web preview");
       await expectNoSidewaysScroll(page, "Long name, Mobile");
+      await beat(page, 1200);
+      await shoot(page, "web-mobile-long");
 
       await showSet(page, TYPICAL);
       await expectFrameText(webFrame(page), TYPICAL_NAME, "the Web preview");
       await expectFrameLacks(webFrame(page), LONG_NAME, "the Web preview");
       await expectNoSidewaysScroll(page, "Typical, Mobile");
+      await beat(page);
 
       await showDevice(page, "Desktop");
       await expectFrameText(webFrame(page), TYPICAL_NAME, "the Web preview");
       await expectFrameText(webFrame(page), OFFER_SENTENCE, "the Web preview");
+      await beat(page, 1200);
+      await shoot(page, "web-desktop-typical");
     });
 
     await test.step("4.6 Email, both sets: the subject, the preheader, the body", async () => {
@@ -485,12 +513,15 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(emailPreheader(page)).toBeVisible();
       await expectFrameText(emailFrame(page), TYPICAL_NAME, "the email body");
       await expectFrameText(emailFrame(page), OFFER_SENTENCE, "the email body");
+      await beat(page, 900);
 
       await showSet(page, LONG);
       await expect(emailSubject(page)).toContainText(LONG_NAME, { timeout: 20_000 });
       await expect(emailSubject(page)).not.toContainText(TYPICAL_NAME);
       await expect(emailPreheader(page)).toBeVisible();
       await expectFrameText(emailFrame(page), LONG_NAME, "the email body");
+      await beat(page, 1200);
+      await shoot(page, "email-long");
     });
 
     await test.step("4.7 A value edited in the sample-set editor reaches the preview, which stays open", async () => {
@@ -502,11 +533,13 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(emailSubject(page)).not.toContainText(TYPICAL_NAME);
       await expectFrameText(emailFrame(page), EDITED_NAME, "the email body");
       await expect(emailPreheader(page)).toBeVisible();
+      await beat(page, 900);
 
       await showChannel(page, "PDF");
       await expectPdfText(page, `Hello ${EDITED_NAME}!`);
       expect(compact(await pdfText(page))).not.toContain(`Hello${TYPICAL_NAME}!`);
       await expect(previewToggle(page)).toHaveAttribute("aria-pressed", "true");
+      await beat(page);
     });
 
     await test.step("4.8 A word typed into the document reaches the preview after the autosave lands", async () => {
@@ -516,7 +549,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       const box = (await offer.boundingBox())!;
       const end = { x: box.width - 4, y: box.height - 10 };
       await untilUncovered(offer, end);
-      await offer.click({ position: end, delay: 90 });
+      await tap(offer, { position: end });
       await page.keyboard.press("End");
       await expect.poll(async () => (await caret(page)).focused).toBe(true);
       await expect
@@ -530,6 +563,7 @@ test.describe("scenario 2: create, preview, submit", () => {
       // The same edit is in the other channels too.
       await showChannel(page, "Web");
       await expectFrameText(webFrame(page), `${OFFER_SENTENCE} ${LATE_WORD}.`, "the Web preview");
+      await beat(page, 900);
     });
 
     // ── 5. Submit ────────────────────────────────────────────────────────────
@@ -539,12 +573,26 @@ test.describe("scenario 2: create, preview, submit", () => {
       await expect(previewToggle(page)).toHaveAttribute("aria-pressed", "false");
       await expect(rail(page)).toHaveCount(0);
       await expect(page.locator("aside[aria-label='Channels and variables']")).toBeVisible();
+      await beat(page, 900);
+      await shoot(page, "variables-view");
     });
 
     await test.step("5.2 Submit for review: In review, v1, no Submit button, read-only", async () => {
       const submit = page.getByRole("button", { name: "Submit for review" });
       await expect(submit).toBeEnabled();
       await tap(submit);
+
+      // The dialog flushes the autosave, then opens with the focus in the note to reviewers.
+      const dialog = page.getByRole("dialog", { name: "Submit v1 for review" });
+      await expect(dialog).toBeVisible({ timeout: 20_000 });
+      const note = dialog.getByRole("textbox", { name: "Note to reviewers" });
+      await expect(note).toBeFocused();
+      await typeSlowly(page, "First version of the spring travel terms.");
+      await expect(note).toHaveValue("First version of the spring travel terms.");
+      await beat(page, 900);
+      await shoot(page, "submit-dialog");
+      await tap(dialog.getByRole("button", { name: "Submit v1", exact: true }));
+      await expect(dialog).toBeHidden({ timeout: 20_000 });
 
       await expect(page.locator('[data-status="in_review"]').filter({ visible: true })).toHaveText("In review", { timeout: 20_000 });
       await expect(page.getByText("v1", { exact: true }).filter({ visible: true })).toBeVisible();
@@ -556,6 +604,8 @@ test.describe("scenario 2: create, preview, submit", () => {
       for (const key of CHIPS) await expect(docChip(page, key)).toHaveCount(1);
       // The Preview is still there for a version in review.
       await expect(previewToggle(page)).toBeVisible();
+      await beat(page, 1200);
+      await shoot(page, "submitted");
     });
 
     await test.step("5.3 The render API: a consumer is refused v1, a preview is not", async () => {

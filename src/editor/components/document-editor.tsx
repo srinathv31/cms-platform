@@ -8,6 +8,11 @@
 // editor produces; the live TipTap editor mounts only after hydration and swaps in with no
 // visible change. Keeping useEditor out of the server render also keeps prerendering pure
 // (TipTap seeds instance ids with Math.random, which Cache Components rejects at prerender).
+//
+// Review comments (Phase 4): `threads` / `activeThreadId` are highlights (extensions/review-threads.ts,
+// in the static paint too); `onRequestComment` adds Comment to the toolbar (read-only too) and
+// ⌘⌥M; the handle places and reveals threads for the host (lib/block-rects.ts). Mechanics only: the
+// host draws the threads themselves.
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { MotionConfig } from "motion/react";
@@ -22,9 +27,11 @@ import {
   type RefObject,
 } from "react";
 import { useStore } from "zustand";
+import { modKey } from "../lib/platform";
 import { focusFirstSection } from "../lib/sections";
+import { blockRequestAt, commentTarget, variableLeafText, type LeafText } from "../lib/threads";
 import type { JSONContent, Variable } from "../model/types";
-import type { DocumentEditorProps, FocusTarget } from "../types";
+import type { DocumentEditorHandle, DocumentEditorProps, FocusTarget, ThreadAnchor } from "../types";
 import { cx } from "../lib/cx";
 import { useHydrated } from "../lib/use-hydrated";
 import { editorExtensions } from "../schema";
@@ -33,8 +40,9 @@ import { BODY_FIELD_LABEL, type EditorRootRuntime } from "../state/editor-root";
 import { BlockHandle } from "./block-handle";
 import { ChipPopover } from "./chip-popover";
 import { DOC_CLASS, SURFACE_CLASS } from "./classes";
+import { createCommentBridge, type CommentBridge } from "./comment-bridge";
 import { EditorRoot, useOptionalEditorRoot } from "./editor-root";
-import { FormatBubble } from "./format-bubble";
+import { FormatBubble, hideFormatBubble, type CommentActions } from "./format-bubble";
 import { SlashMenu, createSlashMenuController } from "./slash-menu";
 import { StaticDocument } from "./static-document";
 import { TableMenu } from "./table-menu";
@@ -42,6 +50,12 @@ import { VariablePicker, createVariablePickerController } from "./variable-picke
 import "../styles.css";
 
 const NO_VARIABLES: Variable[] = [];
+const NO_THREADS: readonly ThreadAnchor[] = [];
+
+/** A stable key for a thread list, so a host re-rendering the same threads costs nothing. */
+function threadsKey(threads: readonly ThreadAnchor[] | undefined): string {
+  return (threads ?? NO_THREADS).map((t) => `${t.id}\u0001${t.blockId}\u0001${t.quote ?? ""}\u0001${t.status}`).join("\u0002");
+}
 
 export function DocumentEditor(props: DocumentEditorProps) {
   const root = useOptionalEditorRoot();
@@ -68,6 +82,11 @@ function RootedDocumentEditor({
   autoFocus = false,
   align = "center",
   className,
+  threads,
+  activeThreadId = null,
+  onThreadClick,
+  onCaretThreadChange,
+  onRequestComment,
 }: DocumentEditorProps & { root: EditorRootRuntime }) {
   const hydrated = useHydrated();
   const readOnly = useStore(root.config, (s) => s.readOnly);
@@ -79,6 +98,29 @@ function RootedDocumentEditor({
   const latestRef = useRef<JSONContent | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const pendingFocusRef = useRef<FocusTarget | "restore" | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Review comments: the host's threads and handlers, read by the live editor through the bridge.
+  const [bridge] = useState(createCommentBridge);
+  useLayoutEffect(() => {
+    bridge.setHandlers({ onThreadClick, onCaretThreadChange, onRequestComment });
+  });
+  const commentsOn = !!onRequestComment;
+  // New threads go to the live editor by content (an equal list re-rendered is a no-op)…
+  const threadKey = threadsKey(threads);
+  useLayoutEffect(() => {
+    bridge.setThreads(threads);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- by content (threadKey), not identity
+  }, [bridge, threadKey]);
+  // …and so does a new active thread (it also replaces one that focusThread() set).
+  useLayoutEffect(() => {
+    bridge.setActive(activeThreadId);
+  }, [bridge, activeThreadId]);
+  // Block positions change with the wrapper's size (and when blocks move: see LiveEditor).
+  useLayoutEffect(() => {
+    bridge.attach(wrapperRef.current);
+    return () => bridge.attach(null);
+  }, [bridge]);
 
   // Register the body with the root. In the root's first render pass this happens during render,
   // so a panel that renders after the document (on the server too) already has its usage counts.
@@ -92,7 +134,7 @@ function RootedDocumentEditor({
 
   useImperativeHandle(
     ref,
-    () => ({
+    (): DocumentEditorHandle => ({
       focus: (target) => {
         const editor = editorRef.current;
         if (!editor || editor.isDestroyed || !editor.isInitialized) {
@@ -101,13 +143,21 @@ function RootedDocumentEditor({
         }
         applyFocus(editor, target ?? "restore");
       },
+      focusThread: bridge.focusThread,
+      getBlockRect: bridge.blockRect,
+      getThreadRect: bridge.threadRect,
+      subscribeBlockRects: bridge.subscribeRects,
+      requestComment: (blockId) => {
+        if (blockId) bridge.requestComment({ blockId });
+      },
     }),
-    [],
+    [bridge],
   );
 
   return (
     <MotionConfig reducedMotion="user">
       <div
+        ref={wrapperRef}
         className={cx("ucomp-editor", className)}
         data-read-only={readOnly ? "" : undefined}
         data-align={align === "start" ? "start" : undefined}
@@ -124,9 +174,13 @@ function RootedDocumentEditor({
             editorRef={editorRef}
             pendingFocusRef={pendingFocusRef}
             variables={variables}
+            bridge={bridge}
+            commentsOn={commentsOn}
+            threads={threads}
+            activeThreadId={activeThreadId}
           />
         ) : (
-          <StaticDocument content={initialContent} variables={variables} />
+          <StaticDocument content={initialContent} variables={variables} threads={threads} activeThreadId={activeThreadId} />
         )}
       </div>
     </MotionConfig>
@@ -144,6 +198,11 @@ interface LiveEditorProps {
   editorRef: RefObject<Editor | null>;
   pendingFocusRef: RefObject<FocusTarget | "restore" | null>;
   variables: readonly Variable[];
+  bridge: CommentBridge;
+  commentsOn: boolean;
+  /** For the static fallback only (the live editor reads the bridge). */
+  threads: readonly ThreadAnchor[] | undefined;
+  activeThreadId: string | null;
 }
 
 function LiveEditor({
@@ -157,11 +216,16 @@ function LiveEditor({
   editorRef,
   pendingFocusRef,
   variables,
+  bridge,
+  commentsOn,
+  threads,
+  activeThreadId,
 }: LiveEditorProps) {
   // Per-instance, created once.
   const [slash] = useState(createSlashMenuController);
   const [picker] = useState(createVariablePickerController);
   const [chip] = useState(createChipPopoverStore);
+  const [leafText] = useState<LeafText>(() => variableLeafText((key) => root.variables.getState().byKey.get(key)));
   const [extensions] = useState(() =>
     editorExtensions({
       store: root.variables,
@@ -169,6 +233,7 @@ function LiveEditor({
       pickerRender: picker.render,
       binding: { fieldId, kind: "body", root, chip },
       requiredNote: () => root.config.getState().requiredNote,
+      reviewThreads: { initial: bridge.initial, onThreadClick: bridge.threadClick, onCaretThread: bridge.caretThread },
     }),
   );
   const [initialFocus] = useState(autoFocus);
@@ -212,6 +277,10 @@ function LiveEditor({
       const pending = pendingFocusRef.current;
       pendingFocusRef.current = null;
       if (pending) applyFocus(ready, pending);
+      bridge.connect(ready);
+    },
+    onTransaction: ({ transaction }) => {
+      if (transaction.docChanged) bridge.docChanged(transaction.before, transaction.doc);
     },
     onUpdate: ({ editor: updated }) => {
       // Skip normalization during mount (missing block ids, a trailing paragraph): it isn't an
@@ -223,6 +292,7 @@ function LiveEditor({
     },
     onDestroy: () => {
       editorRef.current = null;
+      bridge.connect(null);
       if (latestRef.current) setSnapshot(latestRef.current);
     },
   });
@@ -232,23 +302,55 @@ function LiveEditor({
     editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
-  if (!editor || editor.isDestroyed) return <StaticDocument content={snapshot} variables={variables} />;
+  // The Comment action (toolbar) and ⌘⌥M, only while the host takes comment requests.
+  const comments = useMemo<CommentActions | null>(
+    () =>
+      commentsOn
+        ? { target: (state) => commentTarget(state, leafText), request: bridge.requestComment }
+        : null,
+    [commentsOn, leafText, bridge],
+  );
+  useEffect(() => {
+    if (!comments) return;
+    // On the page, not the document: a read-only document never has focus.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.code !== "KeyM" || !event.altKey || event.shiftKey || !modKey(event)) return;
+      const live = editorRef.current;
+      if (!live || live.isDestroyed) return;
+      const { view, state } = live;
+      if (live.isEditable ? !view.hasFocus() : !selectionTouches(view.dom)) return;
+      const anchor = state.selection.empty ? blockRequestAt(state, state.selection.head) : comments.target(state);
+      if (!anchor) return;
+      event.preventDefault();
+      hideFormatBubble(live);
+      comments.request(anchor);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [comments, editorRef]);
+
+  if (!editor || editor.isDestroyed) {
+    return <StaticDocument content={snapshot} variables={variables} threads={threads} activeThreadId={activeThreadId} />;
+  }
 
   return (
     <>
       <EditorContent editor={editor} className={SURFACE_CLASS} />
       <ChipPopover editor={editor} root={root} chip={chip} />
-      {readOnly ? null : (
-        <>
-          <BlockHandle editor={editor} slash={slash} />
-          <TableMenu editor={editor} />
-          <FormatBubble editor={editor} />
-          <SlashMenu controller={slash} editor={editor} />
-          <VariablePicker controller={picker} editor={editor} root={root} />
-        </>
-      )}
+      {readOnly ? null : <BlockHandle editor={editor} slash={slash} />}
+      {readOnly ? null : <TableMenu editor={editor} />}
+      {/* Read-only, the toolbar holds Comment alone (when the host takes comments). */}
+      {readOnly && !comments ? null : <FormatBubble editor={editor} comments={comments} />}
+      {readOnly ? null : <SlashMenu controller={slash} editor={editor} />}
+      {readOnly ? null : <VariablePicker controller={picker} editor={editor} root={root} />}
     </>
   );
+}
+
+/** The page's selection is inside `dom` (a click in a read-only document leaves a caret there, too). */
+function selectionTouches(dom: HTMLElement): boolean {
+  const selection = dom.ownerDocument.getSelection();
+  return !!selection?.anchorNode && dom.contains(selection.anchorNode) && !!selection.focusNode && dom.contains(selection.focusNode);
 }
 
 function applyFocus(editor: Editor, target: FocusTarget | "restore") {

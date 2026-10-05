@@ -10,6 +10,7 @@ const session = vi.hoisted(() => ({ current: null as null | ReturnType<typeof cr
 vi.mock("../session/workspace-session", () => ({
   useWorkspaceSession: () => session.current!,
   useRailOpen: () => useSyncExternalStore(session.current!.subscribe, session.current!.getRailOpen, () => false),
+  useRailTab: () => useSyncExternalStore(session.current!.subscribe, session.current!.getRailTab, () => null),
   usePreviewState: () =>
     useSyncExternalStore(session.current!.subscribe, session.current!.getPreview, () => INITIAL_PREVIEW),
 }));
@@ -112,5 +113,76 @@ describe("Escape in the template name", () => {
     pressEscape(document.body);
     expect(session.current!.getPreview().open).toBe(false);
     expect(document.activeElement).toBe($("toggle"));
+  });
+});
+
+describe("The rail with review comments", () => {
+  function CommentsPage({ preferred = true, count = 5 }: { preferred?: boolean; count?: number }) {
+    return (
+      <Rail
+        channels={<div id="channels" />}
+        comments={{ count, preferred, panel: <div id="threads">Threads</div> }}
+        preview={<div id="preview-surface" />}
+      >
+        <div id="variables-panel" />
+      </Rail>
+    );
+  }
+  const shown = (id: string) => !$(id).closest("[hidden]");
+  const tab = (name: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find((t) => t.textContent?.startsWith(name))!;
+
+  beforeEach(() => {
+    // (The file's own beforeEach opened the preview.)
+    act(() => session.current!.closePreview());
+    act(() => root.render(<CommentsPage />));
+  });
+
+  it("adds Comments and Variables tabs, with the open count, and opens on Comments while something is waiting there", () => {
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(tab("Comments").textContent).toContain("5");
+    expect(tab("Comments").getAttribute("aria-selected")).toBe("true");
+    expect(shown("threads")).toBe(true);
+    expect(shown("variables-panel")).toBe(false);
+  });
+
+  it("opens on Variables when nothing is waiting, and keeps both views mounted", () => {
+    act(() => root.render(<CommentsPage preferred={false} count={0} />));
+    expect(tab("Variables").getAttribute("aria-selected")).toBe("true");
+    expect(shown("variables-panel")).toBe(true);
+    expect(shown("threads")).toBe(false);
+    expect($("threads")).toBeTruthy();
+  });
+
+  it("goes to Variables when the author picks it, and the choice sticks", () => {
+    act(() => session.current!.selectRailView("variables"));
+    expect(shown("variables-panel")).toBe(true);
+    expect(shown("threads")).toBe(false);
+    act(() => root.render(<CommentsPage preferred />));
+    expect(shown("variables-panel")).toBe(true);
+  });
+
+  it("brings the comments back when a thread is shown, and draws no header of its own while the preview is open", () => {
+    act(() => session.current!.selectRailView("variables"));
+    act(() => session.current!.showComments());
+    expect(shown("threads")).toBe(true);
+    act(() => session.current!.openPreview());
+    // The preview surface draws the header then (Preview | Comments | Variables); the rail adds none.
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(shown("threads")).toBe(false);
+    act(() => session.current!.showComments());
+    expect(shown("threads")).toBe(true);
+  });
+
+  it("is the rail it was when the template has no comments", () => {
+    act(() =>
+      root.render(
+        <Rail channels={<div id="channels" />}>
+          <div id="variables-panel" />
+        </Rail>,
+      ),
+    );
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(shown("variables-panel")).toBe(true);
   });
 });

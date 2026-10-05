@@ -1,5 +1,15 @@
-import { WS } from "@/components/workspace/workspace-grid";
+import { ActivityContent } from "@/components/activity/activity-content";
+import { ActivitySkeleton } from "@/components/activity/activity-skeleton";
+import { Stream } from "@/components/primitives/stream";
 
-export default function TemplateActivityPage() {
-  return <div data-slot="activity" className={`${WS.doc} min-h-[24rem]`} />;
+// Activity tab: the template's history as plain sentences, newest first, grouped by day. The
+// document cell of the workspace grid (see workspace-grid.ts); the rail column stays reserved.
+export default function TemplateActivityPage({
+  params,
+}: PageProps<"/[team]/templates/[templateId]/activity">) {
+  return (
+    <Stream fallback={<ActivitySkeleton />}>
+      <ActivityContent params={params} />
+    </Stream>
+  );
 }

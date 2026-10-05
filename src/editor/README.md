@@ -5,15 +5,16 @@ drag, and typed variables that are impossible to break. Built on open-source Tip
 shadcn/ui (Base UI) for every visible control. It knows nothing about Next.js, the database,
 personas or the template lifecycle: the host passes data in and receives events out.
 
-**Status: Phase 2 complete, ready to lift.** The public API below is frozen for Phase 2: later
-phases may add props and exports, but won't change or remove these.
+**Status: Phase 2 complete, ready to lift; Phase 4 adds review-comment mechanics.** The public API
+below is frozen for Phase 2: later phases may add props and exports, but won't change or remove
+these. Phase 4 additions are marked as such.
 
 Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composition) ·
 [Document contract](#document-contract-tiptap-json) · [Behavior](#behavior) ·
 [Keyboard](#keyboard) · [Paste](#paste) · [Alignment](#alignment) ·
 [Performance](#performance) · [Lifting it into another app](#lifting-it-into-another-app) ·
 [Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
-[How it's built](#how-its-built)
+[Changes since Phase 3](#changes-since-phase-3) · [How it's built](#how-its-built)
 
 ## Public API (frozen for Phase 2)
 
@@ -53,15 +54,22 @@ interface DocumentEditorProps {
                                                   // mount-time normalization (ids, trailing line)
   autoFocus?: "start" | "end" | "first-section" | false;
   align?: "center" | "start";                     // default "center"; see Alignment
-  ref?: Ref<DocumentEditorHandle>;                // { focus(target?: FocusTarget): void }
+  ref?: Ref<DocumentEditorHandle>;                // { focus(target?), focusThread(id), ... }: see the handle below
   className?: string;
   // Standalone only (inside a root these come from the root and are ignored):
   variables?: Variable[]; requiredSections?: RequiredSection[]; readOnly?: boolean;
   onVariablesChange?: (variables: Variable[]) => void; requiredNote?: string;
-  // Review comments: accepted, not drawn yet.
-  threads?: ThreadAnchor[]; onRequestComment?: (anchor: CommentRequest) => void;
-  renderThread?: (thread: ThreadAnchor) => ReactNode;
+  // Review comments (Phase 4; see Behavior → Comments):
+  threads?: readonly ThreadAnchor[];              // open ones are highlighted; resolved ones aren't
+  activeThreadId?: string | null;                 // the stronger highlight
+  onThreadClick?: (threadId: string) => void;     // a click on a highlight
+  onCaretThreadChange?: (threadId: string | null) => void;  // the thread under the caret changed
+  onRequestComment?: (anchor: CommentRequest) => void;      // turns commenting on (read-only too)
+  renderThread?: (thread: ThreadAnchor) => ReactNode;       // accepted, not drawn (the host places cards)
 }
+
+interface ThreadAnchor { id: string; blockId: string; quote?: string | null; status: "open" | "resolved" }
+interface CommentRequest { blockId: string; quote?: string }   // quote absent: about the whole block
 
 interface VariablesPanelProps { className?: string }
 
@@ -74,11 +82,27 @@ interface InlineVariableFieldProps {
 
 interface StaticDocumentProps {
   content: JSONContent; variables: readonly Variable[]; align?: "center" | "start"; className?: string;
+  threads?: readonly ThreadAnchor[]; activeThreadId?: string | null;   // Phase 4: the same highlights
 }
 ```
 
 `DocumentEditorHandle.focus(target?)` works before the editor has mounted (it's applied on mount);
 without a target it returns the caret to where it was.
+
+Phase 4 adds to the handle (each works read-only, before mount and while hidden in `<Activity>`).
+All are required members of the type, so a test double or adapter of the handle implements every one
+(no-ops are fine); call them as `ref.current?.focusThread(id)`.
+
+```ts
+interface DocumentEditorHandle {
+  focus(target?: FocusTarget): void;
+  focusThread(threadId: string): void;            // reveal in its scroll container + mark active
+  getBlockRect(blockId: string): DOMRect | null;  // viewport coordinates; null when not rendered
+  getThreadRect(threadId: string): DOMRect | null;  // the highlight (first text run), else its block
+  subscribeBlockRects(listener: () => void): () => void;  // block positions may have changed
+  requestComment(blockId: string): void;          // block-level: onRequestComment({ blockId })
+}
+```
 
 ### Types and utilities
 
@@ -191,20 +215,77 @@ Legal notices) can't be deleted, renamed, retyped, reformatted or moved:
   (its last text block when it has no paragraph); an empty section gets an empty line under its
   heading, outside undo history.
 - **Read-only**: no menus, handles, toolbar or table control; chip popovers still open; the panel
-  shows counts and Required states without controls.
+  shows counts and Required states without controls. Text can be selected (and copied); with
+  `onRequestComment`, a selection gets a toolbar with Comment alone.
+
+### Comments (Phase 4)
+
+Mechanics only: the editor highlights, reports and asks; the host stores threads and draws them
+(a list, popovers or margin cards) with the handle's rect methods.
+
+- **Highlights.** Each open thread highlights the first match of its `quote` in its block (the block
+  with `attrs.id === blockId`, top-level first). Matching ignores whitespace differences; chips read
+  as their label. No quote, or a quote that's no longer in the block: the whole block is washed
+  instead. Resolved threads, unknown blocks and the whole-document thread (`blockId: "doc"`) draw
+  nothing. Markup: `<mark class="ucomp-thread" data-thread="id">` per text run (chips stay
+  outside), `class="ucomp-thread-block" data-thread-block="id"` on a block; the active thread's
+  carries `data-active`. Warning tokens (`--warning-soft` wash with a `--warning-border` underline;
+  active: `--warning-border` with a `--warning` underline), apart from the teal of selection and
+  dragged blocks. Backgrounds and inset shadows only: blocks and chips don't move (text after a
+  highlight on its line can move ≤0.1 px: kerning across the highlight's edge).
+- **Edits.** Highlights are mapped decorations: they follow typing, moves, paste and undo, and are
+  never part of the document or undo history. Typing inside a quote grows its highlight; deleting the
+  quoted text falls back to the block; an edit to that block tries the quote again (so undo restores
+  the text highlight); a deleted block's thread comes back with the block. New `threads` with the
+  same anchors keep their mapped highlights (a re-render with an equal list costs nothing).
+- **Server paint.** `<StaticDocument threads activeThreadId>` (and the editor's own first paint)
+  draws the same markup, so the swap to the live editor shows no change.
+- **Active.** `activeThreadId` is the stronger highlight. `focusThread(id)` also makes a thread
+  active, until `activeThreadId` changes.
+- **Clicks and the caret.** A click on a highlight (quoted text, or a block washed as a whole) calls
+  `onThreadClick(id)`; a drag that selects text doesn't count, nor does a click on a chip.
+  `onCaretThreadChange(id | null)` fires whenever the thread under the caret changes (quote edges
+  count as inside; an overlap reports the active thread, else the shorter highlight); mouse and
+  keyboard alike.
+- **Asking for a comment** (only with `onRequestComment`):
+  - Selected text inside one top-level block gets **Comment** in the toolbar, after Link and a
+    divider: the icon with the label "Comment" beside it (the one toolbar button that says its name;
+    tooltip "Comment ⌘⌥M" for the shortcut). On a required heading (no formatting) or read-only, the
+    toolbar holds Comment alone. A drag that runs on to the very start of the next block still counts.
+  - **Across blocks there's no Comment** (the formatting buttons still show; ⌘⌥M does nothing):
+    a thread anchors to one block, and quoting part of a selection would be a surprise.
+  - The request is `{ blockId, quote }`: the top-level block's id and the selected text, trimmed,
+    whitespace runs as one space, chips as their label; highlighted again it's the block's first
+    occurrence of that text (a phrase that appears twice in a block marks the first). The toolbar
+    hides; the host opens its composer. To keep the text marked while the composer is open, add a
+    provisional open thread with that anchor and make it active.
+  - Block-level: `requestComment(blockId)` on the handle, or ⌘⌥M with a caret (the caret's
+    top-level block): `{ blockId }`.
+- **Placing threads.** `getBlockRect` / `getThreadRect` return viewport boxes (subtract the box of an
+  element that scrolls with the document). `subscribeBlockRects` calls back at most once a frame
+  when the document's size changes (typing that wraps, width, fonts, showing again after being
+  hidden) or blocks are added, removed or reordered; typing within a line doesn't. `focusThread`
+  scrolls only the document's own scroll container (centered when out of view; smooth unless
+  reduced motion), or the page when the document has none.
 
 ## Keyboard
 
 | Where | Keys |
 | --- | --- |
-| Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · Alt+Shift+↑/↓ move block · Home/End line start/end · ⌘Z / ⇧⌘Z |
+| Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Home/End line start/end · ⌘Z / ⇧⌘Z |
+| Highlights | arrows into a highlight report it (`onCaretThreadChange`) |
 | Chip | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove |
 | Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell) |
 | Required heading | Enter at its start adds a line above · edits show the note |
 | Panel | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels |
 
-⌘ is Ctrl outside Apple platforms. Every control has a visible focus ring (`--focus-ring`). The
-editor, its menus, popovers, forms and dialogs pass axe (all rules) in `/editor-lab`.
+⌘ is Ctrl outside Apple platforms (⌥ is Alt). Every control has a visible focus ring
+(`--focus-ring`). The editor, its menus, popovers, forms and dialogs pass axe (all rules) in
+`/editor-lab`, including the Comments toggle's highlights and the Comment toolbar and tooltip
+(editable and read-only).
+
+A read-only document can't hold a keyboard caret, so keyboard-only reviewers reach comments
+through the host (`requestComment(blockId)` from a control of its own).
 
 ## Paste
 
@@ -247,6 +328,7 @@ menus near the end of a document can open below the caret.
 - **Typing latency** (`node e2e/perf/typing-latency.mjs [baseURL]`: Event Timing API, ~190
   keystrokes on the lab's long fixture, next to chips, in a table cell and in a list item): input
   delay plus handler work per keystroke ≈ 1.5 ms median, under 4 ms max. Budget 16 ms.
+  With three threads highlighted (the lab's Comments toggle): 1.3 ms median (Phase 4).
 - **No visible swap**: the server and the hydration pass render `<StaticDocument>`; the live editor
   mounts after hydration with identical markup. Measured: 0 px movement of every block and chip,
   CLS 0 (lab and workspace).
@@ -280,7 +362,7 @@ menus near the end of a document can open below the caret.
    `bg-danger-soft`, `bg-popover`, `ring-ring`, `bg-scrim` (dialogs), `shadow-pop`,
    `rounded-md…4xl`, `font-mono`, `.caps-label`, `sr-only`. CSS variables read by `styles.css`:
    `--text`, `--text-muted`, `--text-subtle`, `--hairline`, `--surface-tinted`, `--brand`,
-   `--brand-1`, `--brand-3`, `--brand-soft`, `--warning-text`, `--warning-soft`,
+   `--brand-1`, `--brand-3`, `--brand-soft`, `--warning`, `--warning-text`, `--warning-soft`,
    `--warning-border`, `--radius-chip`, `--radius-control`, `--radius-card`, `--doc-width`,
    `--ui-font-sans`, `--ui-font-display` (section heads), `--dur-fast`, `--ease-out-soft`; and a
    global `:focus-visible` ring from `--focus-ring`. Theming = changing tokens, never this folder.
@@ -339,6 +421,21 @@ Phase 3 additions (additive only; nothing above changed or went away):
     otherwise the default for the set's kind (custom sets fall back to typical). Keys that aren't in
     the list are dropped; values pass through as given (the render route validates them).
 
+## Changes since Phase 3
+
+Phase 4 additions: review-comment mechanics (additive only; nothing above changed or went away).
+
+- **New `DocumentEditor` props**: `activeThreadId`, `onThreadClick`, `onCaretThreadChange`; `threads`
+  and `onRequestComment` (accepted since Phase 1) now work; `threads` takes a readonly array.
+  `renderThread` stays accepted and not drawn.
+- **New handle methods**: `focusThread`, `getBlockRect`, `getThreadRect`, `subscribeBlockRects`,
+  `requestComment`.
+- **New `StaticDocument` props**: `threads`, `activeThreadId`.
+- **Behavior**: the toolbar's Comment action (icon and label "Comment") and ⌘⌥M; read-only documents
+  show a Comment-only toolbar on selected text when `onRequestComment` is given. See Behavior → Comments.
+- No new exports or dependencies (`ThreadAnchor` and `CommentRequest` were exported already; the
+  tooltip uses `@base-ui/react/tooltip` directly so it renders inside the editor).
+
 ## How it's built
 
 | Need | Piece |
@@ -352,7 +449,9 @@ Phase 3 additions (additive only; nothing above changed or went away):
 | Panel, forms, dialogs, table menu | shadcn `Button`, `Input`, `Select`, `Switch`, `AlertDialog`, `DropdownMenu` |
 | ⋮⋮ handle | `@tiptap/extension-drag-handle-react` + our `+` (`components/block-handle.tsx`) |
 | Dragged-block highlight | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`) |
-| Format toolbar | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`) |
+| Format toolbar (+ Comment) | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`); Base UI `Tooltip` |
+| Review-thread highlights | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute |
+| Thread placement for hosts | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container) |
 | Placeholder | `Placeholder` from `@tiptap/extensions` |
 | Server first paint | `@tiptap/static-renderer` (`components/static-document.tsx`) |
 | *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields; Home/End; the paste normalizer |
@@ -372,7 +471,8 @@ components/               React: EditorRoot, DocumentEditor, VariablesPanel, Inl
                           StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus
 paste/                    clipboard HTML normalizer, `{{key}}` → chips;
                           __fixtures__/ Word (Windows, Mac) and Google Docs clipboard HTML
-lib/                      small helpers (chip transforms, section positions, + insert, hooks)
+lib/                      small helpers (chip transforms, section positions, + insert, hooks,
+                          thread anchors and quotes, block rects, platform keys)
 testing/                  helpers for the tests (headless editors)
 ```
 

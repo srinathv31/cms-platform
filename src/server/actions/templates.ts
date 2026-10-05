@@ -2,13 +2,15 @@
 
 import { RedirectType, redirect } from "next/navigation";
 import type { Route } from "next";
-import { refresh, revalidatePath } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { auditEvents, contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { now } from "@/server/clock";
+import { writeEffects } from "@/server/effects";
+import { submitVersion } from "@/server/actions/review";
 import { getViewer } from "@/server/viewer";
 import { newId, newTemplateId } from "@/server/ids";
 import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
@@ -18,42 +20,17 @@ import {
   createDraft,
   editActive,
   planDraftStart,
-  submit,
   type DraftFields,
-  type LifecycleEffect,
   type VersionSnapshot,
 } from "@/domain/lifecycle";
 
-// Template creation, editing and submitting. Every action checks permissions first, writes in one
-// transaction, refreshes what it changed, and redirects last (submitDraft stays on the page).
+// Template creation and editing. Every action checks permissions first, writes in one transaction,
+// refreshes what it changed, and redirects last. Submitting moved to `actions/review.ts`
+// (`submitDraft` here is its Phase 3 name).
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 // ── Shared helpers ────────────────────────────────────────────
-
-/** Writes the audit events a lifecycle transition asked for, inside the caller's transaction. */
-async function writeEffects(
-  tx: Tx,
-  effects: readonly LifecycleEffect[],
-  ctx: { at: Date; actorId: string; teamId: string; templateId: string; versionId: string },
-) {
-  for (const effect of effects) {
-    await tx.insert(auditEvents).values({
-      id: newId("ae"),
-      at: ctx.at,
-      actorId: ctx.actorId,
-      teamId: ctx.teamId,
-      templateId: ctx.templateId,
-      // The creation event is about the template; the rest belong to the version.
-      versionId: effect.action === "template.created" ? null : ctx.versionId,
-      action: effect.action,
-      details: effect.details,
-      sessionKey: null,
-    });
-  }
-}
 
 function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
   return {
@@ -239,114 +216,13 @@ export async function startDraft(input: { templateId: string }): Promise<void> {
 
 // ── Submit for review ─────────────────────────────────────────
 
-const SubmitDraftInput = z.object({ templateId: z.string().min(1).max(32) });
-
 /** What the Submit button needs: the new version's number, or the one-line reason it was refused. */
 export type SubmitDraftResult = { ok: true; number: number } | { ok: false; reason: string };
 
 /**
- * "Submit for review": the template's open draft becomes its next version, In review (the minimal
- * Submit of Phase 3; the dialog with the contract diff comes with the review phase). The draft, the
- * highest version number and the Active version's variables are read inside the transaction that
- * writes the result, so the number and the contract changes can't go stale.
- *
- * Stays on the page: the workspace re-renders in place (header, document, buttons). A refusal
- * (an undefined chip, no email subject, already in review) writes nothing and comes back as a reason.
- * The client flushes the pending autosave first (`session.flush()`).
+ * "Submit for review" from Phase 3. The submit now lives with the review actions (`submitVersion`,
+ * which adds the note to reviewers and the notifications); this name stays for existing callers.
  */
-export async function submitDraft(input: { templateId: string }): Promise<SubmitDraftResult> {
-  const viewer = await getViewer();
-
-  // As in startDraft, the template is read only to learn its team for the permission check.
-  const parsed = SubmitDraftInput.safeParse(input);
-  const found = parsed.success
-    ? await db
-        .select({ id: templates.id, teamId: templates.teamId })
-        .from(templates)
-        .where(eq(templates.id, parsed.data.templateId))
-        .limit(1)
-        .then((rows) => rows[0])
-    : undefined;
-  assertCan(viewer, "version.submit", { teamId: found?.teamId ?? null });
-  if (!found) throw new Error("Template not found");
-
-  const at = await now();
-
-  const result = await db.transaction(async (tx): Promise<SubmitDraftResult> => {
-    const list = await tx
-      .select({ id: versions.id, number: versions.number, state: versions.state })
-      .from(versions)
-      .where(eq(versions.templateId, found.id));
-
-    const open = list.find((v) => v.state === "draft");
-    if (!open) {
-      return {
-        ok: false,
-        reason: list.some((v) => v.state === "in_review")
-          ? "This version is already in review."
-          : "There is no draft to submit.",
-      };
-    }
-    const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
-    if (!draft) return { ok: false, reason: "There is no draft to submit." };
-
-    const activeId = list.find((v) => v.state === "active")?.id;
-    const baseline = activeId
-      ? await tx
-          .select({ variables: versions.variables })
-          .from(versions)
-          .where(eq(versions.id, activeId))
-          .then((rows) => rows[0]?.variables ?? null)
-      : null;
-
-    const outcome = submit({
-      draft: {
-        state: draft.state,
-        variables: draft.variables,
-        body: draft.body,
-        emailSubject: draft.emailSubject,
-        emailPreheader: draft.emailPreheader,
-        channels: draft.channels,
-      },
-      highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
-      baseline,
-      now: at,
-      submittedBy: viewer.userId,
-    });
-    if (!outcome.ok) return { ok: false, reason: outcome.reason };
-    const { changes, effects } = outcome;
-
-    // The rev and state in the WHERE make this a compare-and-set; the rev bump makes a save that was
-    // still in flight (its `rev` is now behind) fail rather than land on a frozen version.
-    const [saved] = await tx
-      .update(versions)
-      .set({
-        state: changes.state,
-        number: changes.number,
-        submittedBy: changes.submittedBy,
-        submittedAt: changes.submittedAt,
-        currentStage: changes.currentStage,
-        contractChanges: changes.contractChanges,
-        rev: sql`${versions.rev} + 1`,
-        updatedAt: at,
-      })
-      .where(and(eq(versions.id, draft.id), eq(versions.rev, draft.rev), eq(versions.state, "draft")))
-      .returning({ id: versions.id });
-    if (!saved) return { ok: false, reason: "This draft changed. Try again." };
-
-    await writeEffects(tx, effects, {
-      at,
-      actorId: viewer.userId,
-      teamId: found.teamId,
-      templateId: found.id,
-      versionId: draft.id,
-    });
-    return { ok: true, number: changes.number };
-  });
-
-  if (result.ok) {
-    refreshLists(found.id);
-    refresh();
-  }
-  return result;
+export async function submitDraft(input: { templateId: string; note?: string | null }): Promise<SubmitDraftResult> {
+  return submitVersion(input);
 }

@@ -9,10 +9,26 @@ import { Button } from "@/components/ui/button";
 import type { PreviewView } from "@/components/workspace/session/session-store";
 import { cn } from "@/lib/utils";
 
-const VIEWS: readonly { value: PreviewView; label: string }[] = [
+/** One tab of the header. `count` is a quiet number after the label (Comments 5). */
+export interface RailHeaderView {
+  value: PreviewView;
+  label: string;
+  count?: number;
+}
+
+const VIEWS: readonly RailHeaderView[] = [
   { value: "preview", label: "Preview" },
   { value: "variables", label: "Variables" },
 ];
+
+/** The tabs for a rail that has review comments: Preview (while the preview is open), Comments with its count, Variables. */
+export function railHeaderViews({ preview, comments }: { preview: boolean; comments: number | null }): RailHeaderView[] {
+  return [
+    ...(preview ? [VIEWS[0]] : []),
+    ...(comments === null ? [] : [{ value: "comments" as const, label: "Comments", count: comments }]),
+    VIEWS[1],
+  ];
+}
 
 // The tab idiom of the workspace tab bar (workspace-tabs.tsx): text only, muted until chosen, then dark
 // and medium with a 2px dark underline that sits on the row's hairline and slides to the other tab.
@@ -30,16 +46,21 @@ const LABEL =
  * never moves.
  *
  * Preview shows the rendered output; Variables shows the normal rail (Channels, Email details,
- * Variables) to change what it is rendered from.
+ * Variables) to change what it is rendered from. When the template has review comments the header
+ * also holds a Comments tab (`views`, from `railHeaderViews`), and the plain rail uses the same
+ * header without the Preview tab, so the comments never look like a different control.
  */
 export function RailHeader({
   value,
   onChange,
   onClose,
+  views = VIEWS,
   children,
 }: {
   value: PreviewView;
   onChange: (view: PreviewView) => void;
+  /** The tabs, in order. Preview | Variables unless the rail has comments. */
+  views?: readonly RailHeaderView[];
   /** Shown only below the rail's breakpoint, where the rail is an overlay. */
   onClose: () => void;
   /** The control at the right of the row. It gives way (truncates) before the tabs do. */
@@ -50,20 +71,25 @@ export function RailHeader({
       <TabsPrimitive.Root
         value={value}
         onValueChange={(next) => {
-          if (next === "preview" || next === "variables") onChange(next);
+          const view = views.find((v) => v.value === next);
+          if (view) onChange(view.value);
         }}
         className="shrink-0"
       >
         <TabsPrimitive.List aria-label="Rail" className="-mb-px flex h-11 gap-6">
-          {VIEWS.map((view) => {
+          {views.map((view) => {
             const active = view.value === value;
             return (
               <TabsPrimitive.Tab key={view.value} value={view.value} className={TAB}>
                 <span className={LABEL}>
                   {/* The medium weight is wider: an unseen copy of the label holds the room for it, so the tabs don't shift when they swap. */}
-                  <span className={cn("col-start-1 row-start-1", active && "font-medium")}>{view.label}</span>
-                  <span aria-hidden className="invisible col-start-1 row-start-1 font-medium">
+                  <span className={cn("col-start-1 row-start-1 flex items-baseline gap-1.5", active && "font-medium")}>
                     {view.label}
+                    {view.count ? <span className="text-[13px] font-normal text-text-subtle tabular-nums">{view.count}</span> : null}
+                  </span>
+                  <span aria-hidden className="invisible col-start-1 row-start-1 flex items-baseline gap-1.5 font-medium">
+                    {view.label}
+                    {view.count ? <span className="text-[13px] tabular-nums">{view.count}</span> : null}
                   </span>
                 </span>
                 {active ? (

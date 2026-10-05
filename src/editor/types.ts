@@ -17,6 +17,11 @@
 import type { ReactNode, Ref } from "react";
 import type { ContractChange, JSONContent, RequiredSection, Variable } from "./model/types";
 
+/**
+ * A review thread as the editor sees it. It anchors to a block id (`attrs.id`) and, optionally, a
+ * quote: the first match of the quote in the block's text is highlighted; without a quote (or when
+ * the quote isn't in the block any more) the whole block is. Only open threads are highlighted.
+ */
 export interface ThreadAnchor {
   id: string;
   blockId: string;
@@ -24,6 +29,11 @@ export interface ThreadAnchor {
   status: "open" | "resolved";
 }
 
+/**
+ * What a new comment anchors to. From a selection: the top-level block's id and the selected text
+ * (chips read as their label; trimmed, whitespace runs as one space). Block-level (no quote): from
+ * the handle's `requestComment(blockId)`, or ⌘⌥M with a caret.
+ */
 export interface CommentRequest {
   blockId: string;
   quote?: string;
@@ -80,6 +90,33 @@ export interface EditorRootProps {
 export interface DocumentEditorHandle {
   /** Focuses the document at `target`; without one, where the caret last was. Safe before the editor has mounted. */
   focus: (target?: FocusTarget) => void;
+
+  // Phase 4: review comments. Each works in readOnly, and is safe before the editor has mounted
+  // and while it's hidden (<Activity>). A test double or adapter of the handle implements all of them
+  // (no-ops are fine).
+  /**
+   * Scrolls the thread's highlight (its block when it has no text highlight) into view inside its
+   * scroll container, centered when it was out of view, and marks the thread active until
+   * `activeThreadId` changes. Doesn't move focus. Before mount or while hidden, it's applied when
+   * the editor is back.
+   */
+  focusThread: (threadId: string) => void;
+  /** The block's box (`getBoundingClientRect`, viewport coordinates), or null when it isn't rendered. */
+  getBlockRect: (blockId: string) => DOMRect | null;
+  /**
+   * The thread's highlight box: its first text run, or its block for a block-level highlight; the
+   * block's box when it isn't highlighted (resolved); null when neither is rendered.
+   */
+  getThreadRect: (threadId: string) => DOMRect | null;
+  /**
+   * Calls `listener` (at most once a frame) whenever block positions may have changed: the document
+   * resizes or reflows (typing that wraps a line, width, fonts), blocks are added, removed or moved,
+   * the editor shows again after being hidden. Read rects with `getBlockRect` / `getThreadRect` in
+   * the listener. Returns the unsubscribe function.
+   */
+  subscribeBlockRects: (listener: () => void) => () => void;
+  /** A block-level comment: calls `onRequestComment({ blockId })`. */
+  requestComment: (blockId: string) => void;
 }
 
 export interface DocumentEditorProps {
@@ -108,9 +145,22 @@ export interface DocumentEditorProps {
   /** See EditorRootProps.requiredNote. */
   requiredNote?: string;
 
-  // Review comments: accepted for the review screen, not drawn yet.
-  threads?: ThreadAnchor[];
+  // Review comments (Phase 4). See README, Behavior → Comments.
+  /** Open threads are highlighted (their quote, or their whole block); resolved ones aren't. */
+  threads?: readonly ThreadAnchor[];
+  /** The thread shown as active: a stronger highlight. `focusThread` also sets it, until this changes. */
+  activeThreadId?: string | null;
+  /** A click on a highlight (quoted text, or a block highlighted as a whole). */
+  onThreadClick?: (threadId: string) => void;
+  /** The open thread under the caret, each time it changes (null when the caret leaves every highlight). */
+  onCaretThreadChange?: (threadId: string | null) => void;
+  /**
+   * Turns commenting on. Selected text inside one top-level block gets a Comment action in the
+   * toolbar (in readOnly, a toolbar with only Comment), also ⌘⌥M; a caret + ⌘⌥M asks for a
+   * block-level comment. The host opens its composer and saves the thread.
+   */
   onRequestComment?: (anchor: CommentRequest) => void;
+  /** Accepted, not drawn: the host places thread cards itself (see the handle's rect methods). */
   renderThread?: (thread: ThreadAnchor) => ReactNode;
 }
 
@@ -159,4 +209,7 @@ export interface StaticDocumentProps {
   /** Match the live editor's `align`. Default "center". */
   align?: DocumentAlign;
   className?: string;
+  /** Phase 4: the same highlights as the live editor's `threads` / `activeThreadId`. */
+  threads?: readonly ThreadAnchor[];
+  activeThreadId?: string | null;
 }

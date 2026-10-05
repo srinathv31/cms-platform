@@ -11,11 +11,14 @@ import {
   EditorRoot,
   InlineVariableField,
   VariablesPanel,
+  type CommentRequest,
+  type DocumentEditorHandle,
   type JSONContent,
   type RequiredSection,
+  type ThreadAnchor,
   type Variable,
 } from "@/editor";
-import { FIXTURES, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
+import { FIXTURES, LAB_THREADS, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
 
 const JSON_DEBOUNCE_MS = 250;
 
@@ -34,6 +37,11 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
   const [fixtureId, setFixtureId] = useState<FixtureId>("long");
   const [readOnlyToggle, setReadOnlyToggle] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  // Review comments: the lab plays the host (threads in state, a request adds one).
+  const [commentsOn, setCommentsOn] = useState(false);
+  const [threads, setThreads] = useState<ThreadAnchor[]>(LAB_THREADS);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const editorRef = useRef<DocumentEditorHandle>(null);
   const [json, setJson] = useState<LabState>({ doc: FIXTURES[0].content, variables: LAB_VARIABLES });
 
   const fixture = FIXTURES.find((f) => f.id === fixtureId) as Fixture;
@@ -75,6 +83,17 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
     latest.current = { doc: next.content, variables: next.variables ?? LAB_VARIABLES };
     setJson({ ...latest.current });
     setFixtureId(id);
+  };
+
+  const requestComment = useCallback((anchor: CommentRequest) => {
+    const id = `lab-new-${Date.now().toString(36)}`;
+    setThreads((list) => [...list, { id, blockId: anchor.blockId, quote: anchor.quote ?? null, status: "open" }]);
+    setActiveThreadId(id);
+  }, []);
+
+  const focusThread = (id: string) => {
+    setActiveThreadId(id);
+    editorRef.current?.focusThread(id);
   };
 
   const toggleJson = (open: boolean) => {
@@ -130,12 +149,43 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
             Read-only
           </label>
 
+          <label className="flex items-center gap-2.5 text-sm text-text-muted">
+            <Switch checked={commentsOn} onCheckedChange={(checked) => setCommentsOn(checked)} aria-label="Comments" />
+            Comments
+          </label>
+
           <CollapsibleTrigger
             render={<Button variant="outline" size="sm" className="gap-1.5 bg-surface font-normal" />}
           >
             <Braces className="size-4" strokeWidth={1.75} aria-hidden />
             JSON
           </CollapsibleTrigger>
+
+          {commentsOn ? (
+            <ToggleGroup
+              aria-label="Threads"
+              variant="outline"
+              size="sm"
+              spacing={0}
+              value={activeThreadId ? [activeThreadId] : []}
+              onValueChange={(value) => {
+                const id = value[0] as string | undefined;
+                if (id) focusThread(id);
+                else setActiveThreadId(null);
+              }}
+              className="basis-full flex-wrap justify-end bg-surface"
+            >
+              {threads.map((thread) => (
+                <ToggleGroupItem
+                  key={thread.id}
+                  value={thread.id}
+                  className="max-w-56 px-3 font-normal text-text-muted aria-pressed:bg-selected aria-pressed:text-text"
+                >
+                  <span className="truncate">{thread.quote ?? "Whole block"}</span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          ) : null}
         </header>
 
         {/* One root per fixture: the document, the inline field and the panel share its variable list. */}
@@ -160,9 +210,17 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
                 serverPaint
               ) : (
                 <DocumentEditor
+                  ref={editorRef}
                   content={fixture.content}
                   onChange={onChange}
                   autoFocus={fixtureId === "blank" ? "first-section" : false}
+                  threads={commentsOn ? threads : undefined}
+                  activeThreadId={commentsOn ? activeThreadId : null}
+                  onThreadClick={setActiveThreadId}
+                  onCaretThreadChange={(id) => {
+                    if (id) setActiveThreadId(id);
+                  }}
+                  onRequestComment={commentsOn ? requestComment : undefined}
                 />
               )}
             </section>

@@ -11,7 +11,7 @@ import {
 import { closePreview } from "./close-preview";
 import { PreviewPane } from "./preview-pane";
 import { recipientOf, senderOf } from "./preview-sender";
-import { RailHeader } from "./rail-header";
+import { RailHeader, railHeaderViews } from "./rail-header";
 import { findSet, listSets, resolveSetValues } from "./sample-sets/model";
 import { SampleSetSwitcher, type SampleSetSwitcherHandle } from "./sample-sets/sample-set-switcher";
 import { usePreviewRender } from "./use-preview-render";
@@ -30,6 +30,8 @@ export interface PreviewSurfaceProps {
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD. */
   today: string;
+  /** The template has review comments: the header gets a Comments tab, with this many open. Null: no tab. */
+  commentsCount?: number | null;
 }
 
 /**
@@ -51,6 +53,7 @@ export function PreviewSurface({
   editable,
   sampleSets,
   today,
+  commentsCount = null,
 }: PreviewSurfaceProps) {
   const session = useWorkspaceSession();
   const preview = usePreviewState();
@@ -91,8 +94,10 @@ export function PreviewSurface({
   return (
     <>
       <RailHeader
-        value={preview.view}
-        onChange={(view) => session.setPreview({ view })}
+        // A Comments view that has lost its comments (the composer was cancelled on a template without threads) reads as Variables.
+        value={preview.view === "comments" && commentsCount === null ? "variables" : preview.view}
+        views={railHeaderViews({ preview: true, comments: commentsCount })}
+        onChange={(view) => session.selectRailView(view)}
         onClose={() => closePreview(session, { restoreFocus: true })}
       >
         {showing ? (
