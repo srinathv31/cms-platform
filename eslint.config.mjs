@@ -51,6 +51,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The published /api/v1 wire contract: self-contained types both UCOMP and the simulator compile against.
+    files: ["src/contracts/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ regex: ".*", message: "src/contracts is self-contained: no imports." }] }],
+    },
+  },
+  {
     // The simulator talks to UCOMP over /api/v1 only, like Coral would.
     files: ["src/simulator/**/*", "src/app/(simulator)/**/*"],
     rules: {

@@ -581,6 +581,24 @@ describe("simulator data", () => {
     expect(new Set(customers.map((c) => c.homeState)).size).toBeGreaterThanOrEqual(6);
     expect(customers.some((c) => `${c.firstName} ${c.lastName}`.length > 40)).toBe(true);
   });
+
+  it("gives every customer an annual fee and Spring Travel an offer fee and end date (Phase 5 mapping)", async () => {
+    const customers = await db.select().from(sim.simCustomers);
+    for (const c of customers) expect(c.annualFee).toMatch(/^\d+$/);
+    const spring = (await db.select().from(sim.simOffers)).find((o) => o.id === "offer_spring_travel")!;
+    expect(spring.terms.annualFee).toBe(95);
+    expect(spring.terms.endsOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("has Coral's seeded notices read, except Balance Transfer v1's sunset", async () => {
+    const notices = (await db.select().from(ucomp.consumerNotices)).filter((n) => n.consumerId === "coral");
+    const reads = new Set((await db.select().from(sim.simNoticeReads)).map((r) => r.noticeId));
+    const unread = notices.filter((n) => !reads.has(n.id));
+    expect(unread).toHaveLength(1);
+    expect(unread[0].kind).toBe("sunset_scheduled");
+    expect(unread[0].templateId).toBe(tpl("balance-transfer"));
+    expect(reads.size).toBe(notices.length - 1);
+  });
 });
 
 describe("determinism", () => {

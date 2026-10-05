@@ -58,6 +58,7 @@ async function insertAll(db: Db, s: Sink) {
   await insertRows(db, sim.simOffers, s.simOffers);
   await insertRows(db, sim.simCustomers, s.simCustomers);
   await insertRows(db, sim.simLinks, s.simLinks);
+  await insertRows(db, sim.simNoticeReads, s.simNoticeReads);
   await insertRows(db, ucomp.settings, s.settings);
 }
 
