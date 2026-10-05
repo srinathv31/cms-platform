@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Scenario specs run serially from a fresh reset against the production build (`npm run demo`).
-const PORT = Number(process.env.E2E_PORT ?? 3100);
+// The gate port runs the production build (`next start`, after a db:reset). It's 3100 by default; each
+// parallel track (docs/tracks/README.md) sets its own with E2E_GATE_PORT so tracks never share a server.
+const GATE_PORT = Number(process.env.E2E_GATE_PORT ?? 3100);
+const PORT = Number(process.env.E2E_PORT ?? GATE_PORT);
 
 // Gate media: `npm run gate:media` runs the scenario specs in two extra projects. `demo` records the video
 // (1440×900, presentation pacing, a cursor); `stills-1280` takes the 1280×800 stills at full speed. Both are
@@ -70,11 +73,11 @@ export default defineConfig({
         ]
       : []),
   ],
-  // Only the gate port (3100, the production build) may be started here, because starting resets the
-  // database. On any other E2E_PORT (the shared dev server on 3000) the server must already be up:
+  // Only the gate port (the production build) may be started here, because starting resets the
+  // database. On any other E2E_PORT (a dev server, e.g. 3000) the server must already be up:
   // a dev server answering 500 mid-edit used to look "not running" and trigger a reset of the shared DB.
   webServer:
-    PORT === 3100
+    PORT === GATE_PORT
       ? {
           command: `npm run db:reset && npx next start -p ${PORT}`,
           url: `http://localhost:${PORT}`,
