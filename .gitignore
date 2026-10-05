@@ -50,3 +50,6 @@ next-env.d.ts
 
 # local test-runner output
 /.vitest/
+
+# Git worktrees for parallel tracks (docs/tracks/README.md)
+/.claude/worktrees/

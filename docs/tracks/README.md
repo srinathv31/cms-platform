@@ -122,4 +122,4 @@ Also fix:
    - the contact sheet;
    - the walkthrough recording.
 3. Merge the three decision logs into `docs/decisions.md`, write `docs/final-review.md`, and follow the handoff's "Final handoff to Sri" (reset the DB, stop the servers, send the media). Commit as "Phases 5–7: integration" (no attribution lines). Never push.
-4. Clean up worktrees once merged: `git worktree remove` for each track, or the app's clean-up tool.
+4. Remove each track's worktree right after merging it (`git worktree remove <path>`, or the app's clean-up tool), BEFORE starting the main dev server or any heavy run. A worktree with its own `node_modules` sitting inside the repo slows the main checkout's file watching and scanning.
