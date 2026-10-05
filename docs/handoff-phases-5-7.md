@@ -11,7 +11,7 @@ Repo: /Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/cms
 
 **Mandate.** Finish Phases 5, 6 and 7 on your own, then hand Sri the finished product to review once. No per-phase review gates, no blocking taste checkpoints. Make the calls the way Sri has been making them (below), record each one so he can overrule it, and keep going.
 
-**Execution: parallel tracks.** The work runs as three tracks in separate git worktrees (A: Phase 5, B: Phase 6, C: Phase 7a), then one integration session for Phase 7b. `docs/tracks/README.md` has the split, the branches, the ports, the file-ownership map and the laptop resource rules, and it overrides this file where they differ: a track commits on its own branch, records nothing until integration, and never merges into `prototype` itself. If you were started as a track, you're that track's lead, not the lead for all three phases.
+**Execution: parallel tracks.** The work runs as three tracks in separate git worktrees (A: Phase 5, B: Phase 6, C: Phase 7a), then one integration session for Phase 7b. `docs/tracks/README.md` has the split, the branches, the ports, the file-ownership map and the laptop resource rules, and it overrides this file where they differ: a track commits on its own branch, records nothing until integration, and never merges into `prototype` itself. In single-lead mode (the default) you are the lead for all of it: you set up the worktrees, run the tracks through subagents, and integrate.
 
 ## What this is
 UCOMP is a bank's content platform. Business teams write disclosure templates with typed variables; other systems (Coral, simulated) render them.

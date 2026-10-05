@@ -1,25 +1,39 @@
 # Parallel tracks for Phases 5–7
 
-The remaining work runs as three tracks in separate git worktrees, then one integration pass. Read `docs/handoff-phases-5-7.md` first: it holds the context, the decisions and the way of working. This file says how the tracks split the work and share one laptop.
+The remaining work runs as three tracks in separate git worktrees, then one integration pass. **One lead session runs all of it** (single-lead mode): it creates the worktrees, runs Tracks A and B at the same time through subagents, starts Track C when one of them finishes, then integrates in the main checkout. Nobody clicks anything. Read `docs/handoff-phases-5-7.md` first: it holds the context, the decisions and the way of working. This file says how the tracks split the work and share one laptop.
 
-| Track | Scope | Branch | Dev port | Gate port | Starts |
-|---|---|---|---|---|---|
-| A | Phase 5, going live | `track/golive` | 3001 (`ucomp-dev-a`) | 3101 | now |
-| B | Phase 6, access and admin | `track/access` | 3002 (`ucomp-dev-b`) | 3102 | now |
-| C | Phase 7a (import, Copilot, ⌘K) + carried rough edges | `track/import` | 3003 (`ucomp-dev-c`) | 3103 | when A or B finishes |
-| I | Integration + Phase 7b (UX pass, full demo script, final review) | `prototype` (main checkout) | 3000 (`ucomp-dev`) | 3100 | when A, B and C are done |
+Worktrees sit BESIDE the repo, never inside it (Turbopack picks its root by looking for lockfiles upward, so a nested project confuses it). `$P` = `/Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform`, and the main checkout is `$P/cms-platform`.
 
-Base commit for every track: the prep commit on `prototype` that added this file. Run `git log --oneline -1 prototype` in the main checkout to get it.
+| Track | Scope | Worktree | Branch | Dev port (config) | Gate port | Starts |
+|---|---|---|---|---|---|---|
+| A | Phase 5, going live | `$P/ucomp-golive` | `track/golive` | 3001 (`ucomp-dev-a`) | 3101 | now |
+| B | Phase 6, access and admin | `$P/ucomp-access` | `track/access` | 3002 (`ucomp-dev-b`) | 3102 | now |
+| C | Phase 7a (import, Copilot, ⌘K) + carried rough edges | `$P/ucomp-import` | `track/import` | 3003 (`ucomp-dev-c`) | 3103 | when A or B finishes |
+| I | Integration + Phase 7b (UX pass, full demo script, final review) | `$P/cms-platform` (main checkout) | `prototype` | 3000 (`ucomp-dev`) | 3100 | when A, B and C are done |
 
-## Starting a track (first five minutes)
-1. You're in a fresh worktree. Put your branch on the base commit: `git switch -c <branch> <base-sha>`, using the branch from the table. Do NOT use the app's "sync with base branch": the base may be `main`, which lacks Phases 1–4.
-2. `npm install`. The worktree has no `node_modules`.
-3. `npm run db:reset`. This creates YOUR database at `./data/ucomp.db`, inside your worktree.
-4. Start your dev server: `preview_start` with YOUR config name (`ucomp-dev-a`, `-b` or `-c`). Never use 3000, and never another track's port.
-5. Read `docs/handoff-phases-5-7.md`, then your section below. Write your `docs/phase-N-brief.md` and your contract types, then fan out.
+Every track branches from `prototype` as it is when the track starts.
+
+## Setting up a track (the lead does this)
+From the main checkout:
+```bash
+git worktree add ../ucomp-golive -b track/golive prototype   # B: ../ucomp-access track/access · C: ../ucomp-import track/import
+cd ../ucomp-golive && npm install && npm run db:reset           # its own node_modules and its own ./data/ucomp.db
+```
+Then start its dev server with `preview_start` and the track's config (`ucomp-dev-a`, `-b` or `-c`). These configs live in the main checkout's `.claude/launch.json` and `cd` into the worktree, so the lead starts every server from its main session. Write the track's `docs/phase-N-brief.md` and contract types INSIDE the worktree, then fan out.
+
+## Briefing subagents for a track
+Every subagent brief names its track's worktree as its root:
+- All file paths are absolute under that worktree, e.g. `$P/ucomp-golive/src/...`.
+- Every Bash command starts with `cd $P/ucomp-golive && …`. The subagent's own working directory is the main checkout, so it must never edit, test or build there, or in another track's worktree.
+- `docs/agent-brief.md`, `docs/ui-checklist.md` and the Next docs (`node_modules/next/dist/docs/`) are read from that worktree.
+- Give the track's dev URL (`http://localhost:3001`) and its gate port.
+- Name the track in the brief's first line ("Track A, worktree $P/ucomp-golive"), so reports are easy to route.
+
+## Progress log (survives context compaction)
+The lead keeps `docs/tracks/progress.md` in the MAIN checkout. It is updated at every milestone: wave launched, slice done, decision made, track green or committed. Each entry is one line: what's done and what's running, per track. After a compaction, re-read it and `git -C <worktree> log --oneline -5` for each track before doing anything else. Commit it with the integration.
 
 ## Shared laptop: resource rules (16 GB, and Sri is writing in Safari)
-- **At most 3 subagents running at once per track.** Each brief says so.
+- **At most 5 subagents running at once in total, and at most 3 per track.**
 - **One dev server per track,** on its own port.
 - **Heavy steps take the lock.** These are `npx next build`, a full `npx playwright test`, and `npx vitest run` on the whole suite. Wrap each one:
   ```bash
@@ -65,7 +79,7 @@ Anything not listed is owned by the track whose scope needs it. When two tracks 
 - A QA pass (Sonnet, against `docs/ui-checklist.md`) with no open should-fix items. Anything deferred goes in your decisions log with the reason.
 - Stray outputs deleted.
 - Commit on your branch, "Phase N: <name>" (no attribution lines). Never push, and never merge into `prototype` yourself.
-- Post a one-line status, and write `docs/tracks/<a|b|c>-report.md`:
+- Post a one-line status, and write `docs/tracks/<a|b|c>-report.md` in the worktree, on its branch:
   - what you built;
   - schema and migration changes;
   - new dependencies;
@@ -109,7 +123,7 @@ Also fix:
 - **The PDF keep-with-next chain:** a heading plus its one-line intro shouldn't be stranded before a table that moves to the next page.
 - **Redline "Changes only":** give a marker to threads on hidden unchanged blocks.
 
-## Integration (session I, in the main checkout on `prototype`)
+## Integration (the same lead, in the main checkout on `prototype`)
 1. Merge `track/golive`, `track/access` and `track/import` into `prototype` one at a time. Resolve conflicts using each track's report.
    - Drop the track migrations and regenerate one from the merged schema with `npx drizzle-kit generate --name phase5_7`.
    - Run `npm install` for the merged lock file.
@@ -122,4 +136,4 @@ Also fix:
    - the contact sheet;
    - the walkthrough recording.
 3. Merge the three decision logs into `docs/decisions.md`, write `docs/final-review.md`, and follow the handoff's "Final handoff to Sri" (reset the DB, stop the servers, send the media). Commit as "Phases 5–7: integration" (no attribution lines). Never push.
-4. Remove each track's worktree right after merging it (`git worktree remove <path>`, or the app's clean-up tool), BEFORE starting the main dev server or any heavy run. A worktree with its own `node_modules` sitting inside the repo slows the main checkout's file watching and scanning.
+4. Remove each track's worktree after merging it (stop its dev server first): `git worktree remove ../ucomp-golive` (and the others). The branches stay in the repo.

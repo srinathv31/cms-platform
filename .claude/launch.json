@@ -4,31 +4,48 @@
     {
       "name": "ucomp-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "ucomp-demo",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "start", "-p", "3200"],
+      "runtimeArgs": [
+        "next",
+        "start",
+        "-p",
+        "3200"
+      ],
       "port": 3200
     },
     {
       "name": "ucomp-dev-a",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "-p", "3001"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/ucomp-golive && exec npm run dev -- -p 3001"
+      ],
       "port": 3001
     },
     {
       "name": "ucomp-dev-b",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "-p", "3002"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/ucomp-access && exec npm run dev -- -p 3002"
+      ],
       "port": 3002
     },
     {
       "name": "ucomp-dev-c",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "-p", "3003"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/ucomp-import && exec npm run dev -- -p 3003"
+      ],
       "port": 3003
     }
   ]
