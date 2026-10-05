@@ -2,7 +2,8 @@ import type { PlatformRole } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { HOUR } from "./time";
 
-// The eight switchable personas use the fixed ids from docs/agent-brief.md.
+// The switchable personas use the fixed ids from docs/agent-brief.md: the build plan's eight, plus
+// Dana Park (Phase 6), the Legal reviewer a two-stage approval chain names.
 // Everyone else is a non-switchable user who makes the teams, access and inactivity stories real.
 
 interface Person {
@@ -16,7 +17,7 @@ interface Person {
   activeHoursAgo: number;
 }
 
-export const PERSONA_IDS = ["maya", "jordan", "alex", "priya", "sam", "riley", "taylor", "morgan"] as const;
+export const PERSONA_IDS = ["maya", "jordan", "alex", "priya", "sam", "riley", "taylor", "morgan", "dana"] as const;
 
 const PEOPLE: Person[] = [
   // Personas (build plan: "Seed personas")
@@ -41,8 +42,8 @@ const PEOPLE: Person[] = [
   // Someone asking for access to Coral Offers
   { id: "chris", name: "Chris Morales", title: "Marketing Coordinator", hue: 130, activeHoursAgo: 70 },
 
-  // Legal reviewer: seeded for the "add a Legal stage" stretch demo, not a persona yet
-  { id: "dana", name: "Dana Park", title: "Legal Reviewer, Consumer Compliance", hue: 350, activeHoursAgo: 9 * 24 },
+  // Legal reviewer (Phase 6): a Coral Offers Viewer whom Riley names in a "Legal reviewer" approval stage
+  { id: "dana", name: "Dana Park", title: "Legal Reviewer, Consumer Compliance", hue: 350, persona: true, activeHoursAgo: 9 * 24 },
 ];
 
 function initials(name: string) {

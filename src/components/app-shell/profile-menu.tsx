@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -12,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { PersonaSummary } from "@/server/queries/personas";
+import { NAV_ICON_STROKE } from "./nav";
 import { usePersonaSwitch } from "./persona-switch";
 import { UserAvatar } from "./user-avatar";
 
@@ -46,6 +50,14 @@ export function ProfileMenu({
             <div className="truncate text-[13px] leading-[18px] text-text-muted">{me.summary}</div>
           </div>
         </div>
+        <DropdownMenuSeparator className="mx-1 bg-hairline" />
+        <DropdownMenuItem
+          render={<Link href="/request-access" />}
+          className="gap-3 rounded-lg px-2.5 py-2 text-[14px] font-medium"
+        >
+          <UserPlus aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
+          Request access
+        </DropdownMenuItem>
         <DropdownMenuSeparator className="mx-1 bg-hairline" />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2.5 pt-2.5 pb-1.5">

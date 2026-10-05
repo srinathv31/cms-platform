@@ -186,6 +186,27 @@ describe("writeEffects: notifications", () => {
     ]);
   });
 
+  it("links a review to the reviewer's own space when they can't see the template's team", async () => {
+    // A stage naming Naomi (Deposits only) or Riley (Platform Admin) on a Coral Offers version.
+    const ctx = context("balance-transfer", { actorId: "jordan" });
+    const link = { to: "review" as const, templateId: ids["balance-transfer"]!, versionNumber: 3 };
+    await write(
+      ["naomi", "riley", "maya"].map((userId) => ({
+        kind: "notification" as const,
+        notification: "review_requested" as const,
+        to: { kind: "user" as const, userId },
+        title: "Waiting on you.",
+        link,
+      })),
+      ctx,
+    );
+    expect((await notificationsAt(ctx.at)).map((n) => [n.userId, n.href])).toEqual([
+      ["maya", `/coral-offers/review/${ids["balance-transfer"]}/3`],
+      ["naomi", `/deposits/review/${ids["balance-transfer"]}/3`],
+      ["riley", `/coral-offers/review/${ids["balance-transfer"]}/3`],
+    ]);
+  });
+
   it("builds the three kinds of href", () => {
     expect(notificationHref("deposits", { to: "review", templateId: "UC-AAAAAA", versionNumber: 2 })).toBe(
       "/deposits/review/UC-AAAAAA/2",

@@ -45,6 +45,12 @@ export type TeamRole = (typeof TEAM_ROLES)[number];
 
 export type PlatformRole = "platform_admin" | "auditor";
 export type MembershipStatus = "active" | "suspended" | "lapsed";
+/**
+ * Why a membership is not active (Phase 6). `recert_unconfirmed`: lapsed at a recertification
+ * deadline. `inactivity`: a Team Admin suspended a flagged member. `inactivity_auto`: suspended
+ * automatically 120 days after the last sign-in. null while active.
+ */
+export type MembershipStatusReason = "recert_unconfirmed" | "inactivity" | "inactivity_auto";
 
 export interface ViewerMembership {
   teamId: string;
@@ -98,6 +104,18 @@ export interface PermissionResource {
   revokeStartedBy?: string | null;
   /** Whose access request is being decided. */
   requesterId?: string | null;
+  /**
+   * Whose membership is being changed (roles, remove, suspend, keep, reinstate, recertify).
+   * Nobody changes their own access (Phase 6).
+   */
+  subjectUserId?: string | null;
+  /**
+   * Users a version's current approval stage names (`{kind:"user"}` rules, e.g. Dana Park's
+   * "Legal reviewer"). Such a user may open, decide and comment on that version on ANY team, with
+   * no membership or Approver role there, as long as they have active access somewhere and aren't
+   * an Auditor (Phase 6). Pass it only for the version in review whose current stage names them.
+   */
+  stageApproverIds?: readonly string[] | null;
 }
 
 export type PermissionResult = { ok: true } | { ok: false; reason: string };

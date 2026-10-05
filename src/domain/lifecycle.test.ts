@@ -1017,6 +1017,21 @@ describe("approve", () => {
         title: "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
       });
     });
+
+    it("refuses someone who approved an earlier stage of the same round", () => {
+      const second = { ...v2, currentStage: 1 };
+      const twoTeamStages: ApprovalStage[] = [
+        { position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+        { position: 1, name: "Second approver", rule: { kind: "team_role", role: "approver" } },
+      ];
+      expect(run({ chain: twoTeamStages, version: second, approvedBy: ["jordan"] })).toEqual({
+        ok: false,
+        reason: "You approved an earlier stage.",
+      });
+      expect(REFUSALS.approvedEarlierStage).toBe("You approved an earlier stage.");
+      expect(run({ chain: twoTeamStages, version: second, approvedBy: ["alex"] }).ok).toBe(true);
+      expect(run({ chain: twoTeamStages, version: second, approvedBy: [] }).ok).toBe(true);
+    });
   });
 
   it("refuses when the chain has no stage for the version", () => {

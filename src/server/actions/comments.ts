@@ -16,12 +16,12 @@ import { db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { blockIdsOf } from "@/server/queries/review-shared";
+import { blockIdsOf, loadChain, stageApproverIds, waitingStage } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
 // Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen.
 // Authors and approvers on the template's team comment (`review.comment`), and the same people
-// resolve and reopen. Every action checks the permission first, writes in one transaction with its
+// resolve and reopen; so does whoever the stage a version waits on names, on any team (Phase 6). Every action checks the permission first, writes in one transaction with its
 // audit row and notifications, and refreshes the page it came from.
 //
 // A "use server" file may export only async functions: the helpers below stay private.
@@ -48,6 +48,27 @@ function check(viewer: Viewer, resource: PermissionResource): { ok: false; reaso
     if (error instanceof PermissionError) return { ok: false, reason: error.reason };
     throw error;
   }
+}
+
+/**
+ * The users the stage a version waits on names: they comment on it on any team (Phase 6). With no
+ * version given, the template's version in review (a thread may have started on an earlier one).
+ */
+async function namedOnStage(
+  templateId: string,
+  version?: { state: VersionState; currentStage: number; contentTypeId: string },
+): Promise<string[]> {
+  const waiting =
+    version ??
+    (await db
+      .select({ state: versions.state, currentStage: versions.currentStage, contentTypeId: templates.contentTypeId })
+      .from(versions)
+      .innerJoin(templates, eq(templates.id, versions.templateId))
+      .where(and(eq(versions.templateId, templateId), eq(versions.state, "in_review")))
+      .limit(1)
+      .then((rows) => rows[0]));
+  if (!waiting || waiting.state !== "in_review") return [];
+  return stageApproverIds(waitingStage(await loadChain(db, waiting.contentTypeId), waiting.currentStage));
 }
 
 /** A comment's text: trimmed, not empty, not huge. */
@@ -116,6 +137,8 @@ export async function addComment(input: {
           body: versions.body,
           submittedBy: versions.submittedBy,
           createdBy: versions.createdBy,
+          currentStage: versions.currentStage,
+          contentTypeId: templates.contentTypeId,
         })
         .from(versions)
         .innerJoin(templates, eq(templates.id, versions.templateId))
@@ -123,7 +146,10 @@ export async function addComment(input: {
         .limit(1)
         .then((rows) => rows[0])
     : undefined;
-  const refused = check(viewer, { teamId: found?.teamId ?? null });
+  const refused = check(viewer, {
+    teamId: found?.teamId ?? null,
+    stageApproverIds: found ? await namedOnStage(found.templateId, found) : [],
+  });
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
 
@@ -235,7 +261,10 @@ export async function reply(input: { threadId: string; body: string }): Promise<
   const viewer = await getViewer();
   const parsed = ReplyInput.safeParse(input);
   const thread = parsed.success ? await findThread(parsed.data.threadId) : undefined;
-  const refused = check(viewer, { teamId: thread?.teamId ?? null });
+  const refused = check(viewer, {
+    teamId: thread?.teamId ?? null,
+    stageApproverIds: thread ? await namedOnStage(thread.templateId) : [],
+  });
   if (refused) return refused;
   if (!parsed.success || !thread) return { ok: false, reason: REASONS.noThread };
 
@@ -299,7 +328,10 @@ async function setStatus(input: { threadId: string }, to: "open" | "resolved"): 
   const viewer = await getViewer();
   const parsed = ThreadInput.safeParse(input);
   const thread = parsed.success ? await findThread(parsed.data.threadId) : undefined;
-  const refused = check(viewer, { teamId: thread?.teamId ?? null });
+  const refused = check(viewer, {
+    teamId: thread?.teamId ?? null,
+    stageApproverIds: thread ? await namedOnStage(thread.templateId) : [],
+  });
   if (refused) return refused;
   if (!parsed.success || !thread) return { ok: false, reason: REASONS.noThread };
 

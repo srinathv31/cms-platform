@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import type { LifecycleEffect, NotificationLink, Recipients } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import {
@@ -12,6 +12,7 @@ import {
   renderLog,
   teams,
   templates,
+  users,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 
@@ -88,7 +89,9 @@ export async function writeEffects(
       case "notification": {
         const userIds = (await resolveRecipients(tx, effect.to, ctx.teamId)).filter((id) => id !== ctx.actorId);
         if (userIds.length === 0) break;
-        const href = notificationHref((await templateInfo()).teamSlug, effect.link);
+        const { teamSlug } = await templateInfo();
+        // A stage reviewer outside the template's team opens the version from their own space.
+        const spaces = effect.link.to === "review" ? await recipientSpaces(tx, userIds, teamSlug) : null;
         await tx.insert(notifications).values(
           userIds.map((userId) => ({
             id: newId("nt"),
@@ -97,7 +100,7 @@ export async function writeEffects(
             kind: effect.notification,
             title: effect.title,
             body: effect.body ?? null,
-            href,
+            href: notificationHref(spaces?.get(userId) ?? teamSlug, effect.link),
             createdAt: ctx.at,
             readAt: null,
           })),
@@ -138,6 +141,31 @@ async function templateOf(tx: Tx, ctx: EffectContext): Promise<{ name: string; t
     .where(eq(templates.id, ctx.templateId))
     .limit(1);
   return rows[0] ?? { name: ctx.templateId, teamSlug: ctx.teamId };
+}
+
+/**
+ * The space each recipient opens a review link in: the template's team when they can see it (an
+ * active membership there, or a platform role); otherwise their own first space by name, as the
+ * team switcher lists it (a stage that names someone outside the team: `requireReviewVersion`).
+ */
+async function recipientSpaces(tx: Tx, userIds: readonly string[], teamSlug: string): Promise<Map<string, string>> {
+  const [people, rows] = await Promise.all([
+    tx.select({ id: users.id, platformRole: users.platformRole }).from(users).where(inArray(users.id, [...userIds])),
+    tx
+      .selectDistinct({ userId: memberships.userId, slug: teams.slug, name: teams.name })
+      .from(memberships)
+      .innerJoin(teams, eq(teams.id, memberships.teamId))
+      .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
+      .where(and(inArray(memberships.userId, [...userIds]), eq(memberships.status, "active"))),
+  ]);
+  const spaces = new Map<string, string>();
+  for (const userId of userIds) {
+    if (people.find((p) => p.id === userId)?.platformRole) continue;
+    const mine = rows.filter((r) => r.userId === userId);
+    if (mine.length === 0 || mine.some((r) => r.slug === teamSlug)) continue;
+    spaces.set(userId, [...mine].sort((a, b) => a.name.localeCompare(b.name))[0]!.slug);
+  }
+  return spaces;
 }
 
 /** The users a notification goes to, before the actor is taken out. Sorted, without repeats. */

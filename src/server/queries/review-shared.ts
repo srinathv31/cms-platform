@@ -1,14 +1,15 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { canActOnStage } from "@/domain/approval-chain";
+import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
 import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
-import { approvalStages, consumers, renderLog, teams, templates, users } from "@/server/db/schema/ucomp";
+import { approvalStages, approvals, consumers, renderLog, teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { requireSpace, type SpaceContext } from "./spaces";
 
 // Helpers the Phase 4 read models (review, versions, activity, threads) and the review actions
@@ -61,7 +62,13 @@ export interface TemplateAccess {
  */
 export const requireTemplate = cache(async (spaceSlug: string, templateId: string): Promise<TemplateAccess> => {
   const space = await requireSpace(spaceSlug);
-  const template = await db
+  const template = await findTemplate(templateId);
+  if (!template || !seesInSpace(space, template)) notFound();
+  return { space, template };
+});
+
+function findTemplate(templateId: string) {
+  return db
     .select({
       id: templates.id,
       name: templates.name,
@@ -75,12 +82,53 @@ export const requireTemplate = cache(async (spaceSlug: string, templateId: strin
     .where(eq(templates.id, templateId))
     .limit(1)
     .then((rows) => rows[0]);
+}
 
-  if (!template) notFound();
-  if (spaceSlug !== ALL_SPACE && template.teamSlug !== spaceSlug) notFound();
-  if (!canSeeSpace(space.viewer, template.teamSlug)) notFound();
-  return { space, template };
-});
+/** The template belongs to the space (or the space is "All teams"), and the viewer sees its team. */
+function seesInSpace(space: SpaceContext, template: { teamSlug: string }): boolean {
+  if (space.slug !== ALL_SPACE && template.teamSlug !== space.slug) return false;
+  return canSeeSpace(space.viewer, template.teamSlug);
+}
+
+export type ReviewVersionRow = typeof versions.$inferSelect;
+
+/**
+ * The review screen's template and version. As `requireTemplate`, plus one way in from outside the
+ * template's team (Phase 6, a stage that names a person): someone named on the stage a version waits
+ * on opens it from their own space, in any team, and keeps seeing it once they decided it. Any other
+ * version of that template stays a 404 for them.
+ */
+export const requireReviewVersion = cache(
+  async (spaceSlug: string, templateId: string, versionNumber: number): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
+    const space = await requireSpace(spaceSlug);
+    const template = await findTemplate(templateId);
+    if (!template || !Number.isInteger(versionNumber) || versionNumber < 1) notFound();
+    const version = await db.query.versions.findFirst({
+      where: and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)),
+    });
+    if (!version || version.number === null) notFound();
+    if (seesInSpace(space, template)) return { space, template, version };
+    if (await namedOnVersion(space.viewer, template, version)) return { space, template, version };
+    notFound();
+  },
+);
+
+async function namedOnVersion(
+  viewer: Viewer,
+  template: { teamId: string; contentTypeId: string },
+  version: ReviewVersionRow,
+): Promise<boolean> {
+  if (version.state === "in_review") {
+    const stage = waitingStage(await loadChain(db, template.contentTypeId), version.currentStage);
+    if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: stageApproverIds(stage) }).ok) return true;
+  }
+  const decided = await db
+    .select({ id: approvals.id })
+    .from(approvals)
+    .where(and(eq(approvals.versionId, version.id), eq(approvals.actorId, viewer.userId)))
+    .limit(1);
+  return decided.length > 0;
+}
 
 // ── The approval chain ────────────────────────────────────────
 
@@ -131,17 +179,44 @@ export function waitingStage(chain: readonly ApprovalStage[], currentStage: numb
 }
 
 /**
- * May the viewer approve, or request changes on, a version at its current stage? The role grant and
- * maker-checker come from `can("version.decide")`; the stage's own rule from `canActOnStage`. The
- * queue, the review screen and the actions all ask this one question.
+ * The users a stage names (`{kind:"user"}` rules): they may open, decide and comment on the version
+ * waiting on it, on any team (`PermissionResource.stageApproverIds`). Empty for a team-role stage.
+ */
+export function stageApproverIds(stage: ApprovalStage | null | undefined): string[] {
+  return stage?.rule.kind === "user" ? [stage.rule.userId] : [];
+}
+
+/** Who already approved a stage of each version (the "two stages need two people" guard). */
+export async function loadApprovedBy(reader: Reader, versionIds: readonly string[]): Promise<Map<string, string[]>> {
+  const byVersion = new Map<string, string[]>();
+  if (versionIds.length === 0) return byVersion;
+  const rows = await reader
+    .select({ versionId: approvals.versionId, actorId: approvals.actorId })
+    .from(approvals)
+    .where(and(inArray(approvals.versionId, [...versionIds]), eq(approvals.decision, "approved")));
+  for (const r of rows) byVersion.set(r.versionId, [...(byVersion.get(r.versionId) ?? []), r.actorId]);
+  return byVersion;
+}
+
+/**
+ * May the viewer approve, or request changes on, a version at its current stage? The role grant (or
+ * being named on the stage) and maker-checker come from `can("version.decide")`; the stage's own rule
+ * from `canActOnStage`. With `approvedBy` (the approve check), someone who approved an earlier stage
+ * of the version is refused. The queue, the review screen and the actions all ask this one question.
  */
 export function decideCheck(
   viewer: Viewer,
-  input: { teamId: string; submittedBy: string | null; stage: ApprovalStage },
+  input: { teamId: string; submittedBy: string | null; stage: ApprovalStage; approvedBy?: readonly string[] },
 ): PermissionResult {
-  const permitted = can(viewer, "version.decide", { teamId: input.teamId, submittedBy: input.submittedBy });
+  const permitted = can(viewer, "version.decide", {
+    teamId: input.teamId,
+    submittedBy: input.submittedBy,
+    stageApproverIds: stageApproverIds(input.stage),
+  });
   if (!permitted.ok) return permitted;
-  return canActOnStage(viewer, input.stage, input.teamId);
+  const onStage = canActOnStage(viewer, input.stage, input.teamId);
+  if (!onStage.ok) return onStage;
+  return input.approvedBy?.includes(viewer.userId) ? { ok: false, reason: REFUSALS.approvedEarlierStage } : onStage;
 }
 
 // ── Render-log usage ──────────────────────────────────────────

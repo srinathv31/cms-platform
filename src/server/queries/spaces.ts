@@ -14,7 +14,9 @@ import {
   spacesFor,
   type Space,
 } from "@/domain/permissions";
+import type { SidebarCardModel } from "@/domain/access-types";
 import type { Viewer } from "@/domain/types";
+import { getHomeCard, getSidebarCards } from "./access";
 import { shortDate } from "./format";
 
 // ── Settings access (which groups of the settings modal this viewer may use) ──
@@ -48,12 +50,17 @@ export interface SpaceNav {
   icon: string;
   showAudit: boolean;
   settings: SettingsAccess;
+  /** Superseded by `card` (kept until the sidebar switches). */
   recert: RecertCard | null;
+  /** The one dismissible sidebar card for this space (access requests, then recertification). */
+  card: SidebarCardModel | null;
 }
 
 export interface ShellData {
   viewer: { userId: string; name: string };
   spaces: SpaceNav[];
+  /** The card for a viewer with no space yet (their pending request, on /request-access). */
+  homeCard: SidebarCardModel | null;
 }
 
 /** Everything the sidebar needs, for every space at once, so a team switch never refetches. */
@@ -65,7 +72,9 @@ export const getShell = cache(async (): Promise<ShellData> => {
     .orderBy(teams.name);
   // Platform Admin and Auditor get "All teams" first, then every team to step into.
   const spaces = spacesFor(viewer, teamRows);
-  if (spaces.length === 0) return { viewer: { userId: viewer.userId, name: viewer.name }, spaces: [] };
+  if (spaces.length === 0) {
+    return { viewer: { userId: viewer.userId, name: viewer.name }, spaces: [], homeCard: await getHomeCard() };
+  }
 
   const iconBySlug = new Map(teamRows.map((t) => [t.slug, t.icon]));
 
@@ -84,8 +93,11 @@ export const getShell = cache(async (): Promise<ShellData> => {
     recertByTeam.set(r.teamId, { id: r.id, label: r.label, dueLabel: shortDate(r.dueAt) });
   }
 
+  const cards = await getSidebarCards();
+
   return {
     viewer: { userId: viewer.userId, name: viewer.name },
+    homeCard: null,
     spaces: spaces.map((s): SpaceNav => {
       const isAll = s.slug === ALL_SPACE;
       const teamId = isAll ? undefined : s.slug;
@@ -97,6 +109,7 @@ export const getShell = cache(async (): Promise<ShellData> => {
         showAudit: can(viewer, "audit.view", { teamId }).ok,
         settings: settingsAccessFor(viewer, s.slug),
         recert: isAll ? null : (recertByTeam.get(s.slug) ?? null),
+        card: cards[s.slug] ?? null,
       };
     }),
   };

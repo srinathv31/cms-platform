@@ -1,5 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell/page-placeholder";
+import { AuditView } from "@/components/audit/audit-view";
 
-export default function AuditPage({ params }: PageProps<"/[team]/audit">) {
-  return <PagePlaceholder title="Audit" params={params} requireAudit />;
+export default function AuditPage({ params, searchParams }: PageProps<"/[team]/audit">) {
+  return <AuditView params={params} searchParams={searchParams} />;
 }

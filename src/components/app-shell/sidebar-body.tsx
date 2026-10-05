@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { spring } from "@/components/motion/presets";
 import { firstSettingsSection } from "@/components/settings/sections";
+import type { SidebarCardModel } from "@/domain/access-types";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { HelpPopover } from "./help-popover";
 import { NAV_ICON_STROKE, NAV_ITEMS, NAV_ROW, type NavKey } from "./nav";
@@ -63,9 +64,12 @@ function ReviewCount({ counts, slug }: { counts: Promise<Record<string, number>>
 
 export function SidebarBody({
   spaces,
+  homeCard,
   reviewCounts,
 }: {
   spaces: SpaceNav[];
+  /** The card for a viewer with no space yet (their own pending request). */
+  homeCard: SidebarCardModel | null;
   /** Review badge counts by space slug. A promise: the badge streams in after the nav. */
   reviewCounts: Promise<Record<string, number>>;
 }) {
@@ -79,6 +83,7 @@ export function SidebarBody({
   if (derived && derived !== active) setActive(derived);
 
   const settingsSection = space ? firstSettingsSection(space.settings) : null;
+  const card = space ? space.card : homeCard;
   const items = NAV_ITEMS.filter((i) => i.key !== "audit" || space?.showAudit);
 
   return (
@@ -123,7 +128,7 @@ export function SidebarBody({
       </SidebarContent>
 
       <SidebarFooter className="relative gap-3 px-3 pt-0 pb-4">
-        {space?.recert ? <SidebarCard key={space.recert.id} recert={space.recert} teamSlug={space.slug} /> : null}
+        {card ? <SidebarCard key={card.id} card={card} /> : null}
         <div className="mx-1 h-px bg-hairline" />
         <SidebarMenu className="gap-1">
           {space && settingsSection ? (

@@ -1,0 +1,532 @@
+// Platform configuration: teams, content types (required sections), channel rules and approval
+// chains. Pure TypeScript: every function takes `now` (the demo clock) and returns what to write and
+// what to record (`effects`); server/actions/platform.ts applies both in one transaction.
+// Contracts: ./access-types.ts (`PlatformConfigDomain`).
+//
+// The rules:
+//   - A team's slug comes from its name; it must be new (slug and name, case-insensitive) and not a
+//     route the app owns. The team starts with one member, its first Team Admin.
+//   - Required sections shape only templates created afterwards. A document carries its sections as
+//     headings with a `requiredKey`, and the editor protects those, so an existing template keeps the
+//     sections it was made with. Removing a section is allowed: nothing at submit checks sections, so
+//     no existing draft becomes unsubmittable (`conformToSections` shapes a new template's starter).
+//   - A channel turned off stops rendering at once, Active versions included: the consequence names
+//     how many. At least one channel stays on.
+//   - Approval chains: in-review versions keep waiting on the same stage (by id) wherever it moves.
+//     A stage some version waits on can't be removed.
+
+import type {
+  AccessEffect,
+  MembershipChange,
+  Named,
+  Ok,
+  PlatformArea,
+  PlatformConfigDomain,
+  Refused,
+} from "./access-types";
+import { ROLE_LABEL } from "./access";
+import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
+import type { ApprovalStage } from "./review-types";
+import { CHANNELS, TEAM_ROLES, type ApproverRule, type Channel, type JSONContent, type RequiredSection } from "./types";
+
+// ── Limits and wording ───────────────────────────────────────────────────────
+
+export const TEAM_NAME_MAX = 60;
+export const TEAM_DESCRIPTION_MAX = 200;
+export const SECTION_TITLE_MAX = 60;
+export const STAGE_NAME_MAX = 40;
+
+/** Lucide keys the team icon picker offers (the seed's teams use the first three). */
+export const TEAM_ICONS = [
+  "credit-card",
+  "piggy-bank",
+  "receipt-text",
+  "landmark",
+  "wallet",
+  "home",
+  "car",
+  "briefcase",
+  "shield-check",
+  "scale",
+  "megaphone",
+  "building-2",
+] as const;
+
+/** Slugs the app's own routes use: a team can't take them. */
+export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+  "all",
+  "api",
+  "request-access",
+  "design",
+  "editor-lab",
+  "pdf-lab",
+  "settings",
+  "audit",
+  "new",
+  "_next",
+]);
+
+export const PLATFORM_REFUSALS = {
+  teamName: "Give the team a name.",
+  teamNameTooLong: `Keep the name under ${TEAM_NAME_MAX} characters.`,
+  descriptionTooLong: `Keep the description under ${TEAM_DESCRIPTION_MAX} characters.`,
+  icon: "Pick an icon.",
+  reservedName: (name: string) => `"${name}" can't be used as a team name.`,
+  teamTaken: (name: string) => `A team called ${name} already exists.`,
+  pickPerson: "Pick a person.",
+  oneSection: "Keep at least one required section.",
+  sectionTitle: "Give every section a title.",
+  sectionTitleTooLong: `Keep section titles under ${SECTION_TITLE_MAX} characters.`,
+  sectionDuplicate: (title: string) => `There are two sections called ${title}.`,
+  oneChannel: "Keep at least one channel on.",
+  oneStage: "Keep at least one stage.",
+  stageName: "Give every stage a name.",
+  stageNameTooLong: `Keep stage names under ${STAGE_NAME_MAX} characters.`,
+  stageDuplicate: (name: string) => `There are two stages called ${name}.`,
+  stageGone: "A stage changed since you opened this. Try again.",
+  pickRole: "Pick a role.",
+  stageWaiting: (count: number, name: string) =>
+    `${count} ${count === 1 ? "version is" : "versions are"} waiting on ${name}.`,
+} as const;
+
+const refuse = (reason: string): Refused => ({ ok: false, reason });
+
+function configChanged(area: PlatformArea, teamId: string | null, summary: string, details: Record<string, unknown>): AccessEffect {
+  return { kind: "audit", action: "platform.config_changed", teamId, details: { area, summary, ...details } };
+}
+
+// ── Teams ────────────────────────────────────────────────────────────────────
+
+/** "Coral Offers" → "coral-offers"; "Café & Co." → "cafe-co". */
+export function slugify(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+    .replace(/-+$/g, "");
+}
+
+/** Creates a team (id = slug, the seed contract) with `admin` as its first Team Admin. */
+export function createTeam(input: {
+  name: string;
+  description: string;
+  icon: string;
+  admin: Named;
+  actor: Named;
+  now: Date;
+  existing: { slug: string; name: string }[];
+}):
+  | Ok<{
+      team: { id: string; slug: string; name: string; description: string; icon: string; createdAt: Date };
+      membership: MembershipChange;
+      effects: AccessEffect[];
+    }>
+  | Refused {
+  const name = input.name.trim().replace(/\s+/g, " ");
+  const description = input.description.trim();
+  if (!name) return refuse(PLATFORM_REFUSALS.teamName);
+  if (name.length > TEAM_NAME_MAX) return refuse(PLATFORM_REFUSALS.teamNameTooLong);
+  if (description.length > TEAM_DESCRIPTION_MAX) return refuse(PLATFORM_REFUSALS.descriptionTooLong);
+  if (!(TEAM_ICONS as readonly string[]).includes(input.icon)) return refuse(PLATFORM_REFUSALS.icon);
+
+  const slug = slugify(name);
+  if (!slug || RESERVED_SLUGS.has(slug)) return refuse(PLATFORM_REFUSALS.reservedName(name));
+  const taken = input.existing.find((t) => t.slug === slug || t.name.toLowerCase() === name.toLowerCase());
+  if (taken) return refuse(PLATFORM_REFUSALS.teamTaken(taken.name));
+
+  const { admin, actor, now } = input;
+  const team = { id: slug, slug, name, description, icon: input.icon, createdAt: now };
+  return {
+    ok: true,
+    team,
+    membership: {
+      kind: "insert",
+      membership: { userId: admin.id, teamId: team.id, roles: ["team_admin"], addedAt: now, addedBy: actor.id },
+    },
+    effects: [
+      configChanged("teams", team.id, `Created team ${name} with ${admin.name} as Team Admin`, {
+        teamName: name,
+        slug,
+        userId: admin.id,
+        userName: admin.name,
+      }),
+      {
+        kind: "audit",
+        action: "access.granted",
+        teamId: team.id,
+        details: { userId: admin.id, userName: admin.name, role: "team_admin", roles: ["team_admin"], appointed: true },
+      },
+      {
+        kind: "notification",
+        notification: "team_admin_appointed",
+        to: { kind: "user", userId: admin.id },
+        teamId: team.id,
+        title: `${actor.name} made you Team Admin of ${name}.`,
+        link: { to: "settings", teamId: team.id, section: "members" },
+      },
+    ],
+  };
+}
+
+// ── Content types: required sections ────────────────────────────────────────
+
+/** "Rates and fees" → "rates_and_fees". */
+export function sectionKey(title: string): string {
+  const key = title
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return /^[a-z]/.test(key) ? key : `section_${key}`.replace(/_+$/, "");
+}
+
+/**
+ * The content type's required sections, replaced. `next` lists every section in order: an existing
+ * one by its key (its title may change: a rename keeps the key), a new one with any other key (the
+ * key is made from its title, never reusing one the type has or had in this list).
+ */
+export function updateRequiredSections(input: {
+  contentType: { id: string; name: string; requiredSections: RequiredSection[] };
+  next: RequiredSection[];
+  actor: Named;
+  now: Date;
+}): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused {
+  const { contentType } = input;
+  const current = contentType.requiredSections;
+  if (input.next.length === 0) return refuse(PLATFORM_REFUSALS.oneSection);
+
+  const titles = new Set<string>();
+  for (const s of input.next) {
+    const title = s.title.trim();
+    if (!title) return refuse(PLATFORM_REFUSALS.sectionTitle);
+    if (title.length > SECTION_TITLE_MAX) return refuse(PLATFORM_REFUSALS.sectionTitleTooLong);
+    if (titles.has(title.toLowerCase())) return refuse(PLATFORM_REFUSALS.sectionDuplicate(title));
+    titles.add(title.toLowerCase());
+  }
+
+  const currentKeys = new Set(current.map((s) => s.key));
+  const used = new Set(currentKeys);
+  const kept = new Set<string>();
+  const requiredSections = input.next.map((s): RequiredSection => {
+    const title = s.title.trim();
+    if (currentKeys.has(s.key) && !kept.has(s.key)) {
+      kept.add(s.key);
+      return { key: s.key, title };
+    }
+    const base = sectionKey(title);
+    let key = base;
+    for (let n = 2; used.has(key); n++) key = `${base}_${n}`;
+    used.add(key);
+    return { key, title };
+  });
+
+  const before = new Map(current.map((s) => [s.key, s]));
+  const after = new Map(requiredSections.map((s) => [s.key, s]));
+  const added = requiredSections.filter((s) => !before.has(s.key)).map((s) => s.title);
+  const removed = current.filter((s) => !after.has(s.key)).map((s) => s.title);
+  const renamed = requiredSections
+    .filter((s) => before.has(s.key) && before.get(s.key)!.title !== s.title)
+    .map((s) => ({ from: before.get(s.key)!.title, to: s.title }));
+  const keptOrder = (list: RequiredSection[]) => list.filter((s) => before.has(s.key) && after.has(s.key)).map((s) => s.key);
+  const reordered = keptOrder(current).join() !== keptOrder(requiredSections).join();
+
+  if (!added.length && !removed.length && !renamed.length && !reordered) {
+    return { ok: true, requiredSections: current, effects: [] };
+  }
+
+  const parts = [
+    added.length ? `added ${joinWithAnd(added)}` : null,
+    removed.length ? `removed ${joinWithAnd(removed)}` : null,
+    ...renamed.map((r) => `renamed ${r.from} to ${r.to}`),
+    reordered ? "reordered the sections" : null,
+  ].filter((p): p is string => p !== null);
+  const summary = `Changed ${contentType.name} required sections: ${parts.join("; ")}`;
+  return {
+    ok: true,
+    requiredSections,
+    effects: [
+      configChanged("content_types", null, summary, {
+        contentTypeId: contentType.id,
+        contentTypeName: contentType.name,
+        added,
+        removed,
+        renamed,
+        sections: requiredSections.map((s) => s.title),
+      }),
+    ],
+  };
+}
+
+/**
+ * A new template's starter body, shaped to the content type's sections as they are now: a required
+ * heading whose section was removed becomes an ordinary heading (its content stays), a renamed one
+ * takes the new title, and a section the starter lacks is added at the end as an H2. Existing
+ * templates are never reshaped. `newId` gives the added headings their block ids.
+ */
+export function conformToSections(body: JSONContent, sections: readonly RequiredSection[], newId: () => string): JSONContent {
+  const wanted = new Map(sections.map((s) => [s.key, s]));
+  const present = new Set<string>();
+  const content = (body.content ?? []).map((block) => {
+    const key = block.type === "heading" ? (block.attrs?.requiredKey as string | null | undefined) : null;
+    if (!key) return block;
+    const section = wanted.get(key);
+    if (!section) return { ...block, attrs: { ...block.attrs, requiredKey: null } };
+    present.add(key);
+    const text = (block.content ?? []).map((n) => n.text ?? "").join("");
+    return text === section.title ? block : { ...block, content: [{ type: "text", text: section.title }] };
+  });
+  for (const s of sections) {
+    if (present.has(s.key)) continue;
+    content.push({
+      type: "heading",
+      attrs: { id: newId(), level: 2, requiredKey: s.key },
+      content: [{ type: "text", text: s.title }],
+    });
+  }
+  return { ...body, content };
+}
+
+// ── Channel rules ────────────────────────────────────────────────────────────
+
+/**
+ * What turning a channel off stops, before it is committed (the confirm shows these lines):
+ * "2 Active Disclosure versions stop rendering to Email." Turning one on changes nothing that renders.
+ */
+export function channelOffConsequences(contentTypeName: string, channel: Channel, activeUsing: number): string[] {
+  const label = CHANNEL_LABELS[channel];
+  const lines =
+    activeUsing > 0
+      ? [
+          `${activeUsing} Active ${contentTypeName} ${activeUsing === 1 ? "version stops" : "versions stop"} rendering to ${label}.`,
+        ]
+      : [`No Active ${contentTypeName} version renders to ${label}.`];
+  lines.push(`New ${contentTypeName} templates can't turn ${label} on.`);
+  return lines;
+}
+
+/** Turns one channel on or off for a content type (the type × channel matrix). */
+export function setChannelRule(input: {
+  contentType: { id: string; name: string; allowedChannels: Channel[] };
+  channel: Channel;
+  allowed: boolean;
+  activeUsing: number;
+  actor: Named;
+  now: Date;
+}): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused {
+  const { contentType, channel, allowed } = input;
+  const current = contentType.allowedChannels;
+  if (!(CHANNELS as readonly string[]).includes(channel)) return refuse(PLATFORM_REFUSALS.oneChannel);
+  if (current.includes(channel) === allowed) return { ok: true, allowedChannels: current, consequences: [], effects: [] };
+
+  const next = CHANNELS.filter((c) => (c === channel ? allowed : current.includes(c)));
+  if (next.length === 0) return refuse(PLATFORM_REFUSALS.oneChannel);
+
+  const label = CHANNEL_LABELS[channel];
+  const consequences = allowed ? [] : channelOffConsequences(contentType.name, channel, input.activeUsing);
+  const summary = allowed
+    ? `Turned on ${label} for ${contentType.name}`
+    : `Turned off ${label} for ${contentType.name}` +
+      (input.activeUsing > 0
+        ? `: ${input.activeUsing} Active ${input.activeUsing === 1 ? "version stopped" : "versions stopped"} rendering to ${label}`
+        : "");
+  return {
+    ok: true,
+    allowedChannels: next,
+    consequences,
+    effects: [
+      configChanged("channel_rules", null, summary, {
+        contentTypeId: contentType.id,
+        contentTypeName: contentType.name,
+        channel,
+        allowed,
+        activeUsing: allowed ? 0 : input.activeUsing,
+      }),
+    ],
+  };
+}
+
+// ── Approval chains ──────────────────────────────────────────────────────────
+
+/** "Approver role", or the named person's name. */
+export function ruleLabel(rule: ApproverRule, people: readonly Named[]): string {
+  if (rule.kind === "team_role") return `${ROLE_LABEL[rule.role]} role`;
+  return people.find((p) => p.id === rule.userId)?.name ?? rule.userId;
+}
+
+export interface ChainCardStage {
+  /** The stage's id; null for a stage being added. */
+  id: string | null;
+  name: string;
+  ruleLabel: string;
+  /** "added" and "renamed" mark the After card; "removed" marks the Now card. */
+  change: "added" | "removed" | "renamed" | "moved" | null;
+}
+
+export interface ChainChange {
+  now: ChainCardStage[];
+  after: ChainCardStage[];
+  /** Plain lines under the cards. Empty when nothing changes. */
+  lines: string[];
+  changed: boolean;
+}
+
+type StageInput = { id?: string; name: string; rule: ApproverRule };
+
+/**
+ * The "Now / After" consequence cards for a chain edit, before it is saved, with the lines under
+ * them: who reviews what from now on, and that a named person reviews every team's submissions
+ * (including teams they aren't a member of). `waiting` counts the versions waiting per stage id.
+ */
+export function describeChainChange(input: {
+  contentTypeName: string;
+  current: readonly (ApprovalStage & { id: string })[];
+  next: readonly StageInput[];
+  people: readonly Named[];
+  waiting?: Readonly<Record<string, number>>;
+}): ChainChange {
+  const current = [...input.current].sort((a, b) => a.position - b.position);
+  const nextIds = new Set(input.next.map((s) => s.id).filter((id): id is string => !!id));
+  const byId = new Map(current.map((s, index) => [s.id, { stage: s, index }]));
+
+  const now: ChainCardStage[] = current.map((s) => ({
+    id: s.id,
+    name: s.name,
+    ruleLabel: ruleLabel(s.rule, input.people),
+    change: nextIds.has(s.id) ? null : "removed",
+  }));
+  const keptBefore = current.filter((s) => nextIds.has(s.id)).map((s) => s.id);
+  const keptAfter = input.next.filter((s) => s.id && byId.has(s.id)).map((s) => s.id!);
+  const after: ChainCardStage[] = input.next.map((s) => {
+    const was = s.id ? byId.get(s.id)?.stage : undefined;
+    const label = ruleLabel(s.rule, input.people);
+    let change: ChainCardStage["change"] = null;
+    if (!was) change = "added";
+    else if (was.name !== s.name.trim() || ruleLabel(was.rule, input.people) !== label) change = "renamed";
+    else if (keptBefore.indexOf(was.id) !== keptAfter.indexOf(was.id)) change = "moved";
+    return { id: was ? was.id : null, name: s.name.trim(), ruleLabel: label, change };
+  });
+
+  const lines: string[] = [];
+  const type = input.contentTypeName;
+  for (const s of after.filter((a) => a.change === "added")) {
+    lines.push(`${type} submissions will also wait on ${s.name} (${s.ruleLabel}).`);
+  }
+  for (const s of now.filter((n) => n.change === "removed")) {
+    const count = input.waiting?.[s.id!] ?? 0;
+    lines.push(
+      count > 0
+        ? PLATFORM_REFUSALS.stageWaiting(count, s.name)
+        : `${type} submissions will no longer wait on ${s.name}.`,
+    );
+  }
+  const namedNow = new Set(current.flatMap((s) => (s.rule.kind === "user" ? [s.rule.userId] : [])));
+  for (const s of input.next) {
+    if (s.rule.kind !== "user" || namedNow.has(s.rule.userId)) continue;
+    const person = ruleLabel(s.rule, input.people);
+    lines.push(`${person} will review ${type} submissions from every team, including teams they aren't a member of.`);
+  }
+  // Nobody approves two stages of one round, so a person named on two stages would stall it.
+  const named = input.next.flatMap((s) => (s.rule.kind === "user" ? [s.rule.userId] : []));
+  if (new Set(named).size < named.length) lines.push("Each stage needs a different person.");
+  const changed = after.some((a) => a.change !== null) || now.some((n) => n.change !== null) || after.length !== now.length;
+  return { now, after, lines: changed ? lines : [], changed };
+}
+
+/**
+ * The whole chain, in order. Existing stages keep their id (and so every version waiting on one keeps
+ * waiting on it, wherever it moves: `moves` remaps their currentStage); new ones get `id: null`.
+ */
+export function saveApprovalChain(input: {
+  contentType: { id: string; name: string };
+  current: (ApprovalStage & { id: string })[];
+  next: StageInput[];
+  inReview: { versionId: string; currentStage: number }[];
+  people: Named[];
+  actor: Named;
+  now: Date;
+}):
+  | Ok<{
+      stages: (ApprovalStage & { id: string | null })[];
+      moves: { versionId: string; from: number; to: number }[];
+      effects: AccessEffect[];
+    }>
+  | Refused {
+  const { contentType, people } = input;
+  const current = [...input.current].sort((a, b) => a.position - b.position);
+  if (input.next.length === 0) return refuse(PLATFORM_REFUSALS.oneStage);
+
+  const currentIds = new Set(current.map((s) => s.id));
+  const names = new Set<string>();
+  const ids = new Set<string>();
+  for (const s of input.next) {
+    const name = s.name.trim();
+    if (!name) return refuse(PLATFORM_REFUSALS.stageName);
+    if (name.length > STAGE_NAME_MAX) return refuse(PLATFORM_REFUSALS.stageNameTooLong);
+    if (names.has(name.toLowerCase())) return refuse(PLATFORM_REFUSALS.stageDuplicate(name));
+    names.add(name.toLowerCase());
+    if (s.id !== undefined && (!currentIds.has(s.id) || ids.has(s.id))) return refuse(PLATFORM_REFUSALS.stageGone);
+    if (s.id) ids.add(s.id);
+    const rule = s.rule;
+    if (rule.kind === "user" && !people.some((p) => p.id === rule.userId)) return refuse(PLATFORM_REFUSALS.pickPerson);
+    if (rule.kind === "team_role" && !(TEAM_ROLES as readonly string[]).includes(rule.role)) {
+      return refuse(PLATFORM_REFUSALS.pickRole);
+    }
+  }
+
+  // Which stage each version waits on (a stage index past the end reads as the last, as on screen).
+  const waitingOn = input.inReview.map((v) => ({
+    ...v,
+    stageId: current.length ? current[Math.min(Math.max(v.currentStage, 0), current.length - 1)]!.id : null,
+  }));
+  for (const s of current) {
+    if (ids.has(s.id)) continue;
+    const count = waitingOn.filter((v) => v.stageId === s.id).length;
+    if (count > 0) return refuse(PLATFORM_REFUSALS.stageWaiting(count, s.name));
+  }
+
+  const stages = input.next.map((s, position) => ({
+    id: s.id ?? null,
+    position,
+    name: s.name.trim(),
+    rule: s.rule.kind === "user" ? { kind: "user" as const, userId: s.rule.userId } : { kind: "team_role" as const, role: s.rule.role },
+  }));
+  const moves = waitingOn.flatMap((v) => {
+    if (v.stageId === null) return [];
+    const to = stages.findIndex((s) => s.id === v.stageId);
+    return to >= 0 && to !== v.currentStage ? [{ versionId: v.versionId, from: v.currentStage, to }] : [];
+  });
+
+  const change = describeChainChange({ contentTypeName: contentType.name, current, next: input.next, people });
+  if (!change.changed) return { ok: true, stages, moves: [], effects: [] };
+
+  const chainText = (list: { name: string; rule: ApproverRule }[]) =>
+    list.map((s) => `${s.name} (${ruleLabel(s.rule, people)})`).join(" → ");
+  return {
+    ok: true,
+    stages,
+    moves,
+    effects: [
+      configChanged("approval_chains", null, `Set ${contentType.name} approval chain: ${chainText(stages)}`, {
+        contentTypeId: contentType.id,
+        contentTypeName: contentType.name,
+        before: current.map((s) => s.name),
+        after: stages.map((s) => s.name),
+        stages: stages.map((s) => ({ name: s.name, rule: s.rule })),
+        moved: moves.length,
+      }),
+    ],
+  };
+}
+
+/** The contract check: these four are `PlatformConfigDomain` (access-types.ts). */
+export const platformConfig = {
+  createTeam,
+  updateRequiredSections,
+  setChannelRule,
+  saveApprovalChain,
+} satisfies PlatformConfigDomain;

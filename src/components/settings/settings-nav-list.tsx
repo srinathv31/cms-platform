@@ -13,9 +13,12 @@ import { visibleGroups, type SettingsAccessLike } from "./sections";
 export function SettingsNavList({
   teamSlug,
   access,
+  trails = {},
 }: {
   teamSlug: string;
   access: SettingsAccessLike;
+  /** Muted counts trailing the items that need action, by section key. */
+  trails?: Record<string, string>;
 }) {
   const activeSection = useSelectedLayoutSegment();
   const groups = visibleGroups(access);
@@ -38,7 +41,7 @@ export function SettingsNavList({
                       href={`/${teamSlug}/settings/${section.key}` as Route}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
-                        "relative flex h-10 items-center gap-3 rounded-lg px-3 text-[15px] text-text outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
+                        "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[15px] text-text outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
                         isActive && "font-medium hover:bg-transparent",
                       )}
                     >
@@ -54,7 +57,18 @@ export function SettingsNavList({
                         strokeWidth={NAV_ICON_STROKE}
                         className="relative size-5 text-text-muted"
                       />
-                      <span className="relative">{section.label}</span>
+                      <span className="relative flex-1 truncate">{section.label}</span>
+                      {trails[section.key] ? (
+                        // Muted on the plain nav; full strength on the selected and hover fills (contrast).
+                        <span
+                          className={cn(
+                            "relative text-[13px] font-normal tabular-nums",
+                            isActive ? "text-text" : "text-text-muted group-hover:text-text",
+                          )}
+                        >
+                          {trails[section.key]}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 );

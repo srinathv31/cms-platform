@@ -15,6 +15,13 @@
       "when": 1791132306328,
       "tag": "0001_audit_version_session",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791216130932,
+      "tag": "0002_phase6_access",
+      "breakpoints": true
     }
   ]
 }
