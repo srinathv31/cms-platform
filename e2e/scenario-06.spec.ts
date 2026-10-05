@@ -1,6 +1,21 @@
 import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { allVersions, correlation, demoNow, expectError, logFor, longDate, openDb, pick, render, validValues, type SeedVersion } from "./api/helpers";
+import {
+  CUSTOMERS,
+  backToUcomp,
+  dropDemoNoise,
+  expectFailed,
+  openOffer,
+  openOfferTab,
+  openSimulator,
+  restore as restoreCoral,
+  resultsHeadline,
+  selectCustomers,
+  send,
+  takeSnapshot as takeCoralSnapshot,
+  type Snapshot as CoralSnapshot,
+} from "./helpers/golive";
 import { asPersona, beat, demoTimeout, expect, hydrated, openLibrary, shoot, tap, test, typeSlowly, untilUncovered } from "./helpers/scenario";
 
 // Phase 4 gate: demo scenario 6 ("Revoke"), all of it that exists in this phase.
@@ -19,16 +34,24 @@ import { asPersona, beat, demoTimeout, expect, hydrated, openLibrary, shoot, tap
 //      request to the approvers other than Jordan; the revoked notice to the people who need it), and the
 //      audit events `version.revoke_started` and `version.revoked`.
 //
-// Phase 5 adds the simulator's send failure and Phase 6 the Audit page; this spec proves the revoke through
-// the Activity tab and the render API (docs/UCOMP-Implementation-Plan.md, Phase 4).
+// Phase 5 added the simulator's send failure (step 4b): after the revoke, Coral's send on the Balance Transfer
+// offer (linked to v1) fails at once in the simulator, with the revoke message shown verbatim. Phase 6 adds the
+// Audit page; until then this spec proves the revoke through the Activity tab, the render API and the simulator
+// (docs/UCOMP-Implementation-Plan.md, Phase 4).
 //
 // Runs from a fresh reset. It REVOKES the seeded v1, so the rows it changes are snapshotted before and put
 // back in afterAll (the version, the audit events, notifications and consumer notices it wrote for this
-// template, and its own render_log rows): the gate-media run plays the spec twice against one database,
+// template, its own render_log rows, and what Coral's send wrote: the deliveries, the render_log rows they
+// made and the reads of notices): the gate-media run plays the spec twice against one database,
 // and the dev database is shared. Console and page errors fail it.
+
+// The preview frames and the customer views are sandboxed; Playwright's trace injects scripts into them.
+test.use({ trace: "off" });
 
 const TEAM = "coral-offers";
 const NAME = "Balance Transfer Intro — Terms";
+const OFFER = "offer_balance_transfer";
+const OFFER_NAME = "Balance Transfer Intro";
 const REASON = "Wrong intro APR in the legal notices.";
 const OWN_REVOKE = "You started this revoke. Another approver must confirm it.";
 
@@ -72,6 +95,7 @@ let db: Client;
 let v1: SeedVersion;
 let v2: SeedVersion;
 let snapshot: Snapshot;
+let coral: CoralSnapshot;
 let approvers: string[];
 
 const hrefLike = (templateId: string) => `%/templates/${templateId}%`;
@@ -99,6 +123,7 @@ test.beforeAll(async () => {
     throw new Error(`This scenario needs ${ready}. v1 is ${v1.state}${row.revoke !== null ? " with a revoke on it" : ""}, v2 is ${v2.state}.`);
   }
   const [v2Row] = await rows(db, "SELECT rev FROM versions WHERE id = ?", [v2.id]);
+  coral = await takeCoralSnapshot(db);
 
   snapshot = {
     v1Row: row,
@@ -120,9 +145,13 @@ test.beforeAll(async () => {
     .sort();
 });
 
+test.afterEach(({ problems }) => dropDemoNoise(problems));
+
 test.afterAll(async () => {
   if (!db) return;
   try {
+    // Coral's side first: its reads of notices point at the notices removed below.
+    if (coral) await restoreCoral(db, coral, { offers: [OFFER], noticeTemplates: [v1.templateId], clock: false });
     if (snapshot) {
       const columns = Object.keys(snapshot.v1Row).filter((column) => column !== "id");
       await busy(() =>
@@ -223,7 +252,8 @@ test.describe("scenario 6: revoke", () => {
       await beat(page);
 
       await press(templateTab(page, "Versions"));
-      await expect(page).toHaveURL(new RegExp(`/templates/${v1.templateId}/versions$`));
+      // The first visit to a route can take a while to compile on a dev server.
+      await expect(page).toHaveURL(new RegExp(`/templates/${v1.templateId}/versions$`), { timeout: 30_000 });
 
       const first = versionEntry(page, 1);
       const second = versionEntry(page, 2);
@@ -383,6 +413,54 @@ test.describe("scenario 6: revoke", () => {
       expect(active.res.status(), "v2 is unaffected").toBe(200);
       expect(active.res.headers()["x-ucomp-version"]).toBe("2");
       expect(active.res.headers()["x-ucomp-newer-version"], "v2 is the newest").toBeUndefined();
+    });
+
+    // ── 4b. After: Coral's send in the simulator ─────────────────────────────
+
+    await test.step("4b. In the simulator, Coral's send on the offer fails at once, with the revoke message verbatim", async () => {
+      await beat(page);
+      await openSimulator(page);
+      const offerRow = page.getByRole("table", { name: "Offers" }).getByRole("row").filter({ has: page.getByRole("link", { name: OFFER_NAME, exact: true }) });
+      await expect(offerRow).toContainText("Revoked");
+      await beat(page, 900);
+      await shoot(page, "simulator-offers-revoked");
+
+      await openOffer(page, OFFER_NAME);
+      await expect(page.getByText("A send now fails.")).toBeVisible();
+      await expect(page.getByText(/v1 was revoked on /)).toBeVisible();
+      await beat(page, 900);
+      await shoot(page, "simulator-offer-revoked");
+
+      await openOfferTab(page, "Send");
+      await expect(page.getByRole("table", { name: "Customers" })).toBeVisible();
+      await selectCustomers(page, [CUSTOMERS.olivia, CUSTOMERS.marcus]);
+      await beat(page, 500);
+      await send(page);
+
+      // Two customers on the offer's two channels (PDF and Web): four renders, none delivered.
+      await expect(resultsHeadline(page)).toHaveText("0 delivered, 4 failed", { timeout: 60_000 });
+      const message = `Version 1 was revoked on ${confirmedDay}. Version 2 is active.`;
+      await expectFailed(page, 4, { status: 410, code: "version_revoked", message });
+      await beat(page, 900);
+      await resultsHeadline(page).scrollIntoViewIfNeeded();
+      await shoot(page, "simulator-send-revoked");
+
+      // Coral stored the API's words as received, and UCOMP logged the refusals under Coral's id.
+      const deliveries = (await rows(db, "SELECT * FROM sim_deliveries WHERE offer_id = ?", [OFFER])).filter((r) => !coral.simDeliveries.has(String(r.id)));
+      expect(deliveries).toHaveLength(4);
+      for (const delivery of deliveries) {
+        expect(delivery).toMatchObject({ status: "failed", template_id: v1.templateId, version_number: 1, output: null });
+        expect(json(delivery.error)).toEqual({ status: 410, code: "version_revoked", message });
+        const [logged] = await logFor(db, String(delivery.correlation_id));
+        expect(logged).toMatchObject({ consumer_id: "coral", version_number: 1, is_preview: 0, error_code: "version_revoked" });
+      }
+
+      // Back to UCOMP, on the template Alex was looking at.
+      await backToUcomp(page);
+      await page.goto(`/${TEAM}/templates/${v1.templateId}/versions`);
+      await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
+      await hydrated(page);
+      await expect(versionEntry(page, 1)).toHaveAttribute("data-state", "revoked");
     });
 
     // ── 5. The Activity tab ──────────────────────────────────────────────────

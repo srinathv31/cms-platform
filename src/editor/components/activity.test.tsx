@@ -12,7 +12,7 @@ import { Editor as ReactEditor } from "@tiptap/react";
 import { Activity, StrictMode, act, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JSONContent, Variable } from "../model/types";
 import { editorExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
@@ -71,6 +71,11 @@ async function mount() {
         <Harness />
       </StrictMode>,
     );
+  });
+  // The live editor swaps in once the block handle's module has loaded (it loads on the client only).
+  await vi.waitFor(async () => {
+    await wait(10);
+    expect(host.querySelector(".ProseMirror")).not.toBeNull();
   });
   await wait(20);
   return host;

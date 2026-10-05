@@ -53,7 +53,7 @@ export function StatusBadge({
       <StatusIcon icon={meta.icon} />
       {meta.label}
       {state === "superseded" && sunsetAt ? (
-        <span className="font-normal opacity-80">· Sunset {formatShortDate(sunsetAt)}</span>
+        <span className="font-normal">· Sunset {formatShortDate(sunsetAt)}</span>
       ) : null}
     </Badge>
   );

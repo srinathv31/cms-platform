@@ -1,15 +1,9 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { BAD_REQUEST_MESSAGES, RENDER_ERROR_STATUS, badRequest, consumerRequired, renderFailed } from "@/domain/render";
-import type {
-  Base64ResponseBody,
-  EmailRender,
-  EmailResponseBody,
-  RenderError,
-  RenderErrorBody,
-} from "@/domain/render/types";
+import { BAD_REQUEST_MESSAGES, badRequest, consumerRequired, renderFailed } from "@/domain/render";
+import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
-import { newId } from "@/server/ids";
+import { baseHeaders, correlationIdOf, errorResponse } from "@/server/api/http";
 import { renderTemplate, type RenderResult } from "@/server/render/render-template";
 import { getViewer } from "@/server/viewer";
 
@@ -65,32 +59,13 @@ function parseBody(text: string): Parsed {
 }
 
 // ── Headers ──────────────────────────────────────────────────────────────────
-
-/** Visible ASCII, up to 128 characters; anything else gets a fresh id instead of being echoed. */
-const CORRELATION_ID = /^[\x21-\x7e]{1,128}$/;
-
-function correlationIdOf(request: NextRequest): string {
-  const given = request.headers.get("x-correlation-id")?.trim();
-  return given && CORRELATION_ID.test(given) ? given : newId("req", 12);
-}
-
-function baseHeaders(correlationId: string): Headers {
-  return new Headers({
-    "Cache-Control": "no-store",
-    "X-Correlation-Id": correlationId,
-    "X-Content-Type-Options": "nosniff",
-  });
-}
+// The correlation id, no-store and nosniff, and the error body, are shared with the consumer GET
+// routes: src/server/api/http.ts.
 
 // The web document has no scripts and loads nothing; this keeps it that way if it's opened directly.
 const WEB_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'";
 
 // ── Responses ────────────────────────────────────────────────────────────────
-
-function errorResponse(error: RenderError, correlationId: string): Response {
-  const body: RenderErrorBody = { error };
-  return Response.json(body, { status: RENDER_ERROR_STATUS[error.code], headers: baseHeaders(correlationId) });
-}
 
 const toBase64 = (data: Uint8Array | string) =>
   (typeof data === "string" ? Buffer.from(data, "utf8") : Buffer.from(data)).toString("base64");

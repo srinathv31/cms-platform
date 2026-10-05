@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Clapperboard, FlaskConical, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,9 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
   const [pending, startTransition] = useTransition();
   const [days, setDays] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Controlled, so the drawer closes when the presenter leaves for the simulator: the product's layout stays
+  // mounted behind it (Next keeps visited routes alive), and "Back to UCOMP" must not land on an open drawer.
+  const [open, setOpen] = useState(false);
 
   const advance = (n: number) =>
     startTransition(async () => {
@@ -52,7 +56,7 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
   const customValid = Number.isInteger(custom) && custom >= 1 && custom <= 3650;
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         className="fixed right-5 bottom-5 z-40 inline-flex h-8 items-center gap-2 rounded-full border border-dashed border-hairline-strong bg-surface px-3.5 text-xs font-medium text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring"
       >
@@ -137,12 +141,15 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
         </Section>
 
         <Section label="Consumer simulator">
-          <Button variant="outline" size="lg" disabled className="justify-between bg-surface px-3">
-            <span className="flex items-center gap-2.5">
-              <FlaskConical aria-hidden strokeWidth={1.75} />
-              Open simulator
-            </span>
-            <span className="text-xs font-normal text-text-subtle">Phase 5</span>
+          <Button
+            variant="outline"
+            size="lg"
+            nativeButton={false}
+            render={<Link href="/sim" onClick={() => setOpen(false)} />}
+            className="justify-start gap-2.5 bg-surface px-3"
+          >
+            <FlaskConical aria-hidden strokeWidth={1.75} />
+            Open simulator
           </Button>
         </Section>
       </SheetContent>

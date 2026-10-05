@@ -1,0 +1,53 @@
+/*
+ * Coral's palette: the one place outside tokens.css that holds raw colours. Coral is another company's
+ * system ("deliberately foreign"), so none of UCOMP's tokens apply below the frame strip. Everything under
+ * [data-sim] reads these --sim-* properties; components never write a colour of their own.
+ */
+[data-sim] {
+  --sim-bg: #eef1f6;
+  --sim-panel: #ffffff;
+  --sim-panel2: #f4f6fa;
+  --sim-line: #d8dee8;
+  --sim-text: #172033;
+  --sim-muted: #5f6b7f;
+  --sim-accent: #c9402a;
+  --sim-accent-text: #ffffff;
+  --sim-ok: #07704c;
+  --sim-ok-bg: #dff4ea;
+  --sim-bad: #c62e2e;
+  --sim-bad-bg: #fce8e8;
+  --sim-warn: #8f5b00;
+  --sim-warn-bg: #fff1d0;
+  --sim-info: #2459c7;
+  --sim-info-bg: #e3ebfd;
+
+  /* The navy sidebar. */
+  --sim-nav: #101a2e;
+  --sim-nav-text: #c9d2e3;
+  --sim-nav-muted: #a3b0ca;
+  --sim-nav-on: #ffffff;
+  --sim-nav-hover: rgb(255 255 255 / 0.06);
+  --sim-nav-active: rgb(255 255 255 / 0.12);
+
+  /* What the customer sees: the device bezel, the paper and the inbox chrome (light in every theme). */
+  --sim-device: #12151a;
+  --sim-paper: #ffffff;
+  --sim-paper-line: #e6e9ee;
+  --sim-paper-text: #1c1f24;
+  --sim-paper-muted: #5b6472;
+  --sim-viewer: #5c6370;
+
+  --sim-rs: 3px;
+  --sim-rb: 5px;
+  --sim-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --sim-mono: Menlo, "SF Mono", ui-monospace, monospace;
+
+  font-family: var(--sim-font);
+  color: var(--sim-text);
+  background: var(--sim-bg);
+}
+
+[data-sim] :focus-visible {
+  outline: 2px solid var(--sim-info);
+  outline-offset: 2px;
+}

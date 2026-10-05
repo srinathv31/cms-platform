@@ -530,8 +530,9 @@ test.describe("workspace", () => {
     await expect(sheet.getByText("Integration", { exact: true })).toBeVisible();
     await expect(sheet.getByText("Balance Transfer Intro — Terms")).toBeVisible();
     await expect(sheet.getByText(/^UC-[0-9A-Z]{6}$/)).toBeVisible();
-    await expect(sheet.getByText("v2", { exact: true })).toBeVisible();
-    await expect(sheet.locator("[data-status='active']")).toBeVisible();
+    // The integration panel names the Active version in more than one place (the summary and the contract).
+    await expect(sheet.getByText("v2", { exact: true }).first()).toBeVisible();
+    await expect(sheet.locator("[data-status='active']").first()).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();

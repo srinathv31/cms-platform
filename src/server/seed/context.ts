@@ -38,6 +38,7 @@ export interface Sink {
   simOffers: InferInsertModel<typeof sim.simOffers>[];
   simCustomers: InferInsertModel<typeof sim.simCustomers>[];
   simLinks: InferInsertModel<typeof sim.simLinks>[];
+  simNoticeReads: InferInsertModel<typeof sim.simNoticeReads>[];
 }
 
 export function emptySink(): Sink {
@@ -65,6 +66,7 @@ export function emptySink(): Sink {
     simOffers: [],
     simCustomers: [],
     simLinks: [],
+    simNoticeReads: [],
   };
 }
 

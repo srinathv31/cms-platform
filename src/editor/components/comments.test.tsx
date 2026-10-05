@@ -79,6 +79,11 @@ async function mount(props: HarnessProps = {}) {
       </StrictMode>,
     );
   });
+  // The live editor swaps in once the block handle's module has loaded (it loads on the client only).
+  await vi.waitFor(async () => {
+    await wait(10);
+    expect(host.querySelector(".ProseMirror")).not.toBeNull();
+  });
   await wait(20);
   return host;
 }

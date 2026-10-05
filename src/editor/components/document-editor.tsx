@@ -37,7 +37,6 @@ import { useHydrated } from "../lib/use-hydrated";
 import { editorExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
 import { BODY_FIELD_LABEL, type EditorRootRuntime } from "../state/editor-root";
-import { BlockHandle } from "./block-handle";
 import { ChipPopover } from "./chip-popover";
 import { DOC_CLASS, SURFACE_CLASS } from "./classes";
 import { createCommentBridge, type CommentBridge } from "./comment-bridge";
@@ -48,6 +47,41 @@ import { StaticDocument } from "./static-document";
 import { TableMenu } from "./table-menu";
 import { VariablePicker, createVariablePickerController } from "./variable-picker";
 import "../styles.css";
+
+// The block handle is loaded on the client only. The official DragHandle pulls in Yjs, whose lib0
+// probes `localStorage` when its module evaluates, and on Node 26 that probe prints an
+// ExperimentalWarning during prerender. The handle only renders with the live editor (client-only),
+// so the server never needs it. The browser starts the load as this module evaluates, and the live
+// editor waits for it, so the handle mounts in the same commit as the editor: registering its
+// plugin later would reconfigure the view and close a slash menu that is already open.
+type BlockHandleModule = typeof import("./block-handle");
+let blockHandleModule: BlockHandleModule | null = null;
+let blockHandleLoad: Promise<BlockHandleModule> | null = null;
+function loadBlockHandle(): Promise<BlockHandleModule> {
+  blockHandleLoad ??= import("./block-handle").then((m) => (blockHandleModule = m));
+  return blockHandleLoad;
+}
+if (typeof window !== "undefined") void loadBlockHandle();
+
+/** True once the block handle's module has loaded (never on the server). */
+function useBlockHandleReady(): boolean {
+  const [ready, setReady] = useState(blockHandleModule !== null);
+  useEffect(() => {
+    if (ready) return;
+    let live = true;
+    void loadBlockHandle().then(() => live && setReady(true));
+    return () => {
+      live = false;
+    };
+  }, [ready]);
+  return ready;
+}
+
+/** Renders the loaded BlockHandle; only mounted once useBlockHandleReady() is true. */
+function LoadedBlockHandle(props: Parameters<BlockHandleModule["BlockHandle"]>[0]) {
+  const loaded = blockHandleModule;
+  return loaded ? <loaded.BlockHandle {...props} /> : null;
+}
 
 const NO_VARIABLES: Variable[] = [];
 const NO_THREADS: readonly ThreadAnchor[] = [];
@@ -257,6 +291,7 @@ function LiveEditor({
     [readOnly],
   );
 
+  const blockHandleReady = useBlockHandleReady();
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
@@ -329,7 +364,7 @@ function LiveEditor({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [comments, editorRef]);
 
-  if (!editor || editor.isDestroyed) {
+  if (!editor || editor.isDestroyed || (!readOnly && !blockHandleReady)) {
     return <StaticDocument content={snapshot} variables={variables} threads={threads} activeThreadId={activeThreadId} />;
   }
 
@@ -337,7 +372,7 @@ function LiveEditor({
     <>
       <EditorContent editor={editor} className={SURFACE_CLASS} />
       <ChipPopover editor={editor} root={root} chip={chip} />
-      {readOnly ? null : <BlockHandle editor={editor} slash={slash} />}
+      {readOnly ? null : <LoadedBlockHandle editor={editor} slash={slash} />}
       {readOnly ? null : <TableMenu editor={editor} />}
       {/* Read-only, the toolbar holds Comment alone (when the host takes comments). */}
       {readOnly && !comments ? null : <FormatBubble editor={editor} comments={comments} />}
