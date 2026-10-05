@@ -2,7 +2,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { RenderBlock, RenderDoc, RenderTableRow } from "@/domain/render/types";
 import {
+  HEADING_CHAIN_DOC,
   LONG_DOC,
+  LONG_INTRO_DOC,
   LONG_NAME_DOC,
   LONG_VALUES,
   TABLE_ORPHAN_DOC,
@@ -92,10 +94,14 @@ let long: Inspected;
 let widow: Inspected;
 let orphan: Inspected;
 let short: Inspected;
+let chain: Inspected;
+let longIntro: Inspected;
 
 beforeAll(async () => {
-  [typical, longName, long, widow, orphan, short] = await Promise.all(
-    [TYPICAL_DOC, LONG_NAME_DOC, LONG_DOC, TABLE_WIDOW_DOC, TABLE_ORPHAN_DOC, TABLE_SHORT_DOC].map(inspect),
+  [typical, longName, long, widow, orphan, short, chain, longIntro] = await Promise.all(
+    [TYPICAL_DOC, LONG_NAME_DOC, LONG_DOC, TABLE_WIDOW_DOC, TABLE_ORPHAN_DOC, TABLE_SHORT_DOC, HEADING_CHAIN_DOC, LONG_INTRO_DOC].map(
+      inspect,
+    ),
   );
 }, 60_000);
 
@@ -249,6 +255,7 @@ describe("renderPdf", () => {
       [TABLE_WIDOW_DOC, widow],
       [TABLE_ORPHAN_DOC, orphan],
       [TABLE_SHORT_DOC, short],
+      [HEADING_CHAIN_DOC, chain],
     ];
     let crossings = 0;
     for (const [doc, r] of docs) {
@@ -291,6 +298,41 @@ describe("renderPdf", () => {
     const [table] = tablePages(TABLE_SHORT_DOC, short);
     expect(table.pages.map((p) => p.rows)).toEqual([0, 3]);
     expect(table.pages.map((p) => p.header)).toEqual([false, true]);
+  });
+
+  /** The pages a fee notice's "Rates and fees" heading, the line after it, and its first table row are on. */
+  const chainPages = (r: Inspected) => {
+    const lines = r.pages.flatMap((page, n) => bodyLines(page).map((line) => ({ line, n })));
+    const heading = lines.findIndex(({ line }) => line.text === "Rates and fees");
+    return {
+      heading: lines[heading]?.n ?? -1,
+      intro: lines[heading + 1]?.n ?? -1,
+      table: lines.find(({ line }) => startsRow(line, "Annual fee"))?.n ?? -1,
+    };
+  };
+
+  it("keeps a heading, its one-line intro and the table it introduces on one page", () => {
+    // Each of these used to leave the heading and intro stranded at the bottom of page 1.
+    for (const [doc, r] of [[TABLE_ORPHAN_DOC, orphan], [TABLE_SHORT_DOC, short], [HEADING_CHAIN_DOC, chain]] as const) {
+      const at = chainPages(r);
+      expect(at.heading, doc.blocks[0].id ?? "").toBeGreaterThanOrEqual(0);
+      expect([at.intro, at.table], doc.blocks[0].id ?? "").toEqual([at.heading, at.heading]);
+      // Page 1 isn't left with the lead alone and a lot of space: the chain moved as one.
+      expect(at.heading).toBe(1);
+    }
+  });
+
+  it("still splits a long table after the chain, with its header repeated", () => {
+    const [table] = tablePages(HEADING_CHAIN_DOC, chain);
+    const spread = table.pages.filter((p) => p.rows > 0);
+    expect(spread.length).toBeGreaterThan(1);
+    expect(table.pages.filter((p) => p.rows > 0).every((p) => p.header)).toBe(true);
+  });
+
+  it("lets a long intro split instead of dragging its heading along", () => {
+    const at = chainPages(longIntro);
+    expect(at.heading).toBe(0);
+    expect(at.intro).toBe(0);
   });
 
   it("prints callouts in the stone palette and shape the web and email callouts share", () => {

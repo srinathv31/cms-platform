@@ -3,8 +3,9 @@
 //
 // baseExtensions()         server-safe: node/mark specs + behavior plugins, no React NodeViews.
 // editorExtensions()       client: base + chip NodeView, placeholder, `/` and `{{` menus, the
-//                          required-section guard, block moves, the field binding (usage, drop,
-//                          chip popover), Home/End and review-thread highlights.
+//                          required-section guard, the section-merging paste, block moves, the
+//                          field binding (usage, drop, chip popover, paste), Home/End and
+//                          review-thread highlights.
 // inlineFieldExtensions()  a one-line field (email subject, preheader): text + chips only.
 
 import { Node, type Extensions, type JSONContent } from "@tiptap/core";
@@ -22,6 +23,7 @@ import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
 import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
+import { SectionPaste } from "./extensions/section-paste";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
 import { Variable } from "./extensions/variable";
 import { variableSuggestion, type VariablePickerRender, type VariableSuggestion } from "./extensions/variable-picker";
@@ -148,6 +150,7 @@ export function editorExtensions(options: EditorExtensionOptions): Extensions {
       includeChildren: false,
     }),
     SlashCommand.configure({ render: options.slashRender ?? null }),
+    SectionPaste,
     BlockRangeHighlight,
     BlockMove,
     FieldBindingExtension.configure({ binding: options.binding ?? null }),

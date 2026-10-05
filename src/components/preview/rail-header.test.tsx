@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RailHeader } from "./rail-header";
+import { RailHeader, railHeaderViews } from "./rail-header";
 
 const noop = () => {};
 
@@ -34,5 +34,23 @@ describe("RailHeader", () => {
     expect(html.indexOf("Typical customer")).toBeLessThan(html.indexOf('aria-label="Close"'));
     // Close shows only below the rail's breakpoint.
     expect(html).toMatch(/aria-label="Close"[^>]*class="[^"]*@min-\[53rem\]\/ws:hidden/);
+  });
+});
+
+describe("railHeaderViews", () => {
+  const labels = (views: ReturnType<typeof railHeaderViews>) => views.map((v) => v.label);
+
+  it("puts Original after Preview, ahead of Comments and Variables", () => {
+    expect(labels(railHeaderViews({ preview: true, comments: 2, original: true }))).toEqual([
+      "Preview",
+      "Original",
+      "Comments",
+      "Variables",
+    ]);
+    expect(labels(railHeaderViews({ preview: false, comments: null, original: true }))).toEqual(["Original", "Variables"]);
+  });
+
+  it("has no Original tab for a template that wasn't imported", () => {
+    expect(labels(railHeaderViews({ preview: true, comments: null }))).toEqual(["Preview", "Variables"]);
   });
 });

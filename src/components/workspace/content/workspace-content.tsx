@@ -47,6 +47,7 @@ export async function WorkspaceContent({
       canComment={canComment}
       viewer={viewer}
       now={nowIso}
+      importOriginal={doc.importOriginal}
     />
   );
 }

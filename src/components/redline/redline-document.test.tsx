@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { RedlineBlock } from "@/domain/review-types";
 import type { JSONContent } from "@/editor";
-import { blockKind, gapLabel, groupBlocks, joinAnd, markAllDeleted, redlineSummary } from "./blocks";
+import { blockKind, collapsedHosts, gapLabel, groupBlocks, hostKey, joinAnd, markAllDeleted, redlineSummary } from "./blocks";
 import { RedlineDocument } from "./redline-document";
 import { REDLINE_DOC, REDLINE_VARIABLES } from "./redline-fixtures";
 
@@ -27,7 +27,7 @@ describe("RedlineDocument: marks", () => {
     expect(ins.length).toBeGreaterThanOrEqual(2); // the chip and the new words
     const words = ins.find((el) => el.textContent === " for 12 months");
     expect(words?.className).toContain("bg-positive-soft");
-    expect(words?.className).toContain("text-positive");
+    expect(words?.className).toContain("text-(--rl-ins-text)");
     expect(words?.className).toContain("underline");
   });
 
@@ -239,6 +239,87 @@ describe("groupBlocks", () => {
     };
     const items = groupBlocks(doc([block("a", "changed"), withChip, block("b", "changed")]), true, new Map([["product", "Product name"]]));
     expect(show(items)).toEqual(["a", "caption:About Product name", "b"]);
+  });
+});
+
+describe("groupBlocks: hidden blocks and comment markers", () => {
+  const block = (id: string, status: RedlineBlock["status"]): RedlineBlock => ({ id, status, node: { type: "paragraph", attrs: { id } } });
+  const heading = (id: string, text: string, status: RedlineBlock["status"] = "unchanged"): RedlineBlock => ({
+    id,
+    status,
+    node: { type: "heading", attrs: { id, level: 2 }, content: text ? [{ type: "text", text }] : [] },
+  });
+  const doc = (blocks: RedlineBlock[]) => ({ blocks, counts: { added: 0, removed: 0, changed: 0, moved: 0 } });
+  const show = (items: ReturnType<typeof groupBlocks>) =>
+    items.map((i) => (i.type === "gap" ? `gap:${i.count}` : i.type === "caption" ? `caption:${i.text}` : i.block.id));
+  const hidden = (items: ReturnType<typeof groupBlocks>) => items.map((i) => (i.hidden ?? []).join(","));
+
+  const SECTIONS = doc([
+    heading("t", "Title"),
+    heading("h1", "Offer details"),
+    block("a", "unchanged"),
+    block("b", "unchanged"),
+    block("c", "changed"),
+    block("d", "unchanged"),
+    heading("h2", "Rates"),
+    heading("h3", ""),
+    block("e", "unchanged"),
+    heading("h4", "Legal"),
+  ]);
+
+  it("records every hidden block on the caption or count that stands in for it", () => {
+    const items = groupBlocks(SECTIONS, true);
+    expect(show(items)).toEqual(["caption:Offer details", "gap:2", "c", "gap:1", "gap:1"]);
+    // A heading that shows nowhere (the title, one an empty heading replaces, a trailing one) rides on
+    // the next line painted, or the last.
+    expect(hidden(items)).toEqual(["t,h1", "a,b", "", "d", "h2,h3,e,h4"]);
+    // Every unchanged block is placed exactly once.
+    const hosts = collapsedHosts(items);
+    expect([...hosts.keys()].sort()).toEqual(["a", "b", "d", "e", "h1", "h2", "h3", "h4", "t"]);
+    expect(hosts.get("a")).toBe("collapsed:a");
+    expect(hosts.get("b")).toBe("collapsed:a");
+    expect(hosts.get("t")).toBe("collapsed:t");
+    expect(hosts.get("h4")).toBe("collapsed:h2");
+    expect(hosts.has("c")).toBe(false);
+  });
+
+  it("puts a heading that shows nowhere on the next block painted when no line comes first", () => {
+    const items = groupBlocks(doc([heading("t", "Title"), heading("h", "Fees", "changed"), block("x", "changed")]), true);
+    expect(show(items)).toEqual(["h", "x"]);
+    expect(hidden(items)).toEqual(["t", ""]);
+    expect(collapsedHosts(items).get("t")).toBe("h"); // shares the changed heading's marker
+    expect(hostKey(items[0])).toBe("h");
+  });
+
+  it("reveals the block of the thread being read, splitting its run", () => {
+    const items = groupBlocks(SECTIONS, true, undefined, "a");
+    expect(show(items)).toEqual(["caption:Offer details", "a", "gap:1", "c", "gap:1", "gap:1"]);
+    expect(collapsedHosts(items).has("a")).toBe(false);
+    expect(collapsedHosts(items).get("b")).toBe("collapsed:b");
+  });
+
+  it("reveals an unchanged heading as itself, not a caption", () => {
+    const items = groupBlocks(SECTIONS, true, undefined, "h1");
+    expect(show(items)).toEqual(["h1", "gap:2", "c", "gap:1", "gap:1"]);
+    expect(hidden(items)[0]).toBe("t");
+  });
+
+  it("is a no-op with Changes only off", () => {
+    expect(collapsedHosts(groupBlocks(SECTIONS, false, undefined, "a")).size).toBe(0);
+  });
+
+  it("puts the hidden blocks and the line's key on the caption and count elements", () => {
+    const root = dom(renderToStaticMarkup(<RedlineDocument doc={REDLINE_DOC} variables={REDLINE_VARIABLES} changesOnly />));
+    const gaps = [...root.querySelectorAll("[data-redline-gap]")];
+    expect(gaps.map((g) => [g.getAttribute("data-hidden-blocks"), g.getAttribute("data-collapsed")])).toEqual([
+      ["p-1 p-2", "collapsed:p-1"],
+      ["p-6", "collapsed:p-6"],
+    ]);
+    expect(root.querySelector("[data-redline-caption]")?.getAttribute("data-hidden-blocks")).toBe("h-1");
+    // The active block shows in place even though it didn't change.
+    const revealed = dom(renderToStaticMarkup(<RedlineDocument doc={REDLINE_DOC} variables={REDLINE_VARIABLES} changesOnly activeBlockId="p-2" />));
+    expect(revealed.querySelector('[data-block-id="p-2"]')?.hasAttribute("data-active")).toBe(true);
+    expect([...revealed.querySelectorAll("[data-redline-gap]")].map((g) => g.textContent)).toEqual(["1 unchanged block", "1 unchanged block"]);
   });
 });
 

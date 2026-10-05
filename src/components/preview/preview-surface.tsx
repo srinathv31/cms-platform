@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useContractState, type SampleSet } from "@/editor";
+import { OriginalView } from "@/components/import/original-view";
+import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Channel } from "@/domain/types";
 import {
   usePreviewState,
@@ -32,6 +34,8 @@ export interface PreviewSurfaceProps {
   today: string;
   /** The template has review comments: the header gets a Comments tab, with this many open. Null: no tab. */
   commentsCount?: number | null;
+  /** The file the template was imported from: the header gets an Original tab, which shows it. Null: no tab. */
+  original?: ImportOriginalRef | null;
 }
 
 /**
@@ -41,6 +45,9 @@ export interface PreviewSurfaceProps {
  * switch, and on the Preview view the sample-set switcher) while the preview is open, with the
  * Preview view under it while that is what the rail shows. Staying mounted is what keeps the last output (and the sets) when the author
  * flips to the Variables view and back, or closes the preview and opens it again.
+ *
+ * A template that was imported also has an Original view (Compare with original): the widened rail
+ * shows the uploaded file under the same header, instead of the output.
  *
  * Values for a render are the selected set's, formatted by the route. `variables` is the live list,
  * so a variable added in the panel is in the next render; the saved draft supplies the rest.
@@ -54,6 +61,7 @@ export function PreviewSurface({
   sampleSets,
   today,
   commentsCount = null,
+  original = null,
 }: PreviewSurfaceProps) {
   const session = useWorkspaceSession();
   const preview = usePreviewState();
@@ -95,8 +103,12 @@ export function PreviewSurface({
     <>
       <RailHeader
         // A Comments view that has lost its comments (the composer was cancelled on a template without threads) reads as Variables.
-        value={preview.view === "comments" && commentsCount === null ? "variables" : preview.view}
-        views={railHeaderViews({ preview: true, comments: commentsCount })}
+        value={
+          (preview.view === "comments" && commentsCount === null) || (preview.view === "original" && original === null)
+            ? "variables"
+            : preview.view
+        }
+        views={railHeaderViews({ preview: true, comments: commentsCount, original: original !== null })}
         onChange={(view) => session.selectRailView(view)}
         onClose={() => closePreview(session, { restoreFocus: true })}
       >
@@ -129,6 +141,7 @@ export function PreviewSurface({
           recipient={recipientOf(values)}
         />
       ) : null}
+      {preview.view === "original" && original ? <OriginalView original={original} /> : null}
     </>
   );
 }

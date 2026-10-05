@@ -87,7 +87,9 @@ export function PreviewPane({
       <div
         data-slot="preview-well"
         aria-busy={rendering || undefined}
-        className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-surface-tinted"
+        // A scroll region takes Tab, so the keyboard can scroll it.
+        tabIndex={0}
+        className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-surface-tinted outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <m.div
           // A new channel fades in; a new render of the same channel just replaces what's there.

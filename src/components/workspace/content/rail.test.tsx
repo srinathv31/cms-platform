@@ -186,3 +186,67 @@ describe("The rail with review comments", () => {
     expect(shown("variables-panel")).toBe(true);
   });
 });
+
+describe("The rail of an imported template", () => {
+  function ImportedPage({ arrival = false }: { arrival?: boolean }) {
+    return (
+      <>
+        <button data-preview-toggle="" id="toggle">
+          Preview
+        </button>
+        <Rail
+          channels={<div id="channels" />}
+          original
+          takeArrival={() => arrival}
+          footer={<button id="copilot">Copilot prompt</button>}
+          preview={<button id="in-rail">Original file</button>}
+        >
+          <div id="variables-panel" />
+        </Rail>
+      </>
+    );
+  }
+  const shown = (id: string) => !$(id).closest("[hidden]");
+  const tab = (name: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find((t) => t.textContent?.startsWith(name));
+  const rail = () => document.querySelector<HTMLElement>('[data-slot="rail"]')!;
+
+  beforeEach(() => {
+    act(() => session.current!.closePreview());
+    act(() => root.render(<ImportedPage />));
+  });
+
+  it("has Original and Variables tabs, on Variables, with the footer row at the end of the normal rail", () => {
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toBe(tab("Original"));
+    expect(tabs[1]).toBe(tab("Variables"));
+    expect(tab("Variables")!.getAttribute("aria-selected")).toBe("true");
+    expect(shown("variables-panel")).toBe(true);
+    expect(shown("copilot")).toBe(true);
+  });
+
+  it("widens on the Original view when Original is picked, and hides the normal rail", () => {
+    act(() => tab("Original")!.click());
+    expect(session.current!.getPreview()).toMatchObject({ open: true, view: "original" });
+    expect(rail().getAttribute("aria-label")).toBe("Original");
+    expect(rail().dataset.view).toBe("original");
+    expect(shown("variables-panel")).toBe(false);
+  });
+
+  it("is put away by Escape, and focus goes back to the Original tab", async () => {
+    act(() => tab("Original")!.click());
+    $("in-rail").focus();
+    pressEscape($("in-rail"));
+    expect(session.current!.getPreview().open).toBe(false);
+    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(document.activeElement).toBe(tab("Original"));
+  });
+
+  it("opens widened on the Original view when the page arrives from an import, without the width transition", () => {
+    act(() => root.render(<></>));
+    act(() => root.render(<ImportedPage arrival />));
+    expect(session.current!.getPreview()).toMatchObject({ open: true, view: "original" });
+    expect(rail().style.transition).toBe("none");
+  });
+});

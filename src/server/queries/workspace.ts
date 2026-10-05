@@ -11,6 +11,8 @@ import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
 import { loadThreads } from "./threads";
 import type { ThreadView } from "@/domain/review-types";
+import type { ImportOriginalRef } from "@/domain/import-types";
+import { getImportOriginalRef } from "./import";
 
 export interface WorkspaceHeaderData {
   id: string;
@@ -133,6 +135,8 @@ export interface WorkspaceDocumentData {
   editable: boolean;
   /** The template's review threads, anchored against the shown version's blocks (the editor margin). */
   threads: ThreadView[];
+  /** Phase 7a: the file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
+  importOriginal: ImportOriginalRef | null;
 }
 
 /** The document shown on the Content tab: the open draft if there is one, otherwise the latest version. */
@@ -176,6 +180,7 @@ export const getWorkspaceDocument = cache(
     const active = list.find((v) => v.state === "active");
     const today = (await now()).toISOString().slice(0, 10);
     const threads = await loadThreads(header.id, shown.body);
+    const importOriginal = await getImportOriginalRef(header.id);
 
     return {
       templateId: header.id,
@@ -195,6 +200,7 @@ export const getWorkspaceDocument = cache(
       requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
       threads,
+      importOriginal,
     };
   },
 );

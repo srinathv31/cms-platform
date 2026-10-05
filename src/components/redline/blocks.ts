@@ -9,11 +9,14 @@ import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-ty
  * - a block;
  * - with `changesOnly`, a caption (the section an unchanged heading names, over the changes below it)
  *   and a quiet count for a run of unchanged blocks.
+ * `hidden` lists the blocks an item stands in for (Changes only): the blocks of a counted run, the
+ * heading a caption names, and an unchanged heading that shows nowhere. A comment on a hidden block
+ * gets its marker beside that item.
  */
 export type RedlineItem =
-  | { type: "block"; block: RedlineBlock }
-  | { type: "caption"; text: string; key: string }
-  | { type: "gap"; count: number };
+  | { type: "block"; block: RedlineBlock; hidden?: string[] }
+  | { type: "caption"; text: string; key: string; hidden: string[] }
+  | { type: "gap"; count: number; hidden: string[] };
 
 /** The words of a node, for a heading's caption. A chip reads as its label. */
 export function plainText(node: JSONContent, labels?: ReadonlyMap<string, string>): string {
@@ -35,45 +38,98 @@ const isHeading = (block: RedlineBlock) => block.node.type === "heading";
  * - a heading that changed is painted as the change it is, and is its own label;
  * - each run of unchanged blocks (not counting the headings above) becomes one quiet count, where it was.
  * A section with nothing changed still gets its caption and the count, so the reader sees that it was looked at.
+ *
+ * `reveal` (the block of the thread being read) is painted where it is even though it didn't change,
+ * so a comment on an unchanged block can be read against its text; the runs around it are counted
+ * apart.
  */
-export function groupBlocks(doc: RedlineDoc, changesOnly: boolean, labels?: ReadonlyMap<string, string>): RedlineItem[] {
+export function groupBlocks(
+  doc: RedlineDoc,
+  changesOnly: boolean,
+  labels?: ReadonlyMap<string, string>,
+  reveal: string | null = null,
+): RedlineItem[] {
   if (!changesOnly) return doc.blocks.map((block) => ({ type: "block", block }));
 
   const items: RedlineItem[] = [];
-  let run = 0;
+  let run: string[] = [];
   let pending: { text: string; key: string } | null = null;
+  /** Unchanged headings that show nowhere (no caption): they ride on the next item painted. */
+  let dropped: string[] = [];
+  const push = (item: RedlineItem) => {
+    if (dropped.length > 0) item.hidden = [...dropped, ...(item.hidden ?? [])];
+    dropped = [];
+    items.push(item);
+  };
   const flush = () => {
-    if (run > 0) items.push({ type: "gap", count: run });
-    run = 0;
+    if (run.length > 0) push({ type: "gap", count: run.length, hidden: run });
+    run = [];
+  };
+  const drop = () => {
+    if (pending) dropped.push(pending.key);
+    pending = null;
+  };
+  const caption = () => {
+    if (pending) push({ type: "caption", ...pending, hidden: [pending.key] });
+    pending = null;
   };
 
   for (const block of doc.blocks) {
-    if (block.status === "unchanged" && isHeading(block)) {
+    const shown = block.status !== "unchanged" || block.id === reveal;
+    if (!shown && isHeading(block)) {
       flush();
+      drop();
       const text = plainText(block.node, labels).replace(/\s+/g, " ").trim();
-      pending = text ? { text, key: block.id } : null;
+      if (text) pending = { text, key: block.id };
+      else dropped.push(block.id);
       continue;
     }
     if (isHeading(block)) {
-      // A changed heading says where it is on its own.
+      // A changed (or revealed) heading says where it is on its own.
       flush();
-      pending = null;
-      items.push({ type: "block", block });
+      drop();
+      push({ type: "block", block });
       continue;
     }
-    if (pending) {
-      items.push({ type: "caption", ...pending });
-      pending = null;
-    }
-    if (block.status === "unchanged") {
-      run++;
+    caption();
+    if (!shown) {
+      run.push(block.id);
       continue;
     }
     flush();
-    items.push({ type: "block", block });
+    push({ type: "block", block });
   }
   flush();
+  drop();
+  // Headings after the last thing painted ride on it.
+  const last = items[items.length - 1];
+  if (dropped.length > 0 && last) last.hidden = [...(last.hidden ?? []), ...dropped];
   return items;
+}
+
+/**
+ * The key a comment marker is grouped and placed under for what an item stands in for: a block's own
+ * id, or `collapsed:` and the first block a count or caption hides (the element carries it as
+ * `data-collapsed`).
+ */
+export function hostKey(item: RedlineItem): string | null {
+  if (item.type === "block") return item.block.id;
+  return item.hidden.length > 0 ? `collapsed:${item.hidden[0]}` : null;
+}
+
+/** True for the key of a caption or count that stands for hidden blocks (not a block's own id). */
+export function isCollapsedKey(key: string): boolean {
+  return key.startsWith("collapsed:");
+}
+
+/** Every hidden block, to the key of the item it is collapsed into (Changes only). */
+export function collapsedHosts(items: readonly RedlineItem[]): Map<string, string> {
+  const hosts = new Map<string, string>();
+  for (const item of items) {
+    const key = hostKey(item);
+    if (key) for (const id of item.hidden ?? []) hosts.set(id, key);
+  }
+  return hosts;
 }
 
 /** "1 unchanged block", "4 unchanged blocks". */

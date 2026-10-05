@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardEvent, type Ref } from "react";
 import { unstable_rethrow } from "next/navigation";
+import { markPaletteStale } from "@/components/palette/palette-stale";
 import { Spinner } from "@/components/ui/spinner";
 import { createTemplate } from "@/server/actions/templates";
 import { STARTERS, type StarterKey } from "@/server/starters/catalog";
 import { cn } from "@/lib/utils";
+import { ImportRow } from "./import-row";
 import { StarterPreview } from "./starter-preview";
 
 /**
  * The starting points: Blank first, then the examples. Picking one creates the template and opens it,
- * so choosing a card is the second click from the Library. Used in the New template dialog and,
- * inline, as the empty state of a team's Library.
+ * so choosing a card is the second click from the Library. Under the cards, the dashed "Import a file"
+ * row makes a template from a .docx, .pdf or .txt instead. Used in the New template dialog and,
+ * inline, as the empty state of a team's Library. One thing happens at a time: while a card is
+ * creating or a file is importing, the rest are locked.
+ *
+ * `onImported` is called when the new template has opened, from a card as from a file.
  *
  * Keyboard: Tab moves across the cards, and so do the arrow keys (Home and End jump to the ends).
  * Enter or Space picks.
@@ -20,29 +26,51 @@ export function StarterGallery({
   teamSlug,
   columns,
   firstCardRef,
+  importRowRef,
   onBusyChange,
+  onImported,
 }: {
   teamSlug: string;
   /** How many cards sit in a row. It sets the layout and what the up and down arrows mean. */
   columns: 2 | 4;
   /** The dialog focuses the first card when it opens. */
   firstCardRef?: Ref<HTMLButtonElement>;
-  /** True from the pick until the new template opens. The dialog uses it to stay open. */
+  /** The dialog focuses the Import row when it was opened for Import (the ⌘K palette). */
+  importRowRef?: Ref<HTMLButtonElement>;
+  /** True from the pick (or the file) until the new template opens. The dialog uses it to stay open. */
   onBusyChange?: (busy: boolean) => void;
+  /** A template was made (from a card or a file) and has opened: the dialog closes along with that navigation. */
+  onImported?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [picked, setPicked] = useState<StarterKey | null>(null);
   const [failed, setFailed] = useState(false);
+  const [importing, setImporting] = useState(false);
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
+  const busy = pending || importing;
 
   useEffect(() => {
-    onBusyChange?.(pending);
-  }, [pending, onBusyChange]);
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
+
+  // The new template has opened (the creation's navigation is done): let the dialog close, so it
+  // isn't left open behind the template, in the Library that stays mounted but hidden.
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending && picked !== null) {
+      setPicked(null);
+      onImported?.();
+    }
+    wasPending.current = pending;
+  }, [pending, picked, onImported]);
+
+  const onImportBusy = useCallback((next: boolean) => setImporting(next), []);
 
   function pick(starterKey: StarterKey) {
-    if (pending) return;
+    if (busy) return;
     setPicked(starterKey);
     setFailed(false);
+    markPaletteStale();
     startTransition(async () => {
       try {
         // On success the action redirects, which reaches here as an error Next handles itself.
@@ -91,7 +119,7 @@ export function StarterGallery({
                 }
               }}
               aria-describedby={`starter-${starter.key}-description`}
-              aria-disabled={pending && !isPicked ? true : undefined}
+              aria-disabled={busy && !isPicked ? true : undefined}
               aria-busy={isPicked && pending ? true : undefined}
               onClick={() => pick(starter.key)}
               onKeyDown={(event) => onKeyDown(event, index)}
@@ -99,8 +127,8 @@ export function StarterGallery({
                 "group/card flex flex-col gap-3 rounded-2xl border border-hairline bg-surface p-2.5 text-left outline-none transition-colors",
                 "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
                 isPicked && "bg-selected",
-                pending && !isPicked && "opacity-50",
-                pending && "cursor-default",
+                busy && !isPicked && "opacity-50",
+                busy && "cursor-default",
               )}
             >
               <span className="relative block">
@@ -126,6 +154,15 @@ export function StarterGallery({
             </button>
           );
         })}
+      </div>
+      <div className="mt-4">
+        <ImportRow
+          teamSlug={teamSlug}
+          locked={pending}
+          onBusyChange={onImportBusy}
+          onImported={onImported}
+          rowRef={importRowRef}
+        />
       </div>
       {failed ? (
         <p role="alert" className="mt-4 text-[13px] text-danger-text">

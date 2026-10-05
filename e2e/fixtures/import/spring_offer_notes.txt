@@ -1,0 +1,8 @@
+Dear {{First Name}},
+
+Your new purchase APR of {{purchase_apr}} applies from {{Effective Date}}.
+It replaces the rate shown on your last statement.
+
+{{#if member}}Thank you for being a member.{{/if}}
+
+Questions? Call the number on the back of your card.

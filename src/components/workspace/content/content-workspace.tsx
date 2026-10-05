@@ -7,10 +7,13 @@ import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-l
 import { openCount } from "@/components/comments/thread-state";
 import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
+import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Person, ThreadView } from "@/domain/review-types";
 import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor";
 import { cn } from "@/lib/utils";
+import { CopilotPromptButton } from "../copilot/copilot-prompt";
+import { takeJustImported } from "../just-imported";
 import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
@@ -48,6 +51,8 @@ export interface ContentWorkspaceProps {
   viewer: Person;
   /** The demo clock's now (ISO): "3h ago" is measured from it. */
   now: string;
+  /** The file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
+  importOriginal: ImportOriginalRef | null;
 }
 
 /**
@@ -85,9 +90,17 @@ export function ContentWorkspace({
   canComment,
   viewer,
   now,
+  importOriginal,
 }: ContentWorkspaceProps) {
   const session = useWorkspaceSession();
   const { open: previewOpen } = usePreviewState();
+
+  // Arriving from an import, the rail opens widened on the Original view, with the import report at
+  // its top (the name field selects the name, from its own cookie). The rail does it, before the first paint.
+  const takeArrival = useCallback(
+    () => importOriginal !== null && takeJustImported(templateId),
+    [importOriginal, templateId],
+  );
 
   // Tell the workspace which draft is being edited. It starts autosave for it, and the header's name
   // field and save indicator follow. A read-only page binds nothing.
@@ -259,6 +272,9 @@ export function ContentWorkspace({
             preheader={emailPreheader}
           />
         }
+        original={importOriginal !== null}
+        takeArrival={takeArrival}
+        footer={editable ? <CopilotPromptButton templateId={templateId} /> : null}
         preview={
           <PreviewSurface
             templateId={templateId}
@@ -269,6 +285,7 @@ export function ContentWorkspace({
             sampleSets={sampleSets}
             today={today}
             commentsCount={hasComments ? open : null}
+            original={importOriginal}
           />
         }
       >

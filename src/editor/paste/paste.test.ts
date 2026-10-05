@@ -212,7 +212,7 @@ describe("paste from Word for Mac", () => {
     await flush();
     const created = root.variables.getState().variables.slice(KNOWN.length);
     expect(created).toEqual([
-      { key: "new_apr", label: "New apr", type: "text", required: false, sample: "" },
+      { key: "new_apr", label: "New APR", type: "text", required: false, sample: "" },
       { key: "effective_date", label: "Effective date", type: "text", required: false, sample: "" },
     ]);
 

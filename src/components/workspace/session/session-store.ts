@@ -31,10 +31,11 @@ export interface SessionStatus {
 }
 
 /**
- * What the widened rail shows: the rendered output, the template's review comments (only when it has
- * some), or the normal rail (Channels, Email details, Variables).
+ * What the widened rail shows: the rendered output, the file the template was imported from (only
+ * when it was imported), the template's review comments (only when it has some), or the normal rail
+ * (Channels, Email details, Variables).
  */
-export type PreviewView = "preview" | "comments" | "variables";
+export type PreviewView = "preview" | "original" | "comments" | "variables";
 
 /** What the plain rail shows when the template has review comments: the thread list, or the normal rail. */
 export type RailTab = "comments" | "variables";
@@ -108,7 +109,7 @@ export interface WorkspaceSession {
 
   /**
    * The rail's view switch. "comments" and "variables" are also what the plain rail shows once the
-   * preview is put away; "preview" only changes the widened rail.
+   * preview is put away; "preview" and "original" only change the widened rail.
    */
   selectRailView: (view: PreviewView) => void;
   /**
@@ -119,6 +120,8 @@ export interface WorkspaceSession {
 
   /** Opens the preview, on its Preview view. */
   openPreview: () => void;
+  /** Widens the rail on the Original view: the file the template was imported from (like Preview, Esc puts it away). */
+  openOriginal: () => void;
   closePreview: () => void;
   /** Changes any of the preview's fields; a change that changes nothing notifies nobody. */
   setPreview: (patch: Partial<PreviewState>) => void;
@@ -244,7 +247,7 @@ export function createWorkspaceSession(): WorkspaceSession {
 
     selectRailView(view) {
       let changed = false;
-      if (view !== "preview" && railTab !== view) {
+      if (view !== "preview" && view !== "original" && railTab !== view) {
         railTab = view;
         changed = true;
       }
@@ -272,6 +275,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     openPreview: () => setPreview({ open: true, view: "preview" }),
+    openOriginal: () => setPreview({ open: true, view: "original" }),
     closePreview: () => setPreview({ open: false }),
     setPreview,
   };

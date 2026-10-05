@@ -30,3 +30,19 @@ describe("resolveRailView", () => {
     expect(resolveRailView(open("variables"), "comments", waiting)).toBe("variables");
   });
 });
+
+describe("resolveRailView: the imported original", () => {
+  it("shows the Original view while the widened rail is on it", () => {
+    expect(resolveRailView(open("original"), null, none, true)).toBe("original");
+    expect(resolveRailView(open("original"), "comments", waiting, true)).toBe("original");
+  });
+
+  it("is the normal rail when the template has no original", () => {
+    expect(resolveRailView(open("original"), null, none)).toBe("variables");
+  });
+
+  it("is never the plain rail's view: putting the rail away goes back to Comments or Variables", () => {
+    expect(resolveRailView({ ...open("original"), open: false }, null, waiting, true)).toBe("comments");
+    expect(resolveRailView({ ...open("original"), open: false }, null, none, true)).toBe("variables");
+  });
+});

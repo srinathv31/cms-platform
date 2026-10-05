@@ -190,7 +190,7 @@ export function SubmitButton({ templateId }: { templateId: string }) {
 }
 
 /**
- * "Preview": an outline toggle left of the one black button, pressed while the preview is open. Only
+ * "Preview": an outline toggle left of the one black button, pressed while the Preview view is open (not the Original view). Only
  * on the Content tab, and for any version the viewer can see (Active and In review too). Opening it
  * widens the rail into the preview (see workspace-grid.ts); the preview sends the pending autosave
  * before its first render, so what it shows is what is saved. Esc closes it (the rail handles that),
@@ -204,7 +204,9 @@ export function SubmitButton({ templateId }: { templateId: string }) {
 export function PreviewToggle({ className }: { className?: string }) {
   const segment = useSelectedLayoutSegment();
   const session = useWorkspaceSession();
-  const { open } = usePreviewState();
+  const { open: widened, view } = usePreviewState();
+  // Pressed only while the Preview view itself is on screen: the widened rail on Original (or Comments) isn't "Preview".
+  const open = widened && view === "preview";
   const onContent = segment === null;
 
   // Leaving the Content tab puts the preview away, so it isn't waiting open when the tab comes back.
