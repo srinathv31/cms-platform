@@ -201,9 +201,10 @@ export interface FinishImportInput {
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 //
-// POST /api/imports                     multipart/form-data { file: File, team: <team slug> } → ImportResponse
+// POST /api/imports?team=<team slug>   multipart/form-data { file: File } → ImportResponse
 //   A route handler, not a server action: actions cap bodies at 1 MB unless next.config changes.
-//   Permission: can(viewer, "template.create", { teamId }) first (403 with the refusal reason).
+//   Permission: can(viewer, "template.create", { teamId }) first, before the body is read (403 with
+//   the refusal reason); then the body is read with a byte counter, refused (413) past 10 MB + 64 KB.
 //   Status: 200 ok · 400 refused (empty/unreadable/too long/no text/locked/pages) · 403 · 413 size · 415 type.
 //   On success it sets JUST_CREATED_COOKIE (the name is selected on arrival) and JUST_IMPORTED_COOKIE
 //   (the rail opens on Original on arrival), and revalidates the Library; the client then
@@ -265,6 +266,7 @@ export interface CopilotPromptInput {
   /** "Disclosure". */
   contentTypeName: string;
   channels: Channel[];
+  /** The content type's sections now. The prompt titles them as the draft's own required headings do (`promptSections`). */
   requiredSections: RequiredSection[];
   variables: Variable[];
   /** The saved draft (the dialog flushes autosave first). Sections with text go in as the current draft. */

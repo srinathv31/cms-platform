@@ -175,6 +175,16 @@ describe("createTeam", () => {
     });
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it("refuses an Auditor as the first Team Admin; the choices leave them out", async () => {
+    const at = as("riley");
+    expect(await createTeam({ name: "Auto Loans", description: "", icon: "car", adminUserId: "taylor" })).toEqual({
+      ok: false,
+      reason: "Taylor Nguyen is an Auditor and can't be a Team Admin.",
+    });
+    expect(await auditAt(at)).toEqual([]);
+    expect((await getTeamsSection()).people.some((p) => p.id === "taylor")).toBe(false);
+  });
 });
 
 // ── Content types ─────────────────────────────────────────────
@@ -346,6 +356,31 @@ describe("saveApprovalChain", () => {
       reason: "Morgan Lee has no active access.",
     });
     expect((await getApprovalChainsSection()).people.some((p) => p.id === "taylor")).toBe(false);
+  });
+
+  it("refuses an admin naming themselves, or a Platform Admin with no team role; the choices leave them out", async () => {
+    const before = await chain();
+    const at = as("riley");
+    // Keeping the stage id and switching its rule to the acting admin: the self-approval route.
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Sign-off", rule: { kind: "user", userId: "riley" } }] })).toEqual({
+      ok: false,
+      reason: "You can't name yourself as an approver.",
+    });
+    expect(await auditAt(at)).toEqual([]);
+    expect(await chain()).toEqual(before);
+    expect((await getApprovalChainsSection()).people.some((p) => p.id === "riley")).toBe(false);
+
+    // Another Platform Admin with no team role: a platform role alone is no approve power.
+    await db.insert(schema.users).values({ id: "pat", name: "Pat Admin", email: "pat@example.test", initials: "PA", avatarHue: 10, title: "", platformRole: "platform_admin" });
+    try {
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }, { name: "Sign-off", rule: { kind: "user", userId: "pat" } }] })).toEqual({
+        ok: false,
+        reason: "Pat Admin is a Platform Admin with no team role and can't approve.",
+      });
+      expect((await getApprovalChainsSection()).people.some((p) => p.id === "pat")).toBe(false);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, "pat"));
+    }
   });
 
   it("when a waiting stage names someone else, they're told about the versions already waiting", async () => {

@@ -112,6 +112,20 @@ describe("getIntegrationPanel", () => {
     expect(panel.contract.map((r) => r.key)).not.toContain("annual_fee");
   });
 
+  it("a channel Channel rules turned off has no sample and isn't listed", async () => {
+    const { contentTypes } = schema;
+    const [disclosure] = await db.select().from(contentTypes).where(eq(contentTypes.key, "disclosure"));
+    const before = disclosure!.allowedChannels;
+    await db.update(contentTypes).set({ allowedChannels: ["pdf", "email"] }).where(eq(contentTypes.id, disclosure!.id));
+    try {
+      const panel = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!;
+      expect(panel.active.channels).toEqual(["pdf"]);
+      expect(panel.samples.map((s) => s.channel)).toEqual(["pdf"]);
+    } finally {
+      await db.update(contentTypes).set({ allowedChannels: before }).where(eq(contentTypes.id, disclosure!.id));
+    }
+  });
+
   it("null with no Active version or no template", async () => {
     expect(await getIntegrationPanel(id("annual-fee-waiver"), ORIGIN)).toBeNull();
     expect(await getIntegrationPanel("UC-ZZZZZZ", ORIGIN)).toBeNull();

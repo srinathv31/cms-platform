@@ -10,7 +10,7 @@
 // day), and what the picker sends is the same shape.
 
 import { formatDistanceStrict } from "date-fns";
-import { formatShortDate } from "@/domain/render/errors";
+import { formatShortDate, formatStamp as formatFullStamp } from "@/domain/dates";
 
 const LONG = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
 const COUNT = new Intl.NumberFormat("en-US");
@@ -22,8 +22,9 @@ export function formatDate(iso: string, now: Date): string {
 
 const DAY_MS = 86_400_000;
 
+/** Midnight UTC of the date's UTC day: the demo clock's days, as every date here reads. */
 function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 /** "today", "yesterday", "3 days ago", then the date: whole calendar days on the demo clock. */
@@ -48,20 +49,9 @@ export function formatRelative(iso: string, now: Date): string {
   return formatDistanceStrict(date, now, { addSuffix: true });
 }
 
-const STAMP = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "UTC",
-  timeZoneName: "short",
-});
-
 /** "Sun, Oct 4, 2026, 3:42 PM UTC": the absolute time on hover, in UTC like every date on these tabs. */
 export function formatStamp(iso: string): string {
-  return STAMP.format(new Date(iso));
+  return formatFullStamp(iso);
 }
 
 // ── Calendar dates (YYYY-MM-DD) ──────────────────────────────────────────────

@@ -219,6 +219,39 @@ describe("runRender: previews", () => {
     }
   });
 
+  it("lets someone who decided a version preview it only while they still have active access somewhere", async () => {
+    // Naomi (outside Coral Offers) decided Cash-back v3 when a stage named her; that stage has moved on.
+    const [v3] = await db
+      .select({ id: versions.id })
+      .from(versions)
+      .where(and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, 3)));
+    await db.insert(schema.approvals).values({
+      id: "ap_test_naomi",
+      versionId: v3!.id,
+      stagePosition: 1,
+      stageName: "Legal reviewer",
+      actorId: "naomi",
+      decision: "approved",
+      decidedAt: BASE,
+    });
+    try {
+      const values = { ...CUSTOMER, annual_fee: "95" };
+      const naomi = viewer("naomi", [{ id: "deposits", roles: ["approver"] }]);
+      expect(ok((await render({ template: "cash-back", version: 3, preview: true, viewer: naomi, values })).result).versionNumber).toBe(3);
+      // Removed from every team (or lapsed, or suspended): the decision alone opens nothing.
+      const gone = viewer("naomi", []);
+      expect(failed((await render({ template: "cash-back", version: 3, preview: true, viewer: gone, values })).result).code).toBe(
+        "preview_forbidden",
+      );
+      const lapsed: Viewer = { ...naomi, memberships: naomi.memberships.map((m) => ({ ...m, status: "lapsed" })) };
+      expect(failed((await render({ template: "cash-back", version: 3, preview: true, viewer: lapsed, values })).result).code).toBe(
+        "preview_forbidden",
+      );
+    } finally {
+      await db.delete(schema.approvals).where(eq(schema.approvals.id, "ap_test_naomi"));
+    }
+  });
+
   it("forbids a preview to a persona who can't see the team (403), logged as a preview", async () => {
     const { result, rows } = await render({ template: "high-yield-savings", version: 2, preview: true, viewer: maya });
     expect(failed(result)).toEqual({ code: "preview_forbidden", message: "You can't preview this template." });

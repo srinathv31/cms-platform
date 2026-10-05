@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { stageAt } from "@/domain/approval-chain";
-import { can } from "@/domain/permissions";
+import { can, hasActiveTeamAccess } from "@/domain/permissions";
 import {
   BAD_REQUEST_MESSAGES,
   badRequest,
@@ -155,7 +155,9 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
 
 /**
  * The viewer sees the template's team; or, as on the review screen (`requireReviewVersion`), the
- * stage this version waits on names them (a Legal reviewer outside the team), or they decided it.
+ * stage this version waits on names them (a Legal reviewer outside the team), or they decided it AND
+ * still have active access somewhere (the review screen gets that from `requireSpace`): a person
+ * removed from every team, or lapsed, reads nothing they once approved.
  */
 async function previewAllowed(db: Db, viewer: Viewer, template: TemplateRow, version: VersionRow): Promise<boolean> {
   if (can(viewer, "template.view", { teamId: template.teamId }).ok) return true;
@@ -174,7 +176,7 @@ async function previewAllowed(db: Db, viewer: Viewer, template: TemplateRow, ver
     .from(approvals)
     .where(and(eq(approvals.versionId, version.id), eq(approvals.actorId, viewer.userId)))
     .limit(1);
-  return decided !== undefined;
+  return decided !== undefined && hasActiveTeamAccess(viewer);
 }
 
 async function activeNumber(db: Db, templateId: string): Promise<number | null> {

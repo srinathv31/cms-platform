@@ -1,6 +1,9 @@
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   PLATFORM_REFUSALS,
+  RESERVED_SLUGS,
   channelOffConsequences,
   conformToSections,
   createTeam,
@@ -99,6 +102,18 @@ describe("createTeam", () => {
     expect(run({ name: "DEPOSITS" })).toEqual({ ok: false, reason: "A team called Deposits already exists." });
     expect(run({ description: "x".repeat(201) })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.descriptionTooLong });
     expect(run({ icon: "skull" })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.icon });
+  });
+
+  it("refuses a name whose slug is a top-level route: every top-level segment under src/app is reserved", () => {
+    expect(run({ name: "SIM" })).toEqual({ ok: false, reason: '"SIM" can\'t be used as a team name.' });
+    // Route groups "(x)" are looked through; dynamic "[x]", private "_x" and files are not segments.
+    const segments = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith("[") && !e.name.startsWith("_") && !e.name.startsWith("@"))
+        .flatMap((e) => (e.name.startsWith("(") ? segments(join(dir, e.name)) : [e.name]));
+    const top = segments(join(process.cwd(), "src/app"));
+    expect(top).toEqual(expect.arrayContaining(["api", "sim", "request-access", "design"]));
+    expect(top.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
   });
 });
 

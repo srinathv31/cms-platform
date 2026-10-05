@@ -147,7 +147,7 @@ export function AuditFilterBar({
     })),
     ...selTemplates.map((v) => ({ key: `template:${v}`, label: `Template: ${templates.get(v) ?? v}`, remove: () => toggle("template", v) })),
     ...(dated
-      ? [{ key: "date", label: `Date: ${dateRangeLabel(f.from, f.to)}`, remove: () => go({ ...f, from: undefined, to: undefined }) }]
+      ? [{ key: "date", label: `Date: ${dateRangeLabel(f.from, f.to, options.datePresets[0]?.to)}`, remove: () => go({ ...f, from: undefined, to: undefined }) }]
       : []),
   ];
 

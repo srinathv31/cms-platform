@@ -2,12 +2,8 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import type { AuditRow } from "@/domain/access-types";
 import { SYSTEM_ACTOR } from "@/domain/activity";
+import { formatStamp } from "@/domain/dates";
 import { AUDIT_CELL as at, AUDIT_ROW, AUDIT_TABLE, auditGrid, auditHeads } from "./columns";
-
-/** "Mon, Oct 5, 2026, 3:42 PM" -> "Oct 5, 2026, 3:42 PM": the weekday is noise in a log. */
-function shortWhen(when: string) {
-  return when.replace(/^[A-Za-z]{3}, /, "");
-}
 
 /** Newest first. The header sticks to the top of the canvas while the rows scroll under it. */
 export function AuditTable({ rows, showTeam }: { rows: AuditRow[]; showTeam: boolean }) {
@@ -28,8 +24,8 @@ export function AuditTable({ rows, showTeam }: { rows: AuditRow[]; showTeam: boo
           className={cn("items-center border-b border-hairline py-2 text-[14px] text-text", grid, AUDIT_ROW)}
         >
           <span role="cell" className={cn("min-w-0", at.when)}>
-            <time dateTime={e.at} className="block truncate tabular-nums">
-              {shortWhen(e.when)}
+            <time dateTime={e.at} title={formatStamp(e.at)} className="block truncate tabular-nums">
+              {e.when}
             </time>
             <span className="block truncate text-[12px] text-text-muted">{e.ago}</span>
           </span>

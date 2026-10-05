@@ -26,20 +26,23 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
   return <>{space.name}</>;
 }
 
+/** The Export button and its skeleton are one width (10.5rem fits "Export 9999 events"; wider only past that), so nothing shifts as it streams in. */
+const EXPORT_WIDTH = "w-[10.5rem] min-w-fit";
+
 /** The Export link follows the filters (same query, no page limit); a download, so a plain anchor. */
 async function ExportAction({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
   const data = await load(params, searchParams);
   const label = `Export ${data.total} ${data.total === 1 ? "event" : "events"}`;
   if (data.total === 0) {
     return (
-      <Button variant="outline" disabled>
+      <Button variant="outline" disabled className={EXPORT_WIDTH}>
         <Download aria-hidden strokeWidth={1.75} data-icon="inline-start" />
         {label}
       </Button>
     );
   }
   return (
-    <Button variant="outline" render={<a href={data.csvHref} download />} nativeButton={false}>
+    <Button variant="outline" render={<a href={data.csvHref} download />} nativeButton={false} className={EXPORT_WIDTH}>
       <Download aria-hidden strokeWidth={1.75} data-icon="inline-start" />
       {label}
     </Button>
@@ -128,7 +131,7 @@ export function AuditView({ params, searchParams }: { params: TeamParams; search
           </Stream>
         }
         action={
-          <Stream fallback={<Skeleton className="h-8 w-[9.5rem] rounded-lg" />}>
+          <Stream fallback={<Skeleton className={cn("h-8 rounded-lg", EXPORT_WIDTH)} />}>
             <ExportAction params={params} searchParams={searchParams} />
           </Stream>
         }

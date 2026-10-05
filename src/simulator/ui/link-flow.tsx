@@ -49,6 +49,9 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
   // ── Search ─────────────────────────────────────────────────────────────────
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ApiTemplateSummary[] | null>(null);
+  // The query the shown results answer: while it trails the field, a newer search is on its way and the
+  // list may still reorder, so it says it is busy.
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const searching = !candidate;
   useEffect(() => {
@@ -58,6 +61,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       async () => {
         const result = await searchTemplates({ q });
         if (cancelled) return;
+        setResultsFor(q);
         if (result.ok) {
           setResults(result.results);
           setSearchError(null);
@@ -145,10 +149,9 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                   <input
                     type="search"
                     aria-label="Search templates"
-                    placeholder="Name or ID"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-(--sim-muted)"
+                    className="min-w-0 flex-1 bg-transparent outline-none"
                   />
                 </label>
                 {searchError ? (
@@ -156,7 +159,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                     {searchError}
                   </p>
                 ) : null}
-                <ul aria-label="Templates" className="m-0 h-[19rem] list-none divide-y divide-(--sim-line) overflow-y-auto overscroll-contain rounded-(--sim-rb) border border-(--sim-line) p-0">
+                <ul aria-label="Templates" aria-busy={resultsFor !== q} className="m-0 h-[19rem] list-none divide-y divide-(--sim-line) overflow-y-auto overscroll-contain rounded-(--sim-rb) border border-(--sim-line) p-0">
                   {results === null ? (
                     Array.from({ length: 5 }, (_, i) => (
                       <li key={i} aria-hidden className="flex h-[3.75rem] items-center px-3">

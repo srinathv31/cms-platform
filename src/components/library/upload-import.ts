@@ -47,8 +47,8 @@ export async function precheckImportBytes(file: Pick<Blob, "slice"> & { name: st
 export async function uploadImport(file: File, teamSlug: string): Promise<ImportResponse> {
   const form = new FormData();
   form.set("file", file);
-  form.set("team", teamSlug);
-  const response = await fetch("/api/imports", { method: "POST", body: form });
+  // The team goes in the query: the server checks the permission before it reads the body.
+  const response = await fetch(`/api/imports?team=${encodeURIComponent(teamSlug)}`, { method: "POST", body: form });
   try {
     return (await response.json()) as ImportResponse;
   } catch {

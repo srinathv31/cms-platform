@@ -35,7 +35,8 @@ import type { Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
-import { dayAgo, stamp } from "./format";
+import { formatDateTime } from "@/domain/dates";
+import { dayAgo } from "./format";
 import { dayOf, getPeople, iso, personOf, type People } from "./review-shared";
 import { requireSpace } from "./spaces";
 
@@ -58,8 +59,23 @@ interface AuditScope {
 
 const SYSTEM_PERSON_VIEW: Person = { id: SYSTEM_PERSON, name: SYSTEM_ACTOR, initials: "UC", hue: 0 };
 
-/** The Audit page's read model. 404 without `audit.view` in the space (a hidden page, not a refusal). */
-export const getAuditPage = cache(async (spaceSlug: string, filters: AuditFilters): Promise<AuditPageData> => {
+const FILTER_KEYS = ["team", "person", "action", "template", "from", "to"] as const satisfies readonly (keyof AuditFilters)[];
+
+/**
+ * The Audit page's read model. 404 without `audit.view` in the space (a hidden page, not a refusal).
+ * Read once per request: the header's Export count and the table each pass their own filters object,
+ * and React's `cache` keys an object by identity, so the read is cached on a string key instead.
+ */
+export function getAuditPage(spaceSlug: string, filters: AuditFilters): Promise<AuditPageData> {
+  return auditPageFor(spaceSlug, JSON.stringify(FILTER_KEYS.map((key) => filters[key] ?? null)));
+}
+
+const auditPageFor = cache(async (spaceSlug: string, filtersKey: string): Promise<AuditPageData> => {
+  const values = JSON.parse(filtersKey) as (string | null)[];
+  const filters: AuditFilters = {};
+  FILTER_KEYS.forEach((key, i) => {
+    if (values[i] !== null) filters[key] = values[i]!;
+  });
   const space = await requireSpace(spaceSlug);
   if (!can(space.viewer, "audit.view", { teamId: space.teamId ?? ALL_SPACE }).ok) notFound();
   const { data } = await readAudit(
@@ -227,7 +243,7 @@ function toRow(
     actionLabel: actionLabel(e.action, actor !== null),
     summary: describeAuditEvent({ action: e.action, details: e.details, versionNumber }, actor),
     subject: subjectId ? personOf(people, subjectId) : null,
-    when: stamp(e.at),
+    when: formatDateTime(e.at, nowDate),
     ago: dayAgo(e.at, nowDate),
   };
 }

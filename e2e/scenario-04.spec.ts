@@ -141,6 +141,8 @@ test.describe("scenario 4: going live", () => {
       await reactReady(search);
       await click(search);
       await typeSlowly(page, "Spring Travel");
+      // The list answers the whole query (it says it is busy while a newer search is on its way and may reorder).
+      await expect(page.getByRole("list", { name: "Templates" })).toHaveAttribute("aria-busy", "false");
       const result = page.getByRole("list", { name: "Templates" }).getByRole("button", { name: new RegExp(`^${SPRING_NAME}`) }).filter({ hasText: templateId });
       await expect(result, "the template is found by name").toHaveCount(1);
       await expect(result).toContainText(templateId);

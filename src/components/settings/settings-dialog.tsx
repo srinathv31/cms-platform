@@ -84,11 +84,13 @@ export function SettingsDialog({
       <ScrimDialogContent
         instant={takeover}
         aria-label="Settings"
-        className="flex h-[min(46rem,84vh)] w-[min(72vw,70rem)] min-w-[56rem] rounded-3xl"
+        // Never wider than the window (16px a side spare): at 1280 and up the frame is as before; below
+        // about 900px the nav narrows and the content pads less, and wide tables scroll inside the panel.
+        className="flex h-[min(46rem,84vh)] w-[min(72vw,70rem)] min-w-[min(56rem,calc(100vw-2rem))] rounded-3xl"
       >
-        <div className="flex w-[15rem] shrink-0 flex-col bg-surface-tinted">{nav}</div>
+        <div className="flex w-[15rem] shrink-0 flex-col bg-surface-tinted max-[56.25rem]:w-[13.5rem]">{nav}</div>
 
-        <div className="relative min-w-0 flex-1 overflow-y-auto overscroll-contain px-10 pt-12 pb-10">
+        <div className="relative min-w-0 flex-1 overflow-y-auto overscroll-contain px-10 pt-12 pb-10 max-[56.25rem]:px-7">
           {children}
           <DialogClose
             render={

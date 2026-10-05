@@ -177,7 +177,8 @@ export async function sendToCustomers(input: { offerId: string; customerIds: str
     const correlationId = `coral_${randomPart(16)}`;
     const values = valuesFor(mapping, customerRecord(customer), offerRec);
     const rendered = await api.render(link.templateId, { version: link.pinnedVersion, channel, values }, correlationId);
-    return { customer, channel, correlationId, rendered, at: new Date() };
+    // Stamped with UCOMP's answer time (its HTTP Date header: the demo's clock), real time without one.
+    return { customer, channel, correlationId, rendered, at: rendered.at };
   });
 
   const unreachable = results.every((r) => !r.rendered.ok && r.rendered.error.status === 0);

@@ -3,8 +3,7 @@
 
 const DAY_MS = 86_400_000;
 
-const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const monthDayYear = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+import { formatShortDate } from "@/domain/dates";
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -12,8 +11,7 @@ export const firstName = (name: string) => name.split(" ")[0] ?? name;
 
 /** "Oct 5", or "Oct 5, 2027" when the year isn't the demo clock's. `today` is the section's YYYY-MM-DD. */
 export function fmtDay(value: string | Date, today: string): string {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return (d.getUTCFullYear() === Number(today.slice(0, 4)) ? monthDay : monthDayYear).format(d);
+  return formatShortDate(value, `${today.slice(0, 10)}T00:00:00.000Z`);
 }
 
 /** The demo day `n` days after `today` (YYYY-MM-DD). */

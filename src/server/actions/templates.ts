@@ -9,7 +9,7 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams, templates, versions } from "@/server/db/schema/ucomp";
 import { now } from "@/server/clock";
-import { writeEffects } from "@/server/effects";
+import { inTransaction, writeEffects } from "@/server/effects";
 import { submitVersion } from "@/server/actions/review";
 import { getViewer } from "@/server/viewer";
 import { newId } from "@/server/ids";
@@ -81,7 +81,8 @@ export async function createTemplate(input: { teamSlug: string; starterKey: Star
   const created = createDraft({ starter, createdBy: viewer.userId, now: at });
   const versionId = newId("v");
 
-  await db.transaction(async (tx) => {
+  // Retried while the file is busy, like every lifecycle write (`inTransaction`).
+  await inTransaction(db, async (tx) => {
     await insertNewTemplate(tx, {
       templateId,
       teamId: team.id,
@@ -130,54 +131,56 @@ export async function startDraft(input: { templateId: string }): Promise<void> {
   const workspace = `/${found.teamSlug}/templates/${found.id}` as Route;
   const at = await now();
 
-  const outcome = await db
-    .transaction(async (tx) => {
-      const list = await tx
-        .select({ id: versions.id, state: versions.state, number: versions.number })
-        .from(versions)
-        .where(eq(versions.templateId, found.id));
-      const plan = planDraftStart(list);
-      if (plan.kind === "open") return { opened: true as const };
-      if (plan.kind === "blocked") throw new Error(plan.reason);
+  // A write that met another one used to fail with SQLITE_BUSY (and poison its connection), so the
+  // action answered 500 and Edit seemed to do nothing. Writes now take turns (src/lib/serialized-writes.ts);
+  // `inTransaction` still retries a lock held by another process past the busy timeout. The retry
+  // re-reads, so it sees a draft another press made meanwhile.
+  const outcome = await inTransaction(db, async (tx) => {
+    const list = await tx
+      .select({ id: versions.id, state: versions.state, number: versions.number })
+      .from(versions)
+      .where(eq(versions.templateId, found.id));
+    const plan = planDraftStart(list);
+    if (plan.kind === "open") return { opened: true as const };
+    if (plan.kind === "blocked") throw new Error(plan.reason);
 
-      const active = await tx.query.versions.findFirst({
-        where: and(eq(versions.id, plan.from), eq(versions.state, "active")),
-      });
-      if (!active) throw new Error("The Active version changed. Try again.");
-
-      const snapshot: VersionSnapshot = {
-        id: active.id,
-        number: active.number,
-        state: active.state,
-        body: active.body,
-        emailSubject: active.emailSubject,
-        emailPreheader: active.emailPreheader,
-        channels: active.channels,
-        variables: active.variables,
-        sampleSets: active.sampleSets,
-      };
-      const { changes, effects } = editActive({ active: snapshot, createdBy: viewer.userId, now: at });
-      const draftId = newId("v");
-
-      await tx.insert(versions).values(draftRow(changes.draft, { id: draftId, templateId: found.id }));
-      await writeEffects(tx, effects, {
-        at,
-        actorId: viewer.userId,
-        teamId: found.teamId,
-        templateId: found.id,
-        versionId: draftId,
-      });
-      return { opened: false as const };
-    })
-    .catch(async (error: unknown) => {
-      // Two people pressing Edit at once: the partial unique index lets one draft in. The other
-      // simply opens it.
-      const open = await db.query.versions.findFirst({
-        where: and(eq(versions.templateId, found.id), eq(versions.state, "draft")),
-      });
-      if (open) return { opened: true as const };
-      throw error;
+    const active = await tx.query.versions.findFirst({
+      where: and(eq(versions.id, plan.from), eq(versions.state, "active")),
     });
+    if (!active) throw new Error("The Active version changed. Try again.");
+
+    const snapshot: VersionSnapshot = {
+      id: active.id,
+      number: active.number,
+      state: active.state,
+      body: active.body,
+      emailSubject: active.emailSubject,
+      emailPreheader: active.emailPreheader,
+      channels: active.channels,
+      variables: active.variables,
+      sampleSets: active.sampleSets,
+    };
+    const { changes, effects } = editActive({ active: snapshot, createdBy: viewer.userId, now: at });
+    const draftId = newId("v");
+
+    await tx.insert(versions).values(draftRow(changes.draft, { id: draftId, templateId: found.id }));
+    await writeEffects(tx, effects, {
+      at,
+      actorId: viewer.userId,
+      teamId: found.teamId,
+      templateId: found.id,
+      versionId: draftId,
+    });
+    return { opened: false as const };
+  }).catch(async (error: unknown) => {
+    // Two people pressing Edit at once: the partial unique index lets one draft in. The other
+    // simply opens it.
+    const open = await db.query.versions.findFirst({
+      where: and(eq(versions.templateId, found.id), eq(versions.state, "draft")),
+    });
+    if (open) return { opened: true as const };
+    throw error;
+  });
 
   if (!outcome.opened) refreshLists(found.id);
   // Usually called from the workspace itself: replace, so Back doesn't land on the same page twice.

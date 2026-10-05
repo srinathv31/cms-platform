@@ -3,7 +3,7 @@
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ApiChannel } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
 import { getDeliveryView, saveMapping, sendToCustomers } from "@/simulator/actions";
@@ -55,7 +55,13 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
     });
 
   // ── Send ───────────────────────────────────────────────────────────────────
-  const [selected, setSelected] = useState<string[]>([]);
+  // The picker starts empty on each visit: the selection is keyed on the router's visit id (bfcacheId),
+  // which changes on every fresh Link/push navigation to this page but not on refresh(), a ?tab= switch
+  // or browser back/forward. A kept-alive page from an earlier visit so never shows its old ticks.
+  const { bfcacheId } = useRouter();
+  const [picked, setPicked] = useState<{ visit: string; ids: string[] }>({ visit: bfcacheId, ids: [] });
+  const selected = picked.visit === bfcacheId ? picked.ids : [];
+  const setSelected = (ids: string[]) => setPicked({ visit: bfcacheId, ids });
   const [sent, setSent] = useState<SimBatch | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, startSend] = useTransition();

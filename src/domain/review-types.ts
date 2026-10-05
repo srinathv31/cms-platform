@@ -56,7 +56,16 @@ export interface AuditEffect {
 /** Where a notification links to. The server turns it into an href with the team slug. */
 export type NotificationLink =
   | { to: "review"; templateId: string; versionNumber: number }
-  | { to: "template"; templateId: string }
+  | {
+      to: "template";
+      templateId: string;
+      /**
+       * A released or decided version the notification is about. A recipient outside the template's
+       * team (a stage-named reviewer) can't open the workspace, so they get this version's review
+       * screen in their own space instead.
+       */
+      reviewVersion?: number;
+    }
   | { to: "versions"; templateId: string };
 
 export type NotificationKind =

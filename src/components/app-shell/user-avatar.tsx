@@ -9,11 +9,17 @@ export function UserAvatar({
   initials,
   hue,
   size = "default",
+  muted = false,
   className,
 }: {
   initials: string;
   hue: number;
   size?: "default" | "sm" | "lg";
+  /**
+   * A dimmed row (suspended, lapsed, decided): the tint goes almost grey instead of fading the avatar,
+   * so the initials keep ≥ 4.5:1 (about 5.7:1).
+   */
+  muted?: boolean;
   className?: string;
 }) {
   return (
@@ -21,8 +27,8 @@ export function UserAvatar({
       <AvatarFallback
         className={cn("font-medium", size === "sm" ? "text-[10px]" : "text-[12px]")}
         style={{
-          backgroundColor: `oklch(0.925 0.04 ${hue})`,
-          color: `oklch(0.38 0.07 ${hue})`,
+          backgroundColor: muted ? `oklch(0.94 0.008 ${hue})` : `oklch(0.925 0.04 ${hue})`,
+          color: muted ? `oklch(0.45 0.015 ${hue})` : `oklch(0.38 0.07 ${hue})`,
         }}
       >
         {initials}

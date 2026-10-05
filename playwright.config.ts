@@ -19,8 +19,9 @@ const requested = process.env.UCOMP_OPT_IN_PROJECTS ?? named.filter((name) => OP
 process.env.UCOMP_OPT_IN_PROJECTS = requested;
 const wants = (name: string) => requested.split(",").includes(name);
 
-// Only the scenario specs: `scenario-02a` (the Phase 2 gate in short form) is not a gate recording.
-const SCENARIOS = /scenario-\d+\.spec\.ts/;
+// Only the scenario specs and the whole demo script (Phase 7b): `scenario-02a` (the Phase 2 gate in short
+// form) is not a gate recording.
+const SCENARIOS = /(scenario-\d+|demo-script)\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./e2e",

@@ -27,11 +27,14 @@ export function UsageTabs({
   const [value, setValue] = useState<TabId>(initial);
   const choose = (id: TabId) => {
     setValue(id);
-    // The URL follows the tab without a navigation (Next syncs native history calls with the router).
-    const url = new URL(window.location.href);
-    if (id === "overview") url.searchParams.delete("tab");
-    else url.searchParams.set("tab", id);
-    window.history.replaceState(window.history.state, "", url);
+    // The URL follows the tab without a navigation. Pass `null` as the state: Next patches
+    // replaceState and syncs the router (useSearchParams, refresh()) only for calls without its own
+    // internal marker, so handing back `window.history.state` would let the next refresh revert `?tab=`.
+    const params = new URLSearchParams(window.location.search);
+    if (id === "overview") params.delete("tab");
+    else params.set("tab", id);
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
   };
   const base = useId();
   const refs = useRef<Record<TabId, HTMLButtonElement | null>>({ overview: null, consumers: null });

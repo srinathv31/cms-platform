@@ -141,7 +141,8 @@ const MATRIX: { row: string; actions: Action[]; cells: Record<Column, string> }[
   {
     row: "Request access to a team",
     actions: ["access.request"],
-    cells: { viewer: "Anyone", author: "Anyone", approver: "Anyone", team_admin: "Anyone", platform_admin: "Anyone", auditor: "Anyone" },
+    // The Auditor is read-only everywhere and can't ask for a team role (adversarial review fix).
+    cells: { viewer: "Anyone", author: "Anyone", approver: "Anyone", team_admin: "Anyone", platform_admin: "Anyone", auditor: "—" },
   },
 ];
 
@@ -289,10 +290,11 @@ describe("access requests", () => {
     expect(can(riley, "team.manageMembers", coral)).toEqual(deny(GENERIC));
   });
 
-  it("anyone may request access, including Morgan", () => {
-    for (const v of [maya, jordan, alex, priya, sam, riley, taylor, morgan]) {
+  it("anyone may request access, including Morgan; not the Auditor", () => {
+    for (const v of [maya, jordan, alex, priya, sam, riley, morgan]) {
       expect(can(v, "access.request", deposits)).toEqual(allow);
     }
+    expect(can(taylor, "access.request", deposits)).toEqual(deny(GENERIC));
   });
 });
 
@@ -362,6 +364,39 @@ describe("named approvers (a stage that names a user)", () => {
     expect(can(taylor, "version.decide", named)).toEqual(deny(GENERIC));
     expect(can(taylor, "review.comment", named)).toEqual(deny(GENERIC));
     expect(can(taylor, "template.view", named)).toEqual(allow); // an Auditor sees every team anyway
+  });
+
+  it("a Platform Admin named on a stage gets nothing without a team role somewhere", () => {
+    const named = { ...legal, stageApproverIds: ["riley"] };
+    expect(can(riley, "version.decide", named)).toEqual(deny(GENERIC));
+    expect(can(riley, "review.comment", named)).toEqual(deny(GENERIC));
+    const withTeam = person("riley", { platformRole: "platform_admin", memberships: [member("deposits", ["viewer"])] });
+    expect(can(withTeam, "version.decide", named)).toEqual(allow);
+  });
+});
+
+describe("the Auditor is read-only everywhere", () => {
+  // However they came by it, a team role gives an Auditor nothing beyond seeing and the audit log.
+  const auditorMember = person("taylor", {
+    platformRole: "auditor",
+    memberships: [member("deposits", ["author", "approver", "team_admin"])],
+  });
+
+  it("a team role adds no write power", () => {
+    for (const action of [
+      "template.create", "draft.edit", "version.submit", "review.comment", "version.decide", "version.setSunset",
+      "version.revoke.start", "version.revoke.confirm", "team.manageMembers", "team.decideAccessRequest", "platform.manage",
+      "access.request",
+    ] as Action[]) {
+      expect(can(auditorMember, action, { ...deposits, submittedBy: "eli" }), action).toEqual(deny(GENERIC));
+    }
+  });
+
+  it("still sees every team and reads the audit log", () => {
+    for (const action of ["template.view", "integration.view", "audit.view"] as Action[]) {
+      expect(can(auditorMember, action, deposits)).toEqual(allow);
+      expect(can(auditorMember, action, allTeams)).toEqual(allow);
+    }
   });
 });
 

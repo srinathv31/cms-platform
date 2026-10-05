@@ -226,6 +226,37 @@ describe("requesting and deciding access", () => {
 
 // ── Members ──────────────────────────────────────────────────
 
+describe("the Auditor holds no team role (adversarial review fix)", () => {
+  it("Taylor can't ask for one: the refusal says why, and nothing is written", async () => {
+    const before = await requestCount();
+    const at = await as("taylor");
+    expect(await requestAccess({ teamId: "deposits", role: "approver", reason: "Spot checks." })).toEqual({
+      ok: false,
+      reason: REASONS.auditorReadOnly,
+    });
+    expect(await requestCount()).toBe(before);
+    expect(await auditAt(at)).toEqual([]);
+  });
+
+  it("a request Taylor already has can't be approved, only denied", async () => {
+    await db.insert(accessRequests).values({
+      id: "ar_taylor_test",
+      userId: "taylor",
+      teamId: "coral-offers",
+      role: "approver",
+      reason: "Made before the audit role.",
+      createdAt: BASE,
+    });
+    await as("alex");
+    expect(await decideAccessRequest({ requestId: "ar_taylor_test", decision: "approve" })).toEqual({
+      ok: false,
+      reason: "Taylor Nguyen is an Auditor and can't hold team roles.",
+    });
+    expect(await membershipOf("taylor")).toBeNull();
+    expect(await decideAccessRequest({ requestId: "ar_taylor_test", decision: "deny", note: "Auditors are read-only." })).toEqual({ ok: true });
+  });
+});
+
 describe("members", () => {
   it("nobody changes their own access", async () => {
     const alex = await membershipId("alex");

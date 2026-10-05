@@ -191,6 +191,25 @@ describe("addComment", () => {
   });
 });
 
+describe("reply notifications outside the team", () => {
+  it("a stage reviewer from another team who wrote in a decided version's thread gets its review screen in their own space", async () => {
+    // Balance Transfer v2 is Active (no longer in review). Naomi (Deposits only) commented on it as a named stage reviewer.
+    const v2 = await versionOf("balance-transfer", 2);
+    const threadId = "th_outside_reply";
+    await db.insert(commentThreads).values({ id: threadId, templateId: ids["balance-transfer"]!, originVersionId: v2.id, blockId: DOCUMENT_THREAD, createdAt: BASE });
+    await db.insert(comments).values({ id: "cm_outside_reply", threadId, authorId: "naomi", body: "Legal note.", createdAt: BASE });
+
+    const at = as("maya");
+    expect(await reply({ threadId, body: "Thanks, fixed in the draft." })).toEqual({ ok: true });
+    const hrefs = Object.fromEntries((await notificationsAt(at)).map((n) => [n.userId, n.href]));
+    expect(hrefs.naomi).toBe(`/deposits/review/${ids["balance-transfer"]}/2`);
+    // Everyone on the team still goes to the template.
+    for (const [userId, href] of Object.entries(hrefs)) {
+      if (userId !== "naomi") expect(href).toBe(`/coral-offers/templates/${ids["balance-transfer"]}`);
+    }
+  });
+});
+
 describe("who may comment", () => {
   it("refuses a viewer and someone from another team, to comment, reply or resolve", async () => {
     const v3 = await versionOf("cash-back", 3);

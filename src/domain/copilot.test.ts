@@ -2,7 +2,7 @@
 // The round trip through the editor's Markdown paste is in components/workspace/copilot.
 
 import { describe, expect, it } from "vitest";
-import { buildCopilotPrompt, documentToMarkdown } from "./copilot";
+import { buildCopilotPrompt, documentToMarkdown, promptSections } from "./copilot";
 import type { CopilotPromptInput } from "./import-types";
 import type { JSONContent, RequiredSection, Variable } from "./types";
 
@@ -214,6 +214,34 @@ describe("buildCopilotPrompt", () => {
 
   it("a chip alone counts as draft text", () => {
     expect(buildCopilotPrompt(input(doc(h(2, "Offer details", "offer_details"), p(chip("first_name"))))).includesDraft).toBe(true);
+  });
+
+  it("titles the sections as the draft does, not as the content type was renamed since (snapshot)", () => {
+    // The type renamed "Rates and fees" to "Fees and charges" and dropped "Legal notices" after the draft was made.
+    const renamed: RequiredSection[] = [SECTIONS[0]!, { key: "rates_and_fees", title: "Fees and charges" }];
+    const text = buildCopilotPrompt(input(DRAFT, { requiredSections: renamed })).text;
+    expect(text.slice(text.indexOf("Use these section headings"), text.indexOf("Placeholders"))).toMatchInlineSnapshot(`
+      "Use these section headings, exactly as written and in this order:
+      ## Offer details
+      ## Rates and fees
+      ## Legal notices
+
+      "
+    `);
+    expect(text).not.toContain("Fees and charges");
+  });
+
+  it("promptSections: the draft's own headings in its order; the type fills in only what the draft lacks", () => {
+    const partial = doc(h(2, "Rates and fees", "rates_and_fees"), p(text("x")), h(2, "  ", "legal_notices"), h(2, "Extra", null));
+    expect(promptSections(partial, SECTIONS)).toEqual([
+      { key: "offer_details", title: "Offer details" },
+      { key: "rates_and_fees", title: "Rates and fees" },
+      { key: "legal_notices", title: "Legal notices" },
+    ]);
+    const reordered = doc(h(2, "Legal", "legal_notices"), h(2, "Offer", "offer_details"));
+    expect(promptSections(reordered, SECTIONS).map((s) => s.title)).toEqual(["Legal", "Offer", "Rates and fees"]);
+    expect(promptSections(doc(p(text("no headings"))), SECTIONS)).toEqual(SECTIONS);
+    expect(promptSections(doc(h(2, "Old", "gone")), [])).toEqual([{ key: "gone", title: "Old" }]);
   });
 
   it("is deterministic, and channels follow the product's order", () => {

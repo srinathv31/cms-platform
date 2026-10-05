@@ -52,7 +52,10 @@ export const TEAM_ICONS = [
   "building-2",
 ] as const;
 
-/** Slugs the app's own routes use: a team can't take them. */
+/**
+ * Slugs the app's own routes use: a team can't take them. Every top-level segment under src/app
+ * (route groups looked through) must be here; platform-config.test.ts checks the folder.
+ */
 export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "all",
   "api",
@@ -60,6 +63,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "design",
   "editor-lab",
   "pdf-lab",
+  "sim",
   "settings",
   "audit",
   "new",

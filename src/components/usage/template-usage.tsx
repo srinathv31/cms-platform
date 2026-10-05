@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { WS } from "@/components/workspace/workspace-grid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addDays, errorText } from "@/domain/golive/usage";
@@ -84,6 +86,22 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
   const { team, templateId } = await params;
   const d = await getTemplateUsage(team, templateId);
   const nowDate = await now();
+  // No version has ever been Active: nothing can have rendered it, so one calm line instead of empty charts.
+  if (d.versions.length === 0) {
+    return (
+      <section data-slot="usage" aria-label="Usage" className={USAGE_CELL}>
+        <p className="py-10 text-[15px] text-text-muted">
+          Not live yet.{" "}
+          <Link
+            href={`/${team}/templates/${templateId}/versions` as Route}
+            className="rounded-sm text-text underline underline-offset-4 outline-none hover:text-text-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Versions
+          </Link>
+        </p>
+      </section>
+    );
+  }
   const series = versionSeries(d.weeklyVersions);
   const still = d.stillOn.slice(0, 2);
   return (

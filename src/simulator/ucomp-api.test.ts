@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiOrigin, createUcompApi } from "./ucomp-api";
 
-vi.mock("next/headers", () => ({
-  headers: vi.fn(async () => new Headers({ host: "localhost:3001" })),
-}));
+// A forged Host / X-Forwarded-Host must never become the fetch target.
+const headers = vi.hoisted(() => vi.fn(async () => new Headers({ host: "attacker.example", "x-forwarded-host": "169.254.169.254" })));
+vi.mock("next/headers", () => ({ headers }));
+vi.mock("next/server", () => ({ connection: vi.fn(async () => undefined) }));
 
 type Call = { url: string; init: RequestInit };
 
@@ -56,6 +57,7 @@ describe("createUcompApi", () => {
     expect(await api.render("UC-4F7K2Q", { version: 2, channel: "web", values: {} }, "c1")).toEqual({
       ok: false,
       error: { status: 410, code: "version_sunset", message },
+      at: expect.any(Date),
     });
   });
 
@@ -83,7 +85,7 @@ describe("createUcompApi", () => {
     const api = createUcompApi({ origin: "http://x.test", fetch });
 
     const pdf = await api.render("UC-4F7K2Q", { version: 2, channel: "pdf", values: { first_name: "Olivia" } }, "corr-1");
-    expect(pdf).toEqual({ ok: true, data: { output: "JVBERi0=", newerVersion: null } });
+    expect(pdf).toEqual({ ok: true, data: { output: "JVBERi0=", newerVersion: null }, at: expect.any(Date) });
     expect(calls[0].init.method).toBe("POST");
     expect(calls[0].url).toBe("http://x.test/api/v1/templates/UC-4F7K2Q/render");
     expect(JSON.parse(String(calls[0].init.body))).toEqual({ version: 2, channel: "pdf", values: { first_name: "Olivia" }, encoding: "base64" });
@@ -92,23 +94,49 @@ describe("createUcompApi", () => {
     expect(header(calls[0], "Content-Type")).toBe("application/json");
 
     const web = await api.render("UC-4F7K2Q", { version: 2, channel: "web", values: {} }, "corr-2");
-    expect(web).toEqual({ ok: true, data: { output: "<!doctype html><p>Hi</p>", newerVersion: 3 } });
+    expect(web).toEqual({ ok: true, data: { output: "<!doctype html><p>Hi</p>", newerVersion: 3 }, at: expect.any(Date) });
     expect(JSON.parse(String(calls[1].init.body))).not.toHaveProperty("encoding");
 
     const email = await api.render("UC-4F7K2Q", { version: 2, channel: "email", values: {} }, "corr-3");
     expect(email.ok && JSON.parse(email.data.output)).toEqual({ subject: "Your terms", preheader: "Pre", html: "<p>Hi</p>", text: "Hi" });
     expect(email.ok && email.data.newerVersion).toBe(3);
   });
+
+  it("stamps a render with UCOMP's HTTP Date header (the demo clock), real time without one", async () => {
+    const demo = "Wed, 21 Oct 2026 09:30:00 GMT";
+    const dated = fakeFetch((url, init) =>
+      JSON.parse(String(init.body)).version === 2
+        ? new Response("<p>Hi</p>", { headers: { Date: demo } })
+        : json({ error: { code: "version_sunset", message: "Gone." } }, 410, { Date: demo }),
+    );
+    const api = createUcompApi({ origin: "http://x.test", fetch: dated.fetch });
+    expect((await api.render("UC-4F7K2Q", { version: 2, channel: "web", values: {} }, "c1")).at.toISOString()).toBe("2026-10-21T09:30:00.000Z");
+    expect((await api.render("UC-4F7K2Q", { version: 1, channel: "web", values: {} }, "c2")).at.toISOString()).toBe("2026-10-21T09:30:00.000Z");
+
+    const before = Date.now();
+    const plain = fakeFetch(() => new Response("<p>Hi</p>"));
+    const at = (await createUcompApi({ origin: "http://x.test", fetch: plain.fetch }).render("UC-4F7K2Q", { version: 2, channel: "web", values: {} }, "c3")).at;
+    expect(at.getTime()).toBeGreaterThanOrEqual(before);
+  });
 });
 
 describe("apiOrigin", () => {
+  const port = process.env.PORT;
   afterEach(() => {
     delete process.env.UCOMP_API_ORIGIN;
+    if (port === undefined) delete process.env.PORT;
+    else process.env.PORT = port;
   });
 
-  it("uses UCOMP_API_ORIGIN when set, else the request's own origin", async () => {
-    expect(await apiOrigin()).toBe("http://localhost:3001");
-    process.env.UCOMP_API_ORIGIN = "https://ucomp.example";
+  it("uses UCOMP_API_ORIGIN when set, else this server on loopback at its own port; never the request's headers", async () => {
+    process.env.PORT = "3100";
+    expect(await apiOrigin()).toBe("http://127.0.0.1:3100");
+    process.env.PORT = "3200";
+    expect(await apiOrigin()).toBe("http://127.0.0.1:3200");
+    delete process.env.PORT;
+    expect(await apiOrigin()).toBe("http://127.0.0.1:3000");
+    process.env.UCOMP_API_ORIGIN = "https://ucomp.example/";
     expect(await apiOrigin()).toBe("https://ucomp.example");
+    expect(headers).not.toHaveBeenCalled();
   });
 });

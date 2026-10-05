@@ -117,15 +117,15 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "jordan",
     kind: "review_requested",
-    title: `Review requested: ${cashBack.name} v3`,
-    body: `${userName("maya")} submitted v3. It adds the required variable annual_fee, a breaking change for consumers.`,
+    title: `${userName("maya")} submitted ${cashBack.name} v3 for review.`,
+    body: "It adds the required variable annual_fee, a breaking change for consumers.",
     href: `/${coral}/review/${cashBack.id}/3`,
     at: 0.9,
   });
   note({
     user: "maya",
     kind: "changes_requested",
-    title: `${userName("jordan")} requested changes on ${waiver.name} v1`,
+    title: `${userName("jordan")} requested changes on ${waiver.name} v1.`,
     body: waiverReason ?? undefined,
     href: `/${coral}/templates/${waiver.id}`,
     at: 3.9,
@@ -141,7 +141,7 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "alex",
     kind: "recert_due",
-    title: "Recertification due in 30 days",
+    title: "Recertification is due in 30 days.",
     body: `${label} access review for Coral Offers: confirm ${members.length} members.`,
     href: `/${coral}/settings/recertification`,
     at: 4,
@@ -160,7 +160,7 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "priya",
     kind: "sunset_scheduled",
-    title: `Sunset set for ${balanceTransfer.name} v1`,
+    title: `Sunset set for ${balanceTransfer.name} v1.`,
     body: "Coral still renders v1. It keeps working until the sunset date.",
     href: `/${coral}/templates/${balanceTransfer.id}`,
     at: 2.2,
@@ -170,7 +170,7 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "maya",
     kind: "version_live",
-    title: `${cashBack.name} v2 is now Active`,
+    title: `${cashBack.name} v2 is now Active.`,
     href: `/${coral}/templates/${cashBack.id}`,
     at: 86.5,
     read: true,
@@ -178,7 +178,7 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "priya",
     kind: "version_live",
-    title: `${balanceTransfer.name} v2 is now Active`,
+    title: `${balanceTransfer.name} v2 is now Active.`,
     href: `/${coral}/templates/${balanceTransfer.id}`,
     at: 47.5,
     read: true,
@@ -186,7 +186,7 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "priya",
     kind: "version_revoked",
-    title: `${holiday.name} v1 was revoked`,
+    title: `${holiday.name} v1 was revoked.`,
     body: "Reason: Wrong bonus amount.",
     href: `/${coral}/templates/${holiday.id}`,
     at: 34.3,

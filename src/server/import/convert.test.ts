@@ -10,6 +10,7 @@ import type { JSONContent, RequiredSection } from "@/domain/types";
 import { convertFile } from "./convert";
 import { allowlistHtml, stripNotes, withDom } from "./dom";
 import { decodeText, hasAscii, sniffKind } from "./sniff";
+import { ZIP_LIMITS, checkZip } from "./zip-limits";
 
 // The converters on the generated fixtures (e2e/fixtures/import, made by make-fixtures.mjs) and on
 // files made here for the refusals.
@@ -20,6 +21,7 @@ const SECTIONS: RequiredSection[] = [
   { key: "legal_notices", title: "Legal notices" },
 ];
 
+const IMPORT_LIMITS_BYTES = 10 * 1024 * 1024;
 const fixture = (name: string) => new Uint8Array(readFileSync(`e2e/fixtures/import/${name}`));
 const text = (s: string) => new TextEncoder().encode(s);
 
@@ -154,6 +156,62 @@ describe(".docx", () => {
     expect(file.dropped).toContainEqual({ kind: "footnotes", count: 1 });
     expect(JSON.stringify(file.body)).not.toContain("See terms");
     expect(file.compareHtml).toBe("<p>Rates apply.</p>");
+  });
+});
+
+describe("decompression bombs: the server survives, the file is refused", () => {
+  it("a .docx whose parts claim too much once inflated is refused before it is opened", async () => {
+    // ~64 MB of empty paragraphs deflates to well under 1 MB: a small upload, a huge inflate.
+    const zip = new JSZip();
+    zip.file("word/document.xml", `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>${"<w:p/>".repeat(11_000_000)}</w:body></w:document>`);
+    const bomb = new Uint8Array(await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" }));
+    expect(bomb.byteLength).toBeLessThan(IMPORT_LIMITS_BYTES);
+    expect(checkZip(bomb)).toMatchObject({ ok: false });
+    expect(await convertFile("docx", bomb)).toEqual({ ok: false, code: "unreadable" });
+  }, 30_000);
+
+  it("checkZip: entry count, one entry, the total and the ratio", async () => {
+    const fixtureCheck = checkZip(fixture("spring-offer.docx"));
+    expect(fixtureCheck).toMatchObject({ ok: true });
+    const tight = { ...ZIP_LIMITS, maxEntries: 2 };
+    expect(checkZip(fixture("spring-offer.docx"), tight)).toEqual({ ok: false, why: expect.stringMatching(/entries$/) });
+    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, maxEntryBytes: 100 })).toMatchObject({ ok: false });
+    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, maxTotalBytes: 1_000 })).toMatchObject({ ok: false });
+    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, ratioFloorBytes: 0, maxRatio: 1 })).toMatchObject({ ok: false });
+    expect(checkZip(text("PK\u0003\u0004 not a zip"))).toMatchObject({ ok: false });
+  });
+
+  // 24 MB is plenty for the real fixtures (checked first), so a refusal under it is the bomb's doing.
+  const HEAP = { maxHeapMb: 24 };
+
+  it("a .docx that understates its size runs out of the worker's heap: refused, and this process carries on", async () => {
+    expect((await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok).toBe(true);
+    // 150,000 runs make an XML DOM far larger than the heap; the zip's claims are honest and small.
+    const bytes = await docxWith(wp("x").repeat(150_000));
+    expect(checkZip(bytes)).toMatchObject({ ok: true });
+    expect(await convertFile("docx", bytes, HEAP)).toEqual({ ok: false, code: "unreadable" });
+    // The worker died, not us: the next conversion works.
+    expect((await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok).toBe(true);
+  }, 30_000);
+
+  it("a .pdf that exhausts the worker's heap is refused the same way", async () => {
+    expect((await convertFile("pdf", fixture("rate-change-notice.pdf"), HEAP)).ok).toBe(true);
+    // One page, 300,000 one-character text items: a few MB of PDF, far more as pdf.js's text items.
+    const ops = "BT /F1 9 Tf 10 10 Td (x) Tj ET\n".repeat(300_000);
+    const pdf = text(
+      "%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n" +
+        "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R " +
+        "/Resources << /Font << /F1 5 0 R >> >> >> endobj\n" +
+        `4 0 obj << /Length ${ops.length} >> stream\n${ops}endstream endobj\n` +
+        "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n",
+    );
+    expect(pdf.byteLength).toBeLessThan(IMPORT_LIMITS_BYTES);
+    expect(await convertFile("pdf", pdf, HEAP)).toEqual({ ok: false, code: "unreadable" });
+  }, 60_000);
+
+  it("a conversion that takes too long is stopped: .docx and .pdf", async () => {
+    expect(await convertFile("docx", fixture("spring-offer.docx"), { timeoutMs: 1 })).toEqual({ ok: false, code: "unreadable" });
+    expect(await convertFile("pdf", fixture("rate-change-notice.pdf"), { timeoutMs: 1 })).toEqual({ ok: false, code: "unreadable" });
   });
 });
 

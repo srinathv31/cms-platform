@@ -749,9 +749,9 @@ test.describe("scenario 3: the review loop", () => {
       await press(approveButton(page));
       const dialog = page.getByRole("dialog", { name: "Approve v2" });
       await expect(dialog).toBeVisible();
-      // The consequence is the dialog's description; with nothing more to say there is no box under it.
+      // The consequence is the dialog's description; a first Active version adds what that means for consumers.
       await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v2 becomes Active.");
-      await expect(dialog.locator('[data-slot="consequences"]')).toHaveCount(0);
+      await expect(dialog.locator('[data-slot="consequences"]')).toHaveText("Consumers can start using it right away.");
       // Nothing is Active yet, so there is no previous version to sunset.
       await expect(dialog.getByRole("checkbox")).toHaveCount(0);
       await expect(dialog.getByText(/sunset/i)).toHaveCount(0);

@@ -28,7 +28,21 @@ const ALL: Variable[] = [
 const schemaFor = (variables: readonly Variable[]) =>
   contractJsonSchema({ templateId: "UC-4F7K2Q", templateName: "Spring Travel Rewards — Terms", versionNumber: 2, variables });
 const validator = (variables: readonly Variable[]) => z.fromJSONSchema(schemaFor(variables) as never);
-const accepts = (variables: readonly Variable[], values: Record<string, unknown>) => validator(variables).safeParse(values).success;
+/**
+ * The same schema with `format` removed: draft 2020-12 makes format an annotation by default, so a
+ * standard validator may not check it. The schema must hold without it.
+ */
+const annotationOnly = (variables: readonly Variable[]) => {
+  const schema = schemaFor(variables);
+  const properties = Object.fromEntries(Object.entries(schema.properties).map(([k, p]) => [k, { ...p, format: undefined }]));
+  return z.fromJSONSchema(JSON.parse(JSON.stringify({ ...schema, properties })) as never);
+};
+const accepts = (variables: readonly Variable[], values: Record<string, unknown>) => {
+  const strict = validator(variables).safeParse(values).success;
+  // Whatever the format keyword decides, the patterns alone give the same answer.
+  expect(annotationOnly(variables).safeParse(values).success, JSON.stringify(values)).toBe(strict);
+  return strict;
+};
 
 const without = (values: Record<string, unknown>, ...keys: string[]) =>
   Object.fromEntries(Object.entries(values).filter(([key]) => !keys.includes(key)));
@@ -58,12 +72,13 @@ describe("contractJsonSchema", () => {
     expect(jsonSchemaId("UC-ABCDEF", 7)).toBe("https://ucomp.example/schemas/UC-ABCDEF/v7/values.json");
   });
 
-  it("types each property: strings, numbers as strings or JSON numbers, dates, state codes", () => {
+  it("types each property: strings (a required text non-blank), numbers as decimal strings, dates, state codes", () => {
     const { properties: p } = schemaFor(ALL);
-    expect(p.first_name).toEqual({ title: "first name", description: "Text.", type: "string", examples: ["Maya"] });
-    expect(p.annual_fee).toMatchObject({ type: ["string", "number"], description: "Currency, canonical form like 1000 or 1000.50.", examples: ["1000"] });
-    expect(p.purchase_apr).toMatchObject({ type: ["string", "number"], examples: ["21.99"] });
-    expect(p.bonus_points).toMatchObject({ type: ["string", "number"], examples: ["20000"] });
+    expect(p.first_name).toEqual({ title: "first name", description: "Text.", type: "string", minLength: 1, pattern: "\\S", examples: ["Maya"] });
+    expect(schemaFor([v("nickname", "text", false)]).properties.nickname).toEqual({ title: "nickname", description: "Text.", type: "string", examples: ["Maya"] });
+    expect(p.annual_fee).toMatchObject({ type: "string", description: "Currency, canonical form like 1000 or 1000.50.", examples: ["1000"] });
+    expect(p.purchase_apr).toMatchObject({ type: "string", examples: ["21.99"] });
+    expect(p.bonus_points).toMatchObject({ type: "string", examples: ["20000"] });
     expect(p.offer_end_date).toMatchObject({ type: "string", format: "date", examples: ["2027-03-04"] });
     expect(p.home_state).toMatchObject({ type: "string", examples: ["NJ"] });
     expect(p.home_state!.enum).toEqual(Object.keys(US_STATES));
@@ -96,20 +111,48 @@ describe("contractJsonSchema: validated", () => {
     expect(validateValues([variable], { [variable.key]: JUNK[type] }).ok).toBe(false);
   });
 
-  it("numbers may be JSON numbers or decimal strings", () => {
-    for (const value of [1000, 1000.5, "1000", "1000.50", "-12.5", "0"]) {
+  it("numbers are decimal strings; JSON numbers aren't advertised (the route still takes plain ones)", () => {
+    for (const value of ["1000", "1000.50", "-12.5", "0"]) {
       expect(accepts(ALL, { ...samples, annual_fee: value }), String(value)).toBe(true);
     }
-    for (const value of ["$1,000", "1,000", "21.99%", "1e3", ".5", "5.", ""]) {
-      expect(accepts(ALL, { ...samples, annual_fee: value }), value).toBe(false);
+    for (const value of ["$1,000", "1,000", "21.99%", "1e3", ".5", "5.", "", 1000, 1e21, 1e-7, "9".repeat(309)]) {
+      expect(accepts(ALL, { ...samples, annual_fee: value }), String(value)).toBe(false);
+    }
+    // Why: a JSON number in exponent notation is refused by the route.
+    expect(validateValues([v("x", "currency")], { x: 1e21 }).ok).toBe(false);
+    expect(validateValues([v("x", "currency")], { x: 1e-7 }).ok).toBe(false);
+    expect(validateValues([v("x", "currency")], { x: 1000 }).ok).toBe(true);
+  });
+
+  it("a required text must not be blank; an optional one may be", () => {
+    for (const value of ["", "   ", "\t\n"]) {
+      expect(accepts(ALL, { ...samples, first_name: value }), JSON.stringify(value)).toBe(false);
+      expect(validateValues([v("first_name", "text")], { first_name: value }).ok).toBe(false);
+      expect(accepts([v("nickname", "text", false)], { nickname: value })).toBe(true);
+    }
+    expect(accepts(ALL, { ...samples, first_name: " M " })).toBe(true);
+  });
+
+  it("dates must be real calendar days as YYYY-MM-DD, by the pattern alone", () => {
+    for (const value of ["2027-02-30", "2027-04-31", "2100-02-29", "2027-13-01", "2027-00-10", "0099-01-01", "3/4/2027", "March 4, 2027", "2027-3-4"]) {
+      expect(accepts(ALL, { ...samples, offer_end_date: value }), value).toBe(false);
+    }
+    for (const value of ["2028-02-29", "2000-02-29", "2400-02-29", "0100-01-01", "9999-12-31"]) {
+      expect(accepts(ALL, { ...samples, offer_end_date: value }), value).toBe(true);
     }
   });
 
-  it("dates must be real calendar days as YYYY-MM-DD", () => {
-    for (const value of ["2027-02-30", "3/4/2027", "March 4, 2027", "2027-3-4"]) {
-      expect(accepts(ALL, { ...samples, offer_end_date: value }), value).toBe(false);
+  it("the date pattern and the route agree on every YYYY-MM-DD across leap and century years", () => {
+    const date = [v("d", "date")];
+    const pattern = new RegExp(schemaFor(date).properties.d!.pattern!);
+    for (const year of ["0099", "0100", "1900", "2000", "2024", "2025", "2100", "2400"]) {
+      for (let month = 0; month <= 13; month++) {
+        for (let day = 0; day <= 32; day++) {
+          const value = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          expect(pattern.test(value), value).toBe(validateValues(date, { d: value }).ok);
+        }
+      }
     }
-    expect(accepts(ALL, { ...samples, offer_end_date: "2028-02-29" })).toBe(true);
   });
 
   it("states must be the two-letter code", () => {
@@ -119,19 +162,23 @@ describe("contractJsonSchema: validated", () => {
   });
 
   it("whatever the schema accepts, the render route accepts", () => {
+    // The review's counterexamples are in here: blank text, exponent-notation numbers, impossible days.
+    const tricky = ["", " ", "\t", null, 1e21, 1e-7, -1e21, 1e300, 0, -0, "1e3", "9".repeat(309), "0099-12-31", "2027-02-30", "2100-02-29"];
     const candidates: Record<VariableType, unknown[]> = {
-      text: ["Maya", "O'Brien", "Zoë", " spaced "],
-      currency: ["0", "95", "1000.50", "-3", 1000, 0.5],
-      percent: ["21.99", "0", "100", 21.99],
-      number: ["20000", "1.5", 7],
-      date: ["2027-03-04", "2026-12-31", "2028-02-29"],
-      us_state: [...US_STATE_CODES],
+      text: ["Maya", "O'Brien", "Zoë", " spaced ", ...tricky],
+      currency: ["0", "95", "1000.50", "-3", 1000, 0.5, ...tricky],
+      percent: ["21.99", "0", "100", 21.99, ...tricky],
+      number: ["20000", "1.5", 7, ...tricky],
+      date: ["2027-03-04", "2026-12-31", "2028-02-29", ...tricky],
+      us_state: [...US_STATE_CODES, ...tricky],
     };
     for (const type of VARIABLE_TYPES) {
-      const variable = v("x", type);
-      for (const value of candidates[type]) {
-        if (!accepts([variable], { x: value })) continue;
-        expect(validateValues([variable], { x: value }).ok, `${type} ${String(value)}`).toBe(true);
+      for (const required of [true, false]) {
+        const variable = v("x", type, required);
+        for (const value of candidates[type]) {
+          if (!accepts([variable], { x: value })) continue;
+          expect(validateValues([variable], { x: value }).ok, `${type} ${String(value)}`).toBe(true);
+        }
       }
     }
   });

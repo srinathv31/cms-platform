@@ -1,19 +1,22 @@
 import "server-only";
-import { createClient, type Client } from "@libsql/client";
+import type { Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as sim from "@/server/db/schema/sim";
+import { createAppClient } from "@/lib/serialized-writes";
 
 // Coral's own database handle. In the demo it shares UCOMP's file (DATABASE_URL), but it is a separate
 // client that only knows the sim_* tables: the simulator never sees UCOMP's schema.
 
 const url = process.env.DATABASE_URL ?? "file:./data/ucomp.db";
 
-const globalForSim = globalThis as unknown as { __simLibsql?: Client };
+const globalForSim = globalThis as unknown as { __simLibsqlSerialized?: Client };
 
+// Same file as UCOMP's client, so its writes take turns on the same process-wide lock and it waits
+// the same way for another process's lock (see `src/lib/serialized-writes.ts`).
 export const simLibsql =
-  globalForSim.__simLibsql ?? createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
+  globalForSim.__simLibsqlSerialized ?? createAppClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
 
-if (process.env.NODE_ENV !== "production") globalForSim.__simLibsql = simLibsql;
+if (process.env.NODE_ENV !== "production") globalForSim.__simLibsqlSerialized = simLibsql;
 
 export const simDb = drizzle(simLibsql, { schema: sim });
 export type SimDb = typeof simDb;

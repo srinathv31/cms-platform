@@ -1,5 +1,7 @@
 # Track B report: Phase 6, access and admin
 
+> Note: this track's migration was replaced at integration by `src/server/db/migrations/0002_phase5_7.sql` (one migration for Phases 5–7).
+
 Branch `track/access`, worktree `../ucomp-access`. Decisions: `docs/decisions/track-b.md`. Brief: `docs/phase-6-brief.md`.
 
 ## What was built

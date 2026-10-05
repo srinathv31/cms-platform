@@ -1,3 +1,4 @@
+import { can } from "@/domain/permissions";
 import { getViewer } from "@/server/viewer";
 import { getShell } from "@/server/queries/spaces";
 import { getPersonaSummaries } from "@/server/queries/personas";
@@ -28,7 +29,7 @@ export async function TopBarHole() {
     <div className="flex items-center gap-2">
       {shell.spaces.length > 0 ? <CommandPalette templates={templates} spaces={shell.spaces} /> : null}
       <NotificationsPopover data={notifications} />
-      <ProfileMenu me={me} personas={personas} />
+      <ProfileMenu me={me} personas={personas} canRequestAccess={can(viewer, "access.request").ok} />
     </div>
   );
 }

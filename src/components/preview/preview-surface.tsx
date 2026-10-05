@@ -141,7 +141,7 @@ export function PreviewSurface({
           recipient={recipientOf(values)}
         />
       ) : null}
-      {preview.view === "original" && original ? <OriginalView original={original} /> : null}
+      {preview.view === "original" && original ? <OriginalView original={original} today={today} /> : null}
     </>
   );
 }

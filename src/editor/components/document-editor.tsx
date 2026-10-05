@@ -54,30 +54,39 @@ import "../styles.css";
 // so the server never needs it. The browser starts the load as this module evaluates, and the live
 // editor waits for it, so the handle mounts in the same commit as the editor: registering its
 // plugin later would reconfigure the view and close a slash menu that is already open.
+// The handle is optional chrome: if its chunk fails to load (a network blip, a redeploy under an
+// open tab), the editor mounts without it, still editable, and the next editor mounted tries again.
 type BlockHandleModule = typeof import("./block-handle");
 let blockHandleModule: BlockHandleModule | null = null;
-let blockHandleLoad: Promise<BlockHandleModule> | null = null;
-function loadBlockHandle(): Promise<BlockHandleModule> {
-  blockHandleLoad ??= import("./block-handle").then((m) => (blockHandleModule = m));
+let blockHandleLoad: Promise<BlockHandleModule | null> | null = null;
+/** The block handle's module, or null when it failed to load. Never rejects. */
+function loadBlockHandle(): Promise<BlockHandleModule | null> {
+  blockHandleLoad ??= import("./block-handle").then(
+    (m) => (blockHandleModule = m),
+    () => {
+      blockHandleLoad = null;
+      return null;
+    },
+  );
   return blockHandleLoad;
 }
 if (typeof window !== "undefined") void loadBlockHandle();
 
-/** True once the block handle's module has loaded (never on the server). */
-function useBlockHandleReady(): boolean {
-  const [ready, setReady] = useState(blockHandleModule !== null);
+/** True once the block handle's load has settled, loaded or failed (never on the server). */
+function useBlockHandleSettled(): boolean {
+  const [settled, setSettled] = useState(blockHandleModule !== null);
   useEffect(() => {
-    if (ready) return;
+    if (settled) return;
     let live = true;
-    void loadBlockHandle().then(() => live && setReady(true));
+    void loadBlockHandle().then(() => live && setSettled(true));
     return () => {
       live = false;
     };
-  }, [ready]);
-  return ready;
+  }, [settled]);
+  return settled;
 }
 
-/** Renders the loaded BlockHandle; only mounted once useBlockHandleReady() is true. */
+/** Renders the loaded BlockHandle (nothing when it failed to load); mounted once useBlockHandleSettled() is true. */
 function LoadedBlockHandle(props: Parameters<BlockHandleModule["BlockHandle"]>[0]) {
   const loaded = blockHandleModule;
   return loaded ? <loaded.BlockHandle {...props} /> : null;
@@ -291,7 +300,7 @@ function LiveEditor({
     [readOnly],
   );
 
-  const blockHandleReady = useBlockHandleReady();
+  const blockHandleSettled = useBlockHandleSettled();
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
@@ -364,7 +373,7 @@ function LiveEditor({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [comments, editorRef]);
 
-  if (!editor || editor.isDestroyed || (!readOnly && !blockHandleReady)) {
+  if (!editor || editor.isDestroyed || (!readOnly && !blockHandleSettled)) {
     return <StaticDocument content={snapshot} variables={variables} threads={threads} activeThreadId={activeThreadId} />;
   }
 

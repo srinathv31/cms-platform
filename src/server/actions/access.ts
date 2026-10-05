@@ -25,7 +25,7 @@ import {
   type RecertDecision,
   type RequestableRole,
 } from "@/domain/access-types";
-import { PermissionError, assertCan } from "@/domain/permissions";
+import { PermissionError, REASONS, assertCan } from "@/domain/permissions";
 import { TEAM_ROLES, type Action, type PermissionResource, type TeamRole, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { loadMembershipFacts, loadRecertFacts, loadRequestFacts, runAccessSweep } from "@/server/access-sweep";
@@ -120,6 +120,11 @@ async function personNamed(tx: Tx, id: string): Promise<Named> {
 
 const actorOf = (viewer: Viewer): Named => ({ id: viewer.userId, name: viewer.name });
 
+async function isAuditor(tx: Tx, userId: string): Promise<boolean> {
+  const rows = await tx.select({ platformRole: users.platformRole }).from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0]?.platformRole === "auditor";
+}
+
 /** Writes a domain result: the membership change, then the audit rows and notifications. */
 async function commit(tx: Tx, change: MembershipChange | null, effects: readonly AccessEffect[], at: Date, viewer: Viewer) {
   if (change) await applyMembershipChange(tx, change);
@@ -206,6 +211,8 @@ export async function requestAccess(input: {
   const parsed = RequestInput.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   const viewer = await getViewer();
+  // The Auditor is read-only everywhere: no team role for them, so no request either (said plainly).
+  if (viewer.platformRole === "auditor") return { ok: false, reason: REASONS.auditorReadOnly };
   const denied = check(viewer, "access.request", { teamId: parsed.data.teamId });
   if (denied) return denied;
 
@@ -269,6 +276,11 @@ export async function decideAccessRequest(input: {
     if (!request) refuse(MISSING.request);
     const team = (await teamNamed(tx, request.teamId)) ?? refuse(MISSING.team);
     const requester = await personNamed(tx, request.userId);
+    // A request made before the requester became an Auditor (or written around the request check)
+    // can't be approved: an Auditor holds no team role. Denying it still works.
+    if (parsed.data.decision === "approve" && (await isAuditor(tx, request.userId))) {
+      refuse(`${requester.name} is an Auditor and can't hold team roles.`);
+    }
     const [membership] = await loadMembershipFacts(
       tx,
       and(eq(memberships.userId, request.userId), eq(memberships.teamId, request.teamId)),

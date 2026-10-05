@@ -24,7 +24,7 @@ export function SettingsNavList({
   const groups = visibleGroups(access);
 
   return (
-    <nav aria-label="Settings sections" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-7 pb-5">
+    <nav aria-label="Settings sections" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-7 pb-5 max-[56.25rem]:px-3">
       <div className="flex flex-col gap-7">
         {groups.map((group) => (
           <div key={group.key}>
@@ -41,7 +41,7 @@ export function SettingsNavList({
                       href={`/${teamSlug}/settings/${section.key}` as Route}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
-                        "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[15px] text-text outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
+                        "group relative flex h-10 items-center gap-3 rounded-lg px-3 max-[56.25rem]:gap-2.5 text-[15px] text-text outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
                         isActive && "font-medium hover:bg-transparent",
                       )}
                     >

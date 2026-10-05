@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { fadeRise } from "@/components/motion/presets";
 import { ROLE_LABEL } from "@/domain/access";
 import type { SidebarCardModel } from "@/domain/access-types";
+import { formatShortDate } from "@/domain/dates";
 
 const EVENT = "ucomp:card-dismissed";
 
@@ -29,7 +30,6 @@ function readDismissed(key: string): boolean {
   }
 }
 
-const dayFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 interface CardContent {
   title: string;
@@ -54,7 +54,7 @@ function contentOf(card: SidebarCardModel): CardContent {
     case "recert_due":
       return {
         title: "Recertification due",
-        lines: [`${card.label} · due ${dayFormat.format(new Date(card.dueAt))}`, card.progressLabel],
+        lines: [`${card.label} · due ${formatShortDate(card.dueAt)}`, card.progressLabel],
         action: { label: "Review", href: `/${card.teamSlug}/settings/recertification` },
       };
     case "my_request":
@@ -63,8 +63,8 @@ function contentOf(card: SidebarCardModel): CardContent {
         lines: [
           `${ROLE_LABEL[card.role]} access to ${card.teamName}`,
           card.adminName
-            ? `Sent ${dayFormat.format(new Date(card.createdAt))} · waiting on ${card.adminName}`
-            : `Sent ${dayFormat.format(new Date(card.createdAt))}`,
+            ? `Sent ${formatShortDate(card.createdAt)} · waiting on ${card.adminName}`
+            : `Sent ${formatShortDate(card.createdAt)}`,
         ],
       };
   }

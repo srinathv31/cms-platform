@@ -338,6 +338,9 @@ describe("filter helpers", () => {
     expect(dateRangeLabel("2026-09-06")).toBe("From Sep 6, 2026");
     expect(dateRangeLabel(null, "2026-10-05")).toBe("Until Oct 5, 2026");
     expect(dateRangeLabel()).toBe("Any date");
+    // Given the demo clock's day, its own year goes unsaid.
+    expect(dateRangeLabel("2026-09-06", "2026-10-05", "2026-10-05")).toBe("Sep 6 – Oct 5");
+    expect(dateRangeLabel("2025-12-06", "2026-01-05", "2026-01-05")).toBe("Dec 6, 2025 – Jan 5");
   });
 });
 

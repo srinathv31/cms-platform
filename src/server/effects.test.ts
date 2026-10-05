@@ -207,6 +207,26 @@ describe("writeEffects: notifications", () => {
     ]);
   });
 
+  it("a template link that names a version: the team opens the template, someone outside it that version's review", async () => {
+    const ctx = context("balance-transfer", { actorId: "jordan" });
+    const link = { to: "template" as const, templateId: ids["balance-transfer"]!, reviewVersion: 2 };
+    await write(
+      ["naomi", "riley", "maya"].map((userId) => ({
+        kind: "notification" as const,
+        notification: "comment_added" as const,
+        to: { kind: "user" as const, userId },
+        title: "Jordan replied.",
+        link,
+      })),
+      ctx,
+    );
+    expect((await notificationsAt(ctx.at)).map((n) => [n.userId, n.href])).toEqual([
+      ["maya", `/coral-offers/templates/${ids["balance-transfer"]}`],
+      ["naomi", `/deposits/review/${ids["balance-transfer"]}/2`],
+      ["riley", `/coral-offers/templates/${ids["balance-transfer"]}`],
+    ]);
+  });
+
   it("builds the three kinds of href", () => {
     expect(notificationHref("deposits", { to: "review", templateId: "UC-AAAAAA", versionNumber: 2 })).toBe(
       "/deposits/review/UC-AAAAAA/2",

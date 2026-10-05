@@ -198,7 +198,8 @@ export interface ApiJsonSchema {
 export interface ApiJsonSchemaProperty {
   title: string; // the variable's label
   description: string; // "Currency, canonical form like 1000 or 1000.50."
-  type: "string" | ["string", "number"];
+  type: "string"; // the canonical forms are strings (the route also takes JSON numbers; not advertised)
+  minLength?: number; // a required text: 1, with pattern "\\S" (blank counts as missing)
   pattern?: string;
   format?: "date";
   enum?: string[]; // us_state: the two-letter codes

@@ -13,6 +13,7 @@ import {
 } from "@/domain/platform-config";
 import type { ApproverRule } from "@/domain/types";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/primitives/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveApprovalChain } from "@/server/actions/platform";
@@ -349,7 +350,9 @@ function Flow({ stages }: { stages: ChainCardStage[] }) {
       <li aria-hidden className="text-text-muted">
         <ArrowRight strokeWidth={1.75} className="size-3.5" />
       </li>
-      <li className="px-1 text-text-muted">Active</li>
+      <li className="flex">
+        <StatusBadge state="active" />
+      </li>
     </ol>
   );
 }

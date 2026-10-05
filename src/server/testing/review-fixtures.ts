@@ -1,13 +1,13 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createClient } from "@libsql/client";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { createDraft } from "@/domain/lifecycle";
 import type { TeamRole, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { createAppClient } from "@/lib/serialized-writes";
 import { newId, newTemplateId } from "@/server/ids";
 import { buildStarter } from "@/server/starters";
 
@@ -19,7 +19,8 @@ import { buildStarter } from "@/server/starters";
 export function tempDatabase(prefix: string) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   const url = `file:${join(dir, "test.db")}`;
-  const libsql = createClient({ url });
+  // As the app opens it (writes take turns, other connections' locks are waited out).
+  const libsql = createAppClient({ url });
   return { DATABASE_URL: url, libsql, db: drizzle(libsql, { schema }), dir };
 }
 

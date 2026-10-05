@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { parseLimit, QUERY_MESSAGES, SEARCH_LIMIT } from "@/domain/golive/api-errors";
 import type { ApiTemplateSearch } from "@/domain/golive-types";
-import { correlationIdOf, errorResponse, jsonResponse } from "@/server/api/http";
+import { correlationIdOf, errorResponse, jsonResponse, withDemoDate } from "@/server/api/http";
 import { now } from "@/server/clock";
 import { requireConsumer, searchActiveTemplates } from "@/server/queries/consumer-api";
 
@@ -11,7 +11,7 @@ import { requireConsumer, searchActiveTemplates } from "@/server/queries/consume
 // The headers are read before anything touches the database: that makes the handler request-time
 // under Cache Components (a database read first would try to prerender it).
 
-export async function GET(request: NextRequest) {
+export const GET = withDemoDate(async function get(request: NextRequest) {
   const consumerHeader = request.headers.get("x-consumer-id");
   const correlationId = correlationIdOf(request);
   const params = request.nextUrl.searchParams;
@@ -30,4 +30,4 @@ export async function GET(request: NextRequest) {
     results: await searchActiveTemplates(query, limit.value),
   };
   return jsonResponse(body, correlationId);
-}
+});

@@ -8,7 +8,7 @@
 import { TYPE_META } from "@/editor/model/variables";
 import type { CopilotPrompt, CopilotPromptInput } from "./import-types";
 import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
-import { CHANNELS, type Channel, type JSONContent } from "./types";
+import { CHANNELS, type Channel, type JSONContent, type RequiredSection } from "./types";
 
 const CHANNEL_NAMES: Record<Channel, string> = { pdf: "PDF", web: "web page", email: "email" };
 
@@ -165,6 +165,40 @@ function hasDraftText(body: JSONContent): boolean {
 
 // ── The prompt ───────────────────────────────────────────────────
 
+/** A heading's plain text, as the editor reads it (`textContent`): text runs only. */
+function plainText(node: JSONContent): string {
+  if (node.type === "text") return node.text ?? "";
+  return (node.content ?? []).map(plainText).join("");
+}
+
+/**
+ * The section headings the prompt asks for: the draft's own required headings, in document order
+ * and with the draft's own titles, because that is what the paste matches an answer against (a draft
+ * keeps its headings when the content type's sections are renamed later). A section of the content
+ * type that the draft lacks, or whose heading is empty, falls back to the content type's title; a
+ * missing one goes after the section that precedes it in the content type.
+ */
+export function promptSections(body: JSONContent, typeSections: readonly RequiredSection[]): RequiredSection[] {
+  const typeTitle = new Map(typeSections.map((section) => [section.key, section.title]));
+  const sections: RequiredSection[] = [];
+  for (const block of body.content ?? []) {
+    const key = block.type === "heading" ? block.attrs?.requiredKey : null;
+    if (typeof key !== "string" || key === "" || sections.some((section) => section.key === key)) continue;
+    const title = plainText(block).replace(/\s+/g, " ").trim();
+    const fallback = typeTitle.get(key);
+    if (title || fallback) sections.push({ key, title: title || fallback! });
+  }
+  typeSections.forEach((section, index) => {
+    if (sections.some((s) => s.key === section.key)) return;
+    const before = typeSections
+      .slice(0, index)
+      .map((earlier) => sections.findIndex((s) => s.key === earlier.key))
+      .reduce((last, at) => Math.max(last, at), -1);
+    sections.splice(before + 1, 0, { key: section.key, title: section.title });
+  });
+  return sections;
+}
+
 /** True when the first thing in the draft is a heading (rather than, say, a greeting above the first section). */
 function opensWithHeading(body: JSONContent): boolean {
   for (const block of body.content ?? []) {
@@ -176,7 +210,7 @@ function opensWithHeading(body: JSONContent): boolean {
 
 /**
  * The prompt for Copilot: what the template is, its required sections as `##` headings (exactly, in
- * order), its variables as `{{key}}` placeholders, the rules that keep the answer pasteable, then the
+ * order, titled as the draft titles them: `promptSections`), its variables as `{{key}}` placeholders, the rules that keep the answer pasteable, then the
  * current draft as Markdown ("Improve this draft") when it has text, else "Write the body now."
  *
  * A template still called "Untitled template" is sent without a name (the placeholder isn't a title
@@ -194,9 +228,10 @@ export function buildCopilotPrompt(input: CopilotPromptInput): CopilotPrompt {
   lines.push(`Team: ${input.teamName}`, `Content type: ${input.contentTypeName}`);
   if (channels.length) lines.push(`Published as: ${andList(channels)}`);
 
-  if (input.requiredSections.length) {
+  const sections = promptSections(input.body, input.requiredSections);
+  if (sections.length) {
     lines.push("", "Use these section headings, exactly as written and in this order:");
-    for (const section of input.requiredSections) lines.push(`## ${section.title}`);
+    for (const section of sections) lines.push(`## ${section.title}`);
   }
 
   lines.push("");

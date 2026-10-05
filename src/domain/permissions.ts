@@ -27,6 +27,8 @@ export const REASONS = {
   ownRevoke: "You started this revoke. Another approver must confirm it.",
   ownRequest: "You can't decide your own access request.",
   ownAccess: "You can't change your own access.",
+  /** The Auditor is read-only everywhere: no team role, request or approval gives them more. */
+  auditorReadOnly: "Auditors have read-only access and can't hold team roles.",
 } as const;
 
 // ── Grants ────────────────────────────────────────────────────
@@ -54,6 +56,14 @@ const PLATFORM_GRANTS: Record<PlatformRole, readonly Action[]> = {
 };
 
 const EVERYONE: readonly Action[] = ["access.request"];
+
+/**
+ * Everything an Auditor may do, whatever else they hold: see and read the audit log. "Sees
+ * everything, changes nothing" (build plan) is enforced here, centrally: a team membership an
+ * Auditor somehow holds adds nothing, being named on a stage adds nothing, and they can't ask for a
+ * team role (access.request is not theirs).
+ */
+const AUDITOR_ONLY: readonly Action[] = PLATFORM_GRANTS.auditor;
 
 /**
  * What a user named by a version's current approval stage may do on that version (Phase 6: Dana
@@ -112,6 +122,7 @@ export function assertCan(viewer: Viewer, action: Action, resource?: PermissionR
 }
 
 function granted(viewer: Viewer, action: Action, teamId: string | null): boolean {
+  if (viewer.platformRole === "auditor") return AUDITOR_ONLY.includes(action);
   if (EVERYONE.includes(action)) return true;
   if (viewer.platformRole && PLATFORM_GRANTS[viewer.platformRole].includes(action)) return true;
   if (teamId === null) return false; // cross-team context: platform roles only
@@ -129,12 +140,16 @@ function namedApprover(
   if (!resource.stageApproverIds?.includes(viewer.userId)) return false;
   // The Auditor role is read-only everywhere: being named on a stage gives an Auditor nothing.
   if (viewer.platformRole === "auditor") return false;
-  return hasActiveAccess(viewer);
+  return hasActiveTeamAccess(viewer);
 }
 
-/** An active membership with a role somewhere, or a platform role. */
-function hasActiveAccess(viewer: Viewer): boolean {
-  return viewer.platformRole !== null || viewer.memberships.some((m) => m.status === "active" && m.roles.length > 0);
+/**
+ * An active membership with a role on some team. A platform role alone doesn't count for a named
+ * stage: Platform Admin has no approve power (build plan), so naming one gives them nothing until
+ * they hold a team role somewhere.
+ */
+export function hasActiveTeamAccess(viewer: Pick<Viewer, "memberships">): boolean {
+  return viewer.memberships.some((m) => m.status === "active" && m.roles.length > 0);
 }
 
 /** null, undefined and "all" all mean the cross-team context. */

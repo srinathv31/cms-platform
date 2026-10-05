@@ -84,7 +84,7 @@ export function ReviewHeader({
           animate={{ opacity: 1 }}
           transition={{ duration: duration.slow, ease: ease.outSoft }}
         >
-          <StatusBadge state={state} sunsetAt={sunsetAt ? new Date(sunsetAt) : null} />
+          <StatusBadge state={state} sunsetAt={sunsetAt ? new Date(sunsetAt) : null} now={nowIso} />
         </m.span>
         <span className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
           v{versionNumber} by {author.name} · {formatRelative(submittedAt, new Date(nowIso))}

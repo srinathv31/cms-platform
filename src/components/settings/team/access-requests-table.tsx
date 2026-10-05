@@ -59,8 +59,8 @@ function Decided({ rows, today }: { rows: AccessRequestRow[]; today: string }) {
         return (
           <div key={r.id} role="row" className="grid min-h-16 grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1.3fr)_9.5rem] items-center gap-x-3 border-b border-hairline py-2.5">
             <div role="cell" className="flex min-w-0 items-center gap-3">
-              <span aria-hidden className="shrink-0 opacity-50">
-                <UserAvatar initials={r.person.initials} hue={r.person.hue} />
+              <span aria-hidden className="shrink-0">
+                <UserAvatar initials={r.person.initials} hue={r.person.hue} muted />
               </span>
               <span className="truncate text-[15px] font-medium text-text-muted">{r.person.name}</span>
             </div>

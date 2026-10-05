@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { X } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+import { ClipboardCheck, X } from "lucide-react";
 import { m } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { duration, ease } from "@/components/motion/presets";
@@ -97,6 +99,7 @@ export function Rail({
   original = false,
   takeArrival,
   footer,
+  reviewHref = null,
   children,
 }: {
   channels: React.ReactNode;
@@ -116,6 +119,8 @@ export function Rail({
   takeArrival?: () => boolean;
   /** A quiet row at the end of the normal rail, after the sections (the Copilot prompt). */
   footer?: React.ReactNode;
+  /** The shown version is in review: a quiet "Open review" row closes the rail, under either view. */
+  reviewHref?: string | null;
   children: React.ReactNode;
 }) {
   const session = useWorkspaceSession();
@@ -292,6 +297,19 @@ export function Rail({
           <div className="mt-8">{children}</div>
           {footer ? <div className="mt-8">{footer}</div> : null}
         </m.div>
+        {reviewHref && !previewOpen ? (
+          <div className="mt-8">
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<Link href={reviewHref as Route} />}
+              className="h-8 w-full justify-start gap-2 rounded-lg px-2 text-[13px] font-normal text-text-muted hover:text-text"
+            >
+              <ClipboardCheck aria-hidden strokeWidth={1.75} className="size-4" />
+              Open review
+            </Button>
+          </div>
+        ) : null}
       </div>
     </aside>
   );

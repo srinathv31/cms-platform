@@ -4,8 +4,14 @@
 //
 // The schema describes the CANONICAL forms (the ones `Variable.sample` holds and the render route
 // turns every value into): "1000", "21.99", "2027-03-04", "20000", "NJ". The route also accepts
-// friendly forms ("$1,000", "21.99%", "3/4/2027", "New Jersey"); the schema doesn't advertise them,
-// so a consumer that validates against it always sends something the route accepts.
+// friendly forms ("$1,000", "21.99%", "3/4/2027", "New Jersey") and JSON numbers; the schema doesn't
+// advertise them, so a consumer that validates against it always sends something the route accepts,
+// with any standard 2020-12 validator (format is only an annotation there, so the date pattern itself
+// checks the calendar):
+//   - a required text must have a non-blank character (the route reads blank as missing);
+//   - numeric types are decimal strings only: a JSON number like 1e21 or 1e-7 stringifies to exponent
+//     notation, which the route refuses, and a pattern can't constrain numbers;
+//   - a date is a real calendar day from year 0100 on, leap years included.
 
 import { TYPE_META, US_STATES } from "@/editor/model/variables";
 import type { ApiJsonSchema, ApiJsonSchemaProperty, ApiVariable, Variable } from "../golive-types";
@@ -18,10 +24,22 @@ export function jsonSchemaId(templateId: string, versionNumber: number): string 
   return `https://ucomp.example/schemas/${templateId}/v${versionNumber}/values.json`;
 }
 
-/** A plain decimal: "1000", "1000.50", "-12.5". Every match is accepted by the render route. */
-export const DECIMAL_PATTERN = "^-?\\d+(?:\\.\\d+)?$";
-/** A calendar day as YYYY-MM-DD (the `format: "date"` keyword also checks it's a real day). */
-export const DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";
+/**
+ * A plain decimal: "1000", "1000.50", "-12.5". Every match is accepted by the render route: at most
+ * 308 whole digits, so the number stays finite.
+ */
+export const DECIMAL_PATTERN = "^-?\\d{1,308}(?:\\.\\d+)?$";
+/**
+ * A real calendar day as YYYY-MM-DD: month lengths and leap years (every 4th year, not centuries
+ * unless divisible by 400), years 0100–9999 (the route reads years below 100 as 19xx, so refuses them).
+ * `format: "date"` says the same, but validators may treat format as an annotation only.
+ */
+export const DATE_PATTERN =
+  "^(?!00)(?:\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|02-(?:0[1-9]|1\\d|2[0-8]))" +
+  "|(?:\\d{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29)$";
+
+/** At least one non-blank character: a required text the route won't read as missing. */
+export const NON_BLANK_PATTERN = "\\S";
 
 /** The two-letter codes, in the editor's order (50 states plus DC). */
 export const US_STATE_CODES: readonly string[] = Object.keys(US_STATES);
@@ -44,12 +62,12 @@ function propertyOf(variable: Variable): ApiJsonSchemaProperty {
   const base = { title: variable.label, description: DESCRIPTIONS[variable.type], examples: [exampleOf(variable)] };
   switch (variable.type) {
     case "text":
-      return { ...base, type: "string" };
+      return variable.required ? { ...base, type: "string", minLength: 1, pattern: NON_BLANK_PATTERN } : { ...base, type: "string" };
     case "currency":
     case "percent":
     case "number":
-      // A JSON number is fine too; `pattern` only applies to strings.
-      return { ...base, type: ["string", "number"], pattern: DECIMAL_PATTERN };
+      // Strings only: `pattern` can't constrain a JSON number, and some don't stringify plainly.
+      return { ...base, type: "string", pattern: DECIMAL_PATTERN };
     case "date":
       return { ...base, type: "string", format: "date", pattern: DATE_PATTERN };
     case "us_state":

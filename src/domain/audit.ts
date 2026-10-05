@@ -21,6 +21,7 @@ import type {
 } from "./access-types";
 import { INACTIVITY_FLAG_DAYS } from "./access-types";
 import { SYSTEM_ACTOR, describeActivity } from "./activity";
+import { formatShortDate } from "./dates";
 import { formatLongDate } from "./render/errors";
 import type { Person } from "./review-types";
 import { TEAM_ROLES, type TeamRole } from "./types";
@@ -447,11 +448,13 @@ export function datePresets(today: string): { days: number; label: string; from:
   }));
 }
 
-const chipDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-
-/** The Date chip: "Sep 6, 2026 – Oct 5, 2026", "From Sep 6, 2026", "Until Oct 5, 2026". */
-export function dateRangeLabel(from?: string | null, to?: string | null): string {
-  const f = (s: string) => chipDate.format(new Date(`${s}T00:00:00.000Z`));
+/**
+ * The Date chip: "Sep 6, 2026 – Oct 5, 2026", "From Sep 6, 2026", "Until Oct 5, 2026". Given `today`
+ * (YYYY-MM-DD, the demo clock's), a day in its year drops the year: "Sep 6 – Oct 5".
+ */
+export function dateRangeLabel(from?: string | null, to?: string | null, today?: string): string {
+  // With no `today`, every day says its year (`now` year 0 never matches).
+  const f = (s: string) => formatShortDate(`${s}T00:00:00.000Z`, today ? `${today}T00:00:00.000Z` : "0000-01-01T00:00:00.000Z");
   if (from && to) return from === to ? f(from) : `${f(from)} – ${f(to)}`;
   if (from) return `From ${f(from)}`;
   if (to) return `Until ${f(to)}`;

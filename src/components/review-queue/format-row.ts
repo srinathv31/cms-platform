@@ -51,7 +51,9 @@ export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: 
     stageStep: row.stage.count > 1 ? `Stage ${row.stage.position + 1} of ${row.stage.count}` : null,
     decision,
     folded: decision
-      ? `${decision.label} by ${decision.by} · ${decision.when}`
+      ? decision.kind === "approved"
+        ? `Approved by ${decision.by} · ${decision.when}`
+        : `${decision.by} requested changes · ${decision.when}`
       : `${row.author.name} · ${submitted} · ${row.stage.name}`,
   };
 }

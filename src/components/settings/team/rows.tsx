@@ -275,7 +275,8 @@ export function RowTable({
     table.current?.querySelector<HTMLElement>(`[data-act="${CSS.escape(returnTo)}"]`)?.focus();
   }, [open, returnTo]);
 
-  const grid = `minmax(0,1fr) ${cols} ${actionsW}`;
+  // The name column keeps 8rem; on a narrow dialog the table scrolls sideways inside the panel instead.
+  const grid = `minmax(8rem,1fr) ${cols} ${actionsW}`;
   const span = columns.length + 2;
   const close = (rowId: string, key: string, returnFocus: boolean) => {
     setReturnTo(returnFocus ? `${rowId}:${key}` : null);
@@ -299,71 +300,73 @@ export function RowTable({
   if (rows.length === 0) return empty ? <p className="py-6 text-[15px] text-text-muted">{empty}</p> : null;
 
   return (
-    <div ref={table} role="table" aria-label={tableLabel ?? label}>
-      <div role="row" className="grid items-end gap-x-3 border-b border-hairline pb-2" style={{ gridTemplateColumns: grid }}>
-        <span role="columnheader" className="caps-label">{label}</span>
-        {columns.map((c) => (
-          <span role="columnheader" key={c} className="caps-label">{c}</span>
-        ))}
-        <span role="columnheader">
-          <span className="sr-only">Actions</span>
-        </span>
-      </div>
-      {rows.map((row) => {
-        const act = open?.id === row.id ? row.actions.find((a) => a.key === open.key) : undefined;
-        return (
-          <div key={row.id} role="rowgroup" className="border-b border-hairline">
-            <div
-              role="row"
-              data-person={row.person.id}
-              className="grid min-h-16 items-center gap-x-3 py-2.5"
-              style={{ gridTemplateColumns: grid }}
-            >
-              {/* A dimmed row: the avatar fades and the text goes muted (fading the text too would fail contrast). */}
-              <div role="cell" className="flex min-w-0 items-center gap-3">
-                <span aria-hidden className={cn("shrink-0", row.dim && "opacity-50")}>
-                  <UserAvatar initials={row.person.initials} hue={row.person.hue} />
-                </span>
-                <div className="min-w-0">
-                  <div className={cn("truncate text-[15px] font-medium", row.dim ? "text-text-muted" : "text-text")}>
-                    {row.person.name}
-                    {row.aside ? <span className="font-normal text-text-muted"> {row.aside}</span> : null}
-                  </div>
-                  <div className="truncate text-[13px] text-text-muted" title={typeof row.sub === "string" ? row.sub : undefined}>
-                    {row.sub}
+    <div className="overflow-x-auto overscroll-x-contain">
+      <div ref={table} role="table" aria-label={tableLabel ?? label} className="min-w-min">
+        <div role="row" className="grid items-end gap-x-3 border-b border-hairline pb-2" style={{ gridTemplateColumns: grid }}>
+          <span role="columnheader" className="caps-label">{label}</span>
+          {columns.map((c) => (
+            <span role="columnheader" key={c} className="caps-label">{c}</span>
+          ))}
+          <span role="columnheader">
+            <span className="sr-only">Actions</span>
+          </span>
+        </div>
+        {rows.map((row) => {
+          const act = open?.id === row.id ? row.actions.find((a) => a.key === open.key) : undefined;
+          return (
+            <div key={row.id} role="rowgroup" className="border-b border-hairline">
+              <div
+                role="row"
+                data-person={row.person.id}
+                className="grid min-h-16 items-center gap-x-3 py-2.5"
+                style={{ gridTemplateColumns: grid }}
+              >
+                {/* A dimmed row: the avatar goes grey and the text goes muted (fading either would fail contrast). */}
+                <div role="cell" className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden className="shrink-0">
+                    <UserAvatar initials={row.person.initials} hue={row.person.hue} muted={row.dim} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className={cn("truncate text-[15px] font-medium", row.dim ? "text-text-muted" : "text-text")}>
+                      {row.person.name}
+                      {row.aside ? <span className="font-normal text-text-muted"> {row.aside}</span> : null}
+                    </div>
+                    <div className="truncate text-[13px] text-text-muted" title={typeof row.sub === "string" ? row.sub : undefined}>
+                      {row.sub}
+                    </div>
                   </div>
                 </div>
-              </div>
-              {row.cells.map((cell, i) => (
-                <div role="cell" key={columns[i]} className={cn("min-w-0 text-[14px]", row.dim ? "text-text-muted" : "text-text")}>
-                  {cell}
+                {row.cells.map((cell, i) => (
+                  <div role="cell" key={columns[i]} className={cn("min-w-0 text-[14px]", row.dim ? "text-text-muted" : "text-text")}>
+                    {cell}
+                  </div>
+                ))}
+                <div role="cell" className="flex justify-end">
+                  {act ? null : <Actions row={row} onPick={(a) => pick(row, a)} />}
                 </div>
-              ))}
-              <div role="cell" className="flex justify-end">
-                {act ? null : <Actions row={row} onPick={(a) => pick(row, a)} />}
               </div>
+              {failure?.id === row.id ? (
+                <FullRow span={span}>
+                  <p role="alert" className="pb-3 text-right text-[13px] text-danger-text">{failure.reason}</p>
+                </FullRow>
+              ) : null}
+              {act ? (
+                <FullRow span={span} className="pb-3">
+                  {act.custom ? (
+                    act.custom({ close: () => close(row.id, act.key, true) })
+                  ) : act.strip ? (
+                    <ConfirmStrip
+                      spec={act.strip}
+                      onCancel={() => close(row.id, act.key, true)}
+                      onDone={() => close(row.id, act.key, false)}
+                    />
+                  ) : null}
+                </FullRow>
+              ) : null}
             </div>
-            {failure?.id === row.id ? (
-              <FullRow span={span}>
-                <p role="alert" className="pb-3 text-right text-[13px] text-danger-text">{failure.reason}</p>
-              </FullRow>
-            ) : null}
-            {act ? (
-              <FullRow span={span} className="pb-3">
-                {act.custom ? (
-                  act.custom({ close: () => close(row.id, act.key, true) })
-                ) : act.strip ? (
-                  <ConfirmStrip
-                    spec={act.strip}
-                    onCancel={() => close(row.id, act.key, true)}
-                    onDone={() => close(row.id, act.key, false)}
-                  />
-                ) : null}
-              </FullRow>
-            ) : null}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

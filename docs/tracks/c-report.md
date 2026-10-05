@@ -1,5 +1,7 @@
 # Track C report: Phase 7a (import, Copilot, ⌘K) and carried rough edges
 
+> Note: this track's migration was replaced at integration by `src/server/db/migrations/0002_phase5_7.sql` (one migration for Phases 5–7).
+
 Branch `track/import`, worktree `../ucomp-import`. Decisions: `docs/decisions/track-c.md`. Brief: `docs/phase-7a-brief.md`.
 
 ## What was built

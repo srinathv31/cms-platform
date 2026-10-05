@@ -485,7 +485,7 @@ export interface AuditRow {
   summary: string;
   /** S3 addition: whom an access event is about (details.userId); null for template and platform events. */
   subject: Person | null;
-  /** S3 addition: the demo-clock time, "Mon, Oct 5, 2026, 3:42 PM" (`stamp`). */
+  /** S3 addition: the demo-clock time in UTC, "Oct 5, 3:42 PM UTC" (the year only outside the demo clock's; `formatDateTime`). */
   when: string;
   /** S3 addition: relative to the demo clock's now, "3 days ago". */
   ago: string;

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { BAD_REQUEST_MESSAGES, badRequest, consumerRequired, renderFailed } from "@/domain/render";
 import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
-import { baseHeaders, correlationIdOf, errorResponse } from "@/server/api/http";
+import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
 import { renderTemplate, type RenderResult } from "@/server/render/render-template";
 import { getViewer } from "@/server/viewer";
 
@@ -120,7 +120,7 @@ function successResponse(
 
 // ── Handler ──────────────────────────────────────────────────────────────────
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
+export const POST = withDemoDate(async function post(request: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
   const { templateId } = await params;
   const correlationId = correlationIdOf(request);
 
@@ -157,4 +157,4 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     console.error(`[render] ${templateId} ${channel} failed outside the pipeline, correlation ${correlationId}`, error);
     return errorResponse(renderFailed(channel), correlationId);
   }
-}
+});

@@ -90,8 +90,18 @@ export async function writeEffects(
         const userIds = (await resolveRecipients(tx, effect.to, ctx.teamId)).filter((id) => id !== ctx.actorId);
         if (userIds.length === 0) break;
         const { teamSlug } = await templateInfo();
-        // A stage reviewer outside the template's team opens the version from their own space.
-        const spaces = effect.link.to === "review" ? await recipientSpaces(tx, userIds, teamSlug) : null;
+        // A stage reviewer outside the template's team opens the version from their own space: a review
+        // link moves there, and a template link that names a version becomes that version's review.
+        const link = effect.link;
+        const outsideReview: NotificationLink | null =
+          link.to === "template" && link.reviewVersion !== undefined
+            ? { to: "review", templateId: link.templateId, versionNumber: link.reviewVersion }
+            : null;
+        const spaces = link.to === "review" || outsideReview ? await recipientSpaces(tx, userIds, teamSlug) : null;
+        const hrefFor = (userId: string): string => {
+          const own = spaces?.get(userId);
+          return own ? notificationHref(own, outsideReview ?? link) : notificationHref(teamSlug, link);
+        };
         await tx.insert(notifications).values(
           userIds.map((userId) => ({
             id: newId("nt"),
@@ -100,7 +110,7 @@ export async function writeEffects(
             kind: effect.notification,
             title: effect.title,
             body: effect.body ?? null,
-            href: notificationHref(spaces?.get(userId) ?? teamSlug, effect.link),
+            href: hrefFor(userId),
             createdAt: ctx.at,
             readAt: null,
           })),

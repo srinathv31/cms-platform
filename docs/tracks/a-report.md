@@ -1,5 +1,7 @@
 # Track A report: Phase 5, going live
 
+> Note: this track's migration was replaced at integration by `src/server/db/migrations/0002_phase5_7.sql` (one migration for Phases 5–7).
+
 Branch `track/golive`, worktree `../ucomp-golive`. Decisions: `docs/decisions/track-a.md`. Brief: `docs/phase-5-brief.md`.
 
 ## What was built
@@ -32,7 +34,7 @@ Branch `track/golive`, worktree `../ucomp-golive`. Decisions: `docs/decisions/tr
   - `sim_links`: unique index on `offer_id`.
   - `sim_deliveries`: nullable `template_id`, `version_number` and `newer_version`; the error keeps `{status, code, message}`; indexes on (offer_id, at) and batch_id.
   - `sim_offers.terms`: new `endsOn`.
-  - New table `sim_notice_reads`.
+  - `sim_notice_reads` already existed in `0000_init`; this track only seeded rows into it (no schema change to that table).
 - Migration `0002_phase5_golive.sql` (+ snapshot, journal). It collides with Track B's `0002_phase6_access`; regenerate at integration.
 
 ## Seed changes

@@ -6,6 +6,7 @@ import { m } from "motion/react";
 import { duration, ease } from "@/components/motion/presets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { formatShortDate } from "@/domain/dates";
 import type { ImportOriginalRef, ImportOriginalView } from "@/domain/import-types";
 import { DocxSource } from "./docx-source";
 import { OriginalFailed } from "./original-failed";
@@ -17,7 +18,6 @@ const viewCache = new Map<string, ImportOriginalView>();
 
 type Loaded = { status: "loading" } | { status: "ready"; view: ImportOriginalView } | { status: "failed" };
 
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 /** "860 bytes", "24 KB", "1.2 MB". */
 export function formatFileSize(bytes: number): string {
@@ -37,7 +37,7 @@ export function formatFileSize(bytes: number): string {
  * stands where the report and the source go, and is swapped out whole, so nothing that was on screen
  * moves when they arrive.
  */
-export function OriginalView({ original }: { original: ImportOriginalRef }) {
+export function OriginalView({ original, today }: { original: ImportOriginalRef; /** The demo clock's day, YYYY-MM-DD. */ today: string }) {
   const { uploadId } = original;
   const [loaded, setLoaded] = useState<Loaded>(() => {
     const cached = viewCache.get(uploadId);
@@ -81,7 +81,7 @@ export function OriginalView({ original }: { original: ImportOriginalRef }) {
         <FileText aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-subtle" />
         <span className="min-w-0 truncate text-[14px] font-medium text-text">{original.filename}</span>
         <span className="shrink-0">
-          {formatFileSize(original.size)} · {original.uploadedByName} · {shortDate.format(new Date(original.uploadedAt))}
+          {formatFileSize(original.size)} · {original.uploadedByName} · {formatShortDate(original.uploadedAt, `${today}T00:00:00.000Z`)}
         </span>
       </div>
       {loaded.status === "ready" ? (

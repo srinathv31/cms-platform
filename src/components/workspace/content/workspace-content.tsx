@@ -17,10 +17,12 @@ export async function WorkspaceContent({
   // Only a draft or a version in review takes them: on an Active (or any decided) version the threads are a record,
   // as on the review screen. (The shown version is the latest one, whose state the header carries.)
   const { space, template } = await requireTemplate(team, templateId);
-  const { status } = await getWorkspaceHeader(team, templateId);
+  const { status, versionNumber } = await getWorkspaceHeader(team, templateId);
   const viewer = personOf(await getPeople(), space.viewer.userId);
   const canComment = can(space.viewer, "review.comment", { teamId: template.teamId }).ok && versionTakesComments(status);
   const nowIso = (await now()).toISOString();
+  // A version in review opens on the review screen, in this space (anyone who sees the template here can).
+  const reviewHref = status === "in_review" ? `/${team}/review/${templateId}/${versionNumber}` : null;
   return (
     <ContentWorkspace
       // A different version is a different document, editor and autosave session. So is the same
@@ -48,6 +50,7 @@ export async function WorkspaceContent({
       viewer={viewer}
       now={nowIso}
       importOriginal={doc.importOriginal}
+      reviewHref={reviewHref}
     />
   );
 }

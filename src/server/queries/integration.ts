@@ -7,7 +7,7 @@ import { CONSUMER_ERRORS, integrationSamples, renderPathOf, RESPONSE_FORMATS } f
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { CHANNELS } from "@/domain/types";
 import { db } from "@/server/db/client";
-import { consumers, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
 
 // The integration panel (the sheet behind the template's "Share" ring): what a consumer needs to
 // call the render API for the Active version. No viewer here: the action that calls it checks
@@ -29,20 +29,30 @@ async function sampleConsumer(templateId: string): Promise<string> {
 
 /** The panel's data, or null when the template doesn't exist or has no Active version. */
 export async function getIntegrationPanel(templateId: string, origin: string): Promise<IntegrationPanelData | null> {
-  const [template] = await db
-    .select({ id: templates.id, name: templates.name, teamSlug: teams.slug, teamName: teams.name })
+  const [row] = await db
+    .select({
+      id: templates.id,
+      name: templates.name,
+      teamSlug: teams.slug,
+      teamName: teams.name,
+      allowedChannels: contentTypes.allowedChannels,
+    })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
+    .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
     .where(eq(templates.id, templateId))
     .limit(1);
-  if (!template) return null;
+  if (!row) return null;
+  const { allowedChannels, ...template } = row;
 
   const all = await db.select().from(versions).where(eq(versions.templateId, template.id));
   const active = all.find((v) => v.state === "active" && v.number !== null);
   if (!active) return null;
   const activeNumber = active.number!;
 
-  const channels = CHANNELS.filter((c) => active.channels.includes(c));
+  // What the render route accepts: turned on for the version and still allowed by the content type
+  // (Channel rules can turn a channel off after the version went Active).
+  const channels = CHANNELS.filter((c) => active.channels.includes(c) && allowedChannels.includes(c));
   const consumerId = await sampleConsumer(template.id);
   const path = renderPathOf(template.id);
   const base = origin.replace(/\/+$/, "");

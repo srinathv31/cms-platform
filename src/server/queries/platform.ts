@@ -59,7 +59,7 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
     db.select().from(teams).orderBy(asc(teams.name)),
     activeMembers(),
     db.select({ teamId: templates.teamId }).from(templates),
-    db.select({ id: users.id, name: users.name, title: users.title }).from(users),
+    db.select({ id: users.id, name: users.name, title: users.title, platformRole: users.platformRole }).from(users),
     getPeople(),
   ]);
 
@@ -81,7 +81,11 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
         createdAt: iso(t.createdAt),
       };
     }),
-    people: userRows.map((u) => ({ ...personOf(people, u.id), title: u.title })).sort(byName),
+    // The first Team Admin: anyone but an Auditor, who is read-only everywhere.
+    people: userRows
+      .filter((u) => u.platformRole !== "auditor")
+      .map((u) => ({ ...personOf(people, u.id), title: u.title }))
+      .sort(byName),
     icons: TEAM_ICONS,
   };
 });
@@ -138,7 +142,7 @@ export const getChannelRulesSection = cache(async (): Promise<ChannelRulesSectio
 // ── Approval chains ───────────────────────────────────────────
 
 export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSection> => {
-  await requireManage();
+  const viewer = await requireManage();
   const [types, stageRows, inReview, members, userRows, people] = await Promise.all([
     db.select({ id: contentTypes.id, name: contentTypes.name }).from(contentTypes).orderBy(asc(contentTypes.name)),
     db.select().from(approvalStages).orderBy(asc(approvalStages.position)),
@@ -177,14 +181,15 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
     };
   });
 
-  // Someone a stage may name: anyone with active access (a team, or a platform role) — a person with
-  // none could never act on the stage — except an Auditor, who is read-only. Beside the name: the
-  // teams whose templates they see today.
+  // Someone a stage may name: anyone with an active team role — a person with none could never act on
+  // the stage, and a platform role alone isn't approve power — except an Auditor (read-only) and the
+  // admin choosing (nobody names themselves; actions/platform.ts unableToApprove). Beside the name:
+  // the teams whose templates they see today.
   const choices = userRows.flatMap((u) => {
-    if (u.platformRole === "auditor") return [];
+    if (u.platformRole === "auditor" || u.id === viewer.userId) return [];
     const teamNames = [...new Set(members.filter((m) => m.userId === u.id).map((m) => m.teamName))].sort();
     const seen = u.platformRole ? ["All teams"] : teamNames;
-    return seen.length ? [{ ...personOf(people, u.id), title: u.title, teams: seen }] : [];
+    return teamNames.length ? [{ ...personOf(people, u.id), title: u.title, teams: seen }] : [];
   });
 
   return { chains, people: choices.sort(byName), roles: TEAM_ROLES };

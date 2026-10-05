@@ -3,6 +3,7 @@
 // the lines client-side as the sunset date changes, so `now` is the demo clock passed in.
 //
 //   approve  "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks."
+//            (a first version: "v1 becomes Active." then "Consumers can start using it right away.")
 //            and, when the version breaks the contract, one line per consumer of v1:
 //            "Coral has to map `annual_fee` before it moves to v2."
 //   sunset   "Coral still renders v1 (last render today). It will keep working until March 1, 2027."
@@ -18,6 +19,9 @@ import type { ConsequenceAction, ConsumerUsage } from "./review-types";
 import type { ContractChange } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** What going live means when nothing was Active before. */
+export const FIRST_LIVE = "Consumers can start using it right away.";
 
 export function consequences(action: ConsequenceAction, usage: readonly ConsumerUsage[], now: Date): string[] {
   switch (action.kind) {
@@ -48,7 +52,8 @@ function approveLines(
   now: Date,
 ): string[] {
   const live = `v${action.newNumber} becomes Active.`;
-  if (action.previousNumber === null) return [live];
+  // A first version: nothing is superseded, and consumers can now find it (and SHARE opens up).
+  if (action.previousNumber === null) return [live, FIRST_LIVE];
 
   const prev = `v${action.previousNumber}`;
   const superseded = `${live} ${prev} becomes Superseded`;

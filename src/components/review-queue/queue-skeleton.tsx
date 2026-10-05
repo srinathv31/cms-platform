@@ -10,7 +10,7 @@ export function QueueSkeleton() {
     <div aria-hidden>
       <div className={TAB_BAR}>
         {Object.values(TAB_META).map(({ label }) => (
-          <span key={label} className={cn(TAB, "text-text-subtle")}>
+          <span key={label} className={cn(TAB, "text-text-muted")}>
             <span className={TAB_CONTENT}>
               {label}
               <Skeleton className="h-4 w-2.5" />

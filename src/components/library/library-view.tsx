@@ -2,10 +2,11 @@ import { Stream } from "@/components/primitives/stream";
 import { PageHeader } from "@/components/primitives/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { can } from "@/domain/permissions";
+import { now } from "@/server/clock";
 import { getLibraryRows } from "@/server/queries/library";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { cn } from "@/lib/utils";
-import { COLUMNS, ROW, statusColumn } from "./columns";
+import { COLUMNS, FOLDS, ROW, statusColumn } from "./columns";
 import { LibraryBrowser } from "./library-browser";
 import { NewTemplate } from "./new-template";
 
@@ -32,7 +33,8 @@ async function NewTemplateAction({ params }: { params: TeamParams }) {
 async function LibraryList({ params }: { params: TeamParams }) {
   const { space, ok } = await canCreateIn(params);
   const rows = await getLibraryRows(space.slug);
-  return <LibraryBrowser rows={rows} spaceSlug={space.slug} showTeam={space.isAll} canCreate={ok} />;
+  const nowIso = (await now()).toISOString();
+  return <LibraryBrowser rows={rows} spaceSlug={space.slug} showTeam={space.isAll} canCreate={ok} nowIso={nowIso} />;
 }
 
 /** Same geometry as the loaded list (toolbar, header row, six rows), so nothing shifts when it streams in. */
@@ -52,8 +54,8 @@ function LibraryListSkeleton() {
           <span className="caps-label">Template</span>
           <span className="caps-label">Status</span>
           <span className="caps-label">Active</span>
-          <span className="caps-label">Last edited</span>
-          <span className="caps-label">Owner</span>
+          <span className={cn("caps-label", FOLDS)}>Last edited</span>
+          <span className={cn("caps-label", FOLDS)}>Owner</span>
         </div>
       </div>
       {Array.from({ length: 6 }, (_, i) => (
@@ -65,8 +67,8 @@ function LibraryListSkeleton() {
             </span>
             <Skeleton className="h-[22px] w-24 rounded-md" />
             <Skeleton className="h-4 w-7" />
-            <Skeleton className="h-4 w-20" />
-            <span className="flex items-center gap-2.5">
+            <Skeleton className={cn("h-4 w-20", FOLDS)} />
+            <span className={cn("flex items-center gap-2.5", FOLDS)}>
               <Skeleton className="size-6 rounded-full" />
               <Skeleton className="h-4 w-20" />
             </span>

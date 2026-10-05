@@ -6,6 +6,7 @@ import { Eye, PanelRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { startDraft } from "@/server/actions/templates";
@@ -215,23 +216,30 @@ export function PreviewToggle({ className }: { className?: string }) {
   }, [onContent, session]);
 
   if (!onContent) return null;
+  // Named by aria-label and, for the icon-only width, a tooltip (keyboard focus opens it too).
   return (
-    <Button
-      variant="outline"
-      size="lg"
-      aria-label="Preview"
-      aria-pressed={open}
-      title="Preview"
-      data-preview-toggle=""
-      onClick={() => (open ? session.closePreview() : session.openPreview())}
-      className={cn(
-        "px-3.5 aria-pressed:bg-selected @max-[34rem]/bar:w-9 @max-[34rem]/bar:px-0 @max-[53rem]/ws:@max-[39rem]/bar:w-9 @max-[53rem]/ws:@max-[39rem]/bar:px-0",
-        className,
-      )}
-    >
-      <Eye data-icon="inline-start" strokeWidth={1.75} />
-      <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">Preview</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="outline"
+            size="lg"
+            aria-label="Preview"
+            aria-pressed={open}
+            data-preview-toggle=""
+            onClick={() => (open ? session.closePreview() : session.openPreview())}
+            className={cn(
+              "px-3.5 aria-pressed:bg-selected @max-[34rem]/bar:w-9 @max-[34rem]/bar:px-0 @max-[53rem]/ws:@max-[39rem]/bar:w-9 @max-[53rem]/ws:@max-[39rem]/bar:px-0",
+              className,
+            )}
+          />
+        }
+      >
+        <Eye data-icon="inline-start" strokeWidth={1.75} />
+        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">Preview</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Preview</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -252,16 +260,22 @@ export function RailToggle({ className }: { className?: string }) {
 
   if (!onContent) return null;
   return (
-    <Button
-      variant="outline"
-      size="icon-lg"
-      aria-label="Channels and variables"
-      aria-pressed={open}
-      title="Channels and variables"
-      onClick={() => session.setRailOpen(!open)}
-      className={cn("@min-[53rem]/ws:hidden", open && "bg-selected", className)}
-    >
-      <PanelRight strokeWidth={1.75} />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Channels and variables"
+            aria-pressed={open}
+            onClick={() => session.setRailOpen(!open)}
+            className={cn("@min-[53rem]/ws:hidden", open && "bg-selected", className)}
+          />
+        }
+      >
+        <PanelRight strokeWidth={1.75} />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Channels and variables</TooltipContent>
+    </Tooltip>
   );
 }

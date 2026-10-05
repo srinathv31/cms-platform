@@ -109,7 +109,7 @@ export function ConsumersTable({
           <TableHead className={HEAD}>Consumer</TableHead>
           {showTemplate ? <TableHead className={HEAD}>Template</TableHead> : null}
           <TableHead className={HEAD}>Version</TableHead>
-          <TableHead className={cn(HEAD, "w-24 text-right leading-4 whitespace-normal")}>Renders, 30 days</TableHead>
+          <TableHead className={cn(HEAD, "text-right")}>Renders (30d)</TableHead>
           <TableHead className={HEAD}>Trend</TableHead>
           <TableHead className={cn(HEAD, lastCol)}>Last render</TableHead>
           <TableHead className={HEAD}>Note</TableHead>
@@ -140,7 +140,7 @@ export function ConsumersTable({
               <TableCell>
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-[13px] text-text">v{r.versionNumber}</span>
-                  <StatusBadge state={r.versionState} sunsetAt={r.sunsetAt ? new Date(r.sunsetAt) : null} />
+                  <StatusBadge state={r.versionState} sunsetAt={r.sunsetAt ? new Date(r.sunsetAt) : null} now={now} />
                 </span>
               </TableCell>
               <TableCell className="text-right text-text tabular-nums">{NF.format(r.renders30d)}</TableCell>

@@ -4,7 +4,7 @@ import { demoNow } from "./dynamic";
 import { stamp } from "./format";
 
 export interface ClockReadout {
-  /** "Sun, Oct 4, 2026, 3:42 PM" */
+  /** "Sun, Oct 4, 2026, 3:42 PM UTC" */
   label: string;
   offsetDays: number;
 }

@@ -74,6 +74,7 @@ describe("consequences: approve", () => {
   it("a first version has nothing to supersede", () => {
     expect(consequences({ kind: "approve", newNumber: 1, previousNumber: null, sunsetAt: null }, [CORAL_V2], NOW)).toEqual([
       "v1 becomes Active.",
+      "Consumers can start using it right away.",
     ]);
   });
 });
@@ -124,7 +125,7 @@ describe("consequences: approve a breaking version", () => {
   it("a first version has nobody to map for", () => {
     expect(
       consequences({ kind: "approve", newNumber: 1, previousNumber: null, sunsetAt: null, breakingKeys: ["annual_fee"] }, [CORAL_V2], NOW),
-    ).toEqual(["v1 becomes Active."]);
+    ).toEqual(["v1 becomes Active.", "Consumers can start using it right away."]);
   });
 });
 

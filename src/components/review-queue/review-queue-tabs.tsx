@@ -5,10 +5,11 @@ import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import { Tabs } from "@base-ui/react/tabs";
 import { m } from "motion/react";
-import { Check, CornerUpLeft } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { spring } from "@/components/motion/presets";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
+import { StatusBadge } from "@/components/primitives/status-badge";
 import { BreakingBadge } from "./breaking-badge";
 import {
   COLUMNS,
@@ -38,19 +39,18 @@ function ListHeader({ decided }: { decided: boolean }) {
 }
 
 function Decision({ decision, className }: { decision: NonNullable<QueueRowView["decision"]>; className?: string }) {
-  const approved = decision.kind === "approved";
-  const Icon = approved ? Check : CornerUpLeft;
+  // "Approved" is the decision (an action); a version sent back is in the Changes requested state, which
+  // only ever shows as its StatusBadge.
   return (
     <span className={cn("min-w-0", className)}>
-      <span
-        className={cn(
-          "flex items-center gap-1.5 text-[13px] leading-5 font-medium",
-          approved ? "text-status-active-text" : "text-status-changes-text",
-        )}
-      >
-        <Icon aria-hidden strokeWidth={2} className="size-3.5 shrink-0" />
-        <span className="truncate">{decision.label}</span>
-      </span>
+      {decision.kind === "approved" ? (
+        <span className="flex items-center gap-1.5 text-[13px] leading-5 font-medium text-status-active-text">
+          <Check aria-hidden strokeWidth={2} className="size-3.5 shrink-0" />
+          <span className="truncate">{decision.label}</span>
+        </span>
+      ) : (
+        <StatusBadge state="changes_requested" />
+      )}
       <span className="mt-0.5 block truncate text-[12px] leading-4 text-text-muted">
         {decision.by} · {decision.when}
       </span>
@@ -136,7 +136,7 @@ export function ReviewQueueTabs({ tabs, showTeam }: { tabs: QueueTab[]; showTeam
             >
               <span className={TAB_CONTENT}>
                 {tab.label}
-                <span className="text-text-subtle tabular-nums">{tab.rows.length}</span>
+                <span className="text-text-muted tabular-nums">{tab.rows.length}</span>
               </span>
               {active ? (
                 <m.span

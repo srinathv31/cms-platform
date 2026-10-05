@@ -25,6 +25,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { advanceClockAction, resetDemoAction } from "@/server/actions/demo";
+import { rememberSimReturn } from "./back-to-ucomp";
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -151,7 +152,6 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
               value={days}
               onChange={(e) => setDays(e.target.value)}
               aria-label="Days to advance"
-              placeholder="Days"
               className="h-9 w-24 bg-surface"
             />
             <Button type="submit" variant="outline" size="lg" disabled={pending || !customValid} className="bg-surface">
@@ -165,7 +165,15 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
             variant="outline"
             size="lg"
             nativeButton={false}
-            render={<Link href="/sim" onClick={() => setOpen(false)} />}
+            render={
+              <Link
+                href="/sim"
+                onClick={() => {
+                  rememberSimReturn();
+                  setOpen(false);
+                }}
+              />
+            }
             className="justify-start gap-2.5 bg-surface px-3"
           >
             <FlaskConical aria-hidden strokeWidth={1.75} />

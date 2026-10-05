@@ -53,6 +53,8 @@ export interface ContentWorkspaceProps {
   now: string;
   /** The file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
   importOriginal: ImportOriginalRef | null;
+  /** The shown version is in review: the rail links to its review screen. */
+  reviewHref?: string | null;
 }
 
 /**
@@ -91,6 +93,7 @@ export function ContentWorkspace({
   viewer,
   now,
   importOriginal,
+  reviewHref = null,
 }: ContentWorkspaceProps) {
   const session = useWorkspaceSession();
   const { open: previewOpen } = usePreviewState();
@@ -275,6 +278,7 @@ export function ContentWorkspace({
         original={importOriginal !== null}
         takeArrival={takeArrival}
         footer={editable ? <CopilotPromptButton templateId={templateId} /> : null}
+        reviewHref={reviewHref}
         preview={
           <PreviewSurface
             templateId={templateId}

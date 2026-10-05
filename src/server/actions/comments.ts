@@ -79,11 +79,16 @@ function commentBody(body: string): { ok: true; body: string } | { ok: false; re
   return { ok: true, body: trimmed };
 }
 
-/** Where a comment notification leads: the review screen while the version is in review, else the template. */
+/**
+ * Where a comment notification leads: the review screen while the version is in review, else the
+ * template. A numbered version also names itself, so a stage reviewer outside the team (who can't
+ * open the template's workspace) gets its review screen in their own space.
+ */
 function commentLink(templateId: string, version: { number: number | null; state: VersionState }): NotificationLink {
-  return version.state === "in_review" && version.number !== null
+  if (version.number === null) return { to: "template", templateId };
+  return version.state === "in_review"
     ? { to: "review", templateId, versionNumber: version.number }
-    : { to: "template", templateId };
+    : { to: "template", templateId, reviewVersion: version.number };
 }
 
 function versionLabel(templateName: string, version: { number: number | null }): string {

@@ -3,6 +3,7 @@
 // Messages are plain sentences for the people integrating; the simulator shows them as is. They
 // name keys, types, versions, channels and ids, and NEVER echo a submitted variable value.
 
+import { formatLongDate } from "../dates";
 import { CHANNELS, type Channel, type VariableType, type VersionState } from "../types";
 import type {
   InvalidValue,
@@ -19,34 +20,8 @@ export function renderError(code: RenderErrorCode, message: string, details?: Re
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
-const longDate = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-/** "March 1, 2027": the same style as `formatValue`'s dates (en-US, UTC). */
-export function formatLongDate(date: Date): string {
-  return longDate.format(date);
-}
-
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const shortDateYear = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-/**
- * "Mar 1", or "Mar 1, 2027" when `now` is given and the date isn't in its year. UTC, like
- * `formatLongDate`: a sunset is a calendar day stored as that day's midnight UTC, so it reads as
- * the same day in every time zone.
- */
-export function formatShortDate(date: Date, now?: Date): string {
-  return (!now || date.getUTCFullYear() === now.getUTCFullYear() ? shortDate : shortDateYear).format(date);
-}
+// Dates read the one shared way (`@/domain/dates`); re-exported for the callers that import them from here.
+export { formatLongDate, formatShortDate } from "../dates";
 
 /** How a channel is named in messages. */
 export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = { pdf: "PDF", web: "Web", email: "Email" };

@@ -23,9 +23,12 @@ import { UserAvatar } from "./user-avatar";
 export function ProfileMenu({
   me,
   personas,
+  canRequestAccess,
 }: {
   me: PersonaSummary;
   personas: PersonaSummary[];
+  /** False for the Auditor, who is read-only everywhere and holds no team role. */
+  canRequestAccess: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { switchTo } = usePersonaSwitch();
@@ -50,14 +53,18 @@ export function ProfileMenu({
             <div className="truncate text-[13px] leading-[18px] text-text-muted">{me.summary}</div>
           </div>
         </div>
-        <DropdownMenuSeparator className="mx-1 bg-hairline" />
-        <DropdownMenuItem
-          render={<Link href="/request-access" />}
-          className="gap-3 rounded-lg px-2.5 py-2 text-[14px] font-medium"
-        >
-          <UserPlus aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
-          Request access
-        </DropdownMenuItem>
+        {canRequestAccess ? (
+          <>
+            <DropdownMenuSeparator className="mx-1 bg-hairline" />
+            <DropdownMenuItem
+              render={<Link href="/request-access" />}
+              className="gap-3 rounded-lg px-2.5 py-2 text-[14px] font-medium"
+            >
+              <UserPlus aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
+              Request access
+            </DropdownMenuItem>
+          </>
+        ) : null}
         <DropdownMenuSeparator className="mx-1 bg-hairline" />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2.5 pt-2.5 pb-1.5">

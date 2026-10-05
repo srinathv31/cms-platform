@@ -95,7 +95,8 @@ describe("getAuditPage: who sees what", () => {
     for (const r of page.rows) {
       expect(r.summary, r.action).toMatch(/[.]$/);
       expect(r.actionLabel).toBeTruthy();
-      expect(r.when).toMatch(/^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, 20\d\d, /);
+      // UTC, labelled; the year only when it isn't the demo clock's.
+      expect(r.when).toMatch(/^[A-Z][a-z]{2} \d{1,2}, (20\d\d, )?\d{1,2}:\d\d [AP]M UTC$/);
       expect(r.ago).toBeTruthy();
     }
     const flagged = page.rows.find((r) => r.action === "access.flagged_inactive")!;

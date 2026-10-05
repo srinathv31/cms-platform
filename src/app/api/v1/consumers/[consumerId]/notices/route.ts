@@ -8,7 +8,7 @@ import {
   QUERY_MESSAGES,
 } from "@/domain/golive/api-errors";
 import type { ApiNoticeList } from "@/domain/golive-types";
-import { correlationIdOf, errorResponse, jsonResponse } from "@/server/api/http";
+import { correlationIdOf, errorResponse, jsonResponse, withDemoDate } from "@/server/api/http";
 import { now } from "@/server/clock";
 import { findConsumer, listNotices, requireConsumer } from "@/server/queries/consumer-api";
 
@@ -18,7 +18,7 @@ import { findConsumer, listNotices, requireConsumer } from "@/server/queries/con
 // X-Consumer-Id must be registered and must be the consumer in the path. The headers are read before
 // anything touches the database (request-time under Cache Components).
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ consumerId: string }> }) {
+export const GET = withDemoDate(async function get(request: NextRequest, { params }: { params: Promise<{ consumerId: string }> }) {
   const consumerHeader = request.headers.get("x-consumer-id");
   const correlationId = correlationIdOf(request);
   const search = request.nextUrl.searchParams;
@@ -42,4 +42,4 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     notices: await listNotices(consumerId, { since: since.value, templateId, limit: limit.value }),
   };
   return jsonResponse(body, correlationId);
-}
+});

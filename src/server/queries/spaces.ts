@@ -90,7 +90,7 @@ export const getShell = cache(async (): Promise<ShellData> => {
     if (!can(viewer, "team.manageMembers", { teamId: r.teamId }).ok) continue;
     const existing = recertByTeam.get(r.teamId);
     if (existing) continue;
-    recertByTeam.set(r.teamId, { id: r.id, label: r.label, dueLabel: shortDate(r.dueAt) });
+    recertByTeam.set(r.teamId, { id: r.id, label: r.label, dueLabel: shortDate(r.dueAt, nowDate) });
   }
 
   const cards = await getSidebarCards();

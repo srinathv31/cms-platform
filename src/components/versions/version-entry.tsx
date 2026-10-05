@@ -111,7 +111,7 @@ export function VersionEntry({
   const rendersForConsumers = item.state === "active" || item.state === "superseded" || item.state === "revoked";
   const revoke = item.revoke;
   const revokePending = !!revoke && !revoke.confirmedAt;
-  const status = <StatusBadge state={item.state} sunsetAt={item.sunsetAt ? new Date(item.sunsetAt) : null} />;
+  const status = <StatusBadge state={item.state} sunsetAt={item.sunsetAt ? new Date(item.sunsetAt) : null} now={now} />;
   // Breaking changes first, then the rest, each group in the diff's order (as in the submit dialog).
   const contract = [...item.contractItems.filter((c) => c.breaking), ...item.contractItems.filter((c) => !c.breaking)];
 

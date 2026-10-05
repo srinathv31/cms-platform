@@ -13,7 +13,7 @@ import { statusLabel } from "@/domain/status";
 import { VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
-import { COLUMNS, COLUMNS_TEAM, ROW, statusColumn } from "./columns";
+import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn } from "./columns";
 import { StarterGallery } from "./starter-gallery";
 
 type Filter = "all" | VersionState;
@@ -28,17 +28,17 @@ function ListHeader({ showTeam }: { showTeam: boolean }) {
     <div aria-hidden className="border-b border-hairline">
       <div className={cn(ROW, "h-10", showTeam ? COLUMNS_TEAM : COLUMNS)}>
         <span className="caps-label">Template</span>
-        {showTeam ? <span className="caps-label">Team</span> : null}
+        {showTeam ? <span className={cn("caps-label", FOLDS)}>Team</span> : null}
         <span className="caps-label">Status</span>
         <span className="caps-label">Active</span>
-        <span className="caps-label">Last edited</span>
-        <span className="caps-label">Owner</span>
+        <span className={cn("caps-label", FOLDS)}>Last edited</span>
+        <span className={cn("caps-label", FOLDS)}>Owner</span>
       </div>
     </div>
   );
 }
 
-function TemplateRow({ row, space, showTeam }: { row: LibraryRow; space: string; showTeam: boolean }) {
+function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space: string; showTeam: boolean; nowIso: string }) {
   return (
     <li className="border-b border-hairline last:border-b-0">
       <Link
@@ -53,17 +53,20 @@ function TemplateRow({ row, space, showTeam }: { row: LibraryRow; space: string;
           <span className="block truncate text-[15px] leading-5 font-medium" title={row.name}>
             {row.name}
           </span>
-          <span className="mt-0.5 block font-mono text-xs leading-4 text-text-muted">{row.id}</span>
+          <span className="mt-0.5 block truncate text-xs leading-4 text-text-muted">
+            <span className="font-mono">{row.id}</span>
+            {showTeam ? <span className={TEAM_IN_SUBLINE}> · {row.teamName}</span> : null}
+          </span>
         </span>
-        {showTeam ? <span className="truncate text-text-muted">{row.teamName}</span> : null}
+        {showTeam ? <span className={cn("truncate text-text-muted", FOLDS)}>{row.teamName}</span> : null}
         <span>
-          <StatusBadge state={row.status} sunsetAt={row.sunsetAt} />
+          <StatusBadge state={row.status} sunsetAt={row.sunsetAt} now={nowIso} />
         </span>
         <span className="text-text tabular-nums">
           {row.activeNumber !== null ? `v${row.activeNumber}` : <span className="text-text-subtle">—</span>}
         </span>
-        <span className="text-text-muted">{row.lastEdited}</span>
-        <span className="flex min-w-0 items-center gap-2.5">
+        <span className={cn("text-text-muted", FOLDS)}>{row.lastEdited}</span>
+        <span className={cn("flex min-w-0 items-center gap-2.5", FOLDS)}>
           <UserAvatar initials={row.owner.initials} hue={row.owner.hue} size="sm" />
           <span className="truncate">{row.owner.name}</span>
         </span>
@@ -81,6 +84,7 @@ export function LibraryBrowser({
   spaceSlug,
   showTeam,
   canCreate,
+  nowIso,
 }: {
   rows: LibraryRow[];
   spaceSlug: string;
@@ -88,6 +92,8 @@ export function LibraryBrowser({
   showTeam: boolean;
   /** The viewer can create templates in this team (never true in "All teams"). */
   canCreate: boolean;
+  /** The demo clock's now: a sunset outside its year says the year. */
+  nowIso: string;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -138,7 +144,6 @@ export function LibraryBrowser({
           <InputGroupInput
             type="text"
             aria-label="Search templates"
-            placeholder="Search templates"
             autoComplete="off"
             spellCheck={false}
             value={query}
@@ -195,7 +200,7 @@ export function LibraryBrowser({
           <ListHeader showTeam={showTeam} />
           <ul>
             {visible.map((row) => (
-              <TemplateRow key={row.id} row={row} space={spaceSlug} showTeam={showTeam} />
+              <TemplateRow key={row.id} row={row} space={spaceSlug} showTeam={showTeam} nowIso={nowIso} />
             ))}
           </ul>
         </>

@@ -44,15 +44,28 @@ export function importStatus(response: ImportResponse): number {
   return 400;
 }
 
+/**
+ * The permission half of an import, on its own so the route can ask it before reading the body. The
+ * team is looked up only to check the permission on it; an unknown team fails the same way.
+ */
+export async function importPermission(
+  viewer: Viewer,
+  teamSlug: string,
+): Promise<{ ok: true; team: typeof teams.$inferSelect } | (ImportResponse & { ok: false })> {
+  const team = teamSlug ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) }) : undefined;
+  const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
+  if (!allowed.ok || !team) return { ok: false, code: "permission", reason: allowed.ok ? REASONS.generic : allowed.reason };
+  return { ok: true, team };
+}
+
 export async function importTemplate(
   viewer: Viewer,
   input: { teamSlug: string; file: ImportFile | null },
   options: ImportOptions = {},
 ): Promise<ImportResponse> {
-  // The team is looked up only to check the permission on it; an unknown team fails the same way.
-  const team = input.teamSlug ? await db.query.teams.findFirst({ where: eq(teams.slug, input.teamSlug) }) : undefined;
-  const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
-  if (!allowed.ok || !team) return { ok: false, code: "permission", reason: allowed.ok ? REASONS.generic : allowed.reason };
+  const permitted = await importPermission(viewer, input.teamSlug);
+  if (!permitted.ok) return permitted;
+  const { team } = permitted;
 
   const file = input.file;
   if (!file) return refuse("unreadable");

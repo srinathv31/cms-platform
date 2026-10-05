@@ -1,5 +1,7 @@
 // After the gate media run (`playwright test --project=demo --project=stills-1280`, i.e. `npm run gate:media`):
-// turns each scenario spec's recording into e2e/__screens__/gate/<spec-name>.mp4, next to its stills.
+// turns each scenario spec's recording into e2e/__screens__/gate/<spec-name>.mp4, next to its stills. The demo
+// script's recording (the whole walkthrough, scenarios 1-11 in one take) is also kept as recorded, as
+// e2e/__screens__/gate/demo-script.webm.
 //
 //   node e2e/media/collect.mjs
 //
@@ -12,7 +14,7 @@
 // start of that folder's name. If a spec has more than one test, the last recording wins.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,7 +50,7 @@ mkdirSync(gateDir, { recursive: true });
 const recordings = new Map();
 for (const entry of readdirSync(resultsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
-  const spec = /^(scenario-\d+)-/.exec(entry.name)?.[1];
+  const spec = /^(scenario-\d+|demo-script)-/.exec(entry.name)?.[1];
   const video = path.join(resultsDir, entry.name, "video.webm");
   if (!spec || !existsSync(video)) continue;
   const mtime = statSync(video).mtimeMs;
@@ -67,6 +69,11 @@ for (const [spec, { video }] of [...recordings].sort(([a], [b]) => a.localeCompa
     stdio: "inherit",
   });
   produced.push({ file: out, seconds: duration(out) });
+  if (spec === "demo-script") {
+    const walkthrough = path.join(gateDir, "demo-script.webm");
+    copyFileSync(video, walkthrough);
+    produced.push({ file: walkthrough, seconds: duration(walkthrough) });
+  }
 }
 
 // What the gate left behind: the recordings, and every still beside them.

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { BackToUcomp } from "@/components/demo/back-to-ucomp";
 import { DemoPillHole } from "@/components/demo/demo-pill-hole";
 import { Stream } from "@/components/primitives/stream";
 import { NavList, SimNav } from "@/simulator/ui/nav";
@@ -10,21 +9,15 @@ import "@/simulator/theme.css";
 export const metadata: Metadata = { title: { absolute: "Coral Offers (simulated)" } };
 
 /*
- * The frame is UCOMP's (warm stone, dashed): the "← Back to UCOMP" pill and the "Coral — simulated" label mark
- * the boundary. Everything under it is Coral's own system in its own look (src/simulator/theme.css).
+ * The frame is UCOMP's (warm stone, dashed): the "← Back to UCOMP" pill (to where the simulator was
+ * opened) and the "Coral — simulated" label mark the boundary. Everything under it is Coral's own system in its own look (src/simulator/theme.css).
  * The Demo pill is mounted here too, so the presenter can move the clock without leaving Coral.
  */
 export default function SimulatorLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-app">
       <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-dashed border-hairline-strong bg-app px-3">
-        <Link
-          href="/"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-text px-3.5 text-[13px] font-medium text-surface outline-none hover:bg-text/90 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ArrowLeft aria-hidden strokeWidth={1.75} className="size-4" />
-          Back to UCOMP
-        </Link>
+        <BackToUcomp />
         <span className="rounded-md border border-dashed border-hairline-strong px-2.5 py-1 text-[12px] font-semibold tracking-wider text-label uppercase">
           Coral — simulated
         </span>

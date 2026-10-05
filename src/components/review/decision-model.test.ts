@@ -123,8 +123,8 @@ describe("approveLines", () => {
   });
 
   it("is one line when nothing is Active yet, and a sunset date has nothing to apply to", () => {
-    expect(lines({ previousNumber: null })).toEqual(["v3 becomes Active."]);
-    expect(lines({ previousNumber: null, sunset: "2027-03-01" })).toEqual(["v3 becomes Active."]);
+    expect(lines({ previousNumber: null })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);
+    expect(lines({ previousNumber: null, sunset: "2027-03-01" })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);
   });
 
   it("says nobody renders the previous version when the log has no one", () => {

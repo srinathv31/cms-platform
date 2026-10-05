@@ -32,8 +32,14 @@ import { consumerNotices, consumers, contentTypes, teams, templates, versions } 
 const RELEASED: readonly ApiVersionState[] = ["active", "superseded", "revoked"];
 const isReleased = (state: VersionState): state is ApiVersionState => (RELEASED as readonly string[]).includes(state);
 
-/** Channels in the contract's order (pdf, web, email). */
-const ordered = (channels: readonly Channel[]): Channel[] => CHANNELS.filter((c) => channels.includes(c));
+/**
+ * The channels a consumer can render, in the contract's order (pdf, web, email): the ones turned on
+ * for the version that its content type still allows. Channel rules can turn a channel off after a
+ * version went Active, and the render route refuses it from then on (channel_not_allowed), so the API
+ * never advertises it.
+ */
+const published = (versionChannels: readonly Channel[], allowed: readonly Channel[]): Channel[] =>
+  CHANNELS.filter((c) => versionChannels.includes(c) && allowed.includes(c));
 
 // ── Consumers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +90,7 @@ export async function searchActiveTemplates(q: string, limit: number): Promise<A
       teamName: teams.name,
       contentTypeKey: contentTypes.key,
       contentTypeName: contentTypes.name,
+      allowedChannels: contentTypes.allowedChannels,
       number: versions.number,
       activatedAt: versions.activatedAt,
       createdAt: versions.createdAt,
@@ -119,7 +126,7 @@ export async function searchActiveTemplates(q: string, limit: number): Promise<A
       contentType: { key: row.contentTypeKey, name: row.contentTypeName },
       activeVersion: row.number!,
       activatedAt: (row.activatedAt ?? row.createdAt).toISOString(),
-      channels: ordered(row.channels),
+      channels: published(row.channels, row.allowedChannels),
       variableCount: row.variables.length,
       requiredCount: row.variables.filter((v) => v.required).length,
     }));
@@ -129,7 +136,12 @@ export async function searchActiveTemplates(q: string, limit: number): Promise<A
 
 type VersionRow = typeof versions.$inferSelect;
 
-function versionSummary(v: VersionRow & { state: ApiVersionState }, activeNumber: number | null, now: Date): ApiVersionSummary {
+function versionSummary(
+  v: VersionRow & { state: ApiVersionState },
+  activeNumber: number | null,
+  allowed: readonly Channel[],
+  now: Date,
+): ApiVersionSummary {
   const revokedAt = v.revoke?.confirmedAt ?? null;
   return {
     number: v.number!,
@@ -144,7 +156,7 @@ function versionSummary(v: VersionRow & { state: ApiVersionState }, activeNumber
       activeNumber,
       now,
     }).ok,
-    channels: ordered(v.channels),
+    channels: published(v.channels, allowed),
   };
 }
 
@@ -169,6 +181,7 @@ export async function getTemplateDetail(
       teamName: teams.name,
       contentTypeKey: contentTypes.key,
       contentTypeName: contentTypes.name,
+      allowedChannels: contentTypes.allowedChannels,
     })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
@@ -220,7 +233,7 @@ export async function getTemplateDetail(
     ? {
         version: target.number!,
         state: target.state,
-        channels: ordered(target.channels),
+        channels: published(target.channels, template.allowedChannels),
         variables: apiVariables(target.variables),
         jsonSchema: contractJsonSchema({
           templateId: template.id,
@@ -238,7 +251,7 @@ export async function getTemplateDetail(
     contentType: { key: template.contentTypeKey, name: template.contentTypeName },
     asOf: now.toISOString(),
     activeVersion: activeNumber,
-    versions: released.map((v) => versionSummary(v, activeNumber, now)),
+    versions: released.map((v) => versionSummary(v, activeNumber, template.allowedChannels, now)),
     contract,
     ...(changes ? { changes } : {}),
   };

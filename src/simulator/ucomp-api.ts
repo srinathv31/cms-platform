@@ -1,5 +1,5 @@
 import "server-only";
-import { headers } from "next/headers";
+import { connection } from "next/server";
 import type {
   ApiBase64Response,
   ApiChannel,
@@ -41,12 +41,15 @@ export interface UcompApi {
   searchTemplates(input?: { q?: string; limit?: number }): Promise<ApiResult<ApiTemplateSearch>>;
   getTemplate(templateId: string, input?: { version?: number; since?: number }): Promise<ApiResult<ApiTemplateDetail>>;
   listNotices(input?: { since?: string; templateId?: string; limit?: number }): Promise<ApiResult<ApiNoticeList>>;
-  /** POST …/render. PDF is always asked for as base64 (JSON); web comes back as the HTML document. */
+  /**
+   * POST …/render. PDF is always asked for as base64 (JSON); web comes back as the HTML document.
+   * `at` is when UCOMP answered, by its HTTP `Date` header (`answeredAt`).
+   */
   render(
     templateId: string,
     body: Omit<ApiRenderRequest, "encoding">,
     correlationId: string,
-  ): Promise<ApiResult<RenderOutput>>;
+  ): Promise<ApiResult<RenderOutput> & { at: Date }>;
 }
 
 type Fetch = typeof globalThis.fetch;
@@ -80,6 +83,17 @@ function query(params: Record<string, string | number | undefined>): string {
   return text ? `?${text}` : "";
 }
 
+/**
+ * When UCOMP answered: its response's HTTP `Date` header, which UCOMP sets from its own clock (the
+ * demo's world clock, so a delivery reads on the same day as UCOMP's sunsets). Real time when there's
+ * no usable header, or no answer at all.
+ */
+export function answeredAt(response?: Response): Date {
+  const header = response?.headers.get("date");
+  const parsed = header ? Date.parse(header) : Number.NaN;
+  return Number.isNaN(parsed) ? new Date() : new Date(parsed);
+}
+
 function newerVersionOf(response: Response, fromBody?: number | null): number | null {
   const header = response.headers.get(API_HEADERS.newerVersion);
   const parsed = header === null ? NaN : Number.parseInt(header, 10);
@@ -90,7 +104,10 @@ function newerVersionOf(response: Response, fromBody?: number | null): number | 
 export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: string; fetch?: Fetch }): UcompApi {
   const base = origin.replace(/\/+$/, "");
 
-  async function call(path: string, init: RequestInit = {}): Promise<{ ok: true; response: Response } | { ok: false; error: SimApiError }> {
+  async function call(
+    path: string,
+    init: RequestInit = {},
+  ): Promise<{ ok: true; response: Response } | { ok: false; error: SimApiError; response?: Response }> {
     const requestHeaders = new Headers(init.headers);
     requestHeaders.set(API_HEADERS.consumer, CONSUMER_ID);
     requestHeaders.set("Accept", "application/json");
@@ -100,13 +117,13 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
     } catch (error) {
       return { ok: false, error: UNREACHABLE((error as Error)?.message || "network error") };
     }
-    if (!response.ok) return { ok: false, error: await errorOf(response) };
+    if (!response.ok) return { ok: false, error: await errorOf(response), response };
     return { ok: true, response };
   }
 
   async function getJson<T>(path: string): Promise<ApiResult<T>> {
     const result = await call(path);
-    if (!result.ok) return result;
+    if (!result.ok) return { ok: false, error: result.error };
     try {
       return { ok: true, data: (await result.response.json()) as T };
     } catch {
@@ -136,39 +153,40 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
         headers: { "Content-Type": "application/json", [API_HEADERS.correlation]: correlationId },
         body: JSON.stringify(request),
       });
-      if (!result.ok) return result;
+      const at = answeredAt(result.response);
+      if (!result.ok) return { ok: false, error: result.error, at };
       const { response } = result;
       try {
         if (channel === "web") {
-          return { ok: true, data: { output: await response.text(), newerVersion: newerVersionOf(response) } };
+          return { ok: true, data: { output: await response.text(), newerVersion: newerVersionOf(response) }, at };
         }
         if (channel === "pdf") {
           const json = (await response.json()) as ApiBase64Response;
-          return { ok: true, data: { output: json.data, newerVersion: newerVersionOf(response, json.newerVersion) } };
+          return { ok: true, data: { output: json.data, newerVersion: newerVersionOf(response, json.newerVersion) }, at };
         }
         const json = (await response.json()) as ApiEmailResponse;
         const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
-        return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) } };
+        return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
       } catch {
-        return { ok: false, error: { status: response.status, code: "bad_response", message: "UCOMP's render answer couldn't be read." } };
+        return { ok: false, error: { status: response.status, code: "bad_response", message: "UCOMP's render answer couldn't be read." }, at };
       }
     },
   };
 }
 
 /**
- * The origin to call: `UCOMP_API_ORIGIN` when set, else the origin of the request being served
- * (the app calls itself). Reads `headers()`, so callers render inside <Stream> or run in an action.
+ * The origin to call: `UCOMP_API_ORIGIN` when set, else this server itself on loopback, at the port
+ * it listens on (`next dev` / `next start` set PORT: 3000 in dev, 3100 for the e2e gate, 3200 for the
+ * demo). Never from the request's Host or X-Forwarded-* headers: the client controls those, and the
+ * server fetches this origin and stores what it answers (server-side request forgery otherwise).
+ * Calls `connection()`, so callers stay dynamic: they render inside <Stream> or run in an action.
  */
 export async function apiOrigin(): Promise<string> {
+  await connection();
   const configured = process.env.UCOMP_API_ORIGIN?.trim();
-  if (configured) return configured;
-  const h = await headers();
-  const first = (value: string | null) => value?.split(",")[0]?.trim() || null;
-  const host = first(h.get("x-forwarded-host")) ?? first(h.get("host")) ?? "localhost:3000";
-  const local = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
-  const proto = first(h.get("x-forwarded-proto")) ?? (local ? "http" : "https");
-  return `${proto}://${host}`;
+  if (configured) return configured.replace(/\/+$/, "");
+  const port = Number(process.env.PORT);
+  return `http://127.0.0.1:${Number.isInteger(port) && port > 0 ? port : 3000}`;
 }
 
 /** The client for the current request. */

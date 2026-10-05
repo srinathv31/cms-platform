@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { join } from "node:path";
 import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
@@ -7,10 +8,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { createAppClient } from "@/lib/serialized-writes";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
-import { createTemplate } from "./templates";
+import { createTemplate, startDraft } from "./templates";
 
 // A new template takes the content type as Platform settings leave it: its required sections and
 // its allowed channels. Against a temporary database filled by the real seed; only the database, the
@@ -105,5 +107,50 @@ describe("createTemplate shapes the starter to the content type", () => {
     await db.update(contentTypes).set({ allowedChannels: ["pdf", "web"] }).where(eq(contentTypes.id, CT));
     const draft = await create("rate_change_notice");
     expect(draft.channels).toEqual(["pdf", "web"]);
+  });
+});
+
+// "Edit" on an Active template sometimes did nothing: another write in the server held the file at that
+// moment, startDraft's `BEGIN IMMEDIATE` failed with SQLITE_BUSY, and the failure poisoned that pooled
+// connection, so every retry failed too (`src/lib/serialized-writes.ts`). The action answered
+// 500 and the page stayed on Active. Writes now take turns, so startDraft waits and opens the draft.
+describe("startDraft while another write holds the file", () => {
+  it("still opens one draft and redirects to the workspace", async () => {
+    const [active] = await db
+      .select({ templateId: versions.templateId })
+      .from(versions)
+      .innerJoin(templates, eq(templates.id, versions.templateId))
+      .where(and(eq(templates.teamId, "coral-offers"), eq(versions.state, "active")))
+      .limit(1);
+    expect(active, "the seed has an Active Coral template").toBeTruthy();
+    const { templateId } = active!;
+    const draftsOf = () =>
+      db.select({ id: versions.id }).from(versions).where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+    expect(await draftsOf()).toHaveLength(0);
+
+    // A write on the simulator's client (its own pool on the same file, as `src/simulator/db.ts` opens
+    // it), holding the file across an await as a real action's transaction does.
+    const sim = createAppClient({ url: `file:${join(env.dir, "test.db")}` });
+    let holding!: () => void;
+    const held = new Promise<void>((resolve) => (holding = resolve));
+    const other = (async () => {
+      const tx = await sim.transaction("write");
+      await tx.execute("UPDATE templates SET name = name WHERE id = 'nonexistent'");
+      holding();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await tx.commit();
+    })();
+    await held;
+
+    vi.mocked(redirect).mockClear();
+    try {
+      await startDraft({ templateId });
+    } finally {
+      await other;
+      sim.close();
+    }
+
+    expect(await draftsOf()).toHaveLength(1);
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith(`/coral-offers/templates/${templateId}`, "replace");
   });
 });

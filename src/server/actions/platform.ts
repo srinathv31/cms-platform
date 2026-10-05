@@ -115,6 +115,8 @@ export async function createTeam(input: {
   const result = await transact<{ slug: string }>(async (tx) => {
     const admin = await tx.query.users.findFirst({ where: eq(users.id, parsed.data.adminUserId) });
     if (!admin) refuse(REASONS.noPerson);
+    // The Auditor is read-only everywhere: they can't be a team's first Team Admin.
+    if (admin.platformRole === "auditor") refuse(`${admin.name} is an Auditor and can't be a Team Admin.`);
     const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
     const outcome = createTeamRule({
       name: parsed.data.name,
@@ -257,12 +259,15 @@ const sameRule = (a: ApproverRule, b: ApproverRule) =>
   a.kind === "user" ? b.kind === "user" && a.userId === b.userId : b.kind === "team_role" && a.role === b.role;
 
 /**
- * A person a stage newly names who could never act on it: an Auditor (read-only), or someone with no
- * active access anywhere. A stage that already named them is left alone, so re-saving a chain never
- * fails over someone else's access. Returns the refusal, or null.
+ * A person a stage newly names who could never act on it, or who mustn't: the acting admin themselves
+ * (Platform Admin has no approve power; naming yourself would grant it, so another admin must name
+ * you), an Auditor (read-only), or someone with no active team role anywhere. A platform role alone
+ * is not access to approve with (permissions.ts, namedApprover). A stage that already named them is
+ * left alone, so re-saving a chain never fails over someone else's access. Returns the refusal, or null.
  */
 async function unableToApprove(
   tx: Tx,
+  actorId: string,
   current: { id: string; rule: ApproverRule }[],
   next: { id?: string; rule: ApproverRule }[],
 ): Promise<string | null> {
@@ -272,6 +277,7 @@ async function unableToApprove(
     return before?.kind === "user" && before.userId === s.rule.userId ? [] : [s.rule.userId];
   });
   if (named.length === 0) return null;
+  if (named.includes(actorId)) return "You can't name yourself as an approver.";
   const rows = await tx
     .select({ id: users.id, name: users.name, platformRole: users.platformRole })
     .from(users)
@@ -283,7 +289,11 @@ async function unableToApprove(
     .where(and(inArray(memberships.userId, named), eq(memberships.status, "active")));
   for (const u of rows) {
     if (u.platformRole === "auditor") return `${u.name} is an Auditor and can't approve.`;
-    if (!u.platformRole && !active.some((a) => a.userId === u.id)) return `${u.name} has no active access.`;
+    if (!active.some((a) => a.userId === u.id)) {
+      return u.platformRole === "platform_admin"
+        ? `${u.name} is a Platform Admin with no team role and can't approve.`
+        : `${u.name} has no active access.`;
+    }
   }
   return null; // an unknown id: the domain refuses it ("Pick a person.")
 }
@@ -331,7 +341,7 @@ export async function saveApprovalChain(input: {
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(and(eq(templates.contentTypeId, type.id), eq(versions.state, "in_review")));
     const people = await tx.select({ id: users.id, name: users.name }).from(users);
-    const cannotApprove = await unableToApprove(tx, current, parsed.data.stages);
+    const cannotApprove = await unableToApprove(tx, viewer.userId, current, parsed.data.stages);
     if (cannotApprove) refuse(cannotApprove);
 
     const outcome = saveApprovalChainRule({

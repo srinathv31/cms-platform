@@ -176,17 +176,8 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await beat(page);
       const edit = page.getByRole("button", { name: "Edit", exact: true });
       await reactReady(edit);
-      // Pressing Edit twice is safe (the second one opens the same draft): if the first press shows nothing, a
-      // person presses again.
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await click(edit);
-        try {
-          await expect(statusBadge(page)).toHaveText("Draft", { timeout: 8_000 });
-          break;
-        } catch (error) {
-          if (attempt === 2) throw error;
-        }
-      }
+      // One press opens the draft (it used to need a second when a busy SQLite file failed the first).
+      await click(edit);
       await expect(statusBadge(page)).toHaveText("Draft");
       await expect(page.locator("header").filter({ visible: true }).getByText("Based on v2", { exact: true })).toBeVisible();
       await liveEditor(page);

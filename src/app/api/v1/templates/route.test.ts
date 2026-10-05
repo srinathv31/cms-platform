@@ -47,6 +47,7 @@ async function expectError(res: Response, status: number, code: string, message:
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("no-store");
   expect(res.headers.get("X-Correlation-Id")).toBeTruthy();
+  expect(res.headers.get("Date")).toBe(env.now.toUTCString());
   const body = (await res.json()) as ApiErrorBody;
   expect(body).toEqual({ error: { code, message } });
 }
@@ -59,6 +60,8 @@ describe("GET /api/v1/templates", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("X-Correlation-Id")).toBe("search-1");
+    // The HTTP Date is the demo clock's (consumers stamp what they receive with it).
+    expect(res.headers.get("Date")).toBe(env.now.toUTCString());
     const body = (await res.json()) as ApiTemplateSearch;
     expect(body.query).toBe("Balance");
     expect(body.asOf).toBe(env.now.toISOString());

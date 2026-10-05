@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
@@ -52,7 +53,7 @@ test.afterAll(async () => {
 });
 
 function upload(request: APIRequestContext, file: { name: string; mimeType: string; buffer: Buffer }, team = "coral-offers") {
-  return request.post("/api/imports", { multipart: { team, file } });
+  return request.post(`/api/imports?team=${team}`, { multipart: { file } });
 }
 
 async function expectRefusal(res: APIResponse, status: number, code: string, reason: string) {
@@ -178,6 +179,48 @@ test.describe("POST /api/imports", () => {
       const big = Buffer.alloc(10 * 1024 * 1024 + 1, 0x61);
       await expectRefusal(await upload(request, { name: "big.txt", mimeType: "text/plain", buffer: big }), 413, "size", REFUSALS.size);
     });
+  });
+
+  test("a chunked upload with no Content-Length: refused before the body for no permission (403), and once it passes 10 MB (413)", async ({ baseURL }) => {
+    /** POSTs `megabytes` of a multipart body in 1 MB chunks (Transfer-Encoding: chunked); stops when the answer comes. */
+    const chunked = (persona: string, megabytes: number) =>
+      new Promise<{ status: number; body: string; sentMb: number }>((resolve, reject) => {
+        const url = new URL("/api/imports?team=coral-offers", baseURL);
+        const boundary = "----ucomp-chunked";
+        const req = httpRequest(url, {
+          method: "POST",
+          headers: { Cookie: `ucomp_persona=${persona}`, "Content-Type": `multipart/form-data; boundary=${boundary}`, "Transfer-Encoding": "chunked" },
+        });
+        let sentMb = 0;
+        let answered = false;
+        req.on("response", (res) => {
+          answered = true;
+          let body = "";
+          res.on("data", (d: Buffer) => (body += d.toString()));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, body, sentMb }));
+        });
+        req.on("error", (error) => (answered ? undefined : reject(error)));
+        req.write(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\nContent-Type: text/plain\r\n\r\n`);
+        const chunk = Buffer.alloc(1024 * 1024, 0x61);
+        const pump = () => {
+          if (answered) return req.destroy();
+          if (sentMb >= megabytes) return req.end(`\r\n--${boundary}--\r\n`);
+          sentMb += 1;
+          if (req.write(chunk)) setImmediate(pump);
+          else req.once("drain", pump);
+        };
+        pump();
+      });
+
+    const taylor = await chunked("taylor", 64);
+    expect(taylor.status).toBe(403);
+    expect(JSON.parse(taylor.body)).toMatchObject({ ok: false, code: "permission" });
+    expect(taylor.sentMb).toBeLessThan(64);
+
+    const maya = await chunked("maya", 64);
+    expect(maya.status).toBe(413);
+    expect(JSON.parse(maya.body)).toEqual({ ok: false, code: "size", reason: REFUSALS.size });
+    expect(maya.sentMb).toBeLessThan(64);
   });
 
   test("a viewer without create rights gets 403; who can't see the team gets 404 on the reads", async ({ playwright, baseURL }) => {

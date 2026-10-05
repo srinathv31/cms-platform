@@ -37,7 +37,11 @@ import { requireSpace } from "./spaces";
 
 // The Usage read models (slice S2). render_log is ~27k rows: every number is grouped in SQL by
 // day / consumer / template / version / channel, with the windows from `usageWindows(now)` (demo
-// clock, UTC days). Only usage counts: `is_preview = 0 AND consumer_id IS NOT NULL`, never after now.
+// clock, UTC days). Only usage counts: `is_preview = 0 AND consumer_id IS NOT NULL`, never after now,
+// and never a call the render route refused as `unknown_consumer`: that row keeps the caller's
+// unregistered X-Consumer-Id in render_log (the trail of who tried), but a caller UCOMP refused as
+// "not a consumer" is not a consumer. A consumer later removed from the registry still shows: its
+// rows were accepted renders when they happened.
 //
 // One denominator everywhere: a render is an ATTEMPT, succeeded or failed. "Renders" (the headline, the
 // bars, the heatmap, a consumer's row) count every attempt; "failed" is the subset that errored, and
@@ -50,12 +54,14 @@ const day = sql<string>`strftime('%Y-%m-%d', ${renderLog.at} / 1000, 'unixepoch'
 const isOk = sql`${renderLog.outcome} = 'ok'`;
 const isError = sql`${renderLog.outcome} = 'error'`;
 const num = (v: unknown) => Number(v ?? 0);
+const UNKNOWN_CONSUMER: RenderErrorCode = "unknown_consumer";
 
 /** The rows that are usage, up to the demo clock, optionally for some templates only. */
 function usageWhere(w: UsageWindows, templateIds: readonly string[] | null, from?: number): SQL {
   return and(
     eq(renderLog.isPreview, false),
     isNotNull(renderLog.consumerId),
+    sql`coalesce(${renderLog.errorCode}, '') <> ${UNKNOWN_CONSUMER}`,
     lte(renderLog.at, new Date(w.until)),
     from === undefined ? undefined : gte(renderLog.at, new Date(from)),
     templateIds === null ? undefined : inArray(renderLog.templateId, [...templateIds]),

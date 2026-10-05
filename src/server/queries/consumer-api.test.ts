@@ -233,6 +233,25 @@ const JUNK: Record<VariableType, unknown> = {
   us_state: "Narnia",
 };
 
+describe("Channel rules", () => {
+  it("a channel the content type no longer allows isn't advertised anywhere (the render route refuses it)", async () => {
+    const [disclosure] = await db.select().from(schema.contentTypes).where(eq(schema.contentTypes.key, "disclosure"));
+    const before = disclosure!.allowedChannels;
+    await db.update(schema.contentTypes).set({ allowedChannels: ["pdf", "email"] }).where(eq(schema.contentTypes.id, disclosure!.id));
+    try {
+      const [balance] = await searchActiveTemplates(id("balance-transfer"), 20);
+      expect(balance!.channels).toEqual(["pdf"]);
+      const d = await detail("balance-transfer");
+      expect(d.contract!.channels).toEqual(["pdf"]);
+      expect(d.versions.every((v) => !v.channels.includes("web"))).toBe(true);
+      expect((await detail("balance-transfer", { version: 1 })).contract!.channels).not.toContain("web");
+    } finally {
+      await db.update(schema.contentTypes).set({ allowedChannels: before }).where(eq(schema.contentTypes.id, disclosure!.id));
+    }
+    expect((await detail("balance-transfer")).contract!.channels).toEqual(["pdf", "web"]);
+  });
+});
+
 describe("JSON Schema against the seed", () => {
   it("every released version's samples validate against its schema; JUNK in any variable doesn't", async () => {
     const released = (await db.select().from(versions).where(isNotNull(versions.number))).filter((v) =>

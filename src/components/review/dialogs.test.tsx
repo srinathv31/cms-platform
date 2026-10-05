@@ -286,7 +286,7 @@ describe("ApproveDialog", () => {
 
   it("has no sunset to set when nothing is Active yet", async () => {
     await open({ previousNumber: null });
-    expect(lines()).toEqual(["v2 becomes Active."]);
+    expect(lines()).toEqual(["v2 becomes Active.", "Consumers can start using it right away."]);
     expect(sunsetSwitch()).toBeNull();
   });
 
