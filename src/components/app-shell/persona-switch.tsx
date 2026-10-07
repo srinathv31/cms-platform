@@ -56,13 +56,35 @@ export function CanvasFade({
   const { pending } = usePersonaSwitch();
   const busy = usePendingNav().view !== null;
   const ref = useRef<HTMLDivElement>(null);
+  /** Where the page on screen is scrolled to, kept while it is on screen (development only). */
+  const lastTop = useRef(0);
+  /** Where the page hidden behind a pending view was left, until the pending view goes. */
+  const leftTop = useRef<number | null>(null);
 
   useLayoutEffect(() => {
+    // Inline, so production (which never goes busy) gets neither the listener nor the effect's work.
+    if (process.env.NODE_ENV !== "development") return;
     const canvas = ref.current;
-    if (!busy || !canvas) return;
-    const left = canvas.scrollTop;
-    canvas.scrollTo({ top: 0, behavior: "instant" });
-    return () => canvas.scrollTo({ top: left, behavior: "instant" });
+    if (!canvas) return;
+    if (busy) {
+      leftTop.current = lastTop.current;
+      canvas.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
+    // The pending view is gone. Put the page that was left back where it was: this runs after the page's
+    // own layout effects (Next scrolls a refreshed page to its top), and CanvasScroll, which runs after
+    // this, places a page that did change.
+    if (leftTop.current !== null) canvas.scrollTo({ top: leftTop.current, behavior: "instant" });
+    leftTop.current = null;
+    // Kept from here on, not read when the pending view goes up: by then its commit has hidden the page and
+    // put the shorter skeleton in, so the offset is already clamped. This listener is gone (the busy
+    // commit runs its cleanup) before that clamp's scroll event arrives.
+    lastTop.current = canvas.scrollTop;
+    const onScroll = () => {
+      lastTop.current = canvas.scrollTop;
+    };
+    canvas.addEventListener("scroll", onScroll, { passive: true });
+    return () => canvas.removeEventListener("scroll", onScroll);
   }, [busy]);
 
   return (
