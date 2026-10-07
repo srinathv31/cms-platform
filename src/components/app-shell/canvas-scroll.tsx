@@ -89,6 +89,9 @@ function CanvasScrollEffects() {
     s.displayedKey ??= nav?.currentEntry?.key ?? null;
 
     const onScroll = () => {
+      // While a page is on its way (pending-nav.tsx) the canvas shows its skeleton from the top, and the
+      // page being left is hidden: that offset is not where its entry was left.
+      if (canvas.getAttribute("aria-busy") === "true") return;
       if (!s.restoring && s.displayedKey !== null) s.saved.set(s.displayedKey, canvas.scrollTop);
     };
     // The entry changes the moment the URL does, which on back and forward is before the page has
@@ -172,7 +175,8 @@ function scrollTo(canvas: HTMLElement, top: number, done: () => void): (() => vo
     for (const type of TAKE_OVER) canvas.removeEventListener(type, stop);
     done();
   }
-  if (canvas.firstElementChild) observer.observe(canvas.firstElementChild);
+  const page = canvas.querySelector(':scope > [data-slot="canvas-page"]');
+  if (page) observer.observe(page);
   for (const type of TAKE_OVER) canvas.addEventListener(type, stop, { passive: true });
   return stop;
 }

@@ -1,6 +1,32 @@
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ReviewHeaderSkeleton } from "./review-header";
 import { RV } from "./review-grid";
+
+/** The review screen's grid. The page streams into it; its pending view fills it with the skeleton below. */
+export function ReviewFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div data-slot="review" className={RV.grid}>
+      {children}
+    </div>
+  );
+}
+
+/** The header's rows with nothing in them yet. */
+export function ReviewHeaderSkeleton() {
+  return (
+    <div aria-hidden className={cn(RV.header, RV.headerRows)}>
+      <div className="col-start-1 row-start-1 flex min-w-0 flex-col items-start gap-1">
+        <Skeleton className="my-[3px] h-3.5 w-14" />
+        <Skeleton className="my-[3px] h-7 w-72 max-w-full" />
+      </div>
+      <div className="col-start-1 row-start-2 flex min-h-7 items-center gap-3 self-end">
+        <Skeleton className="h-[22px] w-20 rounded-md" />
+        <Skeleton className="h-4 w-44" />
+      </div>
+      <div className={RV.ringSlot} />
+    </div>
+  );
+}
 
 /**
  * The review screen before its data arrives, in the screen's own cells: the header's rows, the tab
@@ -63,5 +89,14 @@ export function ReviewSkeleton() {
         </div>
       </aside>
     </>
+  );
+}
+
+/** The screen before anything has streamed: what its static shell shows. */
+export function ReviewScreenSkeleton() {
+  return (
+    <ReviewFrame>
+      <ReviewSkeleton />
+    </ReviewFrame>
   );
 }

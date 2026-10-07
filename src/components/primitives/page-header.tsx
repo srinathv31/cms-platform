@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Serif page title, optional tracked-caps eyebrow, and a slot for the screen's ONE primary action. */
 export function PageHeader({
@@ -24,4 +25,9 @@ export function PageHeader({
       {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </header>
   );
+}
+
+/** The eyebrow while the space's name streams in. */
+export function EyebrowSkeleton() {
+  return <Skeleton className="h-4 w-24" />;
 }

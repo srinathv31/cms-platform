@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WS } from "@/components/workspace/workspace-grid";
-import { ENTRY_GEOMETRY } from "./version-entry";
+import { ENTRY_GEOMETRY } from "./entry-geometry";
 
 /** The row above the timeline: the Compare button's height and the room below it. The real page has it for every template. */
 export const TOOLBAR = "mb-8 flex h-8 justify-end";

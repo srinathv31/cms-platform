@@ -1,3 +1,6 @@
+import { cn } from "@/lib/utils";
+import { WS } from "@/components/workspace/workspace-grid";
+
 // Sizes the Usage screens and their skeletons share, so the skeleton has the real geometry and
 // nothing moves when the data lands.
 
@@ -20,3 +23,22 @@ const HBAR_GAP = 16;
 export function hbarsMinHeight(rows: number): number {
   return rows * HBAR_ROW + Math.max(0, rows - 1) * HBAR_GAP;
 }
+
+/** The heatmap's squares and the gap between them, in the units it is drawn at. */
+export const HEAT_CELL = 18;
+const HEAT_GAP = 4;
+export const HEAT_PITCH = HEAT_CELL + HEAT_GAP;
+/** The heatmap's height for a given column count, as the width the squares are drawn at: used by the skeleton too. */
+export function heatmapBox(weeks: number) {
+  return { width: weeks * HEAT_PITCH - HEAT_GAP, height: 7 * HEAT_PITCH - HEAT_GAP };
+}
+
+// The template's Usage tab (template-usage.tsx): its cell's layout is described there.
+
+export const TEMPLATE_BARS_HEIGHT = 210;
+/** Classes of the tab's cell, shared with the skeleton. */
+export const USAGE_CELL = cn(
+  WS.doc,
+  "col-end-3 w-[min(calc(100%-var(--canvas-pad-x)),calc(var(--doc-width)+22.5rem-var(--canvas-pad-x)))] max-w-none justify-self-start ml-[max(0px,calc((100%-var(--doc-width)-22.5rem)/2))] @max-[51.25rem]/canvas:w-full",
+);
+export const USAGE_COLUMNS = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]";

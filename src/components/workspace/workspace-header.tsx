@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { TemplateId } from "@/components/primitives/template-id";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/server/clock";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { NameField } from "./name-field";
 import { SaveStatus } from "./save-status";
 import { WS } from "./workspace-grid";
 import { WorkspaceShare } from "./workspace-share";
+import { HEADER } from "./workspace-skeleton";
 
 // The header is a small grid, so the name can run under the Template ID's column:
 //
@@ -19,8 +19,8 @@ import { WorkspaceShare } from "./workspace-share";
 // The ID sits on the status row's line, as in the layout study, rather than beside the name, so a long
 // name keeps nearly the whole width (the ring's column is the only thing it gives up) and wraps to a
 // second line only when it must. Draft and Active are the same height: the ring is shorter than the
-// two rows, and a wrapped name is the only thing that makes the header grow.
-const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
+// two rows, and a wrapped name is the only thing that makes the header grow. The grid's classes
+// (`HEADER`) live in workspace-skeleton.tsx, with the skeleton that shares them.
 
 /**
  * Name, then the status row, with the Template ID and (on Active) the SHARE ring at the right.
@@ -78,18 +78,5 @@ export async function WorkspaceHeader({
         </div>
       ) : null}
     </header>
-  );
-}
-
-/** Name line and status row, same rows as the header. */
-export function WorkspaceHeaderSkeleton() {
-  return (
-    <div aria-hidden className={cn(WS.header, HEADER)}>
-      <Skeleton className="col-span-2 col-start-1 row-start-1 my-[3px] h-7 w-72" />
-      <div className="col-start-1 row-start-2 flex min-h-[2.625rem] items-end gap-3 pb-[3px]">
-        <Skeleton className="h-[22px] w-20 rounded-md" />
-        <Skeleton className="h-4 w-24" />
-      </div>
-    </div>
   );
 }

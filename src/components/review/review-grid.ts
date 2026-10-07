@@ -41,6 +41,17 @@ export const RV = {
   /** The eyebrow link, the name, the status row and the SHARE ring slot. */
   header: `${WS.header} ${STACKED_PR}`,
 
+  /** The header's own grid (review-header.tsx draws it), shared with its skeleton. */
+  headerRows: "grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5",
+
+  /**
+   * The ring's slot: 76px and a 24px gap, where the status row still has the room it needs (about 300px, a
+   * grid of 32.25rem); narrower than that it isn't reserved at all, and an Active version shows no ring
+   * (the status row would wrap, and the tab bar below it would move). Reserved or not, it is the same for
+   * every state at the same width.
+   */
+  ringSlot: "col-start-2 row-span-2 row-start-1 ml-6 hidden size-19 shrink-0 items-center justify-center self-start @min-[32.25rem]/ws:flex",
+
   /** Tabs and the view's own tools. Sticky, one 44px line over a hairline. */
   tabs: `${STACKED_PR} @container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 self-start justify-self-center border-b border-hairline bg-canvas`,
 

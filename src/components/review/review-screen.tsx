@@ -3,8 +3,7 @@ import { now } from "@/server/clock";
 import { getReviewScreen } from "@/server/queries/review";
 import { getPeople, personOf } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
-import { RV } from "./review-grid";
-import { ReviewSkeleton } from "./review-skeleton";
+import { ReviewFrame, ReviewSkeleton } from "./review-skeleton";
 import { ReviewWorkspace } from "./review-workspace";
 
 type Params = Promise<{ team: string; templateId: string; version: string }>;
@@ -28,10 +27,10 @@ async function ReviewData({ params }: { params: Params }) {
  */
 export function ReviewScreen({ params }: { params: Params }) {
   return (
-    <div data-slot="review" className={RV.grid}>
+    <ReviewFrame>
       <Stream fallback={<ReviewSkeleton />}>
         <ReviewData params={params} />
       </Stream>
-    </div>
+    </ReviewFrame>
   );
 }

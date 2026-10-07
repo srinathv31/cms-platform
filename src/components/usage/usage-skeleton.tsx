@@ -1,12 +1,22 @@
+import { EyebrowSkeleton, PageHeader } from "@/components/primitives/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { heatmapBox } from "./charts";
-import { BARS_HEIGHT, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
+import { BARS_HEIGHT, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES, heatmapBox } from "./geometry";
 import { Panel } from "./panel";
 import { HEATMAP_WEEKS } from "@/domain/golive-types";
 
 // The Usage dashboard while it streams: the tab labels, and the Overview's cards with the real
 // geometry (same cards, same chart heights, the heatmap at its real aspect ratio).
+
+/** The Usage page's frame: the title over the dashboard. The page streams into it; its pending view fills it with skeletons. */
+export function UsageFrame({ eyebrow, children }: { eyebrow: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <PageHeader title="Usage" eyebrow={eyebrow} />
+      {children}
+    </div>
+  );
+}
 
 const TAB = "relative -mb-px flex h-11 items-center text-[15px]";
 
@@ -88,5 +98,14 @@ export function UsageSkeleton() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+/** The page before anything has streamed: what its static shell shows. */
+export function UsagePageSkeleton() {
+  return (
+    <UsageFrame eyebrow={<EyebrowSkeleton />}>
+      <UsageSkeleton />
+    </UsageFrame>
   );
 }

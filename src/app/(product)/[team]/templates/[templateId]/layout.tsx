@@ -1,7 +1,8 @@
 import { Stream } from "@/components/primitives/stream";
 import { WorkspaceSessionProvider } from "@/components/workspace/session/workspace-session";
-import { WorkspaceHeader, WorkspaceHeaderSkeleton } from "@/components/workspace/workspace-header";
-import { WS } from "@/components/workspace/workspace-grid";
+import { WorkspaceHeader } from "@/components/workspace/workspace-header";
+import { WorkspacePageSlot } from "@/components/workspace/workspace-page-slot";
+import { WorkspaceFrame, WorkspaceHeaderSkeleton } from "@/components/workspace/workspace-skeleton";
 import { WorkspaceTabBar } from "@/components/workspace/workspace-tab-bar";
 
 // The workspace is one grid (see workspace-grid.ts): the header and the tab bar here, and whatever
@@ -12,14 +13,16 @@ export default function TemplateWorkspaceLayout({
 }: LayoutProps<"/[team]/templates/[templateId]">) {
   return (
     <WorkspaceSessionProvider>
-      <div data-slot="workspace" className={WS.grid}>
-        <Stream fallback={<WorkspaceHeaderSkeleton />}>
-          <WorkspaceHeader params={params} />
-        </Stream>
-        <WorkspaceTabBar params={params} />
-        <div aria-hidden className={WS.railSpace} />
-        {children}
-      </div>
+      <WorkspaceFrame
+        header={
+          <Stream fallback={<WorkspaceHeaderSkeleton />}>
+            <WorkspaceHeader params={params} />
+          </Stream>
+        }
+        tabBar={<WorkspaceTabBar params={params} />}
+      >
+        <WorkspacePageSlot>{children}</WorkspacePageSlot>
+      </WorkspaceFrame>
     </WorkspaceSessionProvider>
   );
 }

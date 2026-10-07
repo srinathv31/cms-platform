@@ -1,17 +1,16 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { WS } from "@/components/workspace/workspace-grid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addDays, errorText } from "@/domain/golive/usage";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { TemplateUsageData } from "@/domain/golive-types";
-import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
 import { renderCount } from "@/components/versions/format";
 import { Legend, StackedBars, type StackSeries } from "./charts";
 import { ConsumersTable } from "./consumers-table";
 import { formatDayShort, formatLastRender } from "./format";
+import { TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./geometry";
 import { Panel, PanelHead, TrendPill } from "./panel";
 import { Numeral, StatLabel } from "./stat";
 
@@ -26,14 +25,7 @@ import { Numeral, StatLabel } from "./stat";
 // inset from the panel's right edge, up to the document width plus the rail column. Below the canvas
 // width where the grid pads its own right side, it is the grid area, as every tab is.
 
-export const TEMPLATE_BARS_HEIGHT = 210;
 const NF = new Intl.NumberFormat("en-US");
-/** Classes of the tab's cell, shared with the skeleton. */
-export const USAGE_CELL = cn(
-  WS.doc,
-  "col-end-3 w-[min(calc(100%-var(--canvas-pad-x)),calc(var(--doc-width)+22.5rem-var(--canvas-pad-x)))] max-w-none justify-self-start ml-[max(0px,calc((100%-var(--doc-width)-22.5rem)/2))] @max-[51.25rem]/canvas:w-full",
-);
-export const USAGE_COLUMNS = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]";
 
 // Newest version darkest; older ones step lighter. Written out so the class scanner sees them.
 const VERSION_SERIES: Pick<StackSeries, "fill" | "bg">[] = [

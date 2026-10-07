@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "./panel";
-import { TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./template-usage";
+import { TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./geometry";
 
 /** The Usage tab while it streams: the chart card, the two number cards and the table's card. */
 export function TemplateUsageSkeleton() {

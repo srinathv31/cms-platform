@@ -6,7 +6,7 @@ import { compactCount } from "@/domain/golive/usage";
 import type { UsageHeatmap } from "@/domain/golive-types";
 import { renderCount } from "@/components/versions/format";
 import { formatDay, formatDayShort } from "./format";
-import { hbarsMinHeight } from "./geometry";
+import { HEAT_CELL, HEAT_PITCH, hbarsMinHeight, heatmapBox } from "./geometry";
 
 /*
  * Small SVG charts drawn from plain numbers, no chart library, all server-rendered. Each mark that
@@ -154,9 +154,6 @@ export function HBars({
 
 // ── Calendar heatmap ─────────────────────────────────────────────────────────
 
-const HEAT_CELL = 18;
-const HEAT_GAP = 4;
-const HEAT_PITCH = HEAT_CELL + HEAT_GAP;
 const HEAT_FILL = ["fill-heat-empty", "fill-brand-1", "fill-brand-2", "fill-brand-3", "fill-brand-4"] as const;
 const HEAT_BG = ["bg-heat-empty", "bg-brand-1", "bg-brand-2", "bg-brand-3", "bg-brand-4"] as const;
 const WEEKDAY_LABELS: [number, string][] = [
@@ -164,11 +161,6 @@ const WEEKDAY_LABELS: [number, string][] = [
   [3, "Wed"],
   [5, "Fri"],
 ];
-
-/** The heatmap's height for a given column count, as the width the squares are drawn at: used by the skeleton too. */
-export function heatmapBox(weeks: number) {
-  return { width: weeks * HEAT_PITCH - HEAT_GAP, height: 7 * HEAT_PITCH - HEAT_GAP };
-}
 
 /**
  * A column per week, a row per weekday (Sunday on top), rounded squares. The squares scale with the

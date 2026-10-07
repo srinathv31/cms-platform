@@ -8,6 +8,7 @@ import { m } from "motion/react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { spring } from "@/components/motion/presets";
+import { usePendingNav } from "@/components/app-shell/pending-nav";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { BreakingBadge } from "./breaking-badge";
@@ -61,10 +62,12 @@ function Decision({ decision, className }: { decision: NonNullable<QueueRowView[
 function QueueRow({ row, showTeam }: { row: QueueRowView; showTeam: boolean }) {
   const decided = row.decision !== undefined;
   const folds = decided ? FOLDS_DECIDED : FOLDS;
+  const { link } = usePendingNav();
   return (
     <li className="border-b border-hairline last:border-b-0">
       <Link
         href={row.href as Route}
+        onNavigate={link(row.href)}
         className={cn(
           ROW,
           ROW_HEIGHT,

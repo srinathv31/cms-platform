@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { EditButton, PreviewToggle, RailToggle, SubmitButton } from "./workspace-actions";
-import { WS } from "./workspace-grid";
+import { TabBarFrame } from "./workspace-skeleton";
 import { WorkspaceTabs, WorkspaceTabsSkeleton } from "./workspace-tabs";
 
 type Params = Promise<{ team: string; templateId: string }>;
@@ -14,23 +14,27 @@ type Params = Promise<{ team: string; templateId: string }>;
  */
 export function WorkspaceTabBar({ params }: { params: Params }) {
   return (
-    <div data-slot="tab-bar" className={WS.tabs}>
-      <Stream fallback={<WorkspaceTabsSkeleton />}>
-        {params.then(({ team, templateId }) => (
-          <WorkspaceTabs base={`/${team}/templates/${templateId}`} />
-        ))}
-      </Stream>
-      <div className="flex h-11 shrink-0 items-center gap-2">
-        {/* Reads which tab is selected; the boundary keeps it out of the static shell if that is ever dynamic. */}
-        <Suspense fallback={null}>
-          <RailToggle />
-        </Suspense>
-        {/* Nothing to hold the place of: the button appears in free space at the right end. */}
-        <Stream fallback={<span aria-hidden />}>
-          <TemplateActions params={params} />
+    <TabBarFrame
+      tabs={
+        <Stream fallback={<WorkspaceTabsSkeleton />}>
+          {params.then(({ team, templateId }) => (
+            <WorkspaceTabs base={`/${team}/templates/${templateId}`} />
+          ))}
         </Stream>
-      </div>
-    </div>
+      }
+      actions={
+        <>
+          {/* Reads which tab is selected; the boundary keeps it out of the static shell if that is ever dynamic. */}
+          <Suspense fallback={null}>
+            <RailToggle />
+          </Suspense>
+          {/* Nothing to hold the place of: the button appears in free space at the right end. */}
+          <Stream fallback={<span aria-hidden />}>
+            <TemplateActions params={params} />
+          </Stream>
+        </>
+      }
+    />
   );
 }
 

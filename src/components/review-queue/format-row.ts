@@ -3,6 +3,7 @@
 
 import type { Person, ReviewQueueRow } from "@/domain/review-types";
 import { relativeTime } from "@/server/queries/format";
+import { TAB_META, type QueueTabKey } from "./tab-meta";
 
 export interface QueueRowView {
   key: string;
@@ -58,7 +59,7 @@ export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: 
   };
 }
 
-export type QueueTabKey = "waiting" | "submitted" | "decided";
+export { TAB_META, type QueueTabKey } from "./tab-meta";
 
 export interface QueueTab {
   key: QueueTabKey;
@@ -67,12 +68,6 @@ export interface QueueTab {
   /** One calm line, never an instruction. */
   empty: string;
 }
-
-export const TAB_META: Record<QueueTabKey, { label: string; empty: string }> = {
-  waiting: { label: "Waiting on me", empty: "Nothing waiting on you." },
-  submitted: { label: "Submitted by me", empty: "You haven't submitted anything for review." },
-  decided: { label: "Recently decided", empty: "No decisions in the last 30 days." },
-};
 
 const TAB_KEYS: readonly QueueTabKey[] = ["waiting", "submitted", "decided"];
 

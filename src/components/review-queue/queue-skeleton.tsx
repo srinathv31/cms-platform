@@ -1,8 +1,19 @@
 import { cn } from "@/lib/utils";
+import { EyebrowSkeleton, PageHeader } from "@/components/primitives/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { COLUMNS, FOLDS, ROW, ROW_HEIGHT } from "./columns";
-import { TAB_META } from "./format-row";
+import { TAB_META } from "./tab-meta";
 import { TAB, TAB_BAR, TAB_CONTENT } from "./tab-styles";
+
+/** The review queue's frame: the title over the queue. The page streams into it; its pending view fills it with skeletons. */
+export function ReviewQueueFrame({ eyebrow, children }: { eyebrow: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <PageHeader title="Review" eyebrow={eyebrow} />
+      {children}
+    </div>
+  );
+}
 
 /** Same geometry as the loaded list (tab bar, header row, four rows), so nothing shifts when it streams in. */
 export function QueueSkeleton() {
@@ -43,5 +54,14 @@ export function QueueSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+/** The queue before anything has streamed: what its static shell shows. */
+export function ReviewQueuePageSkeleton() {
+  return (
+    <ReviewQueueFrame eyebrow={<EyebrowSkeleton />}>
+      <QueueSkeleton />
+    </ReviewQueueFrame>
   );
 }

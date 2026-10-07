@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { Search, X } from "lucide-react";
 import { StatusBadge } from "@/components/primitives/status-badge";
+import { usePendingNav } from "@/components/app-shell/pending-nav";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
@@ -39,10 +40,13 @@ function ListHeader({ showTeam }: { showTeam: boolean }) {
 }
 
 function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space: string; showTeam: boolean; nowIso: string }) {
+  const href = `/${space}/templates/${row.id}`;
+  const { link } = usePendingNav();
   return (
     <li className="border-b border-hairline last:border-b-0">
       <Link
-        href={`/${space}/templates/${row.id}` as Route}
+        href={href as Route}
+        onNavigate={link(href)}
         className={cn(
           ROW,
           "min-h-[4.25rem] rounded-xl py-3 text-[14px] outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",

@@ -20,6 +20,8 @@ import type { SidebarCardModel } from "@/domain/access-types";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { HelpPopover } from "./help-popover";
 import { NAV_ICON_STROKE, NAV_ITEMS, NAV_ROW, type NavKey } from "./nav";
+import { usePendingNav } from "./pending-nav";
+import { navKeyOf } from "./pending-routes";
 import { SidebarCard } from "./sidebar-card";
 
 const ROW_INTERACTION = "hover:bg-hover active:bg-selected data-active:bg-transparent";
@@ -81,6 +83,10 @@ export function SidebarBody({
   const derived = activeFromPath(pathname, space?.slug);
   const [active, setActive] = useState<NavKey>(derived ?? "library");
   if (derived && derived !== active) setActive(derived);
+  // A page on its way lights its item at once (development only: see pending-nav.tsx). The page on
+  // screen keeps `aria-current` until the new one arrives.
+  const { view, link } = usePendingNav();
+  const shown = (process.env.NODE_ENV === "development" && view && navKeyOf(view)) || active;
 
   const settingsSection = space ? firstSettingsSection(space.settings) : null;
   const card = space ? space.card : homeCard;
@@ -92,13 +98,14 @@ export function SidebarBody({
         {space ? (
           <SidebarMenu className="gap-1">
             {items.map((item) => {
-              const isActive = item.key === active;
+              const href = `/${space.slug}/${item.key}`;
+              const isActive = item.key === shown;
               return (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
-                    render={<Link href={`/${space.slug}/${item.key}` as Route} />}
+                    render={<Link href={href as Route} onNavigate={link(href)} />}
                     isActive={isActive}
-                    aria-current={isActive ? "page" : undefined}
+                    aria-current={item.key === active ? "page" : undefined}
                     className={cn(NAV_ROW, ROW_INTERACTION, isActive && "font-medium")}
                   >
                     {isActive ? (

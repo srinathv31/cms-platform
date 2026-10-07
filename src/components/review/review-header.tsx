@@ -7,7 +7,6 @@ import { ChevronLeft } from "lucide-react";
 import { m } from "motion/react";
 import { duration, ease } from "@/components/motion/presets";
 import { StatusBadge } from "@/components/primitives/status-badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelative } from "@/components/versions/format";
 import { WorkspaceShare } from "@/components/workspace/workspace-share";
 import type { Person } from "@/domain/review-types";
@@ -24,16 +23,8 @@ import { RV } from "./review-grid";
 //   name ......................................  ┐
 //   [In review] v3 by Maya Chen · 2 hours ago      │ SHARE ring (Active only), 76px, spans the rows
 //
-// One grid for the real header and its skeleton, so they measure the same.
+// One grid for the real header and its skeleton (review-skeleton.tsx), so they measure the same.
 
-const HEADER = "grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5";
-/**
- * The ring's slot: 76px and a 24px gap, where the status row still has the room it needs (about 300px, a
- * grid of 32.25rem); narrower than that it isn't reserved at all, and an Active version shows no ring
- * (the status row would wrap, and the tab bar below it would move). Reserved or not, it is the same for
- * every state at the same width.
- */
-const RING_SLOT = "col-start-2 row-span-2 row-start-1 ml-6 hidden size-19 shrink-0 items-center justify-center self-start @min-[32.25rem]/ws:flex";
 const BACK =
   "caps-label -ml-1 inline-flex h-5 w-fit items-center gap-0.5 rounded-md pr-1 outline-none hover:text-text focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -66,7 +57,7 @@ export function ReviewHeader({
   slotRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <header className={cn(RV.header, HEADER)}>
+    <header className={cn(RV.header, RV.headerRows)}>
       <div className="col-start-1 row-start-1 flex min-w-0 flex-col items-start gap-1">
         <Link href={`/${team}/review` as Route} className={BACK}>
           <ChevronLeft aria-hidden strokeWidth={1.75} className="size-3.5" />
@@ -93,27 +84,10 @@ export function ReviewHeader({
       <div
         ref={slotRef}
         data-slot="share"
-        className={RING_SLOT}
+        className={RV.ringSlot}
       >
         {ring ? <WorkspaceShare templateId={templateId} templateName={templateName} activeVersion={versionNumber} /> : null}
       </div>
     </header>
-  );
-}
-
-/** The header's rows with nothing in them yet. */
-export function ReviewHeaderSkeleton() {
-  return (
-    <div aria-hidden className={cn(RV.header, HEADER)}>
-      <div className="col-start-1 row-start-1 flex min-w-0 flex-col items-start gap-1">
-        <Skeleton className="my-[3px] h-3.5 w-14" />
-        <Skeleton className="my-[3px] h-7 w-72 max-w-full" />
-      </div>
-      <div className="col-start-1 row-start-2 flex min-h-7 items-center gap-3 self-end">
-        <Skeleton className="h-[22px] w-20 rounded-md" />
-        <Skeleton className="h-4 w-44" />
-      </div>
-      <div className={RING_SLOT} />
-    </div>
   );
 }
