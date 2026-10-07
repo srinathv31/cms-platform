@@ -10,7 +10,7 @@ import { PreviewSurface } from "@/components/preview/preview-surface";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Person, ThreadView } from "@/domain/review-types";
 import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
-import type { CommentRequest, DocumentEditorHandle } from "@/editor";
+import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";

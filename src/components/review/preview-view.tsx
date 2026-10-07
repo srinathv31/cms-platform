@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PreviewPane } from "@/components/preview/preview-pane";
 import { recipientOf, senderOf } from "@/components/preview/preview-sender";
 import { usePreviewRender } from "@/components/preview/use-preview-render";
-import type { VariableValues } from "@/editor";
+import type { VariableValues } from "@/editor/model/types";
 import type { Channel, Variable } from "@/domain/types";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
 import { RV } from "./review-grid";

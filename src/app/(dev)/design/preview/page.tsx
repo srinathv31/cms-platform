@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Stream } from "@/components/primitives/stream";
-import { StaticDocument } from "@/editor";
+import { StaticDocument } from "@/editor/components/static-document";
 import { SPRING_DOC, VARIABLES } from "./fixtures";
 import { PreviewMock } from "./preview-mock";
 import type { ChannelId, DeviceId, ModeId, VariantId } from "./types";

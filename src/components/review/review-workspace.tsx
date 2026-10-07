@@ -8,7 +8,7 @@ import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetS
 import { diffDocuments } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
 import type { Channel, VersionState } from "@/domain/types";
-import type { CommentRequest, DocumentEditorHandle } from "@/editor";
+import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { ApproveDialog, type Approved } from "./approve-dialog";
 import { BlockCommentMenu } from "./block-comment-menu";
 import { DecisionBar } from "./decision-bar";

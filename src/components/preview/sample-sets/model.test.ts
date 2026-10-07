@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SampleSet, Variable } from "@/editor";
+import type { SampleSet, Variable } from "@/editor/model/types";
 import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import {
   addSet,

@@ -2,7 +2,7 @@
 // sample sets and the email fields. Self-contained apart from the variable list and the template model
 // borrowed from the workspace study.
 
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import { CORAL_VARIABLES, modelFor } from "../workspace/fixtures";
 import type { ChannelId, TemplateModel } from "../workspace/types";
 import type { PreviewSet } from "./types";

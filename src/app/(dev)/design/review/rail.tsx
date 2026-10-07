@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, CornerUpLeft, TriangleAlert } from "lucide-react";
-import type { ContractChange } from "@/editor";
+import type { ContractChange } from "@/editor/model/types";
 import type { PermissionResult } from "@/domain/types";
 import type { Person, StepView, ThreadView } from "@/domain/review-types";
 import { DOCUMENT_THREAD } from "@/domain/review-types";

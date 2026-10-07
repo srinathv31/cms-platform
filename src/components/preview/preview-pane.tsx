@@ -1,7 +1,7 @@
 "use client";
 
 import { m } from "motion/react";
-import type { Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
 import type { Channel } from "@/domain/types";
 import { duration, ease } from "@/components/motion/presets";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";

@@ -6,8 +6,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { AllSelection } from "@tiptap/pm/state";
 import { generateJSON } from "@tiptap/html";
-import { baseExtensions, chipsInJSON, markdownToHtml, type JSONContent } from "@/editor";
-import { editorExtensions } from "@/editor/schema";
+import type { JSONContent } from "@/editor/model/types";
+import { chipsInJSON } from "@/editor/paste/chips";
+import { markdownToHtml } from "@/editor/paste/markdown";
+import { baseExtensions, editorExtensions } from "@/editor/schema";
 import { createChipPopoverStore } from "@/editor/state/chip-popover";
 import { createEditorRootRuntime } from "@/editor/state/editor-root";
 import { blocks, destroyEditors, doc as editorDoc, h2, mountEditor, p as line } from "@/editor/testing/editor";

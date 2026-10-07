@@ -1,7 +1,7 @@
 // A small redline for tests and for building UI before the diff is wired. It covers every block
 // status, inline marks on text and on a chip, and a run of unchanged blocks to collapse.
 
-import type { JSONContent, Variable } from "@/editor";
+import type { JSONContent, Variable } from "@/editor/model/types";
 import type { RedlineDoc } from "@/domain/review-types";
 
 export const REDLINE_VARIABLES: Variable[] = [

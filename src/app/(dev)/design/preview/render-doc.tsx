@@ -1,4 +1,5 @@
-import { formatValue, type JSONContent, type Variable } from "@/editor";
+import type { JSONContent, Variable } from "@/editor/model/types";
+import { formatValue } from "@/editor/model/variables";
 import { cn } from "@/lib/utils";
 
 /*

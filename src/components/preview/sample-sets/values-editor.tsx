@@ -11,7 +11,8 @@
 
 import { Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { formatValue, type SampleSet, type Variable, type VariableType } from "@/editor";
+import type { SampleSet, Variable, VariableType } from "@/editor/model/types";
+import { formatValue } from "@/editor/model/variables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

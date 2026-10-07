@@ -49,7 +49,7 @@ describe("the editor folder is portable", () => {
 
   it("finds the module's files", () => {
     expect(all.length).toBeGreaterThan(40);
-    expect(all.some((f) => f.endsWith("index.ts"))).toBe(true);
+    expect(all.some((f) => f.endsWith("schema.ts"))).toBe(true);
   });
 
   it("imports only React, TipTap, Base UI, Floating UI, shadcn ui, lucide, motion, zustand and itself", () => {

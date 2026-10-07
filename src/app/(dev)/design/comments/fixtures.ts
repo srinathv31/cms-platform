@@ -3,7 +3,7 @@
 // demo "now" so the server paint and the client agree.
 
 import { DOCUMENT_THREAD, type CommentView, type Person, type ThreadView } from "@/domain/review-types";
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import { SPRING_DOC, TEMPLATE_ID, TEMPLATE_NAME, VARIABLES, draftModel } from "../preview/fixtures";
 
 export { SPRING_DOC, TEMPLATE_ID, TEMPLATE_NAME, VARIABLES, draftModel };

@@ -15,7 +15,7 @@
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
 
-import type { DocumentEditorHandle } from "@/editor";
+import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
 import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
 

@@ -6,18 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  DocumentEditor,
-  EditorRoot,
-  InlineVariableField,
-  VariablesPanel,
-  type CommentRequest,
-  type DocumentEditorHandle,
-  type JSONContent,
-  type RequiredSection,
-  type ThreadAnchor,
-  type Variable,
-} from "@/editor";
+import { DocumentEditor } from "@/editor/components/document-editor";
+import { EditorRoot } from "@/editor/components/editor-root";
+import { InlineVariableField } from "@/editor/components/inline-variable-field";
+import { VariablesPanel } from "@/editor/components/variables-panel";
+import type { JSONContent, RequiredSection, Variable } from "@/editor/model/types";
+import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 import { FIXTURES, LAB_THREADS, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
 
 const JSON_DEBOUNCE_MS = 250;

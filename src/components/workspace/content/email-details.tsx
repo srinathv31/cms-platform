@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useId, useState } from "react";
-import { InlineVariableField, type JSONContent } from "@/editor";
+import { InlineVariableField } from "@/editor/components/inline-variable-field";
+import type { JSONContent } from "@/editor/model/types";
 import { useWorkspaceSession } from "../session/workspace-session";
 
 export interface EmailDetailsProps {
