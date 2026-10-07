@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { spring } from "@/components/motion/presets";
+import { LinkPending } from "@/components/primitives/link-pending";
 import { firstSettingsSection } from "@/components/settings/sections";
 import type { SidebarCardModel } from "@/domain/access-types";
 import type { SpaceNav } from "@/server/queries/spaces";
@@ -55,7 +56,7 @@ function ReviewCount({ counts, slug }: { counts: Promise<Record<string, number>>
     <span
       role="img"
       aria-label={`${count} waiting`}
-      className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] leading-none font-medium text-brand-foreground tabular-nums"
+      className="relative grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] leading-none font-medium text-brand-foreground tabular-nums"
     >
       {count}
     </span>
@@ -113,7 +114,9 @@ export function SidebarBody({
                       strokeWidth={NAV_ICON_STROKE}
                       className={cn("relative", isActive && "text-text")}
                     />
-                    <span className="relative">{item.label}</span>
+                    <span className="relative truncate">{item.label}</span>
+                    {/* Takes the free space, so it ends the row; on Review it sits just before the count. */}
+                    <LinkPending className="relative ml-auto" />
                     {item.key === "review" ? (
                       <Suspense fallback={null}>
                         <ReviewCount counts={reviewCounts} slug={space.slug} />
