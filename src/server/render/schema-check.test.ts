@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { HANDLED_MARKS, HANDLED_NODES, resolveDocument, validateValues } from "@/domain/render";
 import type { RenderBlock, RenderInline } from "@/domain/render";
 import type { JSONContent, SampleSet, Variable } from "@/domain/types";
-import { sampleSetValues } from "@/editor";
+import { sampleSetValues } from "@/editor/model/sample-sets";
 import { createContext } from "@/server/seed/context";
 import { seedCardStatementsTemplates } from "@/server/seed/templates/card-statements";
 import { seedCoralTemplates } from "@/server/seed/templates/coral";

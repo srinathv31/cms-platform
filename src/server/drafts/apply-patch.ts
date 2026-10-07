@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { PermissionError, assertCan } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
-import { ensureBlockIds } from "@/editor";
+import { ensureBlockIds } from "@/editor/schema";
 import type { Db } from "@/server/db/client";
 import { auditEvents, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";

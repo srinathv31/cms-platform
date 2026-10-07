@@ -1,6 +1,7 @@
 // Public API of the portable editor module, frozen for Phase 2 (see README.md, "Public API").
-// Hosts import from "@/editor" only. Pure model code (model/*) may also be imported directly by
-// code that must not load React or TipTap (domain rules, server validation).
+// UI hosts import from "@/editor". Server and domain code import the server-safe modules directly
+// (schema, model/*, paste/*), so they don't load the editor UI this barrel brings along; an ESLint
+// rule in eslint.config.mjs enforces it.
 
 // ── Components ───────────────────────────────────────────────────
 export { EditorRoot, useContractState } from "./components/editor-root";

@@ -15,8 +15,8 @@ import { writeEffects, type Tx } from "@/server/effects";
 import { newId, newTemplateId } from "@/server/ids";
 
 // The write side of "a new template and its first draft", shared by New template (a starter,
-// src/server/actions/templates.ts) and Import a file (src/server/import/create.ts). The callers
-// check permissions and build the lifecycle result; this inserts it in their transaction.
+// src/server/actions/create-template.ts) and Import a file (src/server/import/create.ts). The
+// callers check permissions and build the lifecycle result; this inserts it in their transaction.
 
 /** A draft's row in `versions`. */
 export function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {

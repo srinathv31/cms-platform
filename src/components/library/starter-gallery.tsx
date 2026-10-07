@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardE
 import { unstable_rethrow } from "next/navigation";
 import { markPaletteStale } from "@/components/palette/palette-stale";
 import { Spinner } from "@/components/ui/spinner";
-import { createTemplate } from "@/server/actions/templates";
+import { createTemplate } from "@/server/actions/create-template";
 import { STARTERS, type StarterKey } from "@/server/starters/catalog";
 import { cn } from "@/lib/utils";
 import { ImportRow } from "./import-row";

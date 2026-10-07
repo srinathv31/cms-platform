@@ -1,7 +1,7 @@
 import "server-only";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
-import { baseExtensions } from "@/editor";
+import { baseExtensions } from "@/editor/schema";
 
 // The guard between stored documents and the renderer: before a body (or an email field) is
 // resolved, it must parse against the editor's own schema. The resolver (src/domain/render/
