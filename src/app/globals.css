@@ -3,6 +3,13 @@
 @import "shadcn/tailwind.css";
 @import "../styles/tokens.css";
 
+/* Tailwind auto-detects classes in every tracked file. These folders hold docs, skills and tests, not UI. */
+@source not "../../docs";
+@source not "../../.agents";
+@source not "../../.claude";
+@source not "../../e2e";
+@source not "../../scripts";
+
 /* Light theme only (build plan). No dark variant. */
 
 @theme inline {
