@@ -6,6 +6,7 @@ import type { Route } from "next";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { spring } from "@/components/motion/presets";
+import { LinkPendingLabel } from "@/components/primitives/link-pending";
 
 export const WORKSPACE_TABS = [
   { key: "content", label: "Content", segment: null },
@@ -34,7 +35,9 @@ export function WorkspaceTabs({ base }: { base: string }) {
             aria-current={active ? "page" : undefined}
             className={cn(TAB, active ? "font-medium text-text" : "text-text-muted hover:text-text")}
           >
-            <span className={LABEL}>{tab.label}</span>
+            <span className={LABEL}>
+              <LinkPendingLabel>{tab.label}</LinkPendingLabel>
+            </span>
             {active ? (
               <m.span
                 layoutId="workspace-tab-underline"
