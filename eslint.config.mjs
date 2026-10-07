@@ -12,7 +12,7 @@ const noSimulatorData = {
 const noEditorBarrel = {
   name: "@/editor",
   message:
-    "The @/editor barrel loads the React editor UI. Import server-safe modules directly: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
+    "There is no @/editor barrel (it was removed: it loaded the React editor UI). Import the server-safe modules that define what you need: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
 };
 
 const eslintConfig = defineConfig([
@@ -61,7 +61,8 @@ const eslintConfig = defineConfig([
   },
   {
     // Server code doesn't read the simulator's tables either, and takes the editor's server-safe modules
-    // directly: the "@/editor" barrel would compile the whole editor UI into every route that reaches it.
+    // directly. The "@/editor" barrel was removed (it compiled the whole editor UI into every route that
+    // reached it); this rule keeps one from coming back here.
     // (domain/ is held tighter above: the editor's pure model only.)
     files: ["src/server/**/*"],
     ignores: ["src/server/seed/**/*", "src/server/reset.ts"],

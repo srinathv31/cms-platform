@@ -8,7 +8,7 @@
 //
 // Plain DOM, no React: the review screen puts it behind a ref (review/redline-view.tsx).
 
-import type { CommentRequest, DocumentEditorHandle } from "@/editor";
+import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 
 export interface RedlineHandleSource {
   /** The element the redline renders in (null before it mounts). */

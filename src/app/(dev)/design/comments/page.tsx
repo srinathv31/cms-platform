@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Stream } from "@/components/primitives/stream";
-import { StaticDocument } from "@/editor";
+import { StaticDocument } from "@/editor/components/static-document";
 import { CommentsMock } from "./comments-mock";
 import { SPRING_DOC, VARIABLES } from "./fixtures";
 import type { ComposeId, ScreenId, VariantId } from "./types";

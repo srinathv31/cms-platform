@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, MessageSquare, MessageSquarePlus } from "lucide-react";
-import { VariableChipView, type JSONContent } from "@/editor";
+import { VariableChipView } from "@/editor/components/variable-chip";
+import type { JSONContent } from "@/editor/model/types";
 import type { RedlineBlock, RedlineStatus, ThreadView } from "@/domain/review-types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

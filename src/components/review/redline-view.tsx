@@ -4,7 +4,8 @@ import { useImperativeHandle, useLayoutEffect, useMemo, useRef, type RefObject }
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { RedlineDocument, collapsedHosts, createRedlineHandle, groupBlocks, isCollapsedKey } from "@/components/redline";
 import type { RedlineDoc, ThreadView } from "@/domain/review-types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor, Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
+import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 
 /**
  * The redline with comments beside it: the same gutter markers as the editor's, the same scroll to a

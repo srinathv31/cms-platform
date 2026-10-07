@@ -1,7 +1,7 @@
 // Pure helpers behind <RedlineDocument>: grouping, labels and the whole-block marks. No React, so
 // they are cheap to test and safe on the server and the client.
 
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
 
 /**

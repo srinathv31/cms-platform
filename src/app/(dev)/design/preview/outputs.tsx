@@ -1,5 +1,5 @@
 import { Lock, Menu } from "lucide-react";
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import { cn } from "@/lib/utils";
 import { FitWidth } from "./fit-width";
 import { EMAIL_PREHEADER, EMAIL_SUBJECT, SPRING_DOC, TEMPLATE_ID } from "./fixtures";

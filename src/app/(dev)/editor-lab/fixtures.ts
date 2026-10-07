@@ -1,7 +1,8 @@
 // Fixture documents for /editor-lab. Deterministic (stable ids) so the server paint and the
 // client hydrate to identical markup.
 
-import type { JSONContent, ThreadAnchor, Variable } from "@/editor";
+import type { JSONContent, Variable } from "@/editor/model/types";
+import type { ThreadAnchor } from "@/editor/types";
 
 export const LAB_VARIABLES: Variable[] = [
   { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },

@@ -26,8 +26,6 @@
 import { Children, type ReactElement, type ReactNode } from "react";
 import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
-// Deep imports, not the "@/editor" barrel: the barrel would pull the whole editor UI into the
-// Versions tab's compare chunk.
 import { VariableChipView } from "@/editor/components/variable-chip";
 import type { JSONContent, Variable } from "@/editor/model/types";
 import { baseExtensions } from "@/editor/schema";

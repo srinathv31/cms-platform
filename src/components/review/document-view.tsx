@@ -2,14 +2,10 @@
 
 import { useMemo, type RefObject } from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
-import {
-  DocumentEditor,
-  EditorRoot,
-  type CommentRequest,
-  type DocumentEditorHandle,
-  type ThreadAnchor,
-  type Variable,
-} from "@/editor";
+import { DocumentEditor } from "@/editor/components/document-editor";
+import { EditorRoot } from "@/editor/components/editor-root";
+import type { Variable } from "@/editor/model/types";
+import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 import type { JSONContent } from "@/domain/types";
 import type { RedlineDoc, ThreadView } from "@/domain/review-types";
 import { RedlineView } from "./redline-view";

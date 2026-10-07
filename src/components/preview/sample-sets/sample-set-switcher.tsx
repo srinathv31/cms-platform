@@ -8,7 +8,7 @@
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { ChevronDown, Eye, Pencil, Plus } from "lucide-react";
 import { useImperativeHandle, useRef, useState, type Ref } from "react";
-import type { SampleSet, Variable } from "@/editor";
+import type { SampleSet, Variable } from "@/editor/model/types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

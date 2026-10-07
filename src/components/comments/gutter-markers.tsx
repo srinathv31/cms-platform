@@ -11,7 +11,7 @@ import {
 } from "react";
 import { MessageSquare, MessageSquarePlus } from "lucide-react";
 import { DOCUMENT_THREAD, type ThreadView } from "@/domain/review-types";
-import type { DocumentEditorHandle } from "@/editor";
+import type { DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 
 /*

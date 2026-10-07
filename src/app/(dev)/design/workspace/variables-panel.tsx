@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Calendar, Check, DollarSign, Hash, MapPin, Percent, Plus, Type, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Variable, VariableType } from "@/editor";
+import type { Variable, VariableType } from "@/editor/model/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 

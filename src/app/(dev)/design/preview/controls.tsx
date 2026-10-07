@@ -14,7 +14,8 @@ import {
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
-import { validateValue, type Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
+import { validateValue } from "@/editor/model/variables";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
