@@ -19,10 +19,13 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 
 ## Public API (frozen for Phase 2)
 
-Everything a host needs comes from `@/editor` (the folder's `index.ts`). Code that must not load
-React or TipTap (domain rules, server validation) may import the pure model directly:
-`@/editor/model/types`, `@/editor/model/variables`, `@/editor/model/contract`,
-`@/editor/model/sample-sets`, `@/editor/model/section-title` (Phase 7a).
+UI hosts import from `@/editor` (the folder's `index.ts`). Server and domain code import the
+server-safe modules directly, so they don't load the editor UI the barrel brings along:
+`@/editor/schema` (`baseExtensions`, `ensureBlockIds`), `@/editor/model/*` and `@/editor/paste/*`.
+An ESLint rule (`eslint.config.mjs`) enforces it. `model/*` and `paste/*` load no React at all;
+`schema` reaches only the chip's node view (through `extensions/variable-view.ts`). Domain rules
+use the pure model only: `@/editor/model/types`, `@/editor/model/variables`,
+`@/editor/model/contract`, `@/editor/model/sample-sets`, `@/editor/model/section-title` (Phase 7a).
 
 ### Components
 

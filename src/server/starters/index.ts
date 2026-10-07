@@ -1,5 +1,5 @@
 import "server-only";
-import { ensureBlockIds } from "@/editor";
+import { ensureBlockIds } from "@/editor/schema";
 import type { StarterContent } from "@/domain/lifecycle";
 import { VariableKit } from "../seed/variables";
 import { blankBody } from "./blank";

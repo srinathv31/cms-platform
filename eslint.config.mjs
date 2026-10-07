@@ -2,6 +2,19 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// Used by more than one block below. Flat config keeps one set of options per rule: a later block that
+// sets no-restricted-imports replaces an earlier block's for the files both match, so the blocks below
+// cover disjoint files and each lists everything that applies to it.
+const noSimulatorData = {
+  group: ["**/schema/sim", "@/server/db/schema/sim", "@/simulator", "@/simulator/*"],
+  message: "UCOMP code must not read simulator (Coral) data.",
+};
+const noEditorBarrel = {
+  name: "@/editor",
+  message:
+    "The @/editor barrel loads the React editor UI. Import server-safe modules directly: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -41,13 +54,26 @@ const eslintConfig = defineConfig([
   {
     // UCOMP never reads the consumer simulator's tables.
     // (editor/ and domain/ already forbid @/server and @/simulator above; flat config would override them here.)
-    files: ["src/app/(product)/**/*", "src/app/api/**/*", "src/server/**/*", "src/components/**/*"],
+    files: ["src/app/(product)/**/*", "src/app/api/**/*", "src/components/**/*"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [noSimulatorData] }],
+    },
+  },
+  {
+    // Server code doesn't read the simulator's tables either, and takes the editor's server-safe modules
+    // directly: the "@/editor" barrel would compile the whole editor UI into every route that reaches it.
+    // (domain/ is held tighter above: the editor's pure model only.)
+    files: ["src/server/**/*"],
     ignores: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": [
-        "error",
-        { patterns: [{ group: ["**/schema/sim", "@/server/db/schema/sim", "@/simulator", "@/simulator/*"], message: "UCOMP code must not read simulator (Coral) data." }] },
-      ],
+      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noSimulatorData] }],
+    },
+  },
+  {
+    // The seed and the reset write the simulator's tables, so only the editor rule applies to them.
+    files: ["src/server/seed/**/*", "src/server/reset.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [noEditorBarrel] }],
     },
   },
   {
