@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { createClient, type Client, type Config, type InStatement, type Transaction, type TransactionMode } from "@libsql/client";
 
 // One writer at a time per process, for a local SQLite file.
@@ -167,5 +169,7 @@ export function serializeWrites(client: Client, options: { waitMs?: number } = {
 
 /** A client for the app's database: writes take turns here, and SQLite waits out other processes' locks. */
 export function createAppClient(config: Pick<Config, "url" | "authToken">): Client {
+  // A fresh clone has no ./data (it's gitignored), and SQLite can't create the file in a missing folder.
+  if (config.url.startsWith("file:")) mkdirSync(dirname(config.url.slice("file:".length)), { recursive: true });
   return serializeWrites(createClient({ ...config, timeout: BUSY_TIMEOUT_MS }));
 }
