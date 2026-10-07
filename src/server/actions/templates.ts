@@ -3,7 +3,6 @@
 import { RedirectType, redirect } from "next/navigation";
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
@@ -13,25 +12,13 @@ import { inTransaction, writeEffects } from "@/server/effects";
 import { submitVersion } from "@/server/actions/review";
 import { getViewer } from "@/server/viewer";
 import { newId } from "@/server/ids";
-import {
-  conformToContentType,
-  disclosureContentType,
-  draftRow,
-  freshTemplateId,
-  insertNewTemplate,
-} from "@/server/templates/create";
-import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
+import { draftRow } from "@/server/templates/create";
 import { assertCan } from "@/domain/permissions";
-import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
-import {
-  createDraft,
-  editActive,
-  planDraftStart,
-  type VersionSnapshot,
-} from "@/domain/lifecycle";
+import { editActive, planDraftStart, type VersionSnapshot } from "@/domain/lifecycle";
 
-// Template creation and editing. Every action checks permissions first, writes in one transaction,
-// refreshes what it changed, and redirects last. Submitting moved to `actions/review.ts`
+// Template editing. Every action checks permissions first, writes in one transaction, refreshes
+// what it changed, and redirects last. New template (`createTemplate`) is in `create-template.ts`,
+// so the routes that only edit don't load the starters. Submitting moved to `actions/review.ts`
 // (`submitDraft` here is its Phase 3 name).
 //
 // A "use server" file may export only async functions: the helpers below stay private.
@@ -42,65 +29,6 @@ import {
 function refreshLists(templateId?: string) {
   revalidatePath("/[team]/library", "page");
   if (templateId) revalidatePath("/[team]/templates/[templateId]", "layout");
-}
-
-// ── New template ──────────────────────────────────────────────
-
-const CreateTemplateInput = z.object({
-  teamSlug: z.string().min(1).max(64),
-  starterKey: z.string(),
-});
-
-/**
- * Creates a template and its first draft from a starter, then opens it in the workspace. The name
- * field selects the name on arrival so the author can rename it at once: it learns the template is
- * new from a one-shot cookie (`just-created.ts`), so the redirect goes to the template's own address
- * and the address bar never needs tidying (one history entry; Back returns to the Library).
- * Blank starts as "Untitled template"; an example keeps its own name.
- */
-export async function createTemplate(input: { teamSlug: string; starterKey: StarterKey }): Promise<void> {
-  const viewer = await getViewer();
-
-  // The team is looked up only to know which team the permission is checked on. An unknown team
-  // has no id, so the check fails the same way as a team the viewer can't write to.
-  const parsed = CreateTemplateInput.safeParse(input);
-  const team = parsed.success
-    ? await db.query.teams.findFirst({ where: eq(teams.slug, parsed.data.teamSlug) })
-    : undefined;
-  assertCan(viewer, "template.create", { teamId: team?.id ?? null });
-
-  if (!parsed.success || !team) throw new Error("Unknown team");
-  if (!isStarterKey(parsed.data.starterKey)) throw new Error("Unknown starter");
-  const starterKey = parsed.data.starterKey;
-
-  const at = await now();
-  const contentType = await disclosureContentType();
-  const templateId = await freshTemplateId();
-
-  const starter = conformToContentType(buildStarter(starterKey, { scope: templateId, now: at }), contentType);
-  const created = createDraft({ starter, createdBy: viewer.userId, now: at });
-  const versionId = newId("v");
-
-  // Retried while the file is busy, like every lifecycle write (`inTransaction`).
-  await inTransaction(db, async (tx) => {
-    await insertNewTemplate(tx, {
-      templateId,
-      teamId: team.id,
-      contentTypeId: contentType.id,
-      versionId,
-      created,
-      at,
-      actorId: viewer.userId,
-    });
-  });
-
-  (await cookies()).set(JUST_CREATED_COOKIE, templateId, {
-    path: "/",
-    sameSite: "lax",
-    maxAge: JUST_CREATED_MAX_AGE,
-  });
-  refreshLists();
-  redirect(`/${team.slug}/templates/${templateId}`);
 }
 
 // ── Edit an Active template ───────────────────────────────────
@@ -114,7 +42,8 @@ const StartDraftInput = z.object({ templateId: z.string().min(1).max(32) });
 export async function startDraft(input: { templateId: string }): Promise<void> {
   const viewer = await getViewer();
 
-  // As in createTemplate, the template is read only to learn its team for the permission check.
+  // As in createTemplate (create-template.ts), the template is read only to learn its team for the
+  // permission check.
   const parsed = StartDraftInput.safeParse(input);
   const found = parsed.success
     ? await db

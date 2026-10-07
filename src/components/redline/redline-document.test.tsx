@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { RedlineBlock } from "@/domain/review-types";
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import { blockKind, collapsedHosts, gapLabel, groupBlocks, hostKey, joinAnd, markAllDeleted, redlineSummary } from "./blocks";
 import { RedlineDocument } from "./redline-document";
 import { REDLINE_DOC, REDLINE_VARIABLES } from "./redline-fixtures";

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Stream } from "@/components/primitives/stream";
-import { StaticDocument } from "@/editor";
+import { StaticDocument } from "@/editor/components/static-document";
 import { CORAL_DOC, CORAL_VARIABLES, DEPOSITS_DOC, DEPOSITS_VARIABLES, countUses } from "./fixtures";
 import { WorkspaceMock } from "./workspace-mock";
 import type { HeadsId, LayoutId, ViewId } from "./types";

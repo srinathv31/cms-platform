@@ -1,6 +1,7 @@
 "use client";
 
-import { VariableChipView, type JSONContent } from "@/editor";
+import { VariableChipView } from "@/editor/components/variable-chip";
+import type { JSONContent } from "@/editor/model/types";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { VariablesPanel } from "../workspace/variables-panel";
 import { ALL_CHANNELS, EMAIL_PREHEADER, EMAIL_SUBJECT, VARIABLES, countUses } from "./fixtures";

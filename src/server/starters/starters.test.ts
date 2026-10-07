@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDraft } from "@/domain/lifecycle";
 import type { JSONContent } from "@/domain/types";
-import { formatValue, validateValue } from "@/editor";
+import { formatValue, validateValue } from "@/editor/model/variables";
 import { REQUIRED_SECTIONS, variableKeys } from "../seed/content";
 import { STARTERS, STARTER_KEYS, buildStarter, isStarterKey } from "./index";
 

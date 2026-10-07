@@ -2,7 +2,8 @@
 // the type's `TYPE_META.icon` key.
 
 import { Calendar, DollarSign, Hash, MapPin, Percent, Type, type LucideIcon } from "lucide-react";
-import { TYPE_META, type VariableIconKey, type VariableType } from "@/editor";
+import type { VariableType } from "@/editor/model/types";
+import { TYPE_META, type VariableIconKey } from "@/editor/model/variables";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<VariableIconKey, LucideIcon> = {

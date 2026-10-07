@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { SampleSet, Variable } from "@/editor";
+import type { SampleSet, Variable } from "@/editor/model/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SampleSetSwitcher, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";

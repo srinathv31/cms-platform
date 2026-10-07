@@ -12,7 +12,8 @@ import { createAppClient } from "@/lib/serialized-writes";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
-import { createTemplate, startDraft } from "./templates";
+import { createTemplate } from "./create-template";
+import { startDraft } from "./templates";
 
 // A new template takes the content type as Platform settings leave it: its required sections and
 // its allowed channels. Against a temporary database filled by the real seed; only the database, the

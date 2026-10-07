@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
 import type { VersionState } from "@/domain/types";
 
 export type LayoutId = "grid" | "column" | "rail";

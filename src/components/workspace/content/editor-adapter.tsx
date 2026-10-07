@@ -16,17 +16,11 @@
 // that renders ContentWorkspace passes `key={versionId}`, which remounts everything below.
 
 import type { Ref } from "react";
-import {
-  DocumentEditor,
-  EditorRoot,
-  VariablesPanel,
-  type CommentRequest,
-  type DocumentEditorHandle,
-  type JSONContent,
-  type RequiredSection,
-  type ThreadAnchor,
-  type Variable,
-} from "@/editor";
+import { DocumentEditor } from "@/editor/components/document-editor";
+import { EditorRoot } from "@/editor/components/editor-root";
+import { VariablesPanel } from "@/editor/components/variables-panel";
+import type { JSONContent, RequiredSection, Variable } from "@/editor/model/types";
+import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 
 export interface EditorScopeProps {
   /** The template's variable list (the consumer contract); the root owns it from the first render. */

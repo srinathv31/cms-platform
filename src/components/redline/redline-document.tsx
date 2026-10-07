@@ -26,7 +26,10 @@
 import { Children, type ReactElement, type ReactNode } from "react";
 import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { baseExtensions, VariableChipView, type DocumentAlign, type JSONContent, type Variable } from "@/editor";
+import { VariableChipView } from "@/editor/components/variable-chip";
+import type { JSONContent, Variable } from "@/editor/model/types";
+import { baseExtensions } from "@/editor/schema";
+import type { DocumentAlign } from "@/editor/types";
 import "@/editor/styles.css";
 import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
 import { cn } from "@/lib/utils";

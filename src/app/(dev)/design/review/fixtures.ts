@@ -3,7 +3,7 @@
 // from review-types.ts (the real diff comes from domain/redline.ts), and the clean v3 document that the
 // outputs render is derived from it, so there is one source of truth.
 
-import type { ContractChange, JSONContent, Variable } from "@/editor";
+import type { ContractChange, JSONContent, Variable } from "@/editor/model/types";
 import type { Channel } from "@/domain/types";
 import type {
   ApprovalStage,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import type { Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
 import { DevBar } from "./dev-bar";
 import {
   CORAL_NAME,

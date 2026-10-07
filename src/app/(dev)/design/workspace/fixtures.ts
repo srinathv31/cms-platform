@@ -2,7 +2,8 @@
 // (minus its own H1, since the template name already is the title); the Deposits one is small and
 // local so the View only state reads as a different team's template.
 
-import { ensureBlockIds, type JSONContent, type Variable } from "@/editor";
+import type { JSONContent, Variable } from "@/editor/model/types";
+import { ensureBlockIds } from "@/editor/schema";
 import { LAB_VARIABLES, LONG_DISCLOSURE } from "../../editor-lab/fixtures";
 import type { ChannelId, TemplateModel, ViewId } from "./types";
 

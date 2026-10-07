@@ -1,5 +1,5 @@
 import { Lock, Menu } from "lucide-react";
-import type { JSONContent } from "@/editor";
+import type { JSONContent } from "@/editor/model/types";
 import { cn } from "@/lib/utils";
 import { FitWidth } from "../preview/fit-width";
 import { EMAIL_PREHEADER, EMAIL_SUBJECT } from "../preview/fixtures";

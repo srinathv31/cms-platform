@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { StaticDocument } from "@/editor";
+import { StaticDocument } from "@/editor/components/static-document";
 import { EditorLab } from "./editor-lab";
 import { LAB_VARIABLES, LONG_DISCLOSURE } from "./fixtures";
 

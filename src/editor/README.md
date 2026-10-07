@@ -19,10 +19,30 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 
 ## Public API (frozen for Phase 2)
 
-Everything a host needs comes from `@/editor` (the folder's `index.ts`). Code that must not load
-React or TipTap (domain rules, server validation) may import the pure model directly:
-`@/editor/model/types`, `@/editor/model/variables`, `@/editor/model/contract`,
-`@/editor/model/sample-sets`, `@/editor/model/section-title` (Phase 7a).
+There's no barrel (no `index.ts`): hosts import each export from the module that defines it, so a
+route compiles only the parts of the editor it uses. The entry modules:
+
+| Module | Exports |
+| --- | --- |
+| `@/editor/components/editor-root` | `EditorRoot`, `useContractState` |
+| `@/editor/components/document-editor` | `DocumentEditor` |
+| `@/editor/components/variables-panel` | `VariablesPanel` |
+| `@/editor/components/inline-variable-field` | `InlineVariableField` |
+| `@/editor/components/static-document` | `StaticDocument` |
+| `@/editor/components/variable-chip` | `VariableChipView`, `VariableChipViewProps` |
+| `@/editor/types` | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`. |
+| `@/editor/model/types` | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`. |
+| `@/editor/model/contract` | `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` |
+| `@/editor/model/variables` | `formatValue`, `validateValue`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types |
+| `@/editor/model/sample-sets` | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `DefaultSampleSetId` |
+| `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
+| `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
+| `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
+
+Server and domain code use only the server-safe ones: `schema`, `model/*` and `paste/*`.
+`model/*` and `paste/*` load no React at all; `schema` reaches only the chip's node view (through
+`extensions/variable-view.ts`). Domain rules use the pure model only (`@/editor/model/*`). ESLint
+(`eslint.config.mjs`) holds `src/domain` to the model and bans `@/editor` itself in `src/server`.
 
 ### Components
 
@@ -124,7 +144,10 @@ interface DocumentEditorHandle {
 ## Composition
 
 ```tsx
-import { DocumentEditor, EditorRoot, InlineVariableField, VariablesPanel } from "@/editor";
+import { DocumentEditor } from "@/editor/components/document-editor";
+import { EditorRoot } from "@/editor/components/editor-root";
+import { InlineVariableField } from "@/editor/components/inline-variable-field";
+import { VariablesPanel } from "@/editor/components/variables-panel";
 
 <EditorRoot key={versionId} variables={version.variables} baseline={active?.variables ?? null}
             requiredSections={contentType.sections} readOnly={!canEdit}
@@ -492,7 +515,6 @@ nothing above changed or went away).
 ### Files
 
 ```
-index.ts                  public API (frozen for Phase 2)
 types.ts                  component contract
 schema.ts                 the one extension list (+ the one-line field list, ensureBlockIds)
 styles.css                document typography and editor states (tokens only)

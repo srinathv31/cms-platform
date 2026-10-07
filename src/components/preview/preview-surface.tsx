@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useContractState, type SampleSet } from "@/editor";
+import { useContractState } from "@/editor/components/editor-root";
+import type { SampleSet } from "@/editor/model/types";
 import { OriginalView } from "@/components/import/original-view";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Channel } from "@/domain/types";

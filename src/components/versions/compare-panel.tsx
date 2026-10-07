@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { diffDocuments } from "@/domain/redline";
 import { STATUS_META } from "@/domain/status";
-import type { Variable } from "@/editor";
+import type { Variable } from "@/editor/model/types";
 import { loadVersionsToCompare, type CompareVersion } from "@/server/queries/compare";
 import type { CompareOption } from "./compare-dialog";
 

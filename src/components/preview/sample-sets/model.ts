@@ -5,7 +5,7 @@
 // The model imports the editor's pure model directly (`@/editor/model/*`, as the editor's README
 // allows for code that must not load React or TipTap).
 
-import type { SampleSet, Variable, VariableValue, VariableValues } from "@/editor";
+import type { SampleSet, Variable, VariableValue, VariableValues } from "@/editor/model/types";
 import { DEFAULT_SAMPLE_SETS, defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import { validateValue } from "@/editor/model/variables";
 

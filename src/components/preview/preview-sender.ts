@@ -1,7 +1,7 @@
 // The email frame's two made-up lines: who the message is from (the team) and who it is out to (the
 // sample set). Pure TypeScript.
 
-import type { VariableValues } from "@/editor";
+import type { VariableValues } from "@/editor/model/types";
 
 /** "Coral Offers" sends from "no-reply@coraloffers.example". */
 export function senderOf(teamName: string): { name: string; address: string } {
