@@ -392,10 +392,10 @@ export async function openSimulator(page: Page) {
   await reactReady(page.getByRole("table", { name: "Offers" }).getByRole("link").first());
 }
 
-/** From the simulator: "Back to UCOMP". */
+/** From the simulator: "Back to Stencil". */
 export async function backToUcomp(page: Page) {
-  await click(page.getByRole("link", { name: "Back to UCOMP" }));
-  await expect(page.getByRole("link", { name: "Back to UCOMP" })).toHaveCount(0);
+  await click(page.getByRole("link", { name: "Back to Stencil" }));
+  await expect(page.getByRole("link", { name: "Back to Stencil" })).toHaveCount(0);
 }
 
 /** Opens one offer from the simulator's offers table. */

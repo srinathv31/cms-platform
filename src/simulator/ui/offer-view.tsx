@@ -136,7 +136,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
     const needs = upgrade.diff.newRequired;
     strip = (
       <Strip tone="info" action={relinkAction}>
-        UCOMP released v{upgrade.toVersion}.{" "}
+        Stencil released v{upgrade.toVersion}.{" "}
         {needs.length > 0 ? (
           <>
             It needs {needs.map((k, i) => (

@@ -1,6 +1,6 @@
-# UCOMP Demo Script
+# Stencil Demo Script
 
-A guided walkthrough for people seeing UCOMP for the first time. It follows one disclosure from a blank page to customers' inboxes, through a safe change and an emergency stop, then shows how the platform is governed.
+A guided walkthrough for people seeing Stencil for the first time. It follows one disclosure from a blank page to customers' inboxes, through a safe change and an emergency stop, then shows how the platform is governed.
 
 - **8 acts, 46 steps, about 50 minutes** (a 20-minute cut is in [Timing, cuts and rules](#timing-cuts-and-rules)).
 - **Verified:** every step was run end to end, in this order, from a fresh `npm run db:reset` against a production build of `main` @ 9a8bc38 on October 7, 2026. Dates in the app depend on the day you run it, so the steps use relative dates.
@@ -26,7 +26,7 @@ In the business's own words (Discovery Brief, "Purpose and problem"):
 
 ### The pitch
 
-UCOMP is one controlled place to author, approve and publish customer content. Business teams write disclosures in an editor as easy as Word, an approver signs off inside the tool, and systems like Coral get each customer's PDF, web page or email built from the approved version. UCOMP never stores customer data, and every change is versioned, audited and rolled out without breaking the systems that depend on it.
+Stencil is one controlled place to author, approve and publish customer content. Business teams write disclosures in an editor as easy as Word, an approver signs off inside the tool, and systems like Coral get each customer's PDF, web page or email built from the approved version. Stencil never stores customer data, and every change is versioned, audited and rolled out without breaking the systems that depend on it.
 
 ### Six things the audience should leave believing
 
@@ -58,7 +58,7 @@ UCOMP is one controlled place to author, approve and publish customer content. B
 
 - **Switch persona:** click the avatar (initials, top right), then pick a name. The page stays where it is.
 - **Demo pill:** the dashed "Demo" button, bottom right. It opens the Coral simulator, moves the demo clock forward (+15 days, or any number), and has **Reset demo**.
-- **Back to UCOMP:** the dark button, top left of the simulator.
+- **Back to Stencil:** the dark button, top left of the simulator.
 - **Files for Act 8:** `e2e/fixtures/import/spring-offer.docx` and `e2e/fixtures/import/rate-change-notice.pdf`. Keep the Finder window ready.
 
 ### Five rules that keep the run working
@@ -177,16 +177,16 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 1. **Do:** Demo pill → **Open simulator**.
    - **They see:** "Coral — simulated". Spring Travel Rewards reads "Not linked"; Balance Transfer reads "v1 Superseded · sunset … · v2 available".
-   - **Say:** "This stands in for Coral, the first business system that uses UCOMP."
+   - **Say:** "This stands in for Coral, the first business system that uses Stencil."
 2. **Do:** **Spring Travel Rewards → Link template**, search `Spring Travel`, and pick the result (its UC- ID, "Active v2").
    - Map: First name → Customer · First name; Purchase APR → Customer · Purchase APR; Home state → Customer · Home state; Offer end date → Offer · Ends on. Click **Link template**.
    - **They see:** "Pinned to v2".
-   - **Say:** "Coral owns the link between its offer and the template. UCOMP stays neutral about the business."
+   - **Say:** "Coral owns the link between its offer and the template. Stencil stays neutral about the business."
 3. **Do:** Tick Olivia Bennett, Marcus Delgado, Anjali Kapoor, Fatima Al-Sayed and Maximiliano-Bartholomew…, then **Send to 5 customers**.
    - Click Olivia's **Web · Delivered** cell, then **Inbox** and **PDF**. Open the long-name customer's view too.
    - **They see:** "15 delivered"; a phone showing "Hello Olivia!"; the subject "Olivia, your Spring Travel Rewards terms"; the PDF. The long name doesn't break the layout.
-   - **Say:** "One approved template, three channels, five customers. UCOMP built each one on request and kept none of their data."
-4. **Do:** **Back to UCOMP → Usage**. Open the **Consumers** tab, then click the template to see its own Usage tab.
+   - **Say:** "One approved template, three channels, five customers. Stencil built each one on request and kept none of their data."
+4. **Do:** **Back to Stencil → Usage**. Open the **Consumers** tab, then click the template to see its own Usage tab.
    - **They see:** renders over 30 days, the channel split, % on Active versions, Nearing sunset, Top templates and a heatmap. Consumers lists Coral · Spring Travel · v2 · 15, and the template shows 100% succeeded.
    - **Say:** "You always know who uses what, and on which version, before you change anything."
 5. **Optional,** for a technical audience: in the Share sheet, **Copy curl** and paste it into Terminal.
@@ -201,20 +201,20 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 1. **Do:** Switch to **Maya**. Open the template's **Content** tab → **Edit** (a Draft "Based on v2"). At the end of "…APR is 21.99%." type ` The annual fee is {{Annual fee`, choose **Create**, set Type to **Currency**, press Enter, then type `.`
    - **Submit for review**, note `Added the annual fee.`, then **Submit v3**.
    - **They see:** "Contract changes — Breaking change: v3 adds required annual_fee (Currency)".
-   - **Say:** "UCOMP spots that this change would break Coral before anyone approves it."
+   - **Say:** "Stencil spots that this change would break Coral before anyone approves it."
 2. **Do:** Switch to **Jordan**. **Review →** v3 (tagged Breaking). Turn on **Show changes**. Click **Approve**, tick **Set a sunset date for v2**, and pick **today + 14 days**. Then **Approve v3**.
    - The date defaults to 30 days out. Change it to 14; 30 breaks step 4.
    - **They see:** the new sentence highlighted against v2, with a "Changes only" toggle. The dialog says "Coral still renders v2 (last render today). It will keep working until …" and "Coral has to map annual_fee before it moves to v3."
    - **Say:** "The approver sees which systems are affected, and when, before committing."
 3. **Do:** Demo pill → **Open simulator**. Look at **Notices**, open the Spring Travel offer, and **Send** to Olivia and Marcus.
-   - **They see:** "v3 available"; notices for the new version and the scheduled sunset; a banner "UCOMP released v3. It needs annual_fee mapped…"; still "Pinned to v2"; then "6 delivered", each marked "Newer: v3".
+   - **They see:** "v3 available"; notices for the new version and the scheduled sunset; a banner "Stencil released v3. It needs annual_fee mapped…"; still "Pinned to v2"; then "6 delivered", each marked "Newer: v3".
    - **Say:** "Coral keeps working on v2, and it's told what to do and by when."
 4. **Do:** Demo pill → **+15 days**, then Esc. **Send to 2 customers** (they're still ticked).
    - **They see:** "v2 stopped rendering. Sends will fail." Then "0 delivered, 6 failed — Version 2 was sunset on … Version 3 is active. 410 version_sunset".
    - **Say:** "After the sunset, old versions stop with a plain reason. No silently wrong documents."
 5. **Do:** Under "Map Annual fee to send", choose **Offer · Annual fee**, then **Relink to v3**. Tick Olivia and Marcus again (the picker resets), **Send**, and open Olivia's Web view.
    - **They see:** "Pinned to v3", "6 delivered", and "The annual fee is $95."
-6. **Do:** Switch to **Jordan**. **Back to UCOMP → Library → Balance Transfer Intro — Terms → Versions → v1 → Revoke v1**. Reason `Wrong intro APR in the legal notices.`, then **Start revoke**.
+6. **Do:** Switch to **Jordan**. **Back to Stencil → Library → Balance Transfer Intro — Terms → Versions → v1 → Revoke v1**. Reason `Wrong intro APR in the legal notices.`, then **Start revoke**.
    - **They see:** "Coral rendered v1 N times… Once confirmed, its renders will fail immediately." Confirm is disabled: "You started this revoke. Another approver must confirm it."
    - **Say:** "There's an emergency stop, and no single person can pull it."
 7. **Do:** Switch to **Alex Kim** on the same page. **Confirm revoke**, then **Confirm revoke** in the dialog. Open the simulator → **Balance Transfer** → Send tab → Olivia and Marcus → **Send**.
@@ -227,7 +227,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 **Goal:** every action is on record and exportable for compliance.
 
-1. **Do:** As Alex: **Back to UCOMP → Audit**.
+1. **Do:** As Alex: **Back to Stencil → Audit**.
    - **They see:** "Revoke started" by Jordan Ellis and "Revoked" by Alex Kim.
 2. **Do:** Switch to **Taylor Nguyen**. Team switcher → **All teams** → **Audit**. Filter **Person → Jordan Ellis**, then **Export**. Clear the filter chip.
    - **They see:** a Team column; filters for Team, Person, Action, Template and Date; Jordan's events counted; a CSV download with When, Who, Team, Template, Version, Action and Details. Times are on the demo clock, in UTC.
@@ -290,7 +290,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    ```
 
    - **They see:** `{{purchase_apr}}` become a chip and the heading merge into the existing section. ⌘Z undoes the whole paste.
-   - **Say:** "Teams can draft with Copilot, which the bank already approves, and UCOMP turns the answer into a governed draft. No AI runs inside UCOMP."
+   - **Say:** "Teams can draft with Copilot, which the bank already approves, and Stencil turns the answer into a governed draft. No AI runs inside Stencil."
 3. **Do:** **New template → Import a file** → choose `rate-change-notice.pdf`.
    - **They see:** a draft "Rate Change Notice" with 6 variables. The PDF's layout is dropped; its text and structure come in.
 4. **Do:** Bell → **Mark all as read**.
@@ -324,12 +324,12 @@ The business rules are written to carry over to the production API.
 
 Every requirement from the Discovery Brief (DB) and the Build Plan (BP), in their order, with where to show it.
 
-| # | Requirement (source) | How UCOMP answers it | Where to show it | Status |
+| # | Requirement (source) | How Stencil answers it | Where to show it | Status |
 |---|---|---|---|---|
 | R1 | One controlled place for customer content (DB · Purpose and problem) | A Library per team; writing, review and rendering in one app | Library (Maya), Act 1 | Covered |
 | R2 | Coral: a T&C disclosure linked to an offer (DB · Scope and first client) | Disclosure content type; Coral links an offer to it | Editor; simulator, Acts 2 and 4 | Covered |
 | R3 | Works for any business and many teams (DB · Scope and first client) | Three teams, two consumers; content types, channels and approval chains are settings | Team switcher (Priya); Settings (Riley), Act 7 | Covered |
-| R4 | Templates only, no customer data; UCOMP renders; consumers can't author (DB · Guiding principles 1–3) | Documents are built on request and never stored; the consumer API can only read and render | Simulator; SHARE, Act 4 | Covered |
+| R4 | Templates only, no customer data; Stencil renders; consumers can't author (DB · Guiding principles 1–3) | Documents are built on request and never stored; the consumer API can only read and render | Simulator; SHARE, Act 4 | Covered |
 | R5 | Review in the tool; maker-checker (DB · Guiding principles 4; Controls and approvals) | Review queue; the author can't approve their own version | Review (Maya, Jordan), Act 3 | Covered |
 | R6 | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle) | Six states; Versions tab with compare; Activity tab | Versions tab, Acts 1 and 3 | Covered |
 | R7 | "One click" simplicity for non-technical users (DB · Guiding principles 6; BP · Experience principles) | Two clicks to typing; a slash menu; plain-language dialogs | New template (Maya), Act 2 | Covered |
@@ -381,7 +381,7 @@ Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scop
 | Content type | The Disclosure blueprint: required sections, allowed channels and the approval chain. |
 | Channel | PDF, Web or Email. |
 | Sample set | Named dummy data used for preview and review. |
-| Render and consumer | A consumer system such as Coral asks UCOMP to fill in a template for one customer. Nothing is stored. |
+| Render and consumer | A consumer system such as Coral asks Stencil to fill in a template for one customer. Nothing is stored. |
 | Contract and breaking change | The variables a consumer must send. Adding a required one breaks the contract. |
 | Team (space) | A business line's private area. Platform Admin and Auditor also see "All teams". |
 | Recertification | A Team Admin's regular review to keep or remove each member. |

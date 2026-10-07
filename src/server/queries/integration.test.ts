@@ -59,7 +59,7 @@ describe("getIntegrationPanel", () => {
     expect(panel.active).toMatchObject({ number: 2, channels: ["pdf", "web"] });
     expect(panel.contract[2]).toEqual({ key: "purchase_apr", label: "Purchase APR", type: "percent", typeLabel: "Percent", required: true, example: "21.99" });
     expect(panel.contract.map((r) => r.key)).toEqual(["first_name", "last_name", "purchase_apr", "home_state", "offer_end_date"]);
-    expect(panel.jsonSchema.$id).toBe(`https://ucomp.example/schemas/${id("balance-transfer")}/v2/values.json`);
+    expect(panel.jsonSchema.$id).toBe(`https://stencil.example/schemas/${id("balance-transfer")}/v2/values.json`);
     expect(panel.jsonSchemaText).toBe(JSON.stringify(panel.jsonSchema, null, 2));
     const path = `/api/v1/templates/${id("balance-transfer")}/render`;
     expect(panel.endpoint).toEqual({ method: "POST", path, url: `${ORIGIN}${path}` });

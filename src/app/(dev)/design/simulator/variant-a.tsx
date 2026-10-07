@@ -348,7 +348,7 @@ function NoticeRow({ n, s }: { n: Notice; s: Sim }) {
 function NoticesPage({ s }: { s: Sim }) {
   return (
     <div className="flex flex-col gap-5">
-      <Header crumbs={["Notices"]} title="Notices from UCOMP" />
+      <Header crumbs={["Notices"]} title="Notices from Stencil" />
       <Panel>
         <ul className="m-0 list-none divide-y divide-(--s-line) p-0">
           {NOTICES.map((n) => <NoticeRow key={n.id} n={n} s={s} />)}

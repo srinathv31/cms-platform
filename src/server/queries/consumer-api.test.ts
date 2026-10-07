@@ -162,7 +162,7 @@ describe("getTemplateDetail", () => {
   it("a Superseded version's contract can be read by number", async () => {
     const d = await detail("balance-transfer", { version: 1 });
     expect(d.contract).toMatchObject({ version: 1, state: "superseded" });
-    expect(d.contract!.jsonSchema.$id).toBe(`https://ucomp.example/schemas/${id("balance-transfer")}/v1/values.json`);
+    expect(d.contract!.jsonSchema.$id).toBe(`https://stencil.example/schemas/${id("balance-transfer")}/v1/values.json`);
     expect(d.activeVersion).toBe(2);
   });
 

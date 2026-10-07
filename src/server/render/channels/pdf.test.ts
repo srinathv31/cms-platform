@@ -159,8 +159,8 @@ describe("renderPdf", () => {
 
   it("sets the document metadata", () => {
     expect(typical.info.Title).toBe("Spring Travel Rewards — Terms");
-    expect(typical.info.Creator).toBe("UCOMP");
-    expect(typical.info.Producer).toBe("UCOMP");
+    expect(typical.info.Creator).toBe("Stencil");
+    expect(typical.info.Producer).toBe("Stencil");
     expect(long.info.Title).toBe("Coral Bank Cardmember Agreement");
   });
 

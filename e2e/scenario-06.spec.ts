@@ -232,8 +232,8 @@ test.describe("scenario 6: revoke", () => {
     await test.step("1. Before: Coral renders v1 (200, newer version 2); v1 is Superseded", async () => {
       const { res, correlationId } = await renderAs(request, v1, "scenario06-before");
       expect(res.status(), "Coral renders the Superseded v1").toBe(200);
-      expect(res.headers()["x-ucomp-version"]).toBe("1");
-      expect(res.headers()["x-ucomp-newer-version"], "the header names the Active version").toBe("2");
+      expect(res.headers()["x-stencil-version"]).toBe("1");
+      expect(res.headers()["x-stencil-newer-version"], "the header names the Active version").toBe("2");
       const [logged] = await logFor(db, correlationId!);
       expect(logged).toMatchObject({ consumer_id: "coral", version_number: 1, is_preview: 0, outcome: "ok", error_code: null });
     });
@@ -411,8 +411,8 @@ test.describe("scenario 6: revoke", () => {
 
       const active = await renderAs(request, v2, "scenario06-v2");
       expect(active.res.status(), "v2 is unaffected").toBe(200);
-      expect(active.res.headers()["x-ucomp-version"]).toBe("2");
-      expect(active.res.headers()["x-ucomp-newer-version"], "v2 is the newest").toBeUndefined();
+      expect(active.res.headers()["x-stencil-version"]).toBe("2");
+      expect(active.res.headers()["x-stencil-newer-version"], "v2 is the newest").toBeUndefined();
     });
 
     // ── 4b. After: Coral's send in the simulator ─────────────────────────────

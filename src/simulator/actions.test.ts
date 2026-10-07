@@ -133,7 +133,7 @@ async function fakeUcomp(input: RequestInfo | URL, init: RequestInit = {}): Prom
     if (body.version === 2 && ucomp.v2Sunset) return apiError(410, "version_sunset", SUNSET_MESSAGE);
     const missing = (body.version === 3 ? V3_VARS : V2_VARS).filter((v) => v.required && !body.values[v.key]).map((v) => v.key);
     if (missing.length) return apiError(422, "missing_variables", `Missing required variables: ${missing.join(", ")}.`);
-    const newer = body.version < ucomp.active ? { "X-UCOMP-Newer-Version": String(ucomp.active) } : undefined;
+    const newer = body.version < ucomp.active ? { "X-Stencil-Newer-Version": String(ucomp.active) } : undefined;
     if (body.channel === "pdf") {
       return Response.json({ channel: "pdf", contentType: "application/pdf", encoding: "base64", data: Buffer.from("%PDF-1.7 fake").toString("base64"), newerVersion: null }, { headers: newer });
     }

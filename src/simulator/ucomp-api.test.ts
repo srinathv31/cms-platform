@@ -65,21 +65,21 @@ describe("createUcompApi", () => {
     const html = fakeFetch(() => new Response("<html>oops</html>", { status: 500 }));
     expect(await createUcompApi({ origin: "http://x.test", fetch: html.fetch }).searchTemplates()).toEqual({
       ok: false,
-      error: { status: 500, code: "bad_response", message: "UCOMP answered 500 without an error body." },
+      error: { status: 500, code: "bad_response", message: "Stencil answered 500 without an error body." },
     });
 
     const down = fakeFetch(() => {
       throw new TypeError("fetch failed");
     });
     const result = await createUcompApi({ origin: "http://x.test", fetch: down.fetch }).listNotices();
-    expect(result).toEqual({ ok: false, error: { status: 0, code: "unreachable", message: "UCOMP couldn't be reached (fetch failed)." } });
+    expect(result).toEqual({ ok: false, error: { status: 0, code: "unreachable", message: "Stencil couldn't be reached (fetch failed)." } });
   });
 
   it("renders: pdf asks for base64, web keeps the HTML, email keeps the JSON; correlation id and newer version", async () => {
     const { fetch, calls } = fakeFetch((url, init) => {
       const body = JSON.parse(String(init.body));
       if (body.channel === "pdf") return json({ channel: "pdf", contentType: "application/pdf", encoding: "base64", data: "JVBERi0=", newerVersion: null });
-      if (body.channel === "web") return new Response("<!doctype html><p>Hi</p>", { headers: { "X-UCOMP-Newer-Version": "3" } });
+      if (body.channel === "web") return new Response("<!doctype html><p>Hi</p>", { headers: { "X-Stencil-Newer-Version": "3" } });
       return json({ subject: "Your terms", preheader: "Pre", html: "<p>Hi</p>", text: "Hi", newerVersion: 3 });
     });
     const api = createUcompApi({ origin: "http://x.test", fetch });

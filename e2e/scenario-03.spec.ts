@@ -949,8 +949,8 @@ test.describe("scenario 3: the review loop", () => {
 
       const active = await call(v2Version, "scenario03-v2");
       expect(active.res.status(), "v2 is the Active version").toBe(200);
-      expect(active.res.headers()["x-ucomp-version"]).toBe("2");
-      expect(active.res.headers()["x-ucomp-newer-version"], "v2 is the newest").toBeUndefined();
+      expect(active.res.headers()["x-stencil-version"]).toBe("2");
+      expect(active.res.headers()["x-stencil-newer-version"], "v2 is the newest").toBeUndefined();
       const [okLog] = await logFor(db, active.correlationId!);
       expect(okLog).toMatchObject({ consumer_id: "coral", version_number: 2, is_preview: 0, outcome: "ok", error_code: null });
 

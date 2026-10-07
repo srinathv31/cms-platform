@@ -57,7 +57,7 @@ type Fetch = typeof globalThis.fetch;
 const UNREACHABLE = (detail: string): SimApiError => ({
   status: 0,
   code: "unreachable",
-  message: `UCOMP couldn't be reached (${detail}).`,
+  message: `Stencil couldn't be reached (${detail}).`,
 });
 
 /** The API's error body, verbatim; a sentence of our own only when the body isn't the contract's. */
@@ -71,7 +71,7 @@ async function errorOf(response: Response): Promise<SimApiError> {
   } catch {
     // fall through
   }
-  return { status: response.status, code: "bad_response", message: `UCOMP answered ${response.status} without an error body.` };
+  return { status: response.status, code: "bad_response", message: `Stencil answered ${response.status} without an error body.` };
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -127,7 +127,7 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
     try {
       return { ok: true, data: (await result.response.json()) as T };
     } catch {
-      return { ok: false, error: { status: result.response.status, code: "bad_response", message: "UCOMP answered with something that isn't JSON." } };
+      return { ok: false, error: { status: result.response.status, code: "bad_response", message: "Stencil answered with something that isn't JSON." } };
     }
   }
 
@@ -168,7 +168,7 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
         const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
         return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
       } catch {
-        return { ok: false, error: { status: response.status, code: "bad_response", message: "UCOMP's render answer couldn't be read." }, at };
+        return { ok: false, error: { status: response.status, code: "bad_response", message: "Stencil's render answer couldn't be read." }, at };
       }
     },
   };

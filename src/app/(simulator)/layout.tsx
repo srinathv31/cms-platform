@@ -9,7 +9,7 @@ import "@/simulator/theme.css";
 export const metadata: Metadata = { title: { absolute: "Coral Offers (simulated)" } };
 
 /*
- * The frame is UCOMP's (warm stone, dashed): the "← Back to UCOMP" pill (to where the simulator was
+ * The frame is UCOMP's (warm stone, dashed): the "← Back to Stencil" pill (to where the simulator was
  * opened) and the "Coral — simulated" label mark the boundary. Everything under it is Coral's own system in its own look (src/simulator/theme.css).
  * The Demo pill is mounted here too, so the presenter can move the clock without leaving Coral.
  */

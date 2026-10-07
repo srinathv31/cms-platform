@@ -64,7 +64,7 @@ export const simDeliveries = sqliteTable(
     channel: text("channel").$type<Channel>().notNull(),
     status: text("status").$type<"delivered" | "failed">().notNull(),
     error: json<{ status: number; code: string; message: string }>("error"),
-    /** X-UCOMP-Newer-Version on a delivered render of a Superseded version. */
+    /** X-Stencil-Newer-Version on a delivered render of a Superseded version. */
     newerVersion: integer("newer_version"),
     correlationId: text("correlation_id").notNull(),
     output: text("output"),

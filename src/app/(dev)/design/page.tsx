@@ -24,7 +24,7 @@ export default function DesignPage() {
         <div className="mx-auto max-w-[82.5rem]">
           <PageHeader title="Design" className="pb-12">
             <p className="mt-2 max-w-xl text-[15px] leading-6 text-text-muted">
-              Type, color, surfaces and the SHARE ring, on real UCOMP content.
+              Type, color, surfaces and the SHARE ring, on real Stencil content.
             </p>
           </PageHeader>
 

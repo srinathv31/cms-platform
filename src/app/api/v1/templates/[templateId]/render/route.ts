@@ -77,10 +77,10 @@ function successResponse(
   opts: { templateId: string; preview: boolean; encoding?: "base64"; correlationId: string },
 ): Response {
   const headers = baseHeaders(opts.correlationId);
-  headers.set("X-UCOMP-Template-Id", opts.templateId);
-  headers.set("X-UCOMP-Version", result.versionNumber === null ? "draft" : String(result.versionNumber));
-  if (result.newerVersion !== null) headers.set("X-UCOMP-Newer-Version", String(result.newerVersion));
-  if (opts.preview) headers.set("X-UCOMP-Preview", "true");
+  headers.set("X-Stencil-Template-Id", opts.templateId);
+  headers.set("X-Stencil-Version", result.versionNumber === null ? "draft" : String(result.versionNumber));
+  if (result.newerVersion !== null) headers.set("X-Stencil-Newer-Version", String(result.newerVersion));
+  if (opts.preview) headers.set("X-Stencil-Preview", "true");
 
   const { newerVersion } = result;
 

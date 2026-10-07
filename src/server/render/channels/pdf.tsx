@@ -42,7 +42,7 @@ export function footerLabel(doc: Pick<RenderDoc, "templateId" | "versionNumber">
 function buildDocument(doc: RenderDoc) {
   const label = footerLabel(doc);
   return (
-    <Document title={doc.templateName} subject={label} creator="UCOMP" producer="UCOMP" language="en-US">
+    <Document title={doc.templateName} subject={label} creator="Stencil" producer="Stencil" language="en-US">
       <Page size="LETTER" style={styles.page}>
         {flow(doc.blocks)}
         <View style={styles.footer} fixed>

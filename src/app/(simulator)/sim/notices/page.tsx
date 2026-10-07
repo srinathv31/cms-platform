@@ -20,7 +20,7 @@ async function Notices() {
   const offerNames = Object.fromEntries(home.offers.map((o) => [o.id, o.name]));
   return (
     <PageScroll>
-      <PageHeader crumbs="Coral Offers" title="Notices from UCOMP" />
+      <PageHeader crumbs="Coral Offers" title="Notices from Stencil" />
       {home.apiError ? <Strip tone="bad">{home.apiError.message}</Strip> : null}
       <NoticesPanel title="Inbox" notices={home.notices} offerNames={offerNames} />
     </PageScroll>

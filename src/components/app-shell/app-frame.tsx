@@ -3,6 +3,7 @@ import { Stream } from "@/components/primitives/stream";
 import { DemoPillHole } from "@/components/demo/demo-pill-hole";
 import { Sidebar, SidebarHeader, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { CanvasScroll } from "./canvas-scroll";
+import { HomeLink } from "./home-link";
 import { CanvasFade, PersonaSwitchProvider } from "./persona-switch";
 import { SidebarBodyHole, TeamSwitcherHole } from "./sidebar-holes";
 import { SidebarBodySkeleton, TeamSwitcherSkeleton, TopBarSkeleton } from "./skeletons";
@@ -18,9 +19,10 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       style={{ "--sidebar-width": "var(--sidebar-w)" } as CSSProperties}
       className="h-svh min-h-0 overflow-hidden bg-app"
     >
-      {/* One landmark for the whole sidebar: the switcher, the space's pages, its card, Settings and Help. */}
+      {/* One landmark for the whole sidebar: the product name, the switcher, the space's pages, its card, Settings and Help. */}
       <Sidebar variant="inset" collapsible="none" role="navigation" aria-label="Sidebar" className="shrink-0">
-        <SidebarHeader className="gap-0 px-3 pt-4 pb-2">
+        <SidebarHeader className="gap-0 px-3 pt-5 pb-2">
+          <HomeLink />
           <Stream fallback={<TeamSwitcherSkeleton />}>
             <TeamSwitcherHole />
           </Stream>

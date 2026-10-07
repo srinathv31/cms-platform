@@ -135,7 +135,7 @@ function Middle({ s }: { s: Sim }) {
         <p className="m-0 text-[14px] leading-6 text-(--s-muted)">{n.body}</p>
         <div className="flex gap-2"><Btn kind="primary" onClick={() => s.setScreen("relink")}>Relink to v3 <ArrowRight className="size-3.5" /></Btn><Btn>Not now</Btn></div>
         <div className="rounded-lg border border-(--s-line) bg-(--s-panel) p-4">
-          <p className={LABEL}>Also from UCOMP</p>
+          <p className={LABEL}>Also from Stencil</p>
           <ul className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
             {NOTICES.slice(1).map((x) => (
               <li key={x.id} className="flex items-start gap-3 text-[13px]"><Dot tone={x.kind === "revoked" ? "bad" : x.kind === "sunset" ? "warn" : "ok"} /><span className="min-w-0 flex-1"><span className="block font-medium">{x.title}</span><span className="block text-(--s-muted)">{x.body}</span></span></li>

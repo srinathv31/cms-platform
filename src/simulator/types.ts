@@ -171,7 +171,7 @@ export interface SimDeliveryResult {
   status: "delivered" | "failed";
   /** The API's error, verbatim: the grid shows `message` exactly as UCOMP wrote it. */
   error: SimApiError | null;
-  /** X-UCOMP-Newer-Version on a delivered render of a Superseded version. */
+  /** X-Stencil-Newer-Version on a delivered render of a Superseded version. */
   newerVersion: number | null;
 }
 

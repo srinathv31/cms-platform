@@ -606,7 +606,7 @@ export function notificationFallback(
     const f = NOTIFICATION_FALLBACKS[kind];
     return { title: f.title(teamName), href: f.href(where) };
   }
-  return { title: "Something changed in UCOMP.", href: teamPath(where, "library") };
+  return { title: "Something changed in Stencil.", href: teamPath(where, "library") };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

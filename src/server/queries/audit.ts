@@ -9,7 +9,7 @@ import {
   type AuditPageData,
   type AuditRow,
 } from "@/domain/access-types";
-import { SYSTEM_ACTOR } from "@/domain/activity";
+import { SYSTEM_ACTOR, SYSTEM_INITIALS } from "@/domain/activity";
 import {
   AUDIT_CATEGORIES,
   CATEGORY_LABEL,
@@ -57,7 +57,7 @@ interface AuditScope {
   name: string;
 }
 
-const SYSTEM_PERSON_VIEW: Person = { id: SYSTEM_PERSON, name: SYSTEM_ACTOR, initials: "UC", hue: 0 };
+const SYSTEM_PERSON_VIEW: Person = { id: SYSTEM_PERSON, name: SYSTEM_ACTOR, initials: SYSTEM_INITIALS, hue: 0 };
 
 const FILTER_KEYS = ["team", "person", "action", "template", "from", "to"] as const satisfies readonly (keyof AuditFilters)[];
 
@@ -101,7 +101,7 @@ export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters:
   const { matching } = await readAudit(scope.scope, filters, nowDate);
   return {
     ok: true,
-    filename: `ucomp-audit-${scope.scope.slug}-${dayOf(nowDate)}.csv`,
+    filename: `stencil-audit-${scope.scope.slug}-${dayOf(nowDate)}.csv`,
     csv: toCsv(matching),
     count: matching.length,
   };

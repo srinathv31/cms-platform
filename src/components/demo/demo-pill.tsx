@@ -63,7 +63,7 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
   const [days, setDays] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Controlled, so the drawer closes when the presenter leaves for the simulator: the product's layout stays
-  // mounted behind it (Next keeps visited routes alive), and "Back to UCOMP" must not land on an open drawer.
+  // mounted behind it (Next keeps visited routes alive), and "Back to Stencil" must not land on an open drawer.
   const [open, setOpen] = useState(false);
 
   const advance = (n: number) =>

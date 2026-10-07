@@ -60,7 +60,7 @@ describe("getAuditPage: who sees what", () => {
     expect(page.total).toBe(page.rows.length);
     expect(page.options.teams.map((t) => t.slug).sort()).toEqual(["card-statements", "coral-offers", "deposits"]);
     expect(page.options.categories.map((c) => c.value)).toEqual(["templates", "access", "platform"]);
-    expect(page.options.people.at(-1)).toMatchObject({ id: "system", name: "UCOMP" });
+    expect(page.options.people.at(-1)).toMatchObject({ id: "system", name: "Stencil" });
     expect(page.options.datePresets.map((p) => p.days)).toEqual([7, 30, 90]);
     expect(page.today).toBe("2026-10-04");
     expect(page.csvHref).toBe("/all/audit/export");
@@ -159,7 +159,7 @@ describe("getAuditExport", () => {
     const page = await getAuditPage("all", { action: "access" });
     const out = await getAuditExport(people.taylor!, "all", { action: "access" });
     if (!out.ok) throw new Error(out.reason);
-    expect(out.filename).toBe("ucomp-audit-all-2026-10-04.csv");
+    expect(out.filename).toBe("stencil-audit-all-2026-10-04.csv");
     expect(out.count).toBe(page.total);
     const lines = parseCsv(out.csv);
     expect(lines[0]).toEqual(["When", "Who", "Team", "Template", "Version", "Action", "Details"]);

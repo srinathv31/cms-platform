@@ -77,7 +77,7 @@ export function SettingsNavList({
           </div>
         ))}
       </div>
-      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">UCOMP · v0.1 prototype</p>
+      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">Stencil · v0.1</p>
     </nav>
   );
 }

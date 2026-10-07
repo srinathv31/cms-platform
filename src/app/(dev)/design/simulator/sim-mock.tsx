@@ -9,7 +9,7 @@ import { VariantB } from "./variant-b";
 import { VariantC } from "./variant-c";
 
 /*
- * The frame is UCOMP's (warm stone, dashed): the "← Back to UCOMP" pill and the "Coral — simulated"
+ * The frame is UCOMP's (warm stone, dashed): the "← Back to Stencil" pill and the "Coral — simulated"
  * label mark the boundary. Everything below it is Coral's own system, in its own look.
  */
 export function SimMock({ initial }: { initial: SimInitial }) {
@@ -40,7 +40,7 @@ export function SimMock({ initial }: { initial: SimInitial }) {
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-text px-3.5 text-[13px] font-medium text-surface outline-none hover:bg-text/90 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft aria-hidden strokeWidth={1.75} className="size-4" />
-          Back to UCOMP
+          Back to Stencil
         </Link>
         <span className="rounded-md border border-dashed border-hairline-strong px-2.5 py-1 text-[12px] font-medium tracking-wider text-label uppercase">
           Coral — simulated

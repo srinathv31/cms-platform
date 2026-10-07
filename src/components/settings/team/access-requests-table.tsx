@@ -29,7 +29,7 @@ function pendingRow(r: AccessRequestRow, team: string, today: string): RowData {
         label: "Approve",
         blocked,
         strip: {
-          consequence: `${r.person.name} gets ${role} access to ${team} and sees its Library the next time they open UCOMP.`,
+          consequence: `${r.person.name} gets ${role} access to ${team} and sees its Library the next time they open Stencil.`,
           confirmLabel: `Approve as ${role}`,
           detail: reason,
           run: () => decideAccessRequest({ requestId: r.id, decision: "approve" }),

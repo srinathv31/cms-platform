@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { ArrowLeft } from "lucide-react";
 
-// "Back to UCOMP" returns to the page the simulator was opened from (the Demo pill remembers it for the
+// "Back to Stencil" returns to the page the simulator was opened from (the Demo pill remembers it for the
 // tab), or to "/" when there is none: a fresh tab, a shared link, storage off.
 
 const KEY = "ucomp:sim-return";
@@ -22,7 +22,7 @@ export function rememberSimReturn() {
     const path = `${window.location.pathname}${window.location.search}`;
     if (usable(path)) window.sessionStorage.setItem(KEY, path);
   } catch {
-    // Storage off: Back to UCOMP goes to "/".
+    // Storage off: Back to Stencil goes to "/".
   }
 }
 
@@ -53,7 +53,7 @@ export function BackToUcomp() {
       className="inline-flex h-8 items-center gap-1.5 rounded-full bg-text px-3.5 text-[13px] font-medium text-surface outline-none hover:bg-text/90 focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ArrowLeft aria-hidden strokeWidth={1.75} className="size-4" />
-      Back to UCOMP
+      Back to Stencil
     </Link>
   );
 }

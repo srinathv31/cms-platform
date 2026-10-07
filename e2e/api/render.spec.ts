@@ -176,13 +176,13 @@ test.describe("headers", () => {
       const { res } = await render(request, { templateId: v.templateId, correlationId: sent, body: bodyFor(v, channel) });
       expect(res.status(), channel).toBe(200);
       const h = res.headers();
-      expect(h["x-ucomp-template-id"], channel).toBe(v.templateId);
-      expect(h["x-ucomp-version"], channel).toBe(String(v.number));
+      expect(h["x-stencil-template-id"], channel).toBe(v.templateId);
+      expect(h["x-stencil-version"], channel).toBe(String(v.number));
       expect(h["cache-control"], channel).toBe("no-store");
       expect(h["x-correlation-id"], channel).toBe(sent);
       // An Active version has no newer one, and a consumer render isn't a preview.
-      expect(h["x-ucomp-newer-version"], channel).toBeUndefined();
-      expect(h["x-ucomp-preview"], channel).toBeUndefined();
+      expect(h["x-stencil-newer-version"], channel).toBeUndefined();
+      expect(h["x-stencil-preview"], channel).toBeUndefined();
     }
   });
 
@@ -203,8 +203,8 @@ test.describe("base64 opt-in", () => {
     const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, "pdf", undefined, { encoding: "base64" }) });
     expect(res.status()).toBe(200);
     expect(res.headers()["content-type"]).toBe("application/json");
-    expect(res.headers()["x-ucomp-template-id"]).toBe(v.templateId);
-    expect(res.headers()["x-ucomp-version"]).toBe(String(v.number));
+    expect(res.headers()["x-stencil-template-id"]).toBe(v.templateId);
+    expect(res.headers()["x-stencil-version"]).toBe(String(v.number));
     const body = await res.json();
     expect(Object.keys(body).sort()).toEqual(["channel", "contentType", "data", "encoding", "newerVersion"]);
     expect(body).toMatchObject({ channel: "pdf", contentType: "application/pdf", encoding: "base64", newerVersion: null });
@@ -426,8 +426,8 @@ test.describe("version rules for consumers", () => {
       const channel = v.channels.includes("web") ? "web" : v.channels[0];
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, channel) });
       expect(res.status(), `${v.templateId} v${v.number}`).toBe(200);
-      expect(res.headers()["x-ucomp-version"]).toBe(String(v.number));
-      expect(res.headers()["x-ucomp-newer-version"], `${v.templateId} v${v.number}`).toBe(String(v.activeNumber));
+      expect(res.headers()["x-stencil-version"]).toBe(String(v.number));
+      expect(res.headers()["x-stencil-newer-version"], `${v.templateId} v${v.number}`).toBe(String(v.activeNumber));
     }
   });
 
@@ -438,7 +438,7 @@ test.describe("version rules for consumers", () => {
     await withTemporarily(db, "versions", v.id, { channels: JSON.stringify(["pdf", "web", "email"]) }, async () => {
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, "email") });
       expect(res.status()).toBe(200);
-      expect(res.headers()["x-ucomp-newer-version"]).toBe(String(v.activeNumber));
+      expect(res.headers()["x-stencil-newer-version"]).toBe(String(v.activeNumber));
       const body = await res.json();
       expect(body.newerVersion).toBe(v.activeNumber);
       expect(typeof body.subject).toBe("string");
@@ -573,9 +573,9 @@ test.describe("previews", () => {
       });
       expect(res.status()).toBe(200);
       expect(res.headers()["content-type"]).toBe("text/html; charset=utf-8");
-      expect(res.headers()["x-ucomp-preview"]).toBe("true");
-      expect(res.headers()["x-ucomp-version"]).toBe("draft");
-      expect(res.headers()["x-ucomp-template-id"]).toBe(draft.templateId);
+      expect(res.headers()["x-stencil-preview"]).toBe("true");
+      expect(res.headers()["x-stencil-version"]).toBe("draft");
+      expect(res.headers()["x-stencil-template-id"]).toBe(draft.templateId);
       expect(res.headers()["cache-control"]).toBe("no-store");
       expect(res.headers()["x-correlation-id"]).toBe(cid);
       expect(await res.text()).toMatch(/<!doctype html>/i);
@@ -606,7 +606,7 @@ test.describe("previews", () => {
       expect(res.status()).toBe(200);
       expect(res.headers()["content-type"]).toBe("application/pdf");
       expect(res.headers()["content-disposition"]).toBe(`inline; filename="${draft.templateId}-draft.pdf"`);
-      expect(res.headers()["x-ucomp-preview"]).toBe("true");
+      expect(res.headers()["x-stencil-preview"]).toBe("true");
       expect(pdfMagic(await res.body())).toBe("%PDF");
     });
   });
@@ -628,10 +628,10 @@ test.describe("previews", () => {
           body: bodyFor(v, v.channels[0], validValues(v.variables), { preview: true }),
         });
         expect(res.status(), v.state).toBe(200);
-        expect(res.headers()["x-ucomp-preview"], v.state).toBe("true");
-        expect(res.headers()["x-ucomp-version"], v.state).toBe(String(v.number));
+        expect(res.headers()["x-stencil-preview"], v.state).toBe("true");
+        expect(res.headers()["x-stencil-version"], v.state).toBe(String(v.number));
         // A Superseded version still points to the version that replaced it.
-        expect(res.headers()["x-ucomp-newer-version"], v.state).toBe(v.state === "superseded" ? String(v.activeNumber) : undefined);
+        expect(res.headers()["x-stencil-newer-version"], v.state).toBe(v.state === "superseded" ? String(v.activeNumber) : undefined);
         expect((await logFor(db, cid))[0], v.state).toMatchObject({ is_preview: 1, consumer_id: null, outcome: "ok" });
       }
     });
@@ -675,7 +675,7 @@ test.describe("previews", () => {
           body: { version: "draft", channel: "web", values: validValues(draft.variables), preview: true },
         });
         await expectError(res, 403, "preview_forbidden", "You can't preview this template.");
-        expect(res.headers()["x-ucomp-preview"]).toBeUndefined();
+        expect(res.headers()["x-stencil-preview"]).toBeUndefined();
       });
       const rows = await logFor(db, cid);
       expect(rows, persona).toHaveLength(1);
@@ -688,7 +688,7 @@ test.describe("previews", () => {
     await asPersona(playwright, baseURL!, PERSONA_CANNOT_SEE_DEPOSITS, async (request) => {
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, "web") });
       expect(res.status()).toBe(200);
-      expect(res.headers()["x-ucomp-preview"]).toBeUndefined();
+      expect(res.headers()["x-stencil-preview"]).toBeUndefined();
     });
   });
 

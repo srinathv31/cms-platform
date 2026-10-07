@@ -13,7 +13,7 @@ export function visibleFor(viewer: Viewer): SettingsGroup[] {
   return SETTINGS_GROUPS.filter((g) => (g.key === "team" ? viewer !== "riley" : viewer !== "alex"));
 }
 
-const VERSION = "UCOMP · v0.1 prototype";
+const VERSION = "Stencil · v0.1";
 
 function Row({
   icon: Icon,

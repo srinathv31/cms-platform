@@ -4,7 +4,7 @@ import { fontVariables } from "@/styles/fonts";
 import { Providers } from "@/components/motion/providers";
 
 export const metadata: Metadata = {
-  title: { default: "UCOMP", template: "%s · UCOMP" },
+  title: { default: "Stencil", template: "%s · Stencil" },
   description: "Author, approve and publish customer content.",
 };
 

@@ -227,7 +227,10 @@ interface Axe {
 }
 
 async function runAxe(page: Page): Promise<Axe> {
-  const results = await new AxeBuilder({ page }).exclude("nextjs-portal").analyze();
+  // Base UI's focus guards (visually hidden, aria-hidden, tabindex 0) only pass focus on. axe lets them through
+  // only when it decides a modal is open, by probing five fixed points for a full-screen layer, and a menu's
+  // backdrop has a hole over its trigger: the team switcher's trigger sits on one probe at 1440×900.
+  const results = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
   const line = (v: (typeof results.violations)[number]) =>
     `${v.id} (${v.impact}) x${v.nodes.length}: ${v.help} — ${v.nodes
       .slice(0, 3)

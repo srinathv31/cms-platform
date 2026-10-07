@@ -22,7 +22,7 @@ const KIND: Record<SimNoticeView["kind"], { title: (n: SimNoticeView) => string;
 export function NoticesPanel({
   notices,
   offerNames,
-  title = "Notices from UCOMP",
+  title = "Notices from Stencil",
   footer,
 }: {
   notices: SimNoticeView[];

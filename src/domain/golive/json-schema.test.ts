@@ -62,14 +62,14 @@ describe("contractJsonSchema", () => {
     const schema = schemaFor(ALL);
     expect(schema).toMatchObject({
       $schema: "https://json-schema.org/draft/2020-12/schema",
-      $id: "https://ucomp.example/schemas/UC-4F7K2Q/v2/values.json",
+      $id: "https://stencil.example/schemas/UC-4F7K2Q/v2/values.json",
       title: "Spring Travel Rewards — Terms v2: values",
       type: "object",
       required: ["first_name", "annual_fee", "purchase_apr", "home_state"],
       additionalProperties: true,
     });
     expect(Object.keys(schema.properties)).toEqual(ALL.map((x) => x.key));
-    expect(jsonSchemaId("UC-ABCDEF", 7)).toBe("https://ucomp.example/schemas/UC-ABCDEF/v7/values.json");
+    expect(jsonSchemaId("UC-ABCDEF", 7)).toBe("https://stencil.example/schemas/UC-ABCDEF/v7/values.json");
   });
 
   it("types each property: strings (a required text non-blank), numbers as decimal strings, dates, state codes", () => {

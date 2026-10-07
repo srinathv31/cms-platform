@@ -1,4 +1,4 @@
-# UCOMP
+# Stencil
 
 Author, approve and publish customer content. Next.js 16 (App Router, Cache Components) on a local SQLite file.
 
@@ -22,7 +22,7 @@ To see the app the way users get it, with routes prerendered and links prefetche
 npm run demo   # next build && next start
 ```
 
-To present UCOMP to a new audience, follow the step-by-step [demo script](docs/demo-script.md).
+To present Stencil to a new audience, follow the step-by-step [demo script](docs/demo-script.md).
 
 ## Checks
 

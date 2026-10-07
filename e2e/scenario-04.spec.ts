@@ -113,7 +113,7 @@ test.describe("scenario 4: going live", () => {
       await expect(page).toHaveURL(/\/sim$/);
 
       await expect(page.getByText("Coral — simulated", { exact: true })).toBeVisible();
-      await expect(page.getByRole("link", { name: "Back to UCOMP" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Back to Stencil" })).toBeVisible();
       const offers = page.getByRole("table", { name: "Offers" });
       await expect(offers).toBeVisible();
       await expect(offers.getByRole("link", { name: SPRING_OFFER_NAME, exact: true })).toBeVisible();

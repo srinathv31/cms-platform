@@ -124,7 +124,7 @@ function AccessRequests({ v }: { v: Variant }) {
       {
         key: "approve",
         label: "Approve",
-        consequence: `${p.name} gets ${r.role} access to ${TEAM} and sees its Library the next time they open UCOMP.`,
+        consequence: `${p.name} gets ${r.role} access to ${TEAM} and sees its Library the next time they open Stencil.`,
         confirmLabel: `Approve as ${r.role}`,
         run: () => s.decide(r.id, r.who, "approved", r.role),
       },

@@ -92,16 +92,16 @@ const logRows = (correlationId: string) =>
 // ── Success, per channel ─────────────────────────────────────────────────────
 
 describe("POST /api/v1/templates/[templateId]/render: channels", () => {
-  it("web: a text/html document with the X-UCOMP headers", async () => {
+  it("web: a text/html document with the X-Stencil headers", async () => {
     const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER }, { ...CORAL, "X-Correlation-Id": "abc-123" });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Correlation-Id")).toBe("abc-123");
-    expect(res.headers.get("X-UCOMP-Template-Id")).toBe(ids["balance-transfer"]);
-    expect(res.headers.get("X-UCOMP-Version")).toBe("2");
-    expect(res.headers.get("X-UCOMP-Newer-Version")).toBeNull();
-    expect(res.headers.get("X-UCOMP-Preview")).toBeNull();
+    expect(res.headers.get("X-Stencil-Template-Id")).toBe(ids["balance-transfer"]);
+    expect(res.headers.get("X-Stencil-Version")).toBe("2");
+    expect(res.headers.get("X-Stencil-Newer-Version")).toBeNull();
+    expect(res.headers.get("X-Stencil-Preview")).toBeNull();
     expect(res.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
     const html = await res.text();
     expect(html.startsWith("<!doctype html>")).toBe(true);
@@ -170,11 +170,11 @@ describe("POST …/render: base64 opt-in", () => {
 });
 
 describe("POST …/render: superseded versions", () => {
-  it("a Superseded version renders with X-UCOMP-Newer-Version", async () => {
+  it("a Superseded version renders with X-Stencil-Newer-Version", async () => {
     const res = await post("balance-transfer", { version: 1, channel: "web", values: CUSTOMER });
     expect(res.status).toBe(200);
-    expect(res.headers.get("X-UCOMP-Version")).toBe("1");
-    expect(res.headers.get("X-UCOMP-Newer-Version")).toBe("2");
+    expect(res.headers.get("X-Stencil-Version")).toBe("1");
+    expect(res.headers.get("X-Stencil-Newer-Version")).toBe("2");
   });
 
   it("the email JSON carries newerVersion too", async () => {
@@ -188,7 +188,7 @@ describe("POST …/render: superseded versions", () => {
       const values = Object.fromEntries(v1!.variables.map((v) => [v.key, v.sample]));
       const res = await post("high-yield-savings", { version: 1, channel: "email", values }, { "X-Consumer-Id": "deposits-online" });
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-UCOMP-Newer-Version")).toBe("2");
+      expect(res.headers.get("X-Stencil-Newer-Version")).toBe("2");
       const body = (await res.json()) as EmailResponseBody;
       expect(body).toMatchObject({ subject: "Your savings rate", preheader: "", newerVersion: 2 });
     } finally {
@@ -217,8 +217,8 @@ describe("POST …/render: previews", () => {
       { "X-Correlation-Id": "preview-1", "X-Consumer-Id": "coral" },
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("X-UCOMP-Version")).toBe("draft");
-    expect(res.headers.get("X-UCOMP-Preview")).toBe("true");
+    expect(res.headers.get("X-Stencil-Version")).toBe("draft");
+    expect(res.headers.get("X-Stencil-Preview")).toBe("true");
     expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["annual-fee-waiver"]}-draft.pdf"`);
     expect(getViewer).toHaveBeenCalledTimes(1);
     expect(await logRows("preview-1")).toEqual([

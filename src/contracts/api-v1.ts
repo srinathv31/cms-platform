@@ -187,7 +187,7 @@ export interface ApiContractDiff {
 /** The subset of JSON Schema the contract uses. */
 export interface ApiJsonSchema {
   $schema: "https://json-schema.org/draft/2020-12/schema";
-  $id: string; // "https://ucomp.example/schemas/UC-4F7K2Q/v2/values.json"
+  $id: string; // "https://stencil.example/schemas/UC-4F7K2Q/v2/values.json"
   title: string; // "Spring Travel Rewards — Terms v2: values"
   type: "object";
   properties: Record<string, ApiJsonSchemaProperty>;
@@ -284,7 +284,7 @@ export interface ApiBase64Response {
 export const API_HEADERS = {
   consumer: "X-Consumer-Id",
   correlation: "X-Correlation-Id",
-  templateId: "X-UCOMP-Template-Id",
-  version: "X-UCOMP-Version",
-  newerVersion: "X-UCOMP-Newer-Version",
+  templateId: "X-Stencil-Template-Id",
+  version: "X-Stencil-Version",
+  newerVersion: "X-Stencil-Newer-Version",
 } as const;

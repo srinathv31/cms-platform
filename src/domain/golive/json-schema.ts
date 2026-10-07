@@ -21,7 +21,7 @@ export const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema
 
 /** Where a contract's schema says it lives. Nothing is served there; it names the schema. */
 export function jsonSchemaId(templateId: string, versionNumber: number): string {
-  return `https://ucomp.example/schemas/${templateId}/v${versionNumber}/values.json`;
+  return `https://stencil.example/schemas/${templateId}/v${versionNumber}/values.json`;
 }
 
 /**

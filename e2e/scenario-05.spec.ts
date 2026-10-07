@@ -156,7 +156,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
     await test.step("0. Before: Coral renders v2 through the API (so the notices and the consequence text name Coral)", async () => {
       const { res } = await coralRender(request, fixture!, 2, "scenario05-before");
       expect(res.status(), "Coral renders the Active v2").toBe(200);
-      expect(res.headers()["x-ucomp-version"]).toBe("2");
+      expect(res.headers()["x-stencil-version"]).toBe("2");
       const [link] = await rows(db, "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'");
       expect(link).toMatchObject({ template_id: templateId, pinned_version: 2 });
     });
@@ -347,7 +347,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await openOffer(page, SPRING_OFFER_NAME);
       await expect(page.getByText("v3 available", { exact: true }).filter({ visible: true })).toHaveCount(1);
       await expect(page.getByText("Pinned to v2", { exact: true })).toBeVisible();
-      const strip = page.getByText(/UCOMP released v3\./);
+      const strip = page.getByText(/Stencil released v3\./);
       await expect(strip).toContainText("annual_fee");
       await beat(page, 900);
       await shoot(page, "simulator-offer-upgrade");

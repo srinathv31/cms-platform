@@ -452,7 +452,7 @@ describe("toCsv", () => {
       "Revoke started",
       tricky,
     ]);
-    expect(second).toEqual(["2026-10-04T08:00:00.000Z", "UCOMP", "Coral Offers", "", "", "Access lapsed", "Sam Ortiz's access lapsed."]);
+    expect(second).toEqual(["2026-10-04T08:00:00.000Z", "Stencil", "Coral Offers", "", "", "Access lapsed", "Sam Ortiz's access lapsed."]);
     expect(third![2]).toBe("All teams");
   });
 
@@ -498,7 +498,7 @@ describe("notification fallbacks", () => {
     expect(at("access_denied").href).toBe("/request-access");
     expect(at("review_requested").href).toBe("/coral-offers/review");
     expect(at("version_live").href).toBe("/coral-offers/library");
-    expect(at("an_old_spelling")).toEqual({ title: "Something changed in UCOMP.", href: "/coral-offers/library" });
+    expect(at("an_old_spelling")).toEqual({ title: "Something changed in Stencil.", href: "/coral-offers/library" });
     expect(notificationFallback("access_granted", { team: null, teamName: null }).title).toBe("You now have access to your team.");
   });
 });

@@ -134,10 +134,10 @@ export interface RenderRequestBody {
 /**
  * Success. Every 200 carries these headers:
  *   X-Correlation-Id       the request's, or the generated one
- *   X-UCOMP-Template-Id    "UC-4F7K2Q"
- *   X-UCOMP-Version        "2", or "draft"
- *   X-UCOMP-Newer-Version  "3", only when the rendered version is Superseded (still renders until its sunset)
- *   X-UCOMP-Preview        "true", only on previews
+ *   X-Stencil-Template-Id    "UC-4F7K2Q"
+ *   X-Stencil-Version        "2", or "draft"
+ *   X-Stencil-Newer-Version  "3", only when the rendered version is Superseded (still renders until its sunset)
+ *   X-Stencil-Preview        "true", only on previews
  *
  * Bodies:
  *   pdf    application/pdf (bytes); Content-Disposition: inline; filename="UC-4F7K2Q-v2.pdf" ("…-draft.pdf")

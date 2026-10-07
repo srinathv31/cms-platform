@@ -153,12 +153,12 @@ describe("describeActivity: details", () => {
   });
 
   it("names the system when there is no actor", () => {
-    expect(describeActivity(event("draft.edited", null), null)).toBe("UCOMP edited the draft.");
+    expect(describeActivity(event("draft.edited", null), null)).toBe("Stencil edited the draft.");
   });
 
   it("says something plain about an action it doesn't know", () => {
     expect(describeActivity(event("platform.config_changed", null, { summary: "Created team Coral Offers" }), null)).toBe(
-      "UCOMP: Created team Coral Offers.",
+      "Stencil: Created team Coral Offers.",
     );
     expect(describeActivity(event("version.archived", 2), MAYA)).toBe("Maya Chen: version archived (v2).");
     expect(describeActivity(event("access.requested", null, { role: "author" }), MAYA)).toBe("Maya Chen: access requested.");

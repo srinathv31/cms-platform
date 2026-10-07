@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import type { AuditRow } from "@/domain/access-types";
-import { SYSTEM_ACTOR } from "@/domain/activity";
+import { SYSTEM_ACTOR, SYSTEM_INITIALS } from "@/domain/activity";
 import { formatStamp } from "@/domain/dates";
 import { AUDIT_CELL as at, AUDIT_ROW, AUDIT_TABLE, auditGrid, auditHeads } from "./columns";
 
@@ -31,7 +31,7 @@ export function AuditTable({ rows, showTeam }: { rows: AuditRow[]; showTeam: boo
           </span>
           <span role="cell" className={cn("flex min-w-0 items-center gap-2", at.who)}>
             <UserAvatar
-              initials={e.actor?.initials ?? "UC"}
+              initials={e.actor?.initials ?? SYSTEM_INITIALS}
               hue={e.actor?.hue ?? 0}
               size="sm"
             />

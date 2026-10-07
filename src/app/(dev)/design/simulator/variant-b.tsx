@@ -309,7 +309,7 @@ function RelinkWizard({ s }: { s: Sim }) {
 function InboxPage({ s }: { s: Sim }) {
   return (
     <div className="mx-auto max-w-[44rem]">
-      <h1 className="m-0 text-[30px] font-semibold tracking-tight">Notices from UCOMP</h1>
+      <h1 className="m-0 text-[30px] font-semibold tracking-tight">Notices from Stencil</h1>
       <ul className="m-0 mt-6 flex list-none flex-col gap-3 p-0">
         {NOTICES.map((n) => {
           const bad = n.kind === "revoked";

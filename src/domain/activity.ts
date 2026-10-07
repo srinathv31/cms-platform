@@ -10,7 +10,8 @@ import { formatLongDate } from "./render/errors";
 import type { AuditAction, Person } from "./review-types";
 
 /** Who a null actor is: the platform itself (the seed's activations, future scheduled jobs). */
-export const SYSTEM_ACTOR = "UCOMP";
+export const SYSTEM_ACTOR = "Stencil";
+export const SYSTEM_INITIALS = "S";
 
 export interface ActivityEvent {
   action: AuditAction | string;
