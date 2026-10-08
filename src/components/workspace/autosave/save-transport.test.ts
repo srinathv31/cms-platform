@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DraftPatch } from "@/domain/types";
+import type { DraftPatch, JSONContent } from "@/domain/types";
+import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
 import { KEEPALIVE_LIMIT_BYTES, createFetchSend } from "./save-transport";
 
 const patch: DraftPatch = { rev: 3, sessionKey: "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21", name: "Annual fee" };
@@ -68,6 +69,30 @@ describe("createFetchSend", () => {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(status, { ok: false, error, message: "m", rev: 9 }));
       await expect(sendWith(fetchImpl)(patch, { keepalive: false })).resolves.toEqual({ ok: false, error, message: "m", rev: 9 });
     }
+  });
+
+  it("refuses a document the server's check would refuse, with its sentence and without a request", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(200, { ok: true, rev: 4, savedAt: "x" }));
+    const list = (start: number): JSONContent => ({
+      type: "doc",
+      content: [{ type: "orderedList", attrs: { start }, content: [{ type: "listItem", content: [{ type: "paragraph" }] }] }],
+    });
+    await expect(sendWith(fetchImpl)({ ...patch, body: list(20_000) }, { keepalive: false })).resolves.toEqual({
+      ok: false,
+      error: "invalid",
+      message: DOCUMENT_MESSAGES.listStart,
+    });
+    const subject: JSONContent = { type: "doc", content: [{ type: "heading", attrs: { level: 1 } }, { type: "paragraph" }] };
+    await expect(sendWith(fetchImpl)({ ...patch, emailSubject: subject }, { keepalive: false })).resolves.toMatchObject({
+      ok: false,
+      error: "invalid",
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    // What normalization fixes (a heading level 5 becomes 3) is sent as usual; the server normalizes it.
+    const heading: JSONContent = { type: "doc", content: [{ type: "heading", attrs: { level: 5 }, content: [{ type: "text", text: "x" }] }] };
+    await sendWith(fetchImpl)({ ...patch, body: heading }, { keepalive: false });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when the network fails", async () => {

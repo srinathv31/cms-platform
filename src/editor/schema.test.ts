@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { filterBlockItems, BLOCK_ITEMS } from "./extensions/block-items";
 import type { Variable } from "./model/types";
 import { BLOCK_ID_TYPES, baseExtensions, ensureBlockIds } from "./schema";
+import { type as typeText } from "./testing/editor";
 
 const VARIABLES: Variable[] = [
   { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
@@ -236,6 +237,44 @@ describe("slash menu items", () => {
     heading.apply(ed.chain().deleteRange({ from: 1, to: 4 })).run();
     expect(ed.getJSON().content?.[0]).toMatchObject({ type: "heading", attrs: { level: 2 } });
     expect(ed.getJSON().content?.[0].content).toBeUndefined();
+  });
+});
+
+describe("numbered list typed rule", () => {
+  /** Types `value` one character at a time at the end of the document's only line. */
+  async function typed(value: string) {
+    const ed = await mount({ type: "doc", content: [{ type: "paragraph" }] });
+    ed.commands.setTextSelection(1);
+    for (const char of value) typeText(ed, char);
+    return ed.state.doc.firstChild!;
+  }
+
+  it.each([
+    ["1. ", 1],
+    ["0. ", 0],
+    ["42. ", 42],
+    ["9999. ", 9999],
+  ])("%j starts a numbered list at %i", async (value, start) => {
+    const block = await typed(value);
+    expect(block.type.name).toBe("orderedList");
+    expect(block.attrs.start).toBe(start);
+    expect(block.textContent).toBe("");
+  });
+
+  it.each(["10000. ", "12345. ", "007007. "])("%j stays text (a list starts at 0 to 9999)", async (value) => {
+    const block = await typed(value);
+    expect(block.type.name).toBe("paragraph");
+    expect(block.textContent).toBe(value);
+  });
+
+  it("joins the list just above when the number continues it, as TipTap's rule does", async () => {
+    const item = (value: string): JSONContent => ({ type: "listItem", content: [{ type: "paragraph", content: [text(value)] }] });
+    const ed = await mount({ type: "doc", content: [{ type: "orderedList", attrs: { start: 1 }, content: [item("One"), item("Two")] }, { type: "paragraph" }] });
+    ed.commands.setTextSelection(ed.state.doc.content.size - 1);
+    for (const char of "3. ") typeText(ed, char);
+    const blocks = ed.getJSON().content ?? [];
+    expect(blocks.filter((block) => block.type === "orderedList")).toHaveLength(1);
+    expect(blocks[0].content).toHaveLength(3);
   });
 });
 

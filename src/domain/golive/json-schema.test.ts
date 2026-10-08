@@ -76,7 +76,11 @@ describe("contractJsonSchema", () => {
     const { properties: p } = schemaFor(ALL);
     expect(p.first_name).toEqual({ title: "first name", description: "Text.", type: "string", minLength: 1, pattern: "\\S", examples: ["Maya"] });
     expect(schemaFor([v("nickname", "text", false)]).properties.nickname).toEqual({ title: "nickname", description: "Text.", type: "string", examples: ["Maya"] });
-    expect(p.annual_fee).toMatchObject({ type: "string", description: "Currency, canonical form like 1000 or 1000.50.", examples: ["1000"] });
+    expect(p.annual_fee).toMatchObject({
+      type: "string",
+      description: "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent.",
+      examples: ["1000"],
+    });
     expect(p.purchase_apr).toMatchObject({ type: "string", examples: ["21.99"] });
     expect(p.bonus_points).toMatchObject({ type: "string", examples: ["20000"] });
     expect(p.offer_end_date).toMatchObject({ type: "string", format: "date", examples: ["2027-03-04"] });
@@ -111,11 +115,12 @@ describe("contractJsonSchema: validated", () => {
     expect(validateValues([variable], { [variable.key]: JUNK[type] }).ok).toBe(false);
   });
 
-  it("numbers are decimal strings; JSON numbers aren't advertised (the route still takes plain ones)", () => {
-    for (const value of ["1000", "1000.50", "-12.5", "0"]) {
+  it("numbers are canonical decimal strings, exactly the route's grammar; JSON numbers aren't advertised", () => {
+    for (const value of ["1000", "1000.50", "-12.5", "0", "0.5", "0.00", "21.90", "9".repeat(400), "1000000000000000000000"]) {
       expect(accepts(ALL, { ...samples, annual_fee: value }), String(value)).toBe(true);
+      expect(validateValue("currency", value)).toEqual({ ok: true, value });
     }
-    for (const value of ["$1,000", "1,000", "21.99%", "1e3", ".5", "5.", "", 1000, 1e21, 1e-7, "9".repeat(309)]) {
+    for (const value of ["$1,000", "1,000", "21.99%", "1e3", ".5", "5.", "+5", "007", "00", "-0", "-0.00", "１２", "", 1000, 1e21, 1e-7]) {
       expect(accepts(ALL, { ...samples, annual_fee: value }), String(value)).toBe(false);
     }
     // Why: a JSON number in exponent notation is refused by the route.
@@ -134,10 +139,10 @@ describe("contractJsonSchema: validated", () => {
   });
 
   it("dates must be real calendar days as YYYY-MM-DD, by the pattern alone", () => {
-    for (const value of ["2027-02-30", "2027-04-31", "2100-02-29", "2027-13-01", "2027-00-10", "0099-01-01", "3/4/2027", "March 4, 2027", "2027-3-4"]) {
+    for (const value of ["2027-02-30", "2027-04-31", "2100-02-29", "2027-13-01", "2027-00-10", "0000-01-01", "２０２７-03-04", "3/4/2027", "March 4, 2027", "2027-3-4"]) {
       expect(accepts(ALL, { ...samples, offer_end_date: value }), value).toBe(false);
     }
-    for (const value of ["2028-02-29", "2000-02-29", "2400-02-29", "0100-01-01", "9999-12-31"]) {
+    for (const value of ["2028-02-29", "2000-02-29", "2400-02-29", "0001-01-01", "0099-01-01", "0100-01-01", "9999-12-31"]) {
       expect(accepts(ALL, { ...samples, offer_end_date: value }), value).toBe(true);
     }
   });
@@ -145,7 +150,7 @@ describe("contractJsonSchema: validated", () => {
   it("the date pattern and the route agree on every YYYY-MM-DD across leap and century years", () => {
     const date = [v("d", "date")];
     const pattern = new RegExp(schemaFor(date).properties.d!.pattern!);
-    for (const year of ["0099", "0100", "1900", "2000", "2024", "2025", "2100", "2400"]) {
+    for (const year of ["0000", "0001", "0004", "0099", "0100", "1900", "2000", "2024", "2025", "2100", "2400", "9996"]) {
       for (let month = 0; month <= 13; month++) {
         for (let day = 0; day <= 32; day++) {
           const value = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -213,5 +218,17 @@ describe("apiVariables", () => {
   it("a blank sample falls back to the type's example", () => {
     expect(exampleOf(v("fee", "currency", true, ""))).toBe("1000");
     expect(apiVariables([v("when", "date", false, "  ")])[0]!.example).toBe("2027-03-04");
+  });
+
+  it("the example is the sample's canonical form, or the type's example when the sample no longer fits", () => {
+    expect(exampleOf(v("fee", "currency", true, "1,000.50"))).toBe("1000.50");
+    expect(exampleOf(v("fee", "currency", true, "1e+21"))).toBe("1000"); // saved before exponents were refused
+    expect(exampleOf(v("name", "text", true, " Maya "))).toBe(" Maya ");
+    for (const type of VARIABLE_TYPES) {
+      for (const sample of ["1e+21", "007", "lots", "", TYPE_META[type].example]) {
+        const variable = v("x", type, true, sample);
+        expect(accepts([variable], { x: exampleOf(variable) }), `${type} ${sample}`).toBe(true);
+      }
+    }
   });
 });

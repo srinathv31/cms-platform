@@ -197,8 +197,8 @@ export interface ApiJsonSchema {
 
 export interface ApiJsonSchemaProperty {
   title: string; // the variable's label
-  description: string; // "Currency, canonical form like 1000 or 1000.50."
-  type: "string"; // the canonical forms are strings (the route also takes JSON numbers; not advertised)
+  description: string; // "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent."
+  type: "string"; // the canonical forms are strings (the route also takes JSON numbers, read from their source text; not advertised)
   minLength?: number; // a required text: 1, with pattern "\\S" (blank counts as missing)
   pattern?: string;
   format?: "date";

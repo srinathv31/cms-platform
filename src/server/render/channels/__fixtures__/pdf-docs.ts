@@ -1,14 +1,23 @@
 // RenderDoc fixtures for the PDF adapter. Hand-built and already resolved: variables are text runs
 // carrying their key, formatted as resolveDocument formats them.
 
-import type { RenderBlock, RenderDoc, RenderInline, RenderListItem, RenderTableCell, RenderText } from "@/domain/render/types";
+import type {
+  RenderBlock,
+  RenderDoc,
+  RenderInline,
+  RenderListItem,
+  RenderParagraph,
+  RenderTableCell,
+  RenderText,
+} from "@/domain/render/types";
+import { BULLET_GLYPHS, formatMarker } from "@/editor/model/list-markers";
 
 const t = (text: string, marks: Omit<RenderText, "type" | "text"> = {}): RenderText => ({ type: "text", text, ...marks });
 const v = (variable: string, text: string): RenderText => ({ type: "text", text, variable });
 const b = (text: string) => t(text, { bold: true });
 const br: RenderInline = { type: "break" };
 
-const p = (id: string | null, ...content: RenderInline[]): RenderBlock => ({ type: "paragraph", id, content });
+const p = (id: string | null, ...content: RenderInline[]): RenderParagraph => ({ type: "paragraph", id, content });
 const h = (id: string, level: 1 | 2 | 3, text: string, section: string | null = null): RenderBlock => ({
   type: "heading",
   id,
@@ -16,10 +25,25 @@ const h = (id: string, level: 1 | 2 | 3, text: string, section: string | null = 
   section,
   content: [t(text)],
 });
-const item = (...content: RenderBlock[]): RenderListItem => ({ content });
+// Items get their marker from the list they're put in (ul / ol below).
+const item = (...content: RenderBlock[]): RenderListItem => ({ marker: "", content });
 const li = (...content: RenderInline[]): RenderListItem => item(p(null, ...content));
-const ul = (id: string | null, ...items: RenderListItem[]): RenderBlock => ({ type: "list", id, ordered: false, start: 1, items });
-const ol = (id: string | null, start: number, ...items: RenderListItem[]): RenderBlock => ({ type: "list", id, ordered: true, start, items });
+const ul = (id: string | null, ...items: RenderListItem[]): RenderBlock => ({
+  type: "list",
+  id,
+  ordered: false,
+  bullet: "disc",
+  items: items.map((it) => ({ ...it, marker: BULLET_GLYPHS.disc })),
+});
+const ol = (id: string | null, start: number, ...items: RenderListItem[]): RenderBlock => ({
+  type: "list",
+  id,
+  ordered: true,
+  start,
+  format: "decimal",
+  delimiter: "period",
+  items: items.map((it, i) => ({ ...it, marker: formatMarker(start + i, "decimal", "period") })),
+});
 const cell = (header: boolean, content: RenderInline[], colspan = 1, rowspan = 1): RenderTableCell => ({
   header,
   colspan,
@@ -28,8 +52,13 @@ const cell = (header: boolean, content: RenderInline[], colspan = 1, rowspan = 1
 });
 const th = (text: string, colspan = 1) => cell(true, [t(text)], colspan);
 const td = (...content: RenderInline[]) => cell(false, content);
-const table = (id: string, rows: RenderTableCell[][]): RenderBlock => ({ type: "table", id, rows: rows.map((cells) => ({ cells })) });
-const callout = (id: string, ...content: RenderBlock[]): RenderBlock => ({ type: "callout", id, content });
+const table = (id: string, rows: RenderTableCell[][]): RenderBlock => ({
+  type: "table",
+  id,
+  columns: Math.max(1, ...rows.map((cells) => cells.reduce((width, c) => width + c.colspan, 0))),
+  rows: rows.map((cells) => ({ cells })),
+});
+const callout = (id: string, ...content: RenderParagraph[]): RenderBlock => ({ type: "callout", id, content });
 const rule = (id: string): RenderBlock => ({ type: "rule", id });
 
 // ── Card offer terms (typical and long-name) ─────────────────────────────────

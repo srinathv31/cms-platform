@@ -133,6 +133,13 @@ describe("commitInput", () => {
     expect(commitInput(type("number"), "20,000")).toEqual({ ok: true, value: "20000" });
   });
 
+  it("keeps the digits as typed: trailing zeros, huge and tiny values, no exponent", () => {
+    expect(commitInput(type("percent"), "21.90")).toEqual({ ok: true, value: "21.90" });
+    expect(commitInput(type("currency"), "1,000,000,000,000,000,000,000")).toEqual({ ok: true, value: "1000000000000000000000" });
+    expect(commitInput(type("number"), "0.0000001")).toEqual({ ok: true, value: "0.0000001" });
+    expect(commitInput(type("currency"), "1,00")).toEqual({ ok: false, message: "Put commas only between groups of three digits, like 1,000,000" });
+  });
+
   it("trims text", () => {
     expect(commitInput(type("text"), "  Maya  ")).toEqual({ ok: true, value: "Maya" });
   });
@@ -144,7 +151,7 @@ describe("commitInput", () => {
   });
 
   it("refuses what the type can't read, with validateValue's message", () => {
-    expect(commitInput(type("currency"), "lots")).toEqual({ ok: false, message: "Enter an amount, like 1000.00" });
+    expect(commitInput(type("currency"), "lots")).toEqual({ ok: false, message: "Enter an amount, like 1000 or 1000.50" });
     expect(commitInput(type("date"), "2027-02-30")).toEqual({ ok: false, message: "Enter a date, like 2027-03-04" });
     expect(commitInput(type("us_state"), "Narnia")).toEqual({ ok: false, message: "Enter a US state, like NJ" });
   });

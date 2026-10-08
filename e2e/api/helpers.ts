@@ -152,7 +152,7 @@ export function validValues(variables: readonly Variable[], overrides: Record<st
 /** What a value of each type must be, as the 422 message words it: "{key} must be {noun}." */
 export const NOUNS: Record<VariableType, string> = {
   text: "text",
-  currency: "an amount, like 1000.00",
+  currency: "an amount, like 1000 or 1000.50",
   percent: "a percentage, like 21.99",
   date: "a date, like 2027-03-04",
   number: "a number, like 20000",

@@ -56,6 +56,21 @@ describe("StaticDocument", () => {
     expect(html).toContain('<p data-id="p-3"></p>');
   });
 
+  it("keeps the empty line after a hard break that ends a paragraph, as the live editor does", () => {
+    const breaks: JSONContent = {
+      type: "doc",
+      content: [
+        { type: "paragraph", attrs: { id: "a" }, content: [{ type: "text", text: "x" }, { type: "hardBreak" }] },
+        { type: "paragraph", attrs: { id: "b" }, content: [{ type: "hardBreak" }, { type: "text", text: "y" }, { type: "hardBreak" }, { type: "hardBreak" }] },
+        { type: "heading", attrs: { id: "c", level: 1 }, content: [{ type: "hardBreak" }] },
+      ],
+    };
+    const out = renderToStaticMarkup(<StaticDocument content={breaks} variables={[]} />);
+    expect(out).toContain('<p data-id="a">x<br/><br class="ProseMirror-trailingBreak"/></p>');
+    expect(out).toContain('<p data-id="b"><br/>y<br/><br/><br class="ProseMirror-trailingBreak"/></p>');
+    expect(out).toContain('<br/><br class="ProseMirror-trailingBreak"/></h1>');
+  });
+
   it("wraps the document in the same surface/doc classes as the live editor", () => {
     expect(html).toMatch(/^<div class="ucomp-surface relative" data-static-document=""><div class="ucomp-doc">/);
   });

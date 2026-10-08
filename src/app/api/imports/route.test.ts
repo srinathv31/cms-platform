@@ -94,6 +94,7 @@ describe("POST /api/imports", () => {
     ["pdfNoText", 400],
     ["pdfLocked", 400],
     ["pdfPages", 400],
+    ["content", 400],
   ] as const)("%s becomes %i, with the body unchanged and no cookies", async (code, status) => {
     const body: ImportResponse = { ok: false, code, reason: code === "permission" ? "You don't have access to do this." : IMPORT_REFUSALS[code] };
     answerWith(body);

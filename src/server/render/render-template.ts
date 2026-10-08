@@ -10,24 +10,17 @@ import {
   checkVersion,
   consumerRequired,
   previewForbidden,
-  renderFailed,
-  resolveDocument,
-  resolveInlineField,
   templateNotFound,
   unknownConsumer,
-  validateValues,
   versionNotFound,
 } from "@/domain/render";
-import type { EmailRender, RenderDoc, RenderError, ResolveContext } from "@/domain/render/types";
+import type { RenderError } from "@/domain/render/types";
 import type { Channel, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db as appDb, type Db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
-import { renderEmail } from "./channels/email";
-import { renderPdf } from "./channels/pdf";
-import { renderWeb } from "./channels/web";
+import { runEngine, type RenderBody } from "./engine";
 import { writeRenderLog } from "./log";
-import { checkDocument } from "./schema-check";
 
 // The render pipeline behind POST /api/v1/templates/{templateId}/render. The editor preview, the
 // review screen and the simulator all come through here, so an approver sees what a customer gets.
@@ -37,8 +30,10 @@ import { checkDocument } from "./schema-check";
 //   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
 //   4 version rules (consumers only) → 409 / 410
 //   5 channel: content type allows it → 422 channel_not_allowed; version has it → 422 channel_not_enabled
-//   6 values → 422 missing_variables / invalid_values
-//   7 the body fits the editor schema, 8 resolve, 9 the channel adapter → 500 render_failed
+//   6–9 the engine (engine.ts): values → 422 missing_variables / invalid_values; the document check,
+//     resolve and the channel adapter → 500 render_failed: "… Try again.", or a reason the caller
+//     can act on (a stored document the check or the resolver refuses, or characters the PDF's
+//     fonts can't draw; see `renderFailure`)
 //  10 one render_log row, ok or error. Never values.
 
 export interface RenderInput {
@@ -56,7 +51,7 @@ export interface RenderInput {
   viewer: Viewer | null;
 }
 
-export type RenderBody = Uint8Array | string | EmailRender;
+export type { RenderBody };
 
 export type RenderResult =
   | {
@@ -233,55 +228,40 @@ async function renderVersion(
     return fail(channelNotEnabled(version.number, input.channel, version.channels));
   }
 
-  // 6. Values, canonicalized.
-  const validated = validateValues(version.variables, input.values);
-  if (!validated.ok) return fail(validated.error);
-
-  // 7–9. Anything that throws from here on is our failure, not the caller's.
-  try {
-    const ctx: ResolveContext = { variables: version.variables, values: validated.values };
-    checkDocument(version.body);
-    const doc: RenderDoc = {
+  // 6–9. The engine.
+  const result = await runEngine(
+    {
       templateId: template.id,
       templateName: template.name,
       versionNumber: version.number,
-      blocks: resolveDocument(version.body, ctx),
-    };
-    const body = await runAdapter(input.channel, doc, version, ctx);
-    return {
-      ok: true,
-      channel: input.channel,
-      versionNumber: version.number,
-      newerVersion,
-      filename: renderFilename(template.id, version.number, input.channel),
-      body,
-    };
-  } catch (error) {
-    reportFailure(template.id, version.number, input.channel, input.correlationId, error);
-    return fail(renderFailed(input.channel));
+      variables: version.variables,
+      values: input.values,
+      body: version.body,
+      emailSubject: version.emailSubject,
+      emailPreheader: version.emailPreheader,
+    },
+    input.channel,
+    at,
+  );
+  if (!result.ok) {
+    // Anything that throws from stage 7 on is our failure, not the caller's.
+    if (result.stage >= 7) reportFailure(template.id, version.number, input.channel, input.correlationId, result.cause);
+    return fail(result.error);
   }
-}
-
-async function runAdapter(channel: Channel, doc: RenderDoc, version: VersionRow, ctx: ResolveContext): Promise<RenderBody> {
-  switch (channel) {
-    case "pdf":
-      return renderPdf(doc);
-    case "web":
-      return renderWeb(doc);
-    case "email": {
-      if (version.emailSubject) checkDocument(version.emailSubject);
-      if (version.emailPreheader) checkDocument(version.emailPreheader);
-      return renderEmail(doc, {
-        subject: resolveInlineField(version.emailSubject, ctx),
-        preheader: resolveInlineField(version.emailPreheader, ctx),
-      });
-    }
-  }
+  return {
+    ok: true,
+    channel: input.channel,
+    versionNumber: version.number,
+    newerVersion,
+    filename: renderFilename(template.id, version.number, input.channel),
+    body: result.body,
+  };
 }
 
 /**
  * Server log for a failed render. The error's message line is left out: an adapter or the
- * resolver could quote document text, and with it a customer's value.
+ * resolver could quote document text, and with it a customer's value (and an unrenderable
+ * character may come from a value). The error's name says which failure it was.
  */
 function reportFailure(templateId: string, version: number | null, channel: Channel, correlationId: string, error: unknown) {
   const name = error instanceof Error ? error.name : typeof error;

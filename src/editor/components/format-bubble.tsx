@@ -1,7 +1,8 @@
 "use client";
 
 // Floating format toolbar on the official BubbleMenu (@tiptap/react/menus):
-// Bold, Italic, Underline and Link (Link swaps the bar for a small inline URL field; ⌘K opens it).
+// Bold, Italic, Underline and Link (Link swaps the bar for a small inline URL field, link-field.tsx;
+// ⌘K opens it; the field takes web, email and phone links only, and says why it refuses anything else).
 // With comments on (`comments`), selected text inside one top-level block also gets Comment (⌘⌥M), an
 // icon with its label after a divider (the one button that says its name: it starts a conversation);
 // read-only, or on a required heading (no formatting), the bar holds Comment alone.
@@ -12,8 +13,8 @@ import { isNodeRangeSelection } from "@tiptap/extension-node-range";
 import { NodeSelection, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { Bold, Check, Italic, Link2, MessageSquarePlus, Underline, Unlink } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Bold, Italic, Link2, MessageSquarePlus, Underline } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { headingsIn } from "../extensions/required-sections";
 import { cx } from "../lib/cx";
@@ -21,7 +22,7 @@ import { useViewDom } from "../lib/editor-view";
 import { isApple } from "../lib/platform";
 import type { CommentRequest } from "../types";
 import { FOCUS_RING } from "./classes";
-import { Input } from "@/components/ui/input";
+import { LinkField } from "./link-field";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Toggle } from "@/components/ui/toggle";
 
@@ -290,79 +291,4 @@ function CommentButton({ onClick }: { onClick: () => void }) {
       </Tooltip.Portal>
     </Tooltip.Root>
   );
-}
-
-function LinkField({
-  editor,
-  initialHref,
-  hasLink,
-  onClose,
-}: {
-  editor: Editor;
-  initialHref: string;
-  hasLink: boolean;
-  onClose: () => void;
-}) {
-  const [href, setHref] = useState(initialHref);
-
-  const apply = (event: FormEvent) => {
-    event.preventDefault();
-    const value = normalizeHref(href);
-    const chain = editor.chain().focus().extendMarkRange("link");
-    if (value) chain.setLink({ href: value }).run();
-    else chain.unsetLink().run();
-    onClose();
-  };
-
-  const remove = () => {
-    editor.chain().focus().extendMarkRange("link").unsetLink().run();
-    onClose();
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-      editor.commands.focus();
-    }
-  };
-
-  return (
-    <form onSubmit={apply} className="flex items-center gap-1">
-      <Input
-        autoFocus
-        type="text"
-        inputMode="url"
-        aria-label="Link address"
-        value={href}
-        onChange={(event) => setHref(event.target.value)}
-        onKeyDown={onKeyDown}
-        className="h-8 w-64 rounded-md border-transparent bg-surface-sunken px-2.5 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
-      />
-      <Button type="submit" size="icon-sm" variant="ghost" aria-label="Apply link" className={cx("size-8 text-label hover:bg-hover hover:text-text", FOCUS_RING)}>
-        <Check {...ICON} />
-      </Button>
-      {hasLink ? (
-        <Button
-          type="button"
-          size="icon-sm"
-          variant="ghost"
-          aria-label="Remove link"
-          className={cx("size-8 text-label hover:bg-hover hover:text-text", FOCUS_RING)}
-          onClick={remove}
-        >
-          <Unlink {...ICON} />
-        </Button>
-      ) : null}
-    </form>
-  );
-}
-
-/** Adds https:// to bare domains; keeps mailto:, tel:, anchors and relative paths. */
-function normalizeHref(input: string): string {
-  const value = input.trim();
-  if (!value) return "";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("/") || value.startsWith("#")) return value;
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
-  return `https://${value}`;
 }

@@ -1,8 +1,11 @@
 "use client";
 
 // Notion-style block handle on the OFFICIAL DragHandle (@tiptap/extension-drag-handle-react):
-// a + that inserts a block below and opens the `/` menu, and a ⋮⋮ grip that drags the block.
-// Centered on each block's first line. Never rendered in read-only mode.
+// a + that inserts a block below and opens the `/` menu, and a ⋮⋮ grip that drags the block, or,
+// clicked, opens the block menu (components/block-menu.tsx: numbering). Alt+F10 from the caret opens
+// the same menu for the caret's block (in a table cell it stays the table's, unless the caret is in
+// a numbered list there). A second click on the grip closes the menu. Centered on each block's first
+// line. Never rendered in read-only mode.
 // Required section headings show the + only: they can't be dragged.
 
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
@@ -11,10 +14,12 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import { GripVertical, Plus } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isRequiredHeading } from "../extensions/required-sections";
 import { useViewDom } from "../lib/editor-view";
 import { insertBlockBelow } from "../lib/insert-below";
+import { keyboardBlockAt } from "../lib/list-numbering";
+import { GripBlockMenu, GripTrigger, KeyboardBlockMenu } from "./block-menu";
 import type { SlashMenuController } from "./slash-menu";
 
 // Stable reference: the React DragHandle re-registers its plugin when this object changes.
@@ -28,6 +33,55 @@ type Current = { node: PMNode | null; pos: number };
 export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMenuController }) {
   const current = useRef<Current>({ node: null, pos: -1 });
   const bar = useRef<HTMLDivElement>(null);
+  const [grip, setGrip] = useState<HTMLElement | null>(null);
+  // The block menu, from the grip (under it) or the keyboard (from a button in the gutter).
+  const [gripMenu, setGripMenu] = useState<{ blockPos: number; open: boolean } | null>(null);
+  const [keyMenu, setKeyMenu] = useState<{ blockPos: number } | null>(null);
+  const menuOpen = useRef(false);
+
+  // While the grip's menu is open the handle stays on its block (no following the pointer, no hiding,
+  // no dragging): the DragHandle's own lock.
+  const lockHandle = (locked: boolean) => {
+    if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta("lockDragHandle", locked));
+  };
+  const openGripMenu = () => {
+    const { node, pos } = current.current;
+    // Still closing (its exit animation): the next click opens it again.
+    if (gripMenu || !node || pos < 0 || editor.isDestroyed || isRequiredHeading(node)) return;
+    menuOpen.current = true;
+    lockHandle(true);
+    setGripMenu({ blockPos: pos, open: true });
+  };
+  const onGripMenuOpenChange = (open: boolean) => {
+    if (!open) setGripMenu((menu) => (menu ? { ...menu, open: false } : menu));
+  };
+  const gripMenuClosed = () => {
+    menuOpen.current = false;
+    setGripMenu(null);
+    lockHandle(false);
+  };
+
+  // Alt+F10 in the text: the block menu for the caret's block. Caught on the way down (capture, on
+  // the document's parent) so the table control's own Alt+F10 doesn't also act when the caret is in
+  // a numbered list inside a cell; anywhere else in a table, it's left to the table control.
+  useViewDom(editor, (dom) => {
+    const parent = dom.parentElement;
+    if (!parent) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "F10" || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      if (!(event.target instanceof Node) || !dom.contains(event.target) || editor.isDestroyed) return;
+      // The document's current editor only (TipTap marks its element with it): a re-created editor
+      // can share the element with one that is on its way out.
+      if ((dom as HTMLElement & { editor?: unknown }).editor !== editor) return;
+      const at = keyboardBlockAt(editor.state);
+      if (!at) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setKeyMenu({ blockPos: at.blockPos });
+    };
+    parent.addEventListener("keydown", onKeyDown, true);
+    return () => parent.removeEventListener("keydown", onKeyDown, true);
+  });
 
   // A required heading can't be dragged: cancel the drag before the DragHandle starts it (capture
   // on the handle's parent runs ahead of the handle's own listener).
@@ -103,44 +157,59 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
   };
 
   const hideWhenLeaving = (event: React.MouseEvent) => {
-    if (editor.isDestroyed) return;
+    if (editor.isDestroyed || menuOpen.current) return;
     const to = event.relatedTarget;
     if (to instanceof Node && editor.view.dom.contains(to)) return;
     editor.view.dispatch(editor.state.tr.setMeta("hideDragHandle", true));
   };
 
   return (
-    <DragHandle
-      editor={editor}
-      className="ucomp-block-handle"
-      computePositionConfig={POSITION}
-      getReferencedVirtualElement={firstLineRect}
-      onNodeChange={({ node, pos }) => {
-        current.current = { node, pos };
-        if (isRequiredHeading(node)) bar.current?.setAttribute("data-required", "");
-        else bar.current?.removeAttribute("data-required");
-      }}
-      onElementDragEnd={settleSelection}
-    >
-      <div ref={bar} className="group/handle flex items-center gap-px pr-1.5 data-typing:invisible" onMouseLeave={hideWhenLeaving}>
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label="Insert block below"
-          className={BUTTON}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={insertBelow}
+    <>
+      <GripBlockMenu
+        editor={editor}
+        blockPos={gripMenu?.blockPos ?? null}
+        open={gripMenu?.open ?? false}
+        onOpenChange={onGripMenuOpenChange}
+        onClosed={gripMenuClosed}
+        anchor={grip}
+      >
+        <DragHandle
+          editor={editor}
+          className="ucomp-block-handle"
+          computePositionConfig={POSITION}
+          getReferencedVirtualElement={firstLineRect}
+          onNodeChange={({ node, pos }) => {
+            current.current = { node, pos };
+            if (isRequiredHeading(node)) bar.current?.setAttribute("data-required", "");
+            else bar.current?.removeAttribute("data-required");
+          }}
+          onElementDragEnd={settleSelection}
         >
-          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-        </button>
-        <div
-          aria-label="Drag to move block"
-          role="img"
-          className={`${BUTTON} cursor-grab active:cursor-grabbing group-data-required/handle:invisible`}
-        >
-          <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
-        </div>
-      </div>
-    </DragHandle>
+          <div ref={bar} className="group/handle flex items-center gap-px pr-1.5 data-typing:invisible" onMouseLeave={hideWhenLeaving}>
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Insert block below"
+              className={BUTTON}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={insertBelow}
+            >
+              <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+            </button>
+            <GripTrigger
+              ref={setGrip}
+              open={gripMenu?.open ?? false}
+              onOpenChange={(open) => (open ? openGripMenu() : onGripMenuOpenChange(false))}
+              className={`${BUTTON} cursor-grab active:cursor-grabbing group-data-required/handle:invisible data-popup-open:bg-hover data-popup-open:text-text-muted`}
+            >
+              <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
+            </GripTrigger>
+          </div>
+        </DragHandle>
+      </GripBlockMenu>
+      {keyMenu ? (
+        <KeyboardBlockMenu key={keyMenu.blockPos} editor={editor} blockPos={keyMenu.blockPos} onClose={() => setKeyMenu(null)} />
+      ) : null}
+    </>
   );
 }

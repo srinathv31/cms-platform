@@ -5,6 +5,11 @@ import type { JSONContent } from "@tiptap/core";
 
 export type { JSONContent };
 
+/** A JSON value that can be a node: an object that isn't an array. Anything else, the schema parse refuses. */
+export function isNode(value: unknown): value is JSONContent {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export const VARIABLE_TYPES = [
   "text",
   "currency",

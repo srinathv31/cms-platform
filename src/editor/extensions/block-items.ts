@@ -32,6 +32,10 @@ export interface BlockItem {
   apply: (chain: ChainedCommands) => ChainedCommands;
 }
 
+/**
+ * Inside a table, at any depth (a list in a cell included): a cell holds paragraphs and lists only,
+ * so headings, tables, callouts and dividers aren't offered there.
+ */
 const inTable = (editor: Editor) => editor.isActive("table");
 
 export const BLOCK_ITEMS: readonly BlockItem[] = [
@@ -49,7 +53,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     label: `Heading ${level}`,
     keywords: ["heading", "title", "section", `h${level}`],
     shortcut: ["Mod", "Alt", String(level)],
-    isAvailable: (editor) => editor.can().setHeading({ level }),
+    // The schema keeps headings out of a cell's own paragraphs, but a list item in a cell could take one.
+    isAvailable: (editor) => !inTable(editor) && editor.can().setHeading({ level }),
     apply: (chain) => chain.setHeading({ level }),
   })),
   {
@@ -87,7 +92,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     label: "Divider",
     keywords: ["divider", "rule", "line", "separator", "hr"],
     markdown: "---",
-    isAvailable: (editor) => editor.can().setHorizontalRule(),
+    // Table cells hold paragraphs and lists only: a rule there would split the table.
+    isAvailable: (editor) => !inTable(editor) && editor.can().setHorizontalRule(),
     apply: (chain) => chain.setHorizontalRule(),
   },
 ];

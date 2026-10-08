@@ -66,7 +66,7 @@ export function registerFonts(): void {
   const families = Font.getRegisteredFonts();
   families.Helvetica.sources = families[SANS].sources;
   // No dictionary hyphenation: it splits names ("Feather-stone-haugh"). The adapter breaks lines
-  // itself (pdf-text.ts) and cuts inside a word only when the word is wider than its line.
+  // itself (pdf-text.ts) and cuts inside a word, bare, only when the word is wider than its line.
   Font.registerHyphenationCallback((word) => [word]);
   registered = true;
 }
@@ -91,16 +91,63 @@ const descriptor = (face: FontFace) => ({
 
 let loading: Promise<void> | null = null;
 
-/** Registers and loads every face. The first call parses the TTFs; later calls resolve at once. */
+/**
+ * Registers and loads every face, and primes each font's glyph cache (below). The first call parses
+ * the TTFs; later calls resolve at once. Nothing may measure or lay out text before it resolves.
+ */
 export function loadFonts(): Promise<void> {
   registerFonts();
-  loading ??= Promise.all(MEASURED_FACES.map((face) => Font.load(descriptor(face)))).then(() => undefined);
+  loading ??= Promise.all(MEASURED_FACES.map((face) => Font.load(descriptor(face)))).then(() => {
+    for (const face of MEASURED_FACES) {
+      primeGlyphCache(loadedFont(face.family, face));
+      primeGlyphCache(loadedFont(FALLBACK_FAMILY, face));
+    }
+  });
   return loading;
 }
 
-interface Measurable {
+/** The parts of a fontkit font the adapter uses. */
+interface LoadedFont {
   unitsPerEm: number;
+  characterSet: number[];
   layout(text: string): { advanceWidth: number };
+  hasGlyphForCodePoint(codePoint: number): boolean;
+  glyphForCodePoint(codePoint: number): { id: number; codePoints: number[] };
+}
+
+// ── The glyph cache ──────────────────────────────────────────────────────────
+//
+// fontkit caches each glyph object the first time any lookup reaches it, with the code points of
+// that lookup, and keeps it for the life of the font (here, the process). Characters that share a
+// glyph then all read as the first one: the code points decide what the PDF's text layer says the
+// glyph is, and react-pdf's layout reads them too (it hangs a line's leading glyphs into the margin
+// only when their code point is U+0020, and it drops soft hyphens). Unprimed, a document whose first
+// hyphen-shaped character was a soft hyphen (U+00AD) took every "-" out of every later PDF, and one
+// that began with a no-break space indented later documents' leading spaces twice and wrote their
+// U+0020s as U+00A0. So each font's cache is filled once, right after loading, in a fixed order:
+// every code point the font maps, lowest first, private-use code points last. A shared glyph reads
+// as its lowest code point: a space as U+0020 (not U+00A0), "-" as U+002D (not U+00AD), "·" as
+// U+00B7 (not U+2219), "ﬁ" as U+FB01 (not its private-use twin). The .notdef glyph is reached
+// first through "\n", which react-pdf lays out at every line break (no font maps it).
+
+const primed = new WeakSet<LoadedFont>();
+const isPrivateUse = (codePoint: number) => (codePoint >= 0xe000 && codePoint <= 0xf8ff) || codePoint >= 0xf0000;
+
+function primeGlyphCache(font: LoadedFont): void {
+  if (primed.has(font)) return;
+  font.glyphForCodePoint(0x0a);
+  const order = [...font.characterSet].sort((a, b) => Number(isPrivateUse(a)) - Number(isPrivateUse(b)) || a - b);
+  for (const codePoint of order) font.glyphForCodePoint(codePoint);
+  primed.add(font);
+}
+
+const faceKey = (face: FontFace) => `${face.family}|${face.weight}|${face.italic ? 1 : 0}`;
+
+/** The loaded font file react-pdf sets `face` with, from `family` (the face's own, or the fallback). */
+function loadedFont(family: string, face: FontFace): LoadedFont {
+  const font = Font.getFont({ ...descriptor(face), fontFamily: family })?.data as LoadedFont | null | undefined;
+  if (!font) throw new Error(`PDF font not loaded: ${family} ${faceKey(face)}`);
+  return font;
 }
 
 const widthCache = new Map<string, number>();
@@ -108,14 +155,78 @@ const widthCache = new Map<string, number>();
 /** The advance width of `text` in points, as react-pdf will set it. Call after `loadFonts()`. */
 export function measure(text: string, face: FontFace, size: number): number {
   if (text.length === 0) return 0;
-  const key = `${face.family}|${face.weight}|${face.italic ? 1 : 0}|${text}`;
+  const key = `${faceKey(face)}|${text}`;
   let em = widthCache.get(key);
   if (em === undefined) {
-    const font = Font.getFont(descriptor(face))?.data as Measurable | null | undefined;
-    if (!font) throw new Error(`PDF font not loaded: ${key}`);
+    const font = loadedFont(face.family, face);
     em = font.layout(text).advanceWidth / font.unitsPerEm;
     if (widthCache.size > 20_000) widthCache.clear();
     widthCache.set(key, em);
   }
   return em * size;
+}
+
+// ── Glyph coverage ───────────────────────────────────────────────────────────
+
+/** react-pdf's last-resort family, pointed at Liberation Sans in `registerFonts`. */
+const FALLBACK_FAMILY = "Helvetica";
+
+const coverage = new Map<string, boolean>();
+
+/**
+ * Whether the PDF can draw `codePoint` in `face`. react-pdf sets each character in the face's own
+ * font when that font has a glyph for it, otherwise in its fallback family (Liberation Sans, in the
+ * face's weight and style). A character neither has would print as an empty box (.notdef) or not at
+ * all. Call after `loadFonts()`.
+ */
+export function canDraw(codePoint: number, face: FontFace): boolean {
+  const key = `${faceKey(face)}|${codePoint}`;
+  let ok = coverage.get(key);
+  if (ok === undefined) {
+    ok = drawingFont(codePoint, face) !== null;
+    coverage.set(key, ok);
+  }
+  return ok;
+}
+
+/** The font react-pdf sets `codePoint` in for `face`: the face's own, else the fallback; null if neither has it. */
+function drawingFont(codePoint: number, face: FontFace): LoadedFont | null {
+  const own = loadedFont(face.family, face);
+  if (own.hasGlyphForCodePoint(codePoint)) return own;
+  const fallback = loadedFont(FALLBACK_FAMILY, face);
+  return fallback.hasGlyphForCodePoint(codePoint) ? fallback : null;
+}
+
+/**
+ * Whether react-pdf hangs `codePoint` into the margin when it begins a line. Its layout counts a
+ * glyph as white space only when the glyph's code points include U+0020, which (once the cache is
+ * primed) is the font's space glyph: U+0020 itself, and U+00A0 in Liberation Sans, which draws it
+ * with the same glyph, but not in Newsreader, which has a glyph of its own for it.
+ */
+export function hangsAtLineStart(codePoint: number, face: FontFace): boolean {
+  const font = drawingFont(codePoint, face);
+  return font !== null && font.glyphForCodePoint(codePoint).codePoints.includes(0x20);
+}
+
+/**
+ * Collects the characters the PDF can't draw, once each, in the order they are first checked (the
+ * adapter checks in document order, the footer last). The adapter refuses to render when any are
+ * found (docs/render-spec.md, "PDF" and "Errors"): no tofu boxes, no silent drops.
+ */
+export class GlyphCheck {
+  readonly #missing = new Map<number, string>();
+
+  /** Checks every character of `text` against the face that will draw it. */
+  check(text: string, face: FontFace): void {
+    for (const ch of text) {
+      const codePoint = ch.codePointAt(0) ?? 0;
+      if (codePoint >= 0x20 && codePoint < 0x7f) continue; // printable ASCII: every face has it
+      if (!this.#missing.has(codePoint) && !canDraw(codePoint, face)) this.#missing.set(codePoint, ch);
+    }
+  }
+
+  /** The characters found so far, in order. */
+  get missing(): string[] {
+    return [...this.#missing.values()];
+  }
 }

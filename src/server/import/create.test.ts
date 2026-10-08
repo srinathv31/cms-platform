@@ -3,10 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client } from "@libsql/client";
 import { eq } from "drizzle-orm";
+import JSZip from "jszip";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { IMPORT_LIMITS, IMPORT_REFUSALS, type ImportResponse } from "@/domain/import-types";
 import { REASONS } from "@/domain/permissions";
+import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
+import { prepareBody } from "@/server/documents/prepare";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -50,6 +53,21 @@ afterAll(() => {
 });
 
 const fixture = (name: string) => new Uint8Array(readFileSync(`e2e/fixtures/import/${name}`));
+
+/** A minimal .docx whose body is `bodyXml` (WordprocessingML). */
+async function docx(bodyXml: string): Promise<Uint8Array> {
+  const zip = new JSZip();
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+  );
+  zip.file(
+    "_rels/.rels",
+    `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+  );
+  zip.file("word/document.xml", `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${bodyXml}</w:body></w:document>`);
+  return new Uint8Array(await zip.generateAsync({ type: "uint8array" }));
+}
 const run = (who: string, file: { name: string; bytes: Uint8Array } | null, teamSlug = "coral-offers") =>
   importTemplate(people[who]!, { teamSlug, file }, { uploadsRoot: root });
 
@@ -147,6 +165,32 @@ describe("importTemplate", () => {
     expect(importStatus(res)).toBe(status);
     expect(await db.select().from(templates)).toHaveLength(before.length);
     expect(readdirSync(root)).toHaveLength(folders);
+  });
+
+  it("refuses a document the check refuses (merged cells that overlap), with the check's sentence, writing nothing", async () => {
+    // Row 3's two vertically merged cells continue C (row 2, two columns wide) and B (row 1): B then
+    // spans rows 1 and 2, over C's second column. Normalization can't fix that without guessing.
+    const cell = (text: string, props = "") => `<w:tc><w:tcPr>${props}</w:tcPr><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
+    const rows = [
+      cell("A") + cell("B"),
+      cell("C", '<w:gridSpan w:val="2"/>'),
+      cell("", "<w:vMerge/>") + cell("", "<w:vMerge/>"),
+    ];
+    const bytes = await docx(`<w:p><w:r><w:t>Fees</w:t></w:r></w:p><w:tbl>${rows.map((r) => `<w:tr>${r}</w:tr>`).join("")}</w:tbl>`);
+    const before = await db.select().from(templates);
+    const folders = readdirSync(root).length;
+    const res = await run("maya", { name: "merged.docx", bytes });
+    expect(res).toEqual({ ok: false, code: "content", reason: `${IMPORT_REFUSALS.content} ${DOCUMENT_MESSAGES.tableShape}` });
+    expect(importStatus(res)).toBe(400);
+    expect(await db.select().from(templates)).toHaveLength(before.length);
+    expect(readdirSync(root)).toHaveLength(folders);
+  });
+
+  it("stores the body exactly as an autosave of it would store it", async () => {
+    const res = ok(await run("maya", { name: "Spring offer.docx", bytes: fixture("spring-offer.docx") }));
+    const draft = await db.query.versions.findFirst({ where: eq(versions.templateId, res.templateId) });
+    expect(prepareBody(draft!.body)).toEqual({ ok: true, doc: draft!.body });
+    expect(JSON.stringify(draft!.body)).not.toMatch(/"(?:align|colwidth|type)":null/);
   });
 
   it("removes the upload's folder when the transaction fails", async () => {

@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { BAD_REQUEST_MESSAGES, badRequest, consumerRequired, renderFailed } from "@/domain/render";
+import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
@@ -39,18 +40,24 @@ const FIELD_MESSAGES: Readonly<Record<string, string>> = {
 
 type Parsed = { ok: true; body: RequestBody } | { ok: false; error: RenderError };
 
+/**
+ * The body, checked. A JSON number in `values` becomes its exact source text ({"apr": 21.90} is
+ * "21.90", not 21.9), so it follows the same grammar as a string (rule: digits are never rewritten).
+ */
 function parseBody(text: string): Parsed {
-  let json: unknown;
+  let read: JsonWithNumberText;
   try {
-    json = JSON.parse(text);
+    read = parseJsonWithNumberText(text);
   } catch {
     return { ok: false, error: badRequest(BAD_REQUEST_MESSAGES.body) };
   }
+  const { json, numbersAsText } = read;
   const required = ["version", "channel", "values"];
   if (!isPlainObject(json) || !required.every((key) => Object.hasOwn(json, key))) {
     return { ok: false, error: badRequest(BAD_REQUEST_MESSAGES.body) };
   }
-  const parsed = RequestBody.safeParse(json);
+  const values = isPlainObject(json.values) ? numbersAsText(json.values) : json.values;
+  const parsed = RequestBody.safeParse({ ...json, values });
   if (!parsed.success) {
     const field = String(parsed.error.issues[0]?.path[0] ?? "");
     return { ok: false, error: badRequest(FIELD_MESSAGES[field] ?? BAD_REQUEST_MESSAGES.body) };

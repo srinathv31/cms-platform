@@ -58,6 +58,11 @@ export const IMPORT_REFUSALS = {
   pdfNoText: "This PDF has no text to import.",
   pdfLocked: "This PDF is password-protected.",
   pdfPages: "This PDF has more than 50 pages.",
+  /**
+   * The converted document fails the document check (docs/render-spec.md §3), e.g. a table whose
+   * merged cells don't line up. The response's reason is this line, then the check's own sentence.
+   */
+  content: "This file can't be imported as it is.",
 } as const;
 export type ImportRefusalCode = keyof typeof IMPORT_REFUSALS;
 
@@ -205,7 +210,7 @@ export interface FinishImportInput {
 //   A route handler, not a server action: actions cap bodies at 1 MB unless next.config changes.
 //   Permission: can(viewer, "template.create", { teamId }) first, before the body is read (403 with
 //   the refusal reason); then the body is read with a byte counter, refused (413) past 10 MB + 64 KB.
-//   Status: 200 ok · 400 refused (empty/unreadable/too long/no text/locked/pages) · 403 · 413 size · 415 type.
+//   Status: 200 ok · 400 refused (empty/unreadable/too long/no text/locked/pages/content) · 403 · 413 size · 415 type.
 //   On success it sets JUST_CREATED_COOKIE (the name is selected on arrival) and JUST_IMPORTED_COOKIE
 //   (the rail opens on Original on arrival), and revalidates the Library; the client then
 //   router.push(href). Audit: "template.created" with details { name, source: "import:<kind>", filename }.

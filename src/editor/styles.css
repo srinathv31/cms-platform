@@ -174,6 +174,8 @@
   padding-left: 1.5em;
 }
 
+/* The browser's own markers, for HTML the editor didn't draw (an imported Word file shown as its
+   source). Documents never use them: see "Drawn markers" below. */
 .ucomp-doc ul {
   list-style: disc;
 }
@@ -213,6 +215,47 @@
 .ucomp-doc li::marker {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Drawn markers: every list item of a document carries the exact text every channel prints
+   (`data-list-marker`: "1.", "(b)", "iv)", "•"), from extensions/list-markers.ts, as a decoration in
+   the live editor and an attribute in the static render. CSS counters can't write "(a)" or the
+   out-of-range fallbacks the same way, so the browser's marker is off and the text is drawn in a
+   column of its own, right-aligned against the item's text.
+   The list is a two-column grid and each item spans it (subgrid): markers in the first column,
+   the item's blocks in the second. The marker column is the list's usual indent, or as wide as its
+   widest marker ("9999.", "mmmdccclxxxviii.") when that is wider, so a marker never hangs out of
+   the list into the block handle's gutter, and every item of a list starts its text at one edge. */
+.ucomp-doc :is(ul, ol):has(> li[data-list-marker]) {
+  display: grid;
+  grid-template-columns: minmax(1.75em, max-content) minmax(0, 1fr);
+  padding-left: 0;
+}
+
+.ucomp-doc li[data-list-marker] {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-content: start;
+  padding-left: 0;
+  list-style: none;
+}
+
+.ucomp-doc li[data-list-marker] > * {
+  grid-column: 2;
+}
+
+.ucomp-doc li[data-list-marker]::before {
+  content: attr(data-list-marker);
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  padding-right: 0.55em;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* ── Tables (hairlines, tinted header) ────────────────────────── */

@@ -1,6 +1,18 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { ATTR_BREAK, FULL_DOC, HOSTILE_DOC } from "./__fixtures__/web-email-docs";
+import {
+  ATTR_BREAK,
+  FULL_DOC,
+  HOSTILE_DOC,
+  br,
+  bullets,
+  cellOf,
+  docOf,
+  heading,
+  numbered,
+  para,
+  t,
+} from "./__fixtures__/web-email-docs";
 import { PALETTE } from "./look";
 import { renderWeb } from "./web";
 
@@ -12,6 +24,19 @@ function parse(html: string): Document {
 const html = renderWeb(FULL_DOC);
 const dom = parse(html);
 const body = dom.querySelector("main")!;
+const css = dom.querySelector("style")!.textContent!;
+
+/** The <main> markup of a document. */
+const main = (...blocks: Parameters<typeof docOf>) => {
+  const out = renderWeb(docOf(...blocks));
+  return out.slice(out.indexOf('<main class="doc">\n') + 19, out.indexOf("\n</main>"));
+};
+
+/** The declarations of the stylesheet rule whose selector is exactly `selector`. */
+const rule = (selector: string) => {
+  const found = css.split("}").find((r) => r.split("{")[0] === selector);
+  return found?.split("{")[1] ?? "";
+};
 
 describe("renderWeb: the document", () => {
   it("is a complete HTML document with lang, charset, viewport and the template name as title", () => {
@@ -35,12 +60,15 @@ describe("renderWeb: the document", () => {
   });
 
   it("styles a readable, responsive measure", () => {
-    const css = dom.querySelector("style")!.textContent!;
     expect(css).toContain("max-width:42rem");
     expect(css).toContain("line-height:1.6");
     expect(css).toContain("overflow-wrap:anywhere");
     expect(css).toMatch(/\.table-wrap\{[^}]*overflow-x:auto/);
     expect(css).toMatch(/system-ui/);
+  });
+
+  it("gives the same bytes for the same document", () => {
+    expect(renderWeb(FULL_DOC)).toBe(html);
   });
 });
 
@@ -80,24 +108,6 @@ describe("renderWeb: blocks", () => {
     expect(p.querySelectorAll("br")).toHaveLength(2);
   });
 
-  it("drops blank paragraphs", () => {
-    expect([...body.querySelectorAll("p")].filter((p) => p.textContent?.trim() === "")).toHaveLength(0);
-  });
-
-  it("renders bullet, nested and ordered lists, with the start number", () => {
-    const ul = body.querySelector("main > ul")!;
-    expect(ul.children).toHaveLength(2);
-    expect(ul.children[0]!.textContent).toBe("Open your account by March 4, 2027.");
-    expect(ul.querySelector("li > ul > li")?.textContent).toBe("Balance transfers don't count.");
-    const ol = body.querySelector("ol")!;
-    expect(ol.getAttribute("start")).toBe("3");
-    expect([...ol.children].map((li) => li.textContent)).toEqual(["Sign in.", "Choose Redeem."]);
-  });
-
-  it("puts a single-paragraph list item's text straight in the <li>", () => {
-    expect(body.querySelector("ol > li")!.innerHTML).toBe("Sign in.");
-  });
-
   it("renders tables with a header row, scopes and spans, inside a scroll wrapper", () => {
     const wrap = body.querySelector(".table-wrap")!;
     const table = wrap.querySelector("table")!;
@@ -111,6 +121,12 @@ describe("renderWeb: blocks", () => {
     const spanned = rows[1]!.querySelector("td")!;
     expect(spanned.getAttribute("colspan")).toBe("2");
     expect(spanned.querySelectorAll("p")).toHaveLength(2);
+  });
+
+  it("keeps a cell whose content was removed, empty", () => {
+    expect(main({ type: "table", id: null, columns: 2, rows: [{ cells: [cellOf([]), cellOf([para(null, t("x"))])] }] })).toContain(
+      "<tr><td></td><td><p>x</p></td></tr>",
+    );
   });
 
   it("renders callouts as a note with an (i) glyph drawn as inline SVG", () => {
@@ -128,14 +144,13 @@ describe("renderWeb: blocks", () => {
   });
 
   it("styles callouts like the PDF's: stone tint and hairline, its radius and padding, no accent rule", () => {
-    const css = dom.querySelector("style")!.textContent!;
-    const callout = css.match(/\.callout\{([^}]*)\}/)![1];
+    const callout = rule(".callout");
     expect(callout).toContain(`background:${PALETTE.callout.fill}`);
     expect(callout).toContain(`border:1px solid ${PALETTE.callout.line}`);
     expect(callout).toContain("border-radius:0.4em");
     expect(callout).toContain("padding:0.9em 1.2em 0.9em 3em");
     expect(callout).not.toContain("border-left");
-    const glyph = css.match(/\.callout-glyph\{([^}]*)\}/)![1];
+    const glyph = rule(".callout-glyph");
     expect(glyph).toContain(`color:${PALETTE.callout.glyph}`);
     expect(glyph).toContain("left:1.1em");
     expect(glyph).toContain("width:1.05em");
@@ -143,6 +158,125 @@ describe("renderWeb: blocks", () => {
 
   it("renders the rule", () => {
     expect(body.querySelectorAll("hr")).toHaveLength(1);
+  });
+
+  it("renders every paragraph of the document, blank ones included", () => {
+    const count = (blocks: readonly { type: string }[]): number =>
+      blocks.reduce((n, b) => {
+        const block = b as (typeof FULL_DOC.blocks)[number];
+        if (block.type === "paragraph") return n + 1;
+        if (block.type === "list") return n + block.items.reduce((m, item) => m + count(item.content), 0);
+        if (block.type === "table") return n + block.rows.reduce((m, row) => m + row.cells.reduce((k, c) => k + count(c.content), 0), 0);
+        if (block.type === "callout") return n + block.content.length;
+        return n;
+      }, 0);
+    expect(body.querySelectorAll("p")).toHaveLength(count(FULL_DOC.blocks));
+  });
+});
+
+describe("renderWeb: lists print the RenderDoc's markers as text", () => {
+  it("turns off the browser's numbering and never writes start or type", () => {
+    expect(rule("ul,ol")).toContain("list-style:none");
+    expect(html).not.toMatch(/<ol[^>]*\b(start|type)=/);
+    expect(css).not.toMatch(/list-style-type|counter\(/);
+  });
+
+  it("prints each item's marker as text, before the item's content", () => {
+    const ul = body.querySelector("main > ul")!;
+    expect([...ul.children].map((li) => li.querySelector(".marker")!.textContent)).toEqual(["\u2022", "\u2022"]);
+    expect(ul.children[0]!.innerHTML).toBe('<span class="marker">\u2022</span><div><p>Open your account by March 4, 2027.</p></div>');
+    expect(ul.querySelector("li > div > ul > li")!.textContent).toBe("\u25E6Balance transfers don't count.");
+    const ol = body.querySelector("ol")!;
+    expect([...ol.children].map((li) => li.textContent)).toEqual(["3.Sign in.", "4.Choose Redeem."]);
+  });
+
+  it.each([
+    [numbered(4, "lower-roman", "parens", [para(null, t("x"))]), "(iv)"],
+    [numbered(0, "decimal", "period", [para(null, t("x"))]), "0."],
+    [numbered(10000, "decimal", "paren-right", [para(null, t("x"))]), "10000)"],
+    [numbered(27, "upper-alpha", "period", [para(null, t("x"))]), "AA."],
+    [bullets("square", [para(null, t("x"))]), "\u25AA"],
+  ])("prints the marker it is given: %#", (list, marker) => {
+    expect(main(list)).toContain(`<li><span class="marker">${marker}</span><div><p>x</p></div></li>`);
+  });
+
+  it("lays items out as a hanging indent: markers right-aligned in their own column", () => {
+    expect(rule("ul,ol")).toContain("display:grid");
+    expect(rule("li")).toContain("grid-template-columns:subgrid");
+    expect(rule(".marker")).toContain("text-align:right");
+  });
+
+  it("puts an item's further blocks after its marker, in the same column as its first", () => {
+    const out = main(bullets("disc", [para(null, t("first")), para(null), bullets("circle", [para(null, t("nested"))])]));
+    expect(out).toBe(
+      [
+        "<ul>",
+        '<li><span class="marker">\u2022</span><div><p>first</p>',
+        "<p><br></p>",
+        "<ul>",
+        '<li><span class="marker">\u25E6</span><div><p>nested</p></div></li>',
+        "</ul></div></li>",
+        "</ul>",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("renderWeb: blank lines, spaces and breaks", () => {
+  it("renders a blank paragraph as one line", () => {
+    expect(main(para(null, t("A")), para(null), para(null, t("B")))).toBe("<p>A</p>\n<p><br></p>\n<p>B</p>");
+  });
+
+  it("renders blank paragraphs inside list items, cells and callouts", () => {
+    const out = main(
+      bullets("disc", [para(null)]),
+      { type: "table", id: null, columns: 1, rows: [{ cells: [cellOf([para(null)])] }] },
+      { type: "callout", id: null, content: [para(null, t("a")), para(null)] },
+    );
+    expect(out.match(/<p><br><\/p>/g)).toHaveLength(3);
+  });
+
+  it("renders an empty heading as one line of its level", () => {
+    expect(main(heading(2), para(null, t("after")))).toBe("<h2><br></h2>\n<p>after</p>");
+  });
+
+  it("styles exactly the elements that hold text pre-wrap, so spaces render as typed", () => {
+    expect(rule("p,h1,h2,h3")).toBe("white-space:pre-wrap");
+    // Block containers aren't: their source newlines between children would show as lines.
+    expect(css).not.toMatch(/(?:^|[},])(?:li|td|th|ul|ol|\.callout|\.doc|body)[^{]*\{[^}]*white-space:pre/);
+  });
+
+  it("writes spaces as typed: leading, trailing and runs, across runs and after a break", () => {
+    expect(main(para(null, t("   Lead"), t("  a  ", { bold: true }), t("b   "), br, t("    indented")))).toBe(
+      "<p>   Lead<strong>  a  </strong>b   <br>    indented</p>",
+    );
+  });
+
+  it("writes a paragraph of spaces as a line holding them", () => {
+    expect(main(para(null, t("   ")), para(null, t("x")))).toBe("<p>   </p>\n<p>x</p>");
+  });
+
+  it("writes every no-break space as &nbsp;", () => {
+    expect(main(para(null, t("a\u00A0\u00A0b")))).toBe("<p>a&nbsp;&nbsp;b</p>");
+    expect(parse(renderWeb({ ...docOf(), templateName: "A\u00A0B" })).head.innerHTML).toContain("<title>A&nbsp;B</title>");
+  });
+
+  it("keeps a break at the start of a paragraph", () => {
+    expect(main(para(null, br, t("x")))).toBe("<p><br>x</p>");
+  });
+});
+
+describe("renderWeb: links", () => {
+  it("writes a link's normalized href, and no link for one that fails the link rule", () => {
+    expect(main(para(null, t("a", { href: "HTTPS://Coral.example/café" }), t(" "), t("b", { href: "https://coral.example/card terms" })))).toBe(
+      '<p><a href="https://Coral.example/caf%C3%A9">a</a> b</p>',
+    );
+  });
+
+  it("keeps a break inside a link only when the link goes on after it", () => {
+    const href = "https://coral.example";
+    expect(main(para(null, t("a", { href }), br, t("b", { href })))).toBe(`<p><a href="${href}">a<br>b</a></p>`);
+    expect(main(para(null, t("a", { href }), br, t("b")))).toBe(`<p><a href="${href}">a</a><br>b</p>`);
   });
 });
 
