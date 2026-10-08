@@ -6,10 +6,10 @@ import { createDraft } from "@/domain/lifecycle";
 import { REASONS, can } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import { defaultSampleSets } from "@/editor/model/sample-sets";
-import { ensureBlockIds } from "@/editor/schema";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { teams, uploads } from "@/server/db/schema/ucomp";
+import { prepareBody } from "@/server/documents/prepare";
 import { newId } from "@/server/ids";
 import { conformToContentType, disclosureContentType, freshTemplateId, insertNewTemplate } from "@/server/templates/create";
 import { convertFile } from "./convert";
@@ -19,8 +19,10 @@ import { defaultUploadsRoot, removeUpload, writeUpload } from "./store";
 // Import a file (Phase 7a): a .docx, .pdf or .txt becomes a new template whose first draft holds
 // its text, with `{{placeholders}}` as Text chips and the content type's required sections in place.
 // The order is the contract's (src/domain/import-types.ts): permission first, then size, kind,
-// conversion; the files are written, then ONE transaction inserts the template, the draft (with
-// `import_upload_id`), the uploads row and the audit event. If the transaction fails, the folder goes.
+// conversion, then the document check (the body is stored as src/server/documents/prepare.ts makes
+// it, as an autosave would store it); the files are written, then ONE transaction inserts the
+// template, the draft (with `import_upload_id`), the uploads row and the audit event. If the
+// transaction fails, the folder goes.
 
 export interface ImportFile {
   /** The client's file name: display text only, never a path. */
@@ -85,6 +87,9 @@ export async function importTemplate(
     size: file.bytes.byteLength,
     requiredSections: contentType.requiredSections,
   });
+  // A document the check refuses is never stored (it couldn't be rendered): nothing is written.
+  const body = prepareBody(finished.body);
+  if (!body.ok) return { ok: false, code: "content", reason: `${IMPORT_REFUSALS.content} ${body.message}` };
 
   const at = await now();
   const templateId = await freshTemplateId();
@@ -96,7 +101,7 @@ export async function importTemplate(
       {
         key: "import",
         name: finished.name,
-        body: ensureBlockIds(finished.body),
+        body: body.doc,
         variables: finished.variables,
         sampleSets: defaultSampleSets(finished.variables, at.toISOString().slice(0, 10)),
       },

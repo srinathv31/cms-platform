@@ -309,3 +309,50 @@ describe(".txt", () => {
     expect(await convertFile("txt", text("a".repeat(200_001)))).toEqual({ ok: false, code: "tooLong" });
   });
 });
+
+// ── Normalization (docs/render-spec.md §3): an import is saved like any other document ──────────
+
+describe("import normalization", () => {
+  const texts = (node: JSONContent): string[] => (node.type === "text" ? [node.text ?? ""] : (node.content ?? []).flatMap(texts));
+  const tc = (...blocks: string[]) => `<w:tc>${blocks.join("") || "<w:p/>"}</w:tc>`;
+  const tbl = (...rows: string[][]) => `<w:tbl>${rows.map((cells) => `<w:tr>${cells.join("")}</w:tr>`).join("")}</w:tbl>`;
+  const width = (table: JSONContent) => Math.max(...(table.content ?? []).map((row) => row.content?.length ?? 0));
+
+  it(".txt: a tab becomes one space", async () => {
+    const file = await converted("txt", text("Annual fee\t$95\n\nLate fee\t\tUp to $41"));
+    expect(texts(file.body)).toEqual(["Annual fee $95", "Late fee  Up to $41"]);
+  });
+
+  it(".docx: a tab becomes one space", async () => {
+    const file = await converted("docx", await docxWith(`<w:p><w:r><w:t>Fee</w:t><w:tab/><w:t>$95</w:t></w:r></w:p>`));
+    expect(texts(file.body)).toEqual(["Fee $95"]);
+  });
+
+  it(".docx: a table wider than 12 columns comes in as tables of at most 12, every cell kept", async () => {
+    const row = (prefix: string) => Array.from({ length: 14 }, (_, i) => tc(wp(`${prefix}${i + 1}`)));
+    const file = await converted("docx", await docxWith(tbl(row("h"), row("c")) + wp("after")));
+    const tables = (file.body.content ?? []).filter((b) => b.type === "table");
+    expect(tables.map(width)).toEqual([12, 2]);
+    expect(tables.flatMap(texts)).toHaveLength(28);
+    expect(tables[1].content?.map((r) => texts(r))).toEqual([
+      ["h13", "h14"],
+      ["c13", "c14"],
+    ]);
+  });
+
+  it(".docx: a table in a table cell becomes the cell's paragraphs, in reading order", async () => {
+    const inner = tbl([tc(wp("in 1")), tc(wp("in 2"))], [tc(wp("in 3")), tc(wp("in 4"))]);
+    const file = await converted("docx", await docxWith(tbl([tc(wp("before"), inner, wp("after")), tc(wp("other"))])));
+    const [table] = (file.body.content ?? []).filter((b) => b.type === "table");
+    const cell = table.content?.[0].content?.[0];
+    expect(cell?.content?.map((b) => [b.type, texts(b).join("")])).toEqual([
+      ["paragraph", "before"],
+      ["paragraph", "in 1"],
+      ["paragraph", "in 2"],
+      ["paragraph", "in 3"],
+      ["paragraph", "in 4"],
+      ["paragraph", "after"],
+    ]);
+    expect(width(table)).toBe(2);
+  });
+});

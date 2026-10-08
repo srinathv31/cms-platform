@@ -1,6 +1,7 @@
 // The network half of autosave: PUT one patch to /api/drafts/[versionId] and read the answer.
 
-import type { DraftSaveError, DraftSaveResponse } from "@/domain/types";
+import type { DraftPatch, DraftSaveError, DraftSaveResponse } from "@/domain/types";
+import { DOCUMENT_MESSAGES, normalizeAndCheckBody, normalizeAndCheckField } from "@/editor/model/document-check";
 import type { Send } from "./autosave-scheduler";
 
 /**
@@ -27,6 +28,21 @@ function isSaveResponse(value: unknown): value is DraftSaveResponse {
 }
 
 /**
+ * The server's document check (src/server/documents/prepare.ts starts with the same two calls), run
+ * before sending. A patch it would refuse is refused here with the same sentence and no request: the
+ * route's 400 would also put a "Failed to load resource" error in the browser console. The editor
+ * keeps its documents inside the limits, so this only catches what paste can still bring in (a list
+ * ten deep). Only the schema parse is left to the server.
+ */
+function refusal(patch: DraftPatch): DraftSaveResponse | null {
+  const problem =
+    (patch.body ? normalizeAndCheckBody(patch.body).problem : null) ??
+    (patch.emailSubject ? normalizeAndCheckField(patch.emailSubject).problem : null) ??
+    (patch.emailPreheader ? normalizeAndCheckField(patch.emailPreheader).problem : null);
+  return problem ? { ok: false, error: "invalid", message: DOCUMENT_MESSAGES[problem] } : null;
+}
+
+/**
  * A `Send` that talks to the route. Rejects when there is no usable answer (offline, a 5xx, a body
  * that isn't one of the route's answers), which the scheduler treats as worth retrying.
  */
@@ -34,6 +50,9 @@ export function createFetchSend(versionId: string, fetchImpl: typeof fetch = (..
   const url = `/api/drafts/${encodeURIComponent(versionId)}`;
 
   return async (patch, { keepalive }) => {
+    const refused = refusal(patch);
+    if (refused) return refused;
+
     const body = JSON.stringify(patch);
     const response = await fetchImpl(url, {
       method: "PUT",

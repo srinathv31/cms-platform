@@ -1,18 +1,29 @@
 import "server-only";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
+import { DOCUMENT_MESSAGES, documentProblem, fieldProblem, type DocumentProblem } from "@/editor/model/document-check";
 import { baseExtensions } from "@/editor/schema";
 
-// The guard between stored documents and the renderer: before a body (or an email field) is
-// resolved, it must parse against the editor's own schema. The resolver (src/domain/render/
-// resolve.ts) handles exactly that schema's nodes and marks; schema-check.test.ts fails the moment
-// the two drift apart.
+// The document check (docs/render-spec.md §3): the guard between a document and storage (autosave)
+// and between a stored document and the renderer (pipeline stage 7). A document must parse against
+// the editor's own schema, and keep the limits the schema can't express (src/editor/model/
+// document-check.ts: heading levels, list start and numbering style, list depth, cell content, table
+// shape and width). The resolver (src/domain/render/resolve.ts) handles exactly that schema's nodes
+// and marks; schema-check.test.ts fails the moment the two drift apart.
 
-/** A document that doesn't fit the editor schema (unknown node or mark, wrong nesting). */
+export { DOCUMENT_MESSAGES, type DocumentProblem };
+
+/**
+ * A document the check refuses. `message` is the author-facing sentence (DOCUMENT_MESSAGES): it
+ * never quotes the document. A schema parse failure keeps ProseMirror's reason as the `cause`.
+ */
 export class RenderDocumentError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+  readonly problem: DocumentProblem;
+
+  constructor(problem: DocumentProblem, options?: { cause?: unknown }) {
+    super(DOCUMENT_MESSAGES[problem], options);
     this.name = "RenderDocumentError";
+    this.problem = problem;
   }
 }
 
@@ -23,8 +34,11 @@ export function editorSchema(): Schema {
   return (schema ??= getSchema(baseExtensions()));
 }
 
-/** Throws a RenderDocumentError when `body` isn't a valid editor document. */
-export function checkDocument(body: JSONContent): void {
+/**
+ * Parses `body` against the editor's schema (node and mark names, where each node may go, an empty
+ * text node, duplicate marks). Throws a RenderDocumentError ("unsupported") when it doesn't parse.
+ */
+export function parseWithSchema(body: JSONContent): void {
   try {
     const node = editorSchema().nodeFromJSON(body);
     if (node.type !== editorSchema().topNodeType) {
@@ -32,7 +46,22 @@ export function checkDocument(body: JSONContent): void {
     }
     node.check();
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new RenderDocumentError(`The document doesn't fit the editor schema: ${reason}`, { cause: error });
+    throw new RenderDocumentError("unsupported", { cause: error });
   }
+}
+
+/** Throws a RenderDocumentError when `body` isn't a valid body document. */
+export function checkDocument(body: JSONContent): void {
+  // The limits first: a document can fail the parse for one of them (a heading in a cell), and the
+  // limit's sentence says what to change.
+  const problem = documentProblem(body);
+  if (problem) throw new RenderDocumentError(problem);
+  parseWithSchema(body);
+}
+
+/** Throws a RenderDocumentError when `field` isn't a valid one-line field (email subject, preheader). */
+export function checkField(field: JSONContent): void {
+  const problem = fieldProblem(field);
+  if (problem) throw new RenderDocumentError(problem);
+  parseWithSchema(field);
 }

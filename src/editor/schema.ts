@@ -4,22 +4,27 @@
 // baseExtensions()         server-safe: node/mark specs + behavior plugins, no React NodeViews.
 // editorExtensions()       client: base + chip NodeView, placeholder, `/` and `{{` menus, the
 //                          required-section guard, the section-merging paste, block moves, the
-//                          field binding (usage, drop, chip popover, paste), Home/End and
-//                          review-thread highlights.
+//                          field binding (usage, drop, chip popover, paste), Home/End,
+//                          review-thread highlights and list markers.
 // inlineFieldExtensions()  a one-line field (email subject, preheader): text + chips only.
 
-import { Node, type Extensions, type JSONContent } from "@tiptap/core";
-import { TableKit } from "@tiptap/extension-table";
+import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
+import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
 import { UniqueID, generateUniqueIds } from "@tiptap/extension-unique-id";
 import { Placeholder } from "@tiptap/extensions";
 import { StarterKit } from "@tiptap/starter-kit";
+import { normalizeLink } from "./model/links";
+import { ORDERED_LIST_ATTRS, isMarkerDelimiter, isMarkerFormat } from "./model/list-markers";
+import { CELL_BLOCKS, HEADING_LEVELS } from "./model/normalize";
 import type { Variable as VariableModel } from "./model/types";
 import type { VariableStore } from "./state/variable-store";
 import { BlockMove } from "./extensions/block-move";
 import { BlockRangeHighlight } from "./extensions/block-range-highlight";
 import { Callout } from "./extensions/callout";
+import { ContentLimits } from "./extensions/content-limits";
 import { FieldBindingExtension, type FieldBinding } from "./extensions/field-binding";
 import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
+import { ListMarkers } from "./extensions/list-markers";
 import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
@@ -41,6 +46,85 @@ export const BLOCK_ID_TYPES = [
   "callout",
   "horizontalRule",
 ] as const;
+
+/**
+ * An ordered list's numbering style (docs/render-spec.md, "Lists and markers"), stored on the
+ * orderedList node under the names in `ORDERED_LIST_ATTRS` (model/list-markers.ts). Null (or absent)
+ * means "default for the list's ordered depth": 1. → a. → i. for the format, "period" for the
+ * delimiter. Rendered as data attributes so the editor can style them; TipTap's own `type`
+ * attribute is not used.
+ */
+const ListNumbering = Extension.create({
+  name: "listNumbering",
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["orderedList"],
+        attributes: {
+          [ORDERED_LIST_ATTRS.format]: {
+            default: null,
+            parseHTML: (element) => {
+              const value = element.getAttribute("data-marker-format");
+              return isMarkerFormat(value) ? value : null;
+            },
+            renderHTML: (attributes) => {
+              const value = attributes[ORDERED_LIST_ATTRS.format];
+              return isMarkerFormat(value) ? { "data-marker-format": value } : {};
+            },
+          },
+          [ORDERED_LIST_ATTRS.delimiter]: {
+            default: null,
+            parseHTML: (element) => {
+              const value = element.getAttribute("data-marker-delimiter");
+              return isMarkerDelimiter(value) ? value : null;
+            },
+            renderHTML: (attributes) => {
+              const value = attributes[ORDERED_LIST_ATTRS.delimiter];
+              return isMarkerDelimiter(value) ? { "data-marker-delimiter": value } : {};
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
+/**
+ * Table cells hold paragraphs and lists only (docs/render-spec.md §2): no tables, headings, rules or
+ * callouts inside a cell. Paste and import move or convert anything else (model/normalize.ts).
+ */
+export const CELL_CONTENT = `(${CELL_BLOCKS.join(" | ")})+`;
+const ParagraphsAndListsCell = TableCell.extend({ content: CELL_CONTENT });
+const ParagraphsAndListsHeader = TableHeader.extend({ content: CELL_CONTENT });
+
+/**
+ * Typing "1. " to "9999. " at the start of a line starts a numbered list from that number. A longer
+ * number stays text: a list starts at 0 to 9999 (LIST_START_MAX), and typing never makes a list the
+ * document check would refuse.
+ */
+export const ORDERED_LIST_INPUT = /^(\d{1,4})\.\s$/;
+
+/**
+ * StarterKit, with the numbered list's typed rule on ORDERED_LIST_INPUT (TipTap's own takes any
+ * number of digits). The rule is otherwise TipTap's: it wraps the line, or joins the list just above
+ * when the number continues it.
+ */
+const Kit = StarterKit.extend({
+  addExtensions() {
+    return (this.parent?.() ?? []).map((extension) =>
+      extension instanceof Node && extension.name === "orderedList"
+        ? extension.extend({
+            addInputRules() {
+              return (this.parent?.() ?? []).map(
+                (rule) => new InputRule({ find: ORDERED_LIST_INPUT, handler: rule.handler, undoable: rule.undoable }),
+              );
+            },
+          })
+        : extension,
+    );
+  },
+});
 
 /** The only placeholder text in the product. */
 export const EMPTY_LINE_PLACEHOLDER = "Type / for blocks";
@@ -77,8 +161,8 @@ function variableNode(opts: InternalBaseOptions) {
 
 function buildBase(opts: InternalBaseOptions): Extensions {
   return [
-    StarterKit.configure({
-      heading: { levels: [1, 2, 3] },
+    Kit.configure({
+      heading: { levels: [...HEADING_LEVELS] },
       code: false,
       codeBlock: false,
       strike: false,
@@ -91,6 +175,8 @@ function buildBase(opts: InternalBaseOptions): Extensions {
         // Only URLs written with their protocol turn into links on their own (typed or pasted).
         // Otherwise a pasted <a href="https://…">example.com</a> would be re-linked to http://.
         shouldAutoLink: (url) => /^[a-z][a-z0-9+.-]*:\/\//i.test(url),
+        // One link check everywhere (model/links.ts): what the editor links, every channel links.
+        isAllowedUri: (url) => normalizeLink(url) !== null,
         HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
       },
       // Colored by styles.css (.ucomp-dropcursor) so it follows the brand token.
@@ -99,8 +185,14 @@ function buildBase(opts: InternalBaseOptions): Extensions {
     TableKit.configure({
       // Same DOM as the editor's TableView (div.tableWrapper > table) so static and live match.
       table: { resizable: false, renderWrapper: true },
+      tableCell: false,
+      tableHeader: false,
     }),
+    ParagraphsAndListsCell,
+    ParagraphsAndListsHeader,
+    ContentLimits,
     opts.requiredGuard ? RequiredSections.configure({ guard: true, note: opts.requiredGuard.note }) : RequiredSections,
+    ListNumbering,
     Callout,
     variableNode(opts),
     UniqueID.configure({ attributeName: "id", types: [...BLOCK_ID_TYPES] }),
@@ -155,6 +247,7 @@ export function editorExtensions(options: EditorExtensionOptions): Extensions {
     BlockMove,
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
+    ListMarkers,
     ReviewThreads.configure({
       ...Object.fromEntries(Object.entries(options.reviewThreads ?? {}).filter(([, value]) => value !== undefined)),
       leafText: variableLeafText((key) => options.store.getState().byKey.get(key)),
@@ -196,6 +289,7 @@ function buildInline(opts: InternalBaseOptions): Extensions {
       dropcursor: { color: false, width: 2, class: "ucomp-dropcursor" },
     }),
     variableNode(opts),
+    ContentLimits.configure({ field: true }),
   ];
 }
 

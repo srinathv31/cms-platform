@@ -13,6 +13,12 @@
 // `<b id="docs-internal-guid-…" style="font-weight:normal">` wrapper.
 // Everything else (colors, fonts, sizes, line heights, images, empty `&nbsp;` paragraphs) goes.
 // HTML copied from a ProseMirror editor (data-pm-slice) is passed through untouched.
+// Table cells keep only paragraphs and lists, at every depth (a heading, callout, rule or table in a
+// cell, or in a list item in a cell, becomes content a cell can hold), and links keep only targets
+// the link check accepts (model/links.ts).
+// The editor's paste then normalizes the parsed slice like a saved document (model/normalize.ts).
+
+import { normalizeLink } from "../model/links";
 
 export interface NormalizeHtmlOptions {
   /** Parses an HTML string into a Document. Default: the global DOMParser (browser, happy-dom). */
@@ -170,8 +176,9 @@ function cleanInto(node: Node, dest: Element, doc: Document) {
       appendTable(el, dest, doc);
       return;
     case "a": {
-      const href = el.getAttribute("href")?.trim() ?? "";
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
+      // One link check (model/links.ts): a link that fails it is its text only.
+      const href = normalizeLink(el.getAttribute("href"));
+      if (href !== null) {
         const a = doc.createElement("a");
         a.setAttribute("href", href);
         appendInline(el, a, dest, doc);
@@ -276,11 +283,74 @@ function appendTable(el: Element, dest: Element, doc: Document) {
         if (value && value !== "1") out.setAttribute(attr, value);
       }
       cleanChildren(cell, out, doc);
+      fitCell(out, doc);
       row.appendChild(out);
     }
     if (row.childNodes.length) table.appendChild(row);
   });
   if (table.childNodes.length) dest.appendChild(table);
+}
+
+/** Marks the empty paragraph a rule in a cell becomes, so pruneEmpty keeps it (and takes the mark off). */
+const KEEP_EMPTY = "data-keep-empty";
+
+/**
+ * A table cell holds paragraphs and lists only, at every depth (docs/render-spec.md §2), so what
+ * else a pasted cell brings is kept as content a cell can hold, before the schema would push it out
+ * of the table: a heading becomes a paragraph, a callout gives its paragraphs, a table gives its
+ * cells' content in reading order, and a rule becomes an empty paragraph. The same goes inside every
+ * list item in the cell. (model/normalize.ts does the same on the JSON; cell-content.test.ts holds
+ * both to the same table of cases.)
+ */
+function fitCell(container: Element, doc: Document) {
+  for (const child of Array.from(container.children)) fitBlock(child, doc);
+}
+
+function fitBlock(child: Element, doc: Document) {
+  const tag = child.localName.toLowerCase();
+  if (tag === "h1" || tag === "h2" || tag === "h3") {
+    const paragraph = doc.createElement("p");
+    paragraph.append(...Array.from(child.childNodes));
+    child.replaceWith(paragraph);
+  } else if (tag === "hr") {
+    const paragraph = doc.createElement("p");
+    paragraph.setAttribute(KEEP_EMPTY, "");
+    child.replaceWith(paragraph);
+  } else if (tag === "div" && child.hasAttribute("data-callout")) {
+    const blocks = Array.from(child.children);
+    child.replaceWith(...Array.from(child.childNodes));
+    for (const block of blocks) fitBlock(block, doc);
+  } else if (tag === "table") {
+    // Its own cells were fitted already (appendTable runs inside out), so they hold no tables.
+    const blocks: Node[] = [];
+    for (const row of Array.from(child.children)) {
+      for (const nested of Array.from(row.children)) blocks.push(...asBlocks(nested, doc));
+    }
+    child.replaceWith(...blocks);
+  } else if (tag === "ul" || tag === "ol") {
+    for (const item of Array.from(child.children)) if (item.localName.toLowerCase() === "li") fitCell(item, doc);
+  }
+}
+
+/** A cell's children as blocks: each run of inline content (text, marks, chips, breaks) in its own paragraph. */
+function asBlocks(cell: Element, doc: Document): Node[] {
+  const out: Node[] = [];
+  let run: Element | null = null;
+  for (const node of Array.from(cell.childNodes)) {
+    const tag = node.nodeType === 1 ? (node as Element).localName.toLowerCase() : "";
+    if (tag === "p" || tag === "ul" || tag === "ol") {
+      run = null;
+      out.push(node);
+      continue;
+    }
+    if (!run) {
+      if (node.nodeType === 3 && !(node as Text).data.trim()) continue;
+      run = doc.createElement("p");
+      out.push(run);
+    }
+    run.appendChild(node);
+  }
+  return out;
 }
 
 // ── Pruning ──────────────────────────────────────────────────────
@@ -296,6 +366,10 @@ function unwrapLinkUnderlines(root: Element) {
 /** Removes paragraphs and headings with nothing in them (Word's `<o:p>&nbsp;</o:p>` lines). */
 function pruneEmpty(root: Element) {
   for (const block of Array.from(root.querySelectorAll("p, h1, h2, h3"))) {
+    if (block.hasAttribute(KEEP_EMPTY)) {
+      block.removeAttribute(KEEP_EMPTY);
+      continue;
+    }
     if (hasText(block) || block.querySelector("br, span[data-variable]")) continue;
     block.remove();
   }

@@ -3,37 +3,20 @@ import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { PermissionError, assertCan } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
-import { ensureBlockIds } from "@/editor/schema";
 import type { Db } from "@/server/db/client";
 import { auditEvents, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import { prepareBody, prepareField } from "@/server/documents/prepare";
 import { newId } from "@/server/ids";
 import { DRAFT_EDITED, changedFields, mergeDraftEdit, sessionOwnsRev } from "./audit-merge";
 import { NAME_MESSAGE, normalizeName } from "./parse-patch";
 
 // The database half of an autosave. `saveDraft` (save-draft.ts) supplies the real database and the
 // demo clock; this takes both as arguments so the tests can run it against a temporary database.
+// The body and the email fields are stored as src/server/documents/prepare.ts makes them (normalized,
+// checked, with block ids); a document it refuses is `invalid` with the check's sentence.
 
 function fail(error: DraftSaveError, message: string, rev?: number): DraftSaveResponse {
   return rev === undefined ? { ok: false, error, message } : { ok: false, error, rev, message };
-}
-
-/**
- * Gives every block that lacks one an `attrs.id` (comment anchors, redline, margin threads), and
- * keeps the ones it has.
- *
- * The editor already emits ids on every block, so for its documents this changes nothing. It runs on
- * every save because the platform's rule is that stored bodies always have ids, whoever wrote them,
- * and because it checks the document against the shared schema: an unknown node or mark type is
- * refused here, at save, rather than failing the render pipeline weeks later. It costs about a
- * millisecond for a short document and about 10 ms for 400 paragraphs.
- * Returns null when the document does not fit the schema.
- */
-function withBlockIds(doc: JSONContent): JSONContent | null {
-  try {
-    return ensureBlockIds(doc);
-  } catch {
-    return null;
-  }
 }
 
 function isBusy(error: unknown): boolean {
@@ -83,9 +66,23 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
 
   let body: JSONContent | undefined;
   if (patch.body !== undefined) {
-    const withIds = withBlockIds(patch.body);
-    if (!withIds) return fail("invalid", "The document has content the editor doesn't support.");
-    body = withIds;
+    const prepared = prepareBody(patch.body);
+    if (!prepared.ok) return fail("invalid", prepared.message);
+    body = prepared.doc;
+  }
+
+  // The email fields: null clears one.
+  const fields: Partial<Record<"emailSubject" | "emailPreheader", JSONContent | null>> = {};
+  for (const key of ["emailSubject", "emailPreheader"] as const) {
+    const value = patch[key];
+    if (value === undefined) continue;
+    if (value === null) {
+      fields[key] = null;
+      continue;
+    }
+    const prepared = prepareField(value);
+    if (!prepared.ok) return fail("invalid", prepared.message);
+    fields[key] = prepared.doc;
   }
 
   const changed = changedFields({ ...patch, name });
@@ -148,8 +145,8 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
     if (body !== undefined) set.body = body;
     if (patch.variables !== undefined) set.variables = patch.variables;
     if (patch.channels !== undefined) set.channels = patch.channels;
-    if (patch.emailSubject !== undefined) set.emailSubject = patch.emailSubject;
-    if (patch.emailPreheader !== undefined) set.emailPreheader = patch.emailPreheader;
+    if (fields.emailSubject !== undefined) set.emailSubject = fields.emailSubject;
+    if (fields.emailPreheader !== undefined) set.emailPreheader = fields.emailPreheader;
     if (patch.sampleSets !== undefined) set.sampleSets = patch.sampleSets;
 
     // The rev and state in the WHERE make this a compare-and-set, whatever the transaction mode.
