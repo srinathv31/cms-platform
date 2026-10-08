@@ -45,6 +45,18 @@ describe("RedlineDocument: marks", () => {
   });
 });
 
+describe("RedlineDocument: hard breaks", () => {
+  it("shows the empty line after a paragraph's last hard break, as the editor does", () => {
+    const br = { type: "hardBreak" };
+    const doc = {
+      counts: { added: 0, removed: 0, changed: 0, moved: 0 },
+      blocks: [{ id: "a", status: "unchanged" as const, node: { type: "paragraph", attrs: { id: "a" }, content: [{ type: "text", text: "x" }, br, { type: "text", text: "y" }, br] } }],
+    };
+    const out = renderToStaticMarkup(<RedlineDocument doc={doc} variables={[]} />);
+    expect(out).toContain('x<br/>y<br/><br class="ProseMirror-trailingBreak"/></p>');
+  });
+});
+
 describe("RedlineDocument: blocks", () => {
   const root = dom(html);
   const frame = (status: string) => root.querySelector(`[data-redline="${status}"]`) as HTMLElement;

@@ -104,3 +104,31 @@ export function type(editor: Editor, value: string) {
 /** The required note's text, and the heading it shows on. */
 export const note = (editor: Editor) => editor.view.dom.querySelector("[data-required-note]")?.getAttribute("data-required-note") ?? null;
 export const noted = (editor: Editor) => editor.view.dom.querySelector("[data-required-note]")?.textContent ?? null;
+
+/**
+ * An element's accessible name as ARIA computes it for a menu or group (name from author only):
+ * `aria-labelledby` first (each referenced element's own `aria-label`, else its text; hidden labels
+ * count), else `aria-label`.
+ */
+export function accessibleName(element: Element): string {
+  const ids = element.getAttribute("aria-labelledby")?.trim();
+  if (ids) {
+    return ids
+      .split(/\s+/)
+      .map((id) => {
+        const label = element.ownerDocument.getElementById(id);
+        return label?.getAttribute("aria-label") ?? label?.textContent ?? "";
+      })
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return element.getAttribute("aria-label")?.trim() ?? "";
+}
+
+/** The one element with this (explicit) role and accessible name under `root`, or null; like getByRole(role, { name }). */
+export function byRole(root: ParentNode, role: string, name: string): HTMLElement | null {
+  const found = [...root.querySelectorAll<HTMLElement>(`[role="${role}"]`)].filter((element) => accessibleName(element) === name);
+  if (found.length > 1) throw new Error(`${found.length} elements with role "${role}" named "${name}"`);
+  return found[0] ?? null;
+}

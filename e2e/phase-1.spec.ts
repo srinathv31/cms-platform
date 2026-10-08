@@ -659,7 +659,7 @@ test.describe("workspace", () => {
       await page.mouse.move(box.x + 60, box.y + box.height / 2 + 1, { steps: 4 });
       await expect(page.getByRole("button", { name: "Insert block below" })).toBeVisible({ timeout: 700 });
     }).toPass({ timeout: 10_000 });
-    await expect(page.getByLabel("Drag to move block")).toBeVisible();
+    await expect(page.getByLabel("Drag to move block, or click for options")).toBeVisible();
   });
 });
 

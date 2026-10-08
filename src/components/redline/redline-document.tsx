@@ -17,6 +17,9 @@
 //                 and a key (`data-collapsed`), so a comment on a hidden block gets a marker there
 //   data-block-id every top-level block's frame carries its id (the review screen scrolls to a block
 //                 and places comment markers beside it from these); `activeBlockId` tints one of them
+//   list markers  the editor's (extensions/list-markers.ts): an unchanged or new item shows the number
+//                 the new version prints; an item struck whole keeps the number it had, and the items
+//                 after it aren't pushed along by it
 //
 // Every block that isn't unchanged is a labelled group ("Added block", "Moved block"...), so the
 // gutter's meaning is spoken, not only colored. The gutter hangs left of the text, in the document's
@@ -24,9 +27,12 @@
 // the "Moved" label needs about that much).
 
 import { Children, type ReactElement, type ReactNode } from "react";
+import { getSchema } from "@tiptap/core";
 import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import { staticHardBreak } from "@/editor/components/static-document";
 import { VariableChipView } from "@/editor/components/variable-chip";
+import { listMarkerAttrs, withListMarkers, type ListItemStatus } from "@/editor/extensions/list-markers";
 import type { JSONContent, Variable } from "@/editor/model/types";
 import { baseExtensions } from "@/editor/schema";
 import type { DocumentAlign } from "@/editor/types";
@@ -147,6 +153,26 @@ function paintedNode(block: RedlineBlock): JSONContent {
   return block.status === "removed" ? markAllDeleted(block.node) : block.node;
 }
 
+/**
+ * A list item struck whole (every text run and chip in it deleted) was removed; one marked inserted
+ * throughout was added. Anything else (unchanged, edited, or empty) is in both versions.
+ */
+export function redlineItemStatus(item: PMNode): ListItemStatus {
+  let deleted = 0;
+  let inserted = 0;
+  let other = 0;
+  item.descendants((node) => {
+    if (!node.isInline) return true;
+    const op = node.marks.find((mark) => mark.type.name === RedlineMark.name)?.attrs.op as string | undefined;
+    if (op === "delete") deleted++;
+    else if (op === "insert") inserted++;
+    else other++;
+    return false;
+  });
+  if (other > 0 || deleted + inserted === 0 || (deleted > 0 && inserted > 0)) return null;
+  return deleted > 0 ? "deleted" : "inserted";
+}
+
 export function RedlineDocument({ doc, variables, changesOnly = false, activeBlockId = null, align = "center", className }: RedlineDocumentProps) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
   const items: RedlineItem[] = groupBlocks(doc, changesOnly, new Map(variables.map((v) => [v.key, v.label])), activeBlockId);
@@ -157,18 +183,24 @@ export function RedlineDocument({ doc, variables, changesOnly = false, activeBlo
     item.type === "caption" ? <Caption key={`caption-${i}`} item={item} /> : item.type === "gap" ? <Gap key={`gap-${i}`} item={item} /> : null;
 
   // One render of all the blocks the document shows; the doc mapping puts each in its frame.
+  const extensions = [...baseExtensions({ variables }), RedlineMark, listMarkerAttrs()];
   const body: ReactNode =
     blocks.length === 0
       ? items.map(aside)
       : renderToReactElement({
-          content: { type: "doc", content: blocks.map(paintedNode) },
-          extensions: [...baseExtensions({ variables }), RedlineMark],
+          content: withListMarkers(
+            getSchema(extensions).nodeFromJSON({ type: "doc", content: blocks.map(paintedNode) }),
+            redlineItemStatus,
+          ),
+          extensions,
           options: {
             nodeMapping: {
               variable: ({ node }: { node: PMNode }) => {
                 const key = (node.attrs.key as string | null) ?? null;
                 return <VariableChipView variableKey={key} variable={key ? byKey.get(key) : undefined} />;
               },
+              // The empty line after a paragraph's last hard break shows, as in the editor and every channel.
+              hardBreak: staticHardBreak,
               doc: ({ children }: { children?: ReactNode }) => {
                 const rendered = Children.toArray(children) as ReactElement[];
                 let at = 0;

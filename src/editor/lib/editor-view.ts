@@ -45,3 +45,17 @@ export function useViewDom(editor: Editor, attach: (dom: HTMLElement) => void | 
     };
   }, [editor]);
 }
+
+/**
+ * Puts focus back in the text without scrolling the page: a menu's `finalFocus` (it returns false,
+ * so the menu doesn't move focus itself). ProseMirror's own focus writes its selection into the
+ * page as it focuses. Focusing the element alone lets the browser drop the caret at the document's
+ * start whenever the page's selection had left the editor (nothing clicked yet, or a press on the
+ * block handle's grip), and ProseMirror then scrolls back to its own selection, wherever that is.
+ */
+export function refocusText(editor: Editor): false {
+  queueMicrotask(() => {
+    if (!editor.isDestroyed) editor.view.focus();
+  });
+  return false;
+}

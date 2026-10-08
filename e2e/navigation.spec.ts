@@ -139,7 +139,7 @@ async function expectBlockHandleOnHover(page: Page, what: string) {
     await page.mouse.move(box.x + 60, box.y + box.height / 2 + 1, { steps: 4 });
     await expect(page.getByRole("button", { name: "Insert block below" })).toBeVisible({ timeout: 700 });
   }, `${what}: the block handle shows on hover`).toPass({ timeout: 10_000 });
-  await expect(page.getByLabel("Drag to move block"), `${what}: with its grip`).toBeVisible();
+  await expect(page.getByLabel("Drag to move block, or click for options"), `${what}: with its grip`).toBeVisible();
 }
 
 /** The draft's Content tab is what is on screen, live and typeable, with its block handle. */
