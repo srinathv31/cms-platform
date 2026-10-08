@@ -51,7 +51,7 @@ describe("authorMessage", () => {
       ],
     });
     expect(authorMessage(error, VARIABLES)).toBe(
-      "Offer end date must be a date, like 2027-03-04. Credit limit must be an amount, like 1000.00.",
+      "Offer end date must be a date, like 2027-03-04. Credit limit must be an amount, like 1000 or 1000.50.",
     );
   });
 

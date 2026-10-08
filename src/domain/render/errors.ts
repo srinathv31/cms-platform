@@ -161,10 +161,14 @@ export function channelNotEnabled(versionNumber: number | null, channel: Channel
 
 // ── 422: values ──────────────────────────────────────────────────────────────
 
-/** What a value of each type must be: "{key} must be {noun}." */
+/**
+ * What a value of each type must be: "{key} must be {noun}." The examples are canonical forms the
+ * published JSON Schema accepts (src/domain/golive/json-schema.ts); the editor's field messages
+ * (`validateValue`) use the same ones.
+ */
 export const VALUE_NOUNS: Readonly<Record<VariableType, string>> = {
   text: "text",
-  currency: "an amount, like 1000.00",
+  currency: "an amount, like 1000 or 1000.50",
   percent: "a percentage, like 21.99",
   date: "a date, like 2027-03-04",
   number: "a number, like 20000",

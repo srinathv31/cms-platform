@@ -325,7 +325,7 @@ describe("the values editor", () => {
     const onChange = vi.fn();
     await render({ onChange });
     await openEditorFromMenu();
-    await typeInto(findField("Annual fee"), "95.00");
+    await typeInto(findField("Annual fee"), "$95"); // the same canonical value, "95" ("95.00" would be new digits)
     await blur(findField("Annual fee"));
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -460,7 +460,8 @@ describe("read-only", () => {
     const text = popup()!.textContent!;
     expect(text).toContain("First name");
     expect(text).toContain("Maya");
-    expect(text).toContain("$95.00"); // formatted by type
+    expect(text).toContain("$95"); // formatted by type, digits as stored
+    expect(text).not.toContain("$95.00");
     expect(text).toContain("New Jersey");
     expect(popup()!.textContent).not.toContain("Delete");
   });

@@ -5,6 +5,10 @@
 // is missing; optional and absent is left out (it renders empty). A present value must be a string
 // or a finite number and fit its type (`validateValue`, which also accepts friendly forms like
 // "21.99%" or "New Jersey"). Keys that aren't in the list are ignored. Messages never echo a value.
+//
+// Canonical decimals are the digits as sent ("21.90" stays "21.90"). The render route hands JSON
+// numbers over as their exact source text (`parseJsonWithNumberText`), so they arrive here as strings;
+// a JS number from an internal caller is read as its JSON text (`String(n)`, see `validateValue`).
 
 import { validateValue } from "@/editor/model/variables";
 import type { Variable } from "../types";

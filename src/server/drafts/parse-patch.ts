@@ -3,6 +3,7 @@
 // the rev current, is the channel allowed for the content type) live in apply-patch.ts.
 
 import { z } from "zod";
+import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
 import { isValidKey } from "@/editor/model/variables";
@@ -144,14 +145,30 @@ export function parseDraftPatch(input: unknown): ParseResult {
   return { ok: true, patch };
 }
 
+/**
+ * A sample set's values hold digits exactly as sent: a JSON number becomes its source text
+ * ({"apr": 21.90} is "21.90", not 21.9), then follows the same grammar as a string when the preview
+ * validates it. Anything that isn't a list of sample-set objects is left for the schema to refuse.
+ */
+function sampleValuesAsText(parsed: JsonWithNumberText): unknown {
+  const { json } = parsed;
+  if (!isRecord(json) || !Array.isArray(json.sampleSets)) return json;
+  return {
+    ...json,
+    sampleSets: json.sampleSets.map((set: unknown) =>
+      isRecord(set) && isRecord(set.values) ? { ...set, values: parsed.numbersAsText(set.values) } : set,
+    ),
+  };
+}
+
 /** Reads and parses a request body with the size guard. `text` is the raw body. */
 export function parseDraftPatchText(text: string): ParseResult {
   if (text.length > MAX_BODY_SIZE) return { ok: false, message: "The draft is too large to save." };
-  let json: unknown;
+  let parsed: JsonWithNumberText;
   try {
-    json = JSON.parse(text);
+    parsed = parseJsonWithNumberText(text);
   } catch {
     return { ok: false, message: "The request body is not valid JSON." };
   }
-  return parseDraftPatch(json);
+  return parseDraftPatch(sampleValuesAsText(parsed));
 }

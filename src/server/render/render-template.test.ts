@@ -147,7 +147,7 @@ describe("runRender: consumer renders", () => {
       version: 2,
       values: { ...CUSTOMER, purchase_apr: "19.5%", home_state: "New Jersey" },
     });
-    expect(ok(result).body).toEqual(expect.stringContaining("19.50%"));
+    expect(ok(result).body).toEqual(expect.stringContaining("19.5%"));
   });
 });
 

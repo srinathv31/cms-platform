@@ -322,6 +322,15 @@ describe("POST …/render: 403, 404 and 422", () => {
     expect(JSON.stringify(error)).not.toContain("Atlantis");
   });
 
+  it("a JSON number in values is read from its exact source text: 21.90 renders 21.90%, 1e1 is refused", async () => {
+    const body = (apr: string) =>
+      `{"version":2,"channel":"web","values":{"first_name":"Maya","last_name":"Chen","purchase_apr":${apr},"home_state":"NJ"}}`;
+    const res = await post("balance-transfer", body("21.90"));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("21.90%");
+    await expectError(await post("balance-transfer", body("1e1")), 422, "invalid_values", "purchase_apr must be a percentage, like 21.99.");
+  });
+
   it("a channel the version hasn't turned on is 422", async () => {
     await expectError(
       await post("balance-transfer", { version: 2, channel: "email", values: CUSTOMER }),

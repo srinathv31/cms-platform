@@ -62,7 +62,7 @@ describe("validateValues: success", () => {
     expect(result).toMatchObject({
       ok: true,
       values: {
-        annual_fee: "1000.5",
+        annual_fee: "1000.50",
         purchase_apr: "21.99",
         offer_end_date: "2027-03-04",
         bonus_points: "20000",
@@ -143,7 +143,7 @@ describe("validateValues: missing", () => {
 
 describe("validateValues: invalid", () => {
   it.each([
-    ["annual_fee", "lots", "annual_fee must be an amount, like 1000.00."],
+    ["annual_fee", "lots", "annual_fee must be an amount, like 1000 or 1000.50."],
     ["purchase_apr", "twenty", "purchase_apr must be a percentage, like 21.99."],
     ["offer_end_date", "2027-02-30", "offer_end_date must be a date, like 2027-03-04."],
     ["bonus_points", "many", "bonus_points must be a number, like 20000."],
@@ -171,7 +171,7 @@ describe("validateValues: invalid", () => {
 
   it("lists several invalid keys in the version's order, one sentence each", () => {
     const error = failure(validateValues(VARIABLES, { ...GOOD, home_state: "ZZ", annual_fee: "x" }));
-    expect(error.message).toBe("annual_fee must be an amount, like 1000.00. home_state must be a US state, like NJ.");
+    expect(error.message).toBe("annual_fee must be an amount, like 1000 or 1000.50. home_state must be a US state, like NJ.");
   });
 
   it("never echoes a submitted value", () => {

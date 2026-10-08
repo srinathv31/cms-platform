@@ -55,7 +55,7 @@ function inline(...content: JSONContent[]) {
 describe("variables", () => {
   it.each([
     ["first_name", "Maya"],
-    ["annual_fee", "$1,000.00"],
+    ["annual_fee", "$1,000"],
     ["purchase_apr", "21.99%"],
     ["offer_end_date", "March 4, 2027"],
     ["bonus_points", "20,000"],

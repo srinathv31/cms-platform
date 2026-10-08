@@ -80,6 +80,14 @@ describe("defaultSampleSets", () => {
       expect(set!.values).toEqual({ apr: "21.99", st: "NJ" });
     });
 
+    it("keeps a sample's digits exactly: no rounding, no exponent, trailing zeros kept", () => {
+      const [set] = defaultSampleSets(
+        [v("big", "currency", "1000000000000000000000"), v("tiny", "number", "0.0000001"), v("apr", "percent", "21.90")],
+        TODAY,
+      );
+      expect(set!.values).toEqual({ big: "1000000000000000000000", tiny: "0.0000001", apr: "21.90" });
+    });
+
     it("falls back to a realistic default when the sample is missing or invalid", () => {
       expect(typical.last_name).toBe("Chen");
       expect(typical.bonus_points).toBe("20000");
@@ -117,7 +125,7 @@ describe("defaultSampleSets", () => {
 
     it("uses large amounts and a high percent", () => {
       expect(long.annual_fee).toBe("1000000");
-      expect(formatValue("currency", long.annual_fee!)).toBe("$1,000,000.00");
+      expect(formatValue("currency", long.annual_fee!)).toBe("$1,000,000");
       expect(long.bonus_points).toBe("1000000");
       expect(Number(long.purchase_apr)).toBeGreaterThanOrEqual(29.99);
     });
