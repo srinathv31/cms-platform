@@ -1,6 +1,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import type { RenderBlock, RenderDoc, RenderTableRow } from "@/domain/render/types";
+import type {
+  RenderBlock,
+  RenderDoc,
+  RenderInline,
+  RenderList,
+  RenderListItem,
+  RenderParagraph,
+  RenderTableCell,
+  RenderTableRow,
+  RenderText,
+} from "@/domain/render/types";
 import {
   HEADING_CHAIN_DOC,
   LONG_DOC,
@@ -12,11 +22,11 @@ import {
   TABLE_WIDOW_DOC,
   TYPICAL_DOC,
 } from "./__fixtures__/pdf-docs";
-import { footerLabel, keepRuns, renderPdf } from "./pdf";
-import { loadFonts } from "./pdf-fonts";
+import { footerLabel, keepRuns, renderPdf, UnrenderableCharactersError } from "./pdf";
+import { GlyphCheck, loadFonts, measure, SANS } from "./pdf-fonts";
 import { PALETTE } from "./look";
-import { CALLOUT, CONTENT_AREA, CONTENT_WIDTH, HAIRLINE, INK, PAGE, TABLE, TYPE } from "./pdf-styles";
-import { prepareText } from "./pdf-text";
+import { CALLOUT, CONTENT_AREA, CONTENT_WIDTH, HAIRLINE, INK, PAGE, SPACE, TABLE, TYPE, lineBox } from "./pdf-styles";
+import { prepareText, type Piece } from "./pdf-text";
 
 // The PDF adapter, read back with pdf.js (the same library the preview draws pages with).
 
@@ -36,10 +46,13 @@ interface Inspected {
   pages: { lines: Line[]; text: string; links: string[]; minX: number; maxX: number }[];
 }
 
-const normalize = (s: string) => s.replace(/ /g, " ");
+const normalize = (s: string) => s.replace(/\u00a0/g, " ");
+/** The render time every test renders at (the PDF keeps whole seconds). */
+const AT = new Date("2027-03-04T12:00:00.789Z");
+const PLAIN_SANS = { family: SANS, weight: 400, italic: false } as const;
 
-async function inspect(doc: RenderDoc): Promise<Inspected> {
-  const bytes = await renderPdf(doc);
+async function inspect(doc: RenderDoc, createdAt = AT): Promise<Inspected> {
+  const bytes = await renderPdf(doc, { createdAt });
   // pdf.js takes ownership of the buffer it's given; hand it a copy.
   const task = getDocument({ data: bytes.slice(), useSystemFonts: false });
   const pdf = await task.promise;
@@ -100,7 +113,7 @@ let longIntro: Inspected;
 beforeAll(async () => {
   [typical, longName, long, widow, orphan, short, chain, longIntro] = await Promise.all(
     [TYPICAL_DOC, LONG_NAME_DOC, LONG_DOC, TABLE_WIDOW_DOC, TABLE_ORPHAN_DOC, TABLE_SHORT_DOC, HEADING_CHAIN_DOC, LONG_INTRO_DOC].map(
-      inspect,
+      (doc) => inspect(doc),
     ),
   );
 }, 60_000);
@@ -351,6 +364,192 @@ describe("renderPdf", () => {
   });
 });
 
+// ── Exactly the RenderDoc ────────────────────────────────────────────────────
+
+const run = (text: string, marks: Omit<RenderText, "type" | "text"> = {}): RenderText => ({ type: "text", text, ...marks });
+const BREAK: RenderInline = { type: "break" };
+const para = (...content: (RenderInline | string)[]): RenderParagraph => ({
+  type: "paragraph",
+  id: null,
+  content: content.map((c) => (typeof c === "string" ? run(c) : c)),
+});
+const items = (markers: string[], text: (i: number) => RenderBlock[]): RenderListItem[] => markers.map((marker, i) => ({ marker, content: text(i) }));
+const ordered = (markers: string[], text: (i: number) => RenderBlock[]): RenderList => ({
+  type: "list",
+  id: null,
+  ordered: true,
+  start: 1,
+  format: "decimal",
+  delimiter: "period",
+  items: items(markers, text),
+});
+const bullets = (glyph: string, text: (i: number) => RenderBlock[], count = 2): RenderList => ({
+  type: "list",
+  id: null,
+  ordered: false,
+  bullet: "disc",
+  items: items(Array.from({ length: count }, () => glyph), text),
+});
+const cellOf = (content: RenderTableCell["content"], extra: Partial<RenderTableCell> = {}): RenderTableCell => ({
+  header: false,
+  colspan: 1,
+  rowspan: 1,
+  content,
+  ...extra,
+});
+const grid = (columns: number, ...rows: RenderTableCell[][]): RenderBlock => ({ type: "table", id: null, columns, rows: rows.map((cells) => ({ cells })) });
+const probe = (...blocks: RenderBlock[]): RenderDoc => ({ templateId: "UC-PROBE", templateName: "Probe", versionNumber: 1, blocks });
+const body = (r: Inspected) => r.pages.flatMap(bodyLines);
+const at = (r: Inspected, text: string) => {
+  const line = body(r).find((l) => l.text.trim() === text);
+  if (!line) throw new Error(`no line "${text}" in:\n${body(r).map((l) => l.text).join("\n")}`);
+  return line;
+};
+const SPACE_WIDTH = () => measure(" ", PLAIN_SANS, TYPE.body.size);
+const LONG_WORD = "Pneumonoultramicroscopicsilicovolcanoconiosis";
+
+/** `depth` levels of lists, ordered and bulleted in turn, two items a level. */
+function deepList(depth: number): RenderList {
+  let inner: RenderList | null = null;
+  for (let d = depth - 1; d >= 0; d -= 1) {
+    const nested: RenderBlock[] = inner ? [inner] : [];
+    const text = (i: number): RenderBlock[] => (i === 0 ? [para(`Level ${d + 1} first item`), ...nested] : [para(`Level ${d + 1} second item`)]);
+    inner = d % 2 === 0 ? ordered(["1.", "2."], text) : bullets("◦", text);
+  }
+  return inner as RenderList;
+}
+
+describe("renderPdf prints exactly the RenderDoc", () => {
+  beforeAll(() => loadFonts());
+
+  it("prints each item's marker as given, recomputing nothing", async () => {
+    const r = await inspect(
+      probe(
+        ordered(["(mmmcmxcix)", "(4000)", "0."], (i) => [para(["last roman", "past roman", "zero start"][i])]),
+        bullets("▪", () => [para("a square at the top level")], 1),
+        // An item whose first block is a list (its paragraph was removed): its marker still prints.
+        ordered(["7."], () => [ordered(["(c)"], () => [para("nested first")])]),
+      ),
+    );
+    expect(body(r).map((l) => l.text)).toEqual([
+      "(mmmcmxcix) last roman",
+      "(4000) past roman",
+      "0. zero start",
+      "▪ a square at the top level",
+      "7. (c) nested first",
+    ]);
+  });
+
+  it("prints blank paragraphs as blank lines of the paragraph's height", async () => {
+    const r = await inspect(probe(para("A"), para(), para("   "), para("B"), para(BREAK, "x")));
+    const step = lineBox(TYPE.body) + SPACE.paragraph;
+    expect(at(r, "A").y - at(r, "B").y).toBeCloseTo(3 * step, 0);
+    // A break at a paragraph's start is an empty first line.
+    expect(at(r, "B").y - at(r, "x").y).toBeCloseTo(step + lineBox(TYPE.body), 0);
+  });
+
+  it("prints the empty line after a hard break that ends a paragraph", async () => {
+    const r = await inspect(probe(para("A"), para("x", BREAK), para("B"), para(BREAK), para("C"), para("y", BREAK, BREAK), para("D")));
+    const step = lineBox(TYPE.body) + SPACE.paragraph;
+    expect(at(r, "A").y - at(r, "x").y).toBeCloseTo(step, 0);
+    // n breaks give n + 1 lines, the empty ones at the end included.
+    expect(at(r, "x").y - at(r, "B").y).toBeCloseTo(step + lineBox(TYPE.body), 0);
+    expect(at(r, "B").y - at(r, "C").y).toBeCloseTo(2 * step + lineBox(TYPE.body), 0);
+    expect(at(r, "y").y - at(r, "D").y).toBeCloseTo(step + 2 * lineBox(TYPE.body), 0);
+  });
+
+  it("keeps the author's leading spaces, at the start of a paragraph and after a hard break", async () => {
+    const r = await inspect(
+      probe(para("Edge"), para("   Lead"), para("Line one", BREAK, "    after a break"), para(run("  "), run("linked", { href: "https://example.com/" }))),
+    );
+    const edge = at(r, "Edge").x;
+    expect(edge).toBeCloseTo(PAGE.marginX, 1);
+    expect(at(r, "Lead").x - edge).toBeCloseTo(3 * SPACE_WIDTH(), 1);
+    expect(at(r, "after a break").x - edge).toBeCloseTo(4 * SPACE_WIDTH(), 1);
+    expect(at(r, "linked").x - edge).toBeCloseTo(2 * SPACE_WIDTH(), 1);
+  });
+
+  it("cuts long words and URLs bare, never adding a hyphen", async () => {
+    const url = "https://example.com/" + "segment/".repeat(12) + LONG_WORD.repeat(3);
+    const r = await inspect(probe(para(url), grid(6, Array.from({ length: 6 }, () => cellOf([para(LONG_WORD)])))));
+    const text = body(r).map((l) => l.text).join("");
+    expect(text).not.toContain("-");
+    expect(text.replace(/ /g, "")).toContain(url);
+    expect(text.split(LONG_WORD.slice(0, 10)).length - 1).toBeGreaterThanOrEqual(6 + 3);
+  });
+
+  it("refuses characters its fonts can't draw, naming each once, in order, without quoting them in the message", async () => {
+    const heading = (level: 1 | 2 | 3, text: string): RenderBlock => ({ type: "heading", id: null, level, section: null, content: [run(text)] });
+    const refusal = (doc: RenderDoc) =>
+      renderPdf(doc, { createdAt: AT }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+    const error = await refusal(probe(para("Fee ₹100, then ạ"), heading(1, "₹ ✓"), para(run("ạ", { bold: true }))));
+    expect(error).toBeInstanceOf(UnrenderableCharactersError);
+    expect((error as UnrenderableCharactersError).characters).toEqual(["₹", "ạ", "✓"]);
+    expect((error as Error).message).not.toMatch(/[₹ạ✓]/u);
+    // The serif section heads draw Vietnamese; the sans body can't.
+    expect(await refusal(probe(heading(2, "Tiếng Việt")))).toBeNull();
+    expect((await refusal(probe(heading(3, "Tiếng Việt"))) as UnrenderableCharactersError).characters).toEqual(["ế", "ệ"]);
+    // Markers and the footer are drawn too.
+    expect((await refusal(probe(bullets("✓", () => [para("x")], 1))) as UnrenderableCharactersError).characters).toEqual(["✓"]);
+    expect((await refusal({ ...probe(para("x")), templateId: "UC-₹" })) as UnrenderableCharactersError).toMatchObject({ characters: ["₹"] });
+  });
+
+  it("gives the same bytes for the same document and time, dated to the second", async () => {
+    const a = await renderPdf(TYPICAL_DOC, { createdAt: AT });
+    const b = await renderPdf(TYPICAL_DOC, { createdAt: new Date(AT.getTime() + 150) });
+    const c = await renderPdf(TYPICAL_DOC, { createdAt: new Date("2027-03-05T00:00:00Z") });
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+    expect(Buffer.from(a).equals(Buffer.from(c))).toBe(false);
+    expect(typical.info.CreationDate).toBe("D:20270304120000Z");
+    expect(typical.info.ModDate).toBe("D:20270304120000Z");
+    expect(ascii(a)).not.toContain("/ModificationDate");
+  });
+});
+
+describe("renderPdf never crashes or hangs", () => {
+  it("sets tables of up to 12 columns, whatever their cells hold", async () => {
+    const twelve = (cell: (i: number) => RenderTableCell["content"]) => Array.from({ length: 12 }, (_, i) => cellOf(cell(i)));
+    const nested = grid(12, twelve((i) => (i === 0 ? [bullets("•", () => [para("in a list"), grid(12, twelve(() => [para(LONG_WORD)]))], 1)] : [para("c")])));
+    const r = await inspect(
+      probe(
+        grid(12, twelve((i) => [para(LONG_WORD + i)]), twelve(() => [para(), para("   lead"), deepList(9)]), twelve(() => [])),
+        grid(12, twelve((i) => (i === 0 ? [deepList(9)] : [para("c")]))),
+        nested,
+      ),
+    );
+    expect(r.pageCount).toBeGreaterThanOrEqual(1);
+    for (const page of r.pages) expect(page.minX).toBeGreaterThanOrEqual(PAGE.marginX - 0.5);
+  });
+
+  it("bounds a malformed table's width and spans instead of hanging", async () => {
+    const started = performance.now();
+    const r = await inspect(
+      probe(
+        grid(1, [cellOf([para("wide")], { colspan: 1e9 })], [cellOf([para("x")])]),
+        grid(1e9, [cellOf([para("huge")], { colspan: 1e9, rowspan: 1e9 })]),
+        grid(Number.NaN, Array.from({ length: 6 }, (_, i) => cellOf([para(`c${i}`)]))),
+      ),
+    );
+    expect(performance.now() - started).toBeLessThan(5_000);
+    const text = allText(r);
+    for (const s of ["wide", "huge", "c0", "c5"]) expect(text).toContain(s);
+  });
+
+  it("lays out deep lists in linear time", async () => {
+    await renderPdf(probe(deepList(3)), { createdAt: AT }); // warm up
+    for (const depth of [9, 12]) {
+      const started = performance.now();
+      const r = await inspect(probe(deepList(depth)));
+      // Before the fix: 0.3 s at 9 levels, 4.3 s at 12 (doubling a level).
+      expect(performance.now() - started, `${depth} levels`).toBeLessThan(1_000);
+      expect(allText(r)).toContain(`Level ${depth} second item`);
+    }
+  });
+});
+
 describe("keepRuns", () => {
   const rows = (n: number, height = 23, keep: number[] = []) =>
     Array.from({ length: n }, (_, i) => ({ height, keepWithNext: keep.includes(i) }));
@@ -384,22 +583,79 @@ describe("prepareText", () => {
 
   it("keeps a name whole when it fits, and breaks it only at its hyphen when it doesn't", () => {
     const name = [run(LONG_VALUES.last_name, { variable: "last_name" })];
-    expect(prepareText(name, TYPE.body, CONTENT_WIDTH).inlines).toEqual([expect.objectContaining({ text: LONG_VALUES.last_name })]);
-    const narrow = prepareText(name, TYPE.table, 100);
+    expect(prepareText(name, TYPE.body, CONTENT_WIDTH, new GlyphCheck()).inlines).toEqual([expect.objectContaining({ text: LONG_VALUES.last_name })]);
+    const narrow = prepareText(name, TYPE.table, 100, new GlyphCheck());
     expect(narrow.lines).toBe(2);
     expect(narrow.inlines[0]).toMatchObject({ text: "Featherstonehaugh-\nVilliers" });
   });
 
-  it("joins a short variable's words so it never wraps mid-value", () => {
-    const { inlines } = prepareText([run("Valid until "), run("September 30, 2027", { variable: "offer_end_date" })], TYPE.body, CONTENT_WIDTH);
-    expect(inlines[1]).toMatchObject({ text: "September 30, 2027" });
+  it("never wraps a short variable mid-value, and leaves its characters alone", () => {
+    // "September" alone would still fit on the first line; the whole date moves to the second.
+    const width = measure("Valid until September", PLAIN_SANS, TYPE.body.size) + 2;
+    const date = run("September 30, 2027", { variable: "offer_end_date" });
+    const { inlines, lines } = prepareText([run("Valid until "), date], TYPE.body, width, new GlyphCheck());
+    expect(lines).toBe(2);
+    expect(inlines).toEqual([
+      expect.objectContaining({ text: "Valid until\n" }),
+      expect.objectContaining({ text: "September 30, 2027" }),
+    ]);
   });
 
-  it("cuts a token wider than the line so it can't overflow", () => {
-    const url = "https://example.com/" + "a".repeat(200);
-    const { inlines, lines } = prepareText([run(url)], TYPE.body, CONTENT_WIDTH);
+  it("cuts a token wider than the line bare, inserting nothing", () => {
+    const url = "https://example.com/" + "segment/".repeat(12) + "a".repeat(200);
+    const { inlines, lines } = prepareText([run(url)], TYPE.body, CONTENT_WIDTH, new GlyphCheck());
     expect(lines).toBeGreaterThan(1);
-    const text = (inlines[0] as { text: string }).text;
-    expect(text.replace(/-?\n/g, "")).toBe(url);
+    const text = (inlines[0] as Piece).text;
+    expect(text.split("\n")[0]).toMatch(/segment\/$/); // after the last separator that fits
+    expect(text.replace(/\n/g, "")).toBe(url);
+    const word = "Pneumonoultramicroscopicsilicovolcanoconiosis";
+    const narrow = prepareText([run(word)], TYPE.table, 60, new GlyphCheck());
+    expect(narrow.lines).toBeGreaterThan(2);
+    expect((narrow.inlines[0] as Piece).text.replace(/\n/g, "")).toBe(word);
+    expect((narrow.inlines[0] as Piece).text).not.toContain("-");
+  });
+
+  it("never loops or throws in a box narrower than a glyph", () => {
+    for (const width of [0, -40, 0.5, Number.NaN]) {
+      const { inlines, lines } = prepareText([run("ab cd")], TYPE.table, width, new GlyphCheck());
+      expect(lines).toBe(4);
+      expect((inlines[0] as Piece).text).toBe("a\nb\nc\nd");
+    }
+  });
+
+  it("keeps the author's spaces: leading ones as an indented run of their own, runs inside as typed", () => {
+    const space = measure(" ", PLAIN_SANS, TYPE.body.size);
+    const { inlines } = prepareText(
+      [run("   Lead and   three"), { type: "break" }, run("  "), run("after a break")],
+      TYPE.body,
+      CONTENT_WIDTH,
+      new GlyphCheck(),
+    );
+    expect(inlines).toEqual([
+      expect.objectContaining({ text: "   ", indent: 3 * space }),
+      expect.objectContaining({ text: "Lead and   three" }),
+      { kind: "break" },
+      expect.objectContaining({ text: "  ", indent: 2 * space }),
+      expect.objectContaining({ text: "after a break" }),
+    ]);
+  });
+
+  it("absorbs the spaces where a line wraps, never carrying them to the next line", () => {
+    const filler = "word ".repeat(20).trim();
+    const { inlines } = prepareText([run(filler + "      ")], TYPE.body, CONTENT_WIDTH, new GlyphCheck());
+    const lines = (inlines[0] as Piece).text.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[1].startsWith("word")).toBe(true);
+    expect(lines.join(" ")).toBe(filler + "      "); // the wrap took the one space it fell in
+  });
+
+  it("keeps trailing spaces that fit, and absorbs those past the line's end", () => {
+    const space = measure(" ", PLAIN_SANS, TYPE.body.size);
+    const word = measure("word", PLAIN_SANS, TYPE.body.size);
+    const width = word + 10.5 * space + 1; // room for "word" and 10 spaces (plus the 1 pt slack)
+    const { inlines, lines } = prepareText([run("word" + " ".repeat(30)), { type: "break" }, run(" ".repeat(300))], TYPE.body, width, new GlyphCheck());
+    expect(lines).toBe(2);
+    expect(inlines[0]).toMatchObject({ text: "word" + " ".repeat(10) });
+    expect(inlines[2]).toMatchObject({ text: " ".repeat(Math.floor((width - 1) / space)) });
   });
 });

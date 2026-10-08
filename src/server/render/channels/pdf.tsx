@@ -2,13 +2,22 @@ import "server-only";
 
 import { Circle, Document, Link, Page, Path, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { Fragment, type ReactElement, type ReactNode } from "react";
-import type { RenderBlock, RenderDoc, RenderTableCell, RenderTableRow } from "@/domain/render/types";
-import { loadFonts, measure } from "./pdf-fonts";
+import type { RenderBlock, RenderDoc, RenderTable, RenderTableCell, RenderTableRow } from "@/domain/render/types";
+import { MAX_TABLE_COLUMNS } from "@/editor/model/table-grid";
+import { GlyphCheck, loadFonts, measure } from "./pdf-fonts";
 import { CALLOUT, CONTENT_AREA, CONTENT_WIDTH, HAIRLINE, INK, LIST, SPACE, TABLE, TYPE, lineBox, styles, type TypeSpec } from "./pdf-styles";
-import { prepareText, type PreparedInline } from "./pdf-text";
+import { faceOf, prepareText, type PreparedInline, type PreparedText } from "./pdf-text";
 
 // The PDF channel: a RenderDoc becomes US Letter pages with real, selectable text and embedded
 // fonts. Server-only; @react-pdf never reaches the client.
+//
+// It prints exactly the RenderDoc (docs/render-spec.md, "Channels"): every block, in order; every
+// list item's `marker` as given (nothing is renumbered or recomputed here); blank paragraphs as
+// blank lines of their type's height; spaces and hard breaks as typed (pdf-text.ts). Before
+// layout, every character that will be drawn is checked against the face that draws it; if any
+// can't be drawn, the render fails with UnrenderableCharactersError instead of printing boxes.
+// The output is a function of the RenderDoc and `createdAt` alone: the same input gives the same
+// bytes.
 //
 // Pagination, steered through react-pdf's page breaker:
 //   - Top-level blocks are siblings on one wrapping <Page>, separated by spacer Views. A spacer
@@ -27,11 +36,62 @@ import { prepareText, type PreparedInline } from "./pdf-text";
 //   - List items up to 5 lines and callouts up to 200 pt move whole; longer ones split between
 //     lines.
 
-/** Renders a resolved document to PDF bytes. */
-export async function renderPdf(doc: RenderDoc): Promise<Uint8Array> {
+export interface PdfOptions {
+  /** The render time (the pipeline's `at`): the PDF's creation and modification date, in whole seconds. */
+  createdAt: Date;
+}
+
+/**
+ * The PDF fonts can't draw some of the document's characters. `characters` lists them once each,
+ * in the order they first appear. The message never quotes them: one may come from a value, and
+ * error messages reach the server log.
+ */
+export class UnrenderableCharactersError extends Error {
+  readonly characters: readonly string[];
+
+  constructor(characters: readonly string[]) {
+    super(`The PDF fonts can't draw ${characters.length} of the document's characters.`);
+    this.name = "UnrenderableCharactersError";
+    this.characters = characters;
+  }
+}
+
+/** Renders a resolved document to PDF bytes. Throws UnrenderableCharactersError before any layout. */
+export async function renderPdf(doc: RenderDoc, options: PdfOptions): Promise<Uint8Array> {
+  const createdAt = wholeSeconds(options.createdAt);
   await loadFonts();
-  const buffer = await renderToBuffer(buildDocument(doc));
-  return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const glyphs = new GlyphCheck();
+  const tree = buildDocument(doc, createdAt, glyphs);
+  if (glyphs.missing.length > 0) throw new UnrenderableCharactersError(glyphs.missing);
+  const buffer = await renderToBuffer(tree);
+  return withModDate(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
+}
+
+const REACT_PDF_MOD_KEY = "/ModificationDate";
+const PDF_MOD_KEY = "/ModDate".padEnd(REACT_PDF_MOD_KEY.length, " ");
+
+/**
+ * react-pdf writes the modification date under a key of its own, /ModificationDate; PDF readers
+ * read /ModDate (ISO 32000-1, 14.3.3). This renames the key inside the document information
+ * dictionary, padded with spaces to the same length, so no byte offset (and no xref entry) moves.
+ * The bytes are react-pdf's own buffer, changed in place.
+ */
+function withModDate(bytes: Uint8Array): Uint8Array {
+  const text = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("latin1");
+  const trailer = text.lastIndexOf("\ntrailer\n");
+  const info = trailer < 0 ? undefined : /\/Info (\d+) 0 R/.exec(text.slice(trailer))?.[1];
+  const start = info === undefined ? -1 : text.indexOf(`\n${info} 0 obj\n`);
+  const end = start < 0 ? -1 : text.indexOf("\nendobj", start);
+  const key = end < 0 ? -1 : text.indexOf(`\n${REACT_PDF_MOD_KEY} `, start);
+  if (key < 0 || key > end) return bytes; // pdf.test.ts pins the /ModDate entry
+  bytes.set(Buffer.from(PDF_MOD_KEY, "latin1"), key + 1);
+  return bytes;
+}
+
+function wholeSeconds(at: Date): Date {
+  const ms = at instanceof Date ? at.getTime() : Number.NaN;
+  if (!Number.isFinite(ms)) throw new TypeError("renderPdf needs a valid createdAt date.");
+  return new Date(Math.floor(ms / 1000) * 1000);
 }
 
 /** "UC-4F7K2Q · v2", or "UC-4F7K2Q · Draft" for an unsubmitted draft. */
@@ -39,12 +99,28 @@ export function footerLabel(doc: Pick<RenderDoc, "templateId" | "versionNumber">
   return `${doc.templateId} · ${doc.versionNumber === null ? "Draft" : `v${doc.versionNumber}`}`;
 }
 
-function buildDocument(doc: RenderDoc) {
+/** Every digit and word the footer's page numbers can use. */
+const PAGE_NUMBER_TEXT = "Page 0123456789 of";
+
+function buildDocument(doc: RenderDoc, createdAt: Date, glyphs: GlyphCheck) {
   const label = footerLabel(doc);
+  const blocks = flow(doc.blocks, glyphs);
+  // The footer isn't document content: its characters are checked after the body's.
+  const footerFace = faceOf(TYPE.footer, PLAIN);
+  glyphs.check(label, footerFace);
+  glyphs.check(PAGE_NUMBER_TEXT, footerFace);
   return (
-    <Document title={doc.templateName} subject={label} creator="Stencil" producer="Stencil" language="en-US">
+    <Document
+      title={doc.templateName}
+      subject={label}
+      creator="Stencil"
+      producer="Stencil"
+      language="en-US"
+      creationDate={createdAt}
+      modificationDate={createdAt}
+    >
       <Page size="LETTER" style={styles.page}>
-        {flow(doc.blocks)}
+        {blocks}
         <View style={styles.footer} fixed>
           <Text>{label}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
@@ -61,8 +137,8 @@ interface Ctx {
   width: number;
   /** Paragraph type here: body, table or callout. */
   spec: TypeSpec;
-  /** List nesting depth. */
-  depth: number;
+  /** Where every drawn character is checked. */
+  glyphs: GlyphCheck;
 }
 
 /** A block measured for layout: its element and estimates of its height. */
@@ -75,7 +151,6 @@ interface Laid {
   render: (spaceAbove: number, keepAhead: number) => ReactElement;
 }
 
-const PAGE_CTX: Ctx = { width: CONTENT_WIDTH, spec: TYPE.body, depth: 0 };
 const HEADING_SPEC = { 1: TYPE.h1, 2: TYPE.h2, 3: TYPE.h3 } as const;
 const HEADING_STYLE = { 1: styles.h1, 2: styles.h2, 3: styles.h3 } as const;
 /** react-pdf's line-breaking "infinity": a run boundary no line may end on. */
@@ -87,8 +162,9 @@ const NEVER_BREAK = 10_000;
 const MAX_KEEP = 0.45 * CONTENT_AREA;
 
 /** The page's own flow. */
-function flow(blocks: readonly RenderBlock[]): ReactNode[] {
-  const laid = blocks.map((block) => lay(block, PAGE_CTX));
+function flow(blocks: readonly RenderBlock[], glyphs: GlyphCheck): ReactNode[] {
+  const page: Ctx = { width: CONTENT_WIDTH, spec: TYPE.body, glyphs };
+  const laid = blocks.map((block) => lay(block, page));
   const out: ReactNode[] = [];
   for (let i = 0; i < laid.length; i += 1) {
     const item = laid[i];
@@ -200,20 +276,43 @@ function inlineNodes(inlines: readonly PreparedInline[]): ReactNode[] {
       ...(item.italic ? { fontStyle: "italic" as const } : {}),
       ...(item.underline ? { textDecoration: "underline" as const } : {}),
     };
+    // A line's leading spaces, indented by the width react-pdf hangs into the margin so they print
+    // in place; a space the font has no glyph for, set as no-break spaces with letter spacing that
+    // gives its own width (pdf-text.ts). textIndent isn't inherited, so both sit on the innermost
+    // <Text> (inside a link's, too).
+    const own = {
+      ...(item.indent ? { textIndent: item.indent } : {}),
+      ...(item.spacing ? { letterSpacing: item.spacing } : {}),
+    };
+    const hasOwn = Object.keys(own).length > 0;
     if (item.href) {
       return (
         <Link key={i} src={item.href} style={[styles.link, marks]}>
-          {item.text}
+          {hasOwn ? <Text style={own}>{item.text}</Text> : item.text}
         </Link>
       );
     }
-    if (!item.bold && !item.italic && !item.underline) return item.text;
+    if (!item.bold && !item.italic && !item.underline && !hasOwn) return item.text;
     return (
-      <Text key={i} style={marks}>
+      <Text key={i} style={{ ...marks, ...own }}>
         {item.text}
       </Text>
     );
   });
+}
+
+/** What an empty last line holds: a no-break space (react-pdf sets no line for empty text). */
+const LINE_HOLDER = "\u00A0";
+
+/**
+ * A paragraph's or heading's lines. react-pdf sets no line for empty text, nor for the empty line
+ * after a final hard break, so an empty last line holds LINE_HOLDER: every line the author made
+ * takes its line (an empty paragraph one, a paragraph ending with a break one more).
+ */
+function lineNodes(inlines: readonly PreparedInline[]): ReactNode {
+  if (inlines.length === 0) return LINE_HOLDER;
+  const nodes = inlineNodes(inlines);
+  return inlines[inlines.length - 1]!.kind === "break" ? [...nodes, LINE_HOLDER] : nodes;
 }
 
 const textStyle = (spec: TypeSpec) => ({
@@ -226,7 +325,7 @@ const textStyle = (spec: TypeSpec) => ({
 function layParagraph(block: Extract<RenderBlock, { type: "paragraph" }>, ctx: Ctx, bold = false): Laid {
   const spec = ctx.spec;
   const content = bold ? block.content.map((r) => (r.type === "text" ? { ...r, bold: true as const } : r)) : block.content;
-  const { inlines, lines } = prepareText(content, spec, ctx.width);
+  const { inlines, lines } = prepareText(content, spec, ctx.width, ctx.glyphs);
   return {
     block,
     // Orphans and widows are 2, so a paragraph of 3 lines or fewer moves as a whole.
@@ -234,7 +333,7 @@ function layParagraph(block: Extract<RenderBlock, { type: "paragraph" }>, ctx: C
     height: lines * lineBox(spec),
     render: (above) => (
       <Text style={[textStyle(spec), { marginTop: above }]} orphans={2} widows={2} hyphenationPenalty={NEVER_BREAK}>
-        {inlines.length === 0 ? " " : inlineNodes(inlines)}
+        {lineNodes(inlines)}
       </Text>
     ),
   };
@@ -242,7 +341,7 @@ function layParagraph(block: Extract<RenderBlock, { type: "paragraph" }>, ctx: C
 
 function layHeading(block: Extract<RenderBlock, { type: "heading" }>, ctx: Ctx): Laid {
   const spec = HEADING_SPEC[block.level];
-  const { inlines, lines } = prepareText(block.content, spec, ctx.width);
+  const { inlines, lines } = prepareText(block.content, spec, ctx.width, ctx.glyphs);
   const height = lines * lineBox(spec);
   return {
     block,
@@ -254,7 +353,7 @@ function layHeading(block: Extract<RenderBlock, { type: "heading" }>, ctx: Ctx):
         minPresenceAhead={keepAhead}
         hyphenationPenalty={NEVER_BREAK}
       >
-        {inlines.length === 0 ? " " : inlineNodes(inlines)}
+        {lineNodes(inlines)}
       </Text>
     ),
   };
@@ -264,34 +363,47 @@ function layHeading(block: Extract<RenderBlock, { type: "heading" }>, ctx: Ctx):
 
 /** Items up to this many lines move to the next page whole instead of splitting. */
 const KEEP_ITEM_LINES = 5;
+const PLAIN = { bold: false, italic: false } as const;
+
+/** A list item's marker, set as given: whole when it fits its column, otherwise wrapped there, bare. */
+function prepareMarker(marker: string, spec: TypeSpec, room: number, glyphs: GlyphCheck): PreparedText {
+  const fits = measure(marker, faceOf(spec, PLAIN), spec.size) <= room;
+  return prepareText([{ type: "text", text: marker }], spec, fits ? Infinity : room, glyphs);
+}
 
 function layList(block: Extract<RenderBlock, { type: "list" }>, ctx: Ctx): Laid {
   const spec = ctx.spec;
-  // Every item's marker is resolved in the RenderDoc (docs/render-spec.md): printed as given.
-  const markers = block.items.map((item) => item.marker);
-  const widest = Math.max(0, ...markers.map((m) => measure(m, { family: spec.family, weight: 400, italic: false }, spec.size)));
-  // Hanging indent: markers right-aligned in their own column, text aligned after it.
-  const column = Math.max(LIST.minMarker, Math.ceil(widest + LIST.markerGap));
-  const inner: Ctx = { width: ctx.width - column, spec, depth: ctx.depth + 1 };
+  const width = Math.max(0, ctx.width);
+  const widest = Math.max(0, ...block.items.map((item) => measure(item.marker, faceOf(spec, PLAIN), spec.size)));
+  // Hanging indent: markers right-aligned in their own column, text aligned after it. The column
+  // never takes more than half the box (a deep list in a narrow cell keeps room for its text).
+  const column = Math.min(Math.max(LIST.minMarker, Math.ceil(widest + LIST.markerGap)), width / 2);
+  const gap = Math.min(LIST.markerGap, column / 3);
+  // The body gets an explicit width, not flex-grow: nested flex rows that size from their content
+  // make react-pdf's layout (Yoga) exponential in the nesting depth.
+  const inner: Ctx = { ...ctx, width: width - column };
 
   const items = block.items.map((item) => {
+    const marker = prepareMarker(item.marker, spec, column - gap, ctx.glyphs);
     const laid = item.content.map((b) => lay(b, inner));
-    const height = stackHeight(laid);
+    const height = Math.max(marker.lines * lineBox(spec), stackHeight(laid));
     const nested = item.content.some((b) => b.type === "list");
-    return { laid, height, keep: !nested && height <= KEEP_ITEM_LINES * lineBox(spec) + 1 };
+    return { marker, laid, height, keep: !nested && height <= KEEP_ITEM_LINES * lineBox(spec) + 1 };
   });
   const first = items[0];
 
   return {
     block,
-    head: first ? (first.keep ? first.height : first.laid[0]?.head ?? 0) : 0,
+    head: first ? (first.keep ? first.height : Math.max(first.marker.lines * lineBox(spec), first.laid[0]?.head ?? 0)) : 0,
     height: items.reduce((h, item, i) => h + item.height + (i > 0 ? SPACE.listItem : 0), 0),
     render: (above) => (
       <View style={{ marginTop: above }}>
         {items.map((item, i) => (
           <View key={i} style={[styles.listItem, { marginTop: i > 0 ? SPACE.listItem : 0 }]} wrap={!item.keep}>
-            <Text style={[textStyle(spec), styles.marker, { width: column, paddingRight: LIST.markerGap }]}>{markers[i]}</Text>
-            <View style={styles.listBody}>{stack(item.laid)}</View>
+            <Text style={[textStyle(spec), styles.marker, { width: column, paddingRight: gap }]} hyphenationPenalty={NEVER_BREAK}>
+              {inlineNodes(item.marker.inlines)}
+            </Text>
+            <View style={{ width: inner.width }}>{stack(item.laid)}</View>
           </View>
         ))}
       </View>
@@ -313,15 +425,24 @@ interface GridCell {
   open: boolean;
 }
 
+/** `value` as an integer from `min` to `max`; anything else is `min`. */
+function bounded(value: number, min: number, max: number): number {
+  return Number.isInteger(value) ? Math.min(Math.max(value, min), Math.max(min, max)) : min;
+}
+
 /**
- * Places cells on a column grid. Colspan widens a cell. Rowspan is approximated: the cell's
- * content sits in its first row, and the rows it spans get a blank cell with no rule between.
+ * Places cells on the table's column grid, `columns` wide. Colspan widens a cell. Rowspan is
+ * approximated: the cell's content sits in its first row, and the rows it spans get a blank cell
+ * with no rule between. The document check guarantees a rectangular grid of 1–12 columns; the
+ * width and spans are still bounded here, so a malformed RenderDoc can't make the grid huge, and a
+ * row with more cells than the width still prints every cell (the grid widens by one per cell).
  */
-function grid(rows: readonly RenderTableRow[]): { columns: number; rows: GridCell[][] } {
+function grid(table: RenderTable): { columns: number; rows: GridCell[][] } {
+  const width = bounded(table.columns, 1, MAX_TABLE_COLUMNS);
   const covered: number[] = []; // per column: rows still covered by a rowspan from above
   const out: GridCell[][] = [];
   let columns = 0;
-  for (const row of rows) {
+  table.rows.forEach((row, r) => {
     const cells: GridCell[] = [];
     let col = 0;
     const skipCovered = () => {
@@ -333,8 +454,8 @@ function grid(rows: readonly RenderTableRow[]): { columns: number; rows: GridCel
     };
     for (const cell of row.cells) {
       skipCovered();
-      const span = Math.max(1, cell.colspan);
-      const rowspan = Math.max(1, cell.rowspan);
+      const span = bounded(cell.colspan, 1, width - col);
+      const rowspan = bounded(cell.rowspan, 1, table.rows.length - r);
       for (let k = 0; k < span; k += 1) covered[col + k] = rowspan - 1;
       cells.push({ cell, span, open: rowspan > 1 });
       col += span;
@@ -342,8 +463,8 @@ function grid(rows: readonly RenderTableRow[]): { columns: number; rows: GridCel
     skipCovered();
     columns = Math.max(columns, col);
     out.push(cells);
-  }
-  return { columns: Math.max(1, columns), rows: out };
+  });
+  return { columns: Math.max(width, columns), rows: out };
 }
 
 /** Body rows that stay on each side of a page break inside a table. */
@@ -378,18 +499,20 @@ export function keepRuns(rows: readonly { height: number; keepWithNext: boolean 
 
 function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Laid {
   const spec = TYPE.table;
-  const { columns, rows } = grid(block.rows);
-  const unit = ctx.width / columns; // equal columns, like the editor's fixed table layout
+  const { columns, rows } = grid(block);
+  const unit = Math.max(0, ctx.width) / columns; // equal columns, like the editor's fixed table layout
   const repeat = repeatsHeader(block.rows);
 
   const laidRows = rows.map((cells, r) => {
     const laidCells = cells.map((g, k) => {
       const width = unit * g.span;
       const rules = HAIRLINE * (k === 0 ? 2 : 1);
-      const cellCtx: Ctx = { width: width - 2 * TABLE.padX - rules, spec, depth: 0 };
+      // A narrow cell (a table in a list in a 12-column table) gives up padding before text room.
+      const padX = Math.min(TABLE.padX, width / 4);
+      const cellCtx: Ctx = { ...ctx, width: Math.max(0, width - 2 * padX - rules), spec };
       const header = g.cell?.header === true;
       const laid = (g.cell?.content ?? []).map((b) => (header && b.type === "paragraph" ? layParagraph(b, cellCtx, true) : lay(b, cellCtx)));
-      return { g, width, header, laid, height: stackHeight(laid) };
+      return { g, width, padX, header, laid, height: stackHeight(laid) };
     });
     // Rows overlap by a hairline, so each adds one.
     const height = Math.max(lineBox(spec), ...laidCells.map((c) => c.height)) + 2 * TABLE.padY + HAIRLINE;
@@ -421,7 +544,7 @@ function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Lai
             key={k}
             style={[
               styles.cell,
-              { width: c.width },
+              { width: c.width, paddingHorizontal: c.padX },
               k === 0 ? styles.firstCell : {},
               c.header ? styles.headerCell : {},
               c.g.cell === null ? { borderTopWidth: 0 } : {},
@@ -465,7 +588,7 @@ const KEEP_CALLOUT = 200;
 
 function layCallout(block: Extract<RenderBlock, { type: "callout" }>, ctx: Ctx): Laid {
   const spec = TYPE.callout;
-  const inner: Ctx = { width: ctx.width - CALLOUT.padLeft - CALLOUT.padRight - 2 * HAIRLINE, spec, depth: 0 };
+  const inner: Ctx = { ...ctx, width: Math.max(0, ctx.width - CALLOUT.padLeft - CALLOUT.padRight - 2 * HAIRLINE), spec };
   const laid = block.content.map((b) => lay(b, inner));
   const height = stackHeight(laid) + CALLOUT.padTop + CALLOUT.padBottom + 2 * HAIRLINE;
   const keep = height <= KEEP_CALLOUT;

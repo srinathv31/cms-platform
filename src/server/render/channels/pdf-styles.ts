@@ -136,10 +136,6 @@ export const styles = StyleSheet.create({
     color: INK.marker,
     textAlign: "right",
   },
-  listBody: {
-    flexGrow: 1,
-    flexShrink: 1,
-  },
   // Every cell draws its own box and each row overlaps the one above by a hairline, so the lines
   // read as single rules and a table split across pages stays closed on both sides. (A split
   // container would stretch to the page bottom, so the table itself draws nothing.)

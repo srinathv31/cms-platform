@@ -6,12 +6,15 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { ResolveError } from "@/domain/render";
 import type { EmailRender } from "@/domain/render/types";
-import type { Viewer } from "@/domain/types";
+import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
+import { renderFailure } from "./engine";
 import { runRender, type RenderInput, type RenderResult } from "./render-template";
+import { checkDocument, type RenderDocumentError } from "./schema-check";
 
 // The pipeline end to end against a temporary database filled by the real seed (every lifecycle
 // state is in it). runRender takes the database and the time, the way applyDraftPatch does.
@@ -368,26 +371,82 @@ describe("runRender: render failures", () => {
     }
   });
 
-  it("a stored body that doesn't fit the editor schema is render_failed", async () => {
-    const id = ids["checking-fees"]!;
-    const [row] = await db.select().from(versions).where(and(eq(versions.templateId, id), eq(versions.number, 1)));
-    await db
-      .update(versions)
-      .set({ body: { type: "doc", content: [{ type: "marquee", content: [{ type: "text", text: "x" }] }] } })
-      .where(eq(versions.id, row!.id));
+  /** Renders `template` with its version's body (and nothing else) swapped for `body`, then puts it back. */
+  async function withBody<T>(template: string, number: number, body: JSONContent, run: (variables: Variable[]) => Promise<T>): Promise<T> {
+    const id = ids[template]!;
+    const [row] = await db.select().from(versions).where(and(eq(versions.templateId, id), eq(versions.number, number)));
+    await db.update(versions).set({ body }).where(eq(versions.id, row!.id));
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      const { result } = await render({
-        template: "checking-fees",
-        consumerId: "deposits-online",
-        values: Object.fromEntries(row!.variables.map((v) => [v.key, v.sample])),
-      });
-      expect(failed(result)).toEqual({ code: "render_failed", message: "The web page couldn't be rendered. Try again." });
+      return await run(row!.variables);
     } finally {
       spy.mockRestore();
       await db.update(versions).set({ body: row!.body }).where(eq(versions.id, row!.id));
     }
+  }
+  const samples = (variables: Variable[]) => Object.fromEntries(variables.map((v) => [v.key, v.sample]));
+  const paragraph = (text: string) => ({ type: "paragraph", content: [{ type: "text", text }] });
+
+  it("a stored body the document check refuses is render_failed with the check's sentence", async () => {
+    const body = { type: "doc", content: [{ type: "marquee", content: [{ type: "text", text: "x" }] }] };
+    const sentence = (() => {
+      try {
+        checkDocument(body);
+      } catch (error) {
+        return (error as RenderDocumentError).message;
+      }
+      throw new Error("the check accepted the body");
+    })();
+    expect(sentence).not.toContain("marquee");
+    await withBody("checking-fees", 1, body, async (variables) => {
+      const { result, rows } = await render({ template: "checking-fees", consumerId: "deposits-online", values: samples(variables) });
+      expect(failed(result)).toEqual({
+        code: "render_failed",
+        message: `The web page couldn't be rendered. ${sentence}`,
+        details: { reason: "document" },
+      });
+      expect(rows[0]).toMatchObject({ outcome: "error", errorCode: "render_failed" });
+    });
   });
+
+  it("a stored body the resolver refuses is render_failed with the resolver's sentence", async () => {
+    const error = new ResolveError("Headings can only be levels 1 to 3.");
+    expect(renderFailure("pdf", error)).toEqual({
+      code: "render_failed",
+      message: "The PDF couldn't be rendered. Headings can only be levels 1 to 3.",
+      details: { reason: "document" },
+    });
+    expect(renderFailure("email", new Error("could not lay out Maya Chen"))).toEqual({
+      code: "render_failed",
+      message: "The email couldn't be rendered. Try again.",
+    });
+  });
+
+  it("a PDF whose fonts can't draw some characters is render_failed naming them, and the log doesn't", async () => {
+    await withBody("balance-transfer", 2, { type: "doc", content: [paragraph("Fee ₹100, then ạ and ₹ again")] }, async () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { result, rows } = await render({ template: "balance-transfer", version: 2, channel: "pdf" });
+      expect(failed(result)).toEqual({
+        code: "render_failed",
+        message: "The PDF couldn't be rendered. Its font can't show these characters: U+20B9 (₹), U+1EA1 (ạ).",
+        details: { reason: "glyphs", characters: ["U+20B9", "U+1EA1"] },
+      });
+      expect(rows[0]).toMatchObject({ outcome: "error", errorCode: "render_failed" });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0]![0])).not.toMatch(/[₹ạ]/u);
+      spy.mockRestore();
+    });
+  }, 30_000);
+
+  it("dates the PDF with the render time, so the same request at the same time gives the same bytes", async () => {
+    const at = new Date("2026-10-04T12:00:00.000Z");
+    const first = ok((await render({ template: "balance-transfer", version: 2, channel: "pdf" }, at)).result).body as Uint8Array;
+    const again = ok((await render({ template: "balance-transfer", version: 2, channel: "pdf" }, at)).result).body as Uint8Array;
+    expect(Buffer.from(first).equals(Buffer.from(again))).toBe(true);
+    const raw = Buffer.from(first).toString("latin1");
+    expect(raw.match(/\(D:20261004120000Z\)/g)).toHaveLength(2); // CreationDate and ModDate
+    expect(raw).toContain("/ModDate");
+  }, 30_000);
 });
 
 describe("render_log never holds values", () => {
