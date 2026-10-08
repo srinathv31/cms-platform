@@ -5,16 +5,24 @@
 // the standard hidden preheader at the top of the body. Text: a plain-text alternative that reads
 // well on its own (headings underlined, lists marked, tables as rows, links as "text (url)").
 //
+// Both print the RenderDoc as it is (docs/render-spec.md, "Email"): every list marker as text (the
+// HTML lays lists out as two-cell rows Outlook keeps, never list-style numbering), blank paragraphs
+// as blank lines, and spaces as typed (the HTML writes the no-break space technique, since mail
+// clients collapse spaces and ignore `white-space`).
+//
 // The email <title> is the subject, as mail tools expect. The template name never appears.
 
-import type { EmailFields, EmailRender, RenderBlock, RenderDoc, RenderInline } from "@/domain/render/types";
+import type { EmailFields, EmailRender, RenderBlock, RenderDoc, RenderInline, RenderListItem, RenderTable } from "@/domain/render/types";
+import { normalizeLink } from "@/editor/model/links";
 import {
   FONT_STACK,
   blocksHtml,
   escapeHtml,
   groupByLink,
-  isBlankInline,
+  isHeaderRow,
+  noBreakSpaces,
   type HtmlFlavor,
+  type HtmlItem,
   type HtmlRole,
   type Place,
 } from "./html";
@@ -36,9 +44,6 @@ const STYLE: Record<HtmlRole, string> = {
   h1: `${FONT};font-size:26px;line-height:1.25;font-weight:bold;color:${C.text}`,
   h2: `${FONT};font-size:20px;line-height:1.3;font-weight:bold;color:${C.text}`,
   h3: `${FONT};font-size:17px;line-height:1.4;font-weight:bold;color:${C.text}`,
-  ul: `padding:0 0 0 24px;${BODY_TEXT}`,
-  ol: `padding:0 0 0 24px;${BODY_TEXT}`,
-  li: BODY_TEXT,
   table: `width:100%;border-collapse:collapse;border:1px solid ${C.hairline}`,
   th: `padding:8px 10px;border:1px solid ${C.hairline};background-color:${C.tableHead};text-align:left;vertical-align:top;${FONT};font-size:15px;line-height:1.5;font-weight:bold;color:${C.text}`,
   td: `padding:8px 10px;border:1px solid ${C.hairline};text-align:left;vertical-align:top;${FONT};font-size:15px;line-height:1.5;color:${C.text}`,
@@ -55,9 +60,6 @@ const MARGIN: Partial<Record<HtmlRole, readonly [number, number]>> = {
   h1: [0, 16],
   h2: [28, 10],
   h3: [22, 8],
-  ul: [0, 16],
-  ol: [0, 16],
-  li: [0, 6],
   table: [4, 20],
   hr: [28, 28],
 };
@@ -75,6 +77,34 @@ function styleFor(role: HtmlRole, place: Place): string {
 }
 
 const px = (em: number) => Math.round(em * TEXT_PX);
+
+/** A list's [top, bottom] margin, and the space between its items, in px. */
+const LIST_MARGIN = [0, 16] as const;
+const ITEM_GAP = 6;
+/** The marker column: at least this wide (it grows for a wide marker like "(viii)"), then a gap. */
+const MARKER_WIDTH = 24;
+const MARKER_GAP = 8;
+
+/**
+ * A list as a presentation table, one row per item: the marker, right-aligned in its own cell, then
+ * the item's content. Outlook keeps this layout (it ignores list-style tricks and most CSS), the
+ * marker is real text, and the item's further lines and blocks hang aligned after it.
+ */
+function listHtml(items: readonly HtmlItem[], place: Place): string {
+  const top = place.first ? 0 : LIST_MARGIN[0];
+  const bottom = place.last ? 0 : LIST_MARGIN[1];
+  const rows = items.map((item) => {
+    const gap = item.place.last ? 0 : ITEM_GAP;
+    const marker = `width:${MARKER_WIDTH}px;padding:0 ${MARKER_GAP}px ${gap}px 0;vertical-align:top;text-align:right;white-space:nowrap;${BODY_TEXT}`;
+    const content = `padding:0 0 ${gap}px;vertical-align:top;${BODY_TEXT}`;
+    return `<tr><td style="${marker}">${item.marker}</td><td style="${content}">${item.content}</td></tr>`;
+  });
+  return [
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:${top}px 0 ${bottom}px;width:100%;border-collapse:collapse;">`,
+    ...rows,
+    "</table>",
+  ].join("\n");
+}
 
 /**
  * The callout matches the PDF's stone note: the same tint, hairline and radius, and the same
@@ -94,6 +124,10 @@ const EMAIL: HtmlFlavor = {
   attrs: (role, place) =>
     (role === "table" ? ' cellpadding="0" cellspacing="0" border="0" width="100%"' : "") +
     ` style="${styleFor(role, place)}"`,
+  spaces: "nbsp",
+  emptyLine: "&nbsp;",
+  bareParagraph: true,
+  list: (_ordered, items, place) => listHtml(items, place),
   wrapTable: (table) => table,
   callout: (content, place) =>
     [
@@ -109,9 +143,10 @@ const EMAIL: HtmlFlavor = {
 // first lines of the body into the inbox preview.
 const PREHEADER_FILL = "&#847;&zwnj;&nbsp;".repeat(60);
 
+/** The hidden preheader. Its spaces use the no-break space technique, like the body's. */
 function preheaderHtml(preheader: string): string {
   if (!preheader) return "";
-  return `<span class="preheader" style="display:none !important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.canvas};max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(preheader)}${PREHEADER_FILL}</span>`;
+  return `<span class="preheader" style="display:none !important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.canvas};max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(noBreakSpaces(preheader))}${PREHEADER_FILL}</span>`;
 }
 
 function emailHtml(doc: RenderDoc, subject: string, preheader: string): string {
@@ -145,19 +180,32 @@ function emailHtml(doc: RenderDoc, subject: string, preheader: string): string {
 }
 
 // ── Plain text ───────────────────────────────────────────────────────────────
+//
+// The exact layout of docs/render-spec.md ("Plain text"), so a second engine writes the same bytes.
+// Characters are written as typed (no-break spaces included) and nothing is trimmed; widths are
+// counted in code points.
 
 const RULE = "-".repeat(40);
 const FRAME = `+${"-".repeat(39)}`;
 
 const width = (line: string) => [...line].length;
 
-/** "text (url)", or just the text when it already is the address. mailto: and tel: show bare. */
+const isBlank = (text: string) => text.trim() === "";
+
+/** Ignoring case and one trailing "/". */
+const sameAddress = (a: string, b: string) => a.replace(/\/$/, "").toLowerCase() === b.replace(/\/$/, "").toLowerCase();
+
+/**
+ * "text (address)", where the address is the href without a leading mailto: or tel:. Just the text
+ * when it already is the address (normalizeLink(text) is the href, or the text is the address);
+ * just the address when the link text is blank.
+ */
 function linkText(text: string, href: string): string {
-  const address = href.replace(/^(?:mailto:|tel:)/i, "");
+  const address = href.replace(/^(?:mailto:|tel:)/, "");
+  if (isBlank(text)) return address;
   const shown = text.trim();
-  if (!shown) return address;
-  const same = (a: string, b: string) => a.replace(/\/$/, "").toLowerCase() === b.replace(/\/$/, "").toLowerCase();
-  if (same(shown, href) || same(shown, address)) return text;
+  const asLink = normalizeLink(shown);
+  if ((asLink !== null && sameAddress(asLink, href)) || sameAddress(shown, address)) return text;
   return `${text} (${address})`;
 }
 
@@ -171,78 +219,98 @@ export function inlineText(content: readonly RenderInline[]): string {
     .join("");
 }
 
-const indent = (text: string, first: string, rest: string) =>
-  text
-    .split("\n")
-    .map((line, i) => (line === "" ? "" : (i === 0 ? first : rest) + line))
-    .join("\n");
-
-function underline(text: string, mark: "=" | "-"): string {
-  const longest = Math.max(...text.split("\n").map(width));
-  return `${text}\n${mark.repeat(Math.max(longest, 3))}`;
+/** Blocks as lines. `gap` puts an empty line between blocks (the top level, callouts); else none. */
+function blocksLines(blocks: readonly RenderBlock[], gap: boolean): string[] {
+  const lines: string[] = [];
+  blocks.forEach((block, i) => {
+    if (gap && i > 0) lines.push("");
+    lines.push(...blockLines(block));
+  });
+  return lines;
 }
 
-/** Each block as one chunk; chunks are separated by a blank line. */
-function blockChunks(blocks: readonly RenderBlock[]): string[] {
-  const chunks: string[] = [];
-  for (const block of blocks) {
-    switch (block.type) {
-      case "paragraph":
-        if (!isBlankInline(block.content)) chunks.push(inlineText(block.content).trim());
-        break;
-      case "heading": {
-        const text = inlineText(block.content).trim();
-        if (!text) break;
-        chunks.push(block.level === 1 ? underline(text, "=") : block.level === 2 ? underline(text, "-") : text);
-        break;
-      }
-      case "list": {
-        const items = block.items.map((item, i) => {
-          const marker = block.ordered ? `${block.start + i}. ` : "- ";
-          const body = blockChunks(item.content).join("\n");
-          return indent(body || "", marker, " ".repeat(marker.length));
-        });
-        chunks.push(items.join("\n"));
-        break;
-      }
-      case "table": {
-        const lines: string[] = [];
-        block.rows.forEach((row, i) => {
-          const line = row.cells
-            .map((cell) => blockChunks(cell.content).join(" ").replace(/\s*\n\s*/g, " "))
-            .join(" | ");
-          lines.push(line);
-          const isHead = row.cells.length > 0 && row.cells.every((c) => c.header);
-          if (isHead && i < block.rows.length - 1) lines.push("-".repeat(Math.max(width(line), 3)));
-        });
-        chunks.push(lines.join("\n"));
-        break;
-      }
-      case "callout": {
-        const inner = blockChunks(block.content).join("\n\n");
-        const framed = inner
-          .split("\n")
-          .map((line) => (line === "" ? "|" : `| ${line}`))
-          .join("\n");
-        chunks.push(`${FRAME}\n${framed}\n${FRAME}`);
-        break;
-      }
-      case "rule":
-        chunks.push(RULE);
-        break;
+function blockLines(block: RenderBlock): string[] {
+  switch (block.type) {
+    case "paragraph":
+      // An empty paragraph is one empty line; a paragraph of spaces is a line of those spaces.
+      return inlineText(block.content).split("\n");
+    case "heading": {
+      const lines = inlineText(block.content).split("\n");
+      // Level 1 is underlined with =, level 2 with -, level 3 not at all; a blank heading never is.
+      if (block.level === 3 || lines.every(isBlank)) return lines;
+      const mark = block.level === 1 ? "=" : "-";
+      return [...lines, mark.repeat(Math.max(3, ...lines.map(width)))];
     }
+    case "list":
+      return block.items.flatMap(itemLines);
+    case "table":
+      return tableLines(block);
+    case "callout":
+      return [FRAME, ...blocksLines(block.content, true).map((line) => (line === "" ? "|" : `| ${line}`)), FRAME];
+    case "rule":
+      return [RULE];
   }
-  return chunks;
 }
 
+/**
+ * The item's marker, a space and its first line; its further lines and blocks hang indented by the
+ * marker's width plus one. Empty lines stay empty, and an item whose first line is empty is its
+ * marker alone (no trailing space).
+ */
+function itemLines(item: RenderListItem): string[] {
+  const indent = " ".repeat(width(item.marker) + 1);
+  return blocksLines(item.content, false).map((line, i) => {
+    if (i === 0) return line === "" ? item.marker : `${item.marker} ${line}`;
+    return line === "" ? "" : indent + line;
+  });
+}
+
+/**
+ * Each row as lines. A cell's lines are its blocks' lines (an empty cell is one empty line); a row
+ * has as many lines as its tallest cell. Row line j: each cell's line j (or "" when it has fewer),
+ * every cell but the last padded with spaces to its longest line, joined with " | ", except that an
+ * empty last piece is joined with " |". A row of header cells is underlined with -, unless it is the
+ * table's last row.
+ */
+function tableLines(table: RenderTable): string[] {
+  const out: string[] = [];
+  table.rows.forEach((row, r) => {
+    const cells = row.cells.map((cell) => (cell.content.length === 0 ? [""] : blocksLines(cell.content, false)));
+    const widths = cells.map((lines) => Math.max(...lines.map(width)));
+    const height = Math.max(0, ...cells.map((lines) => lines.length));
+    const rowLines: string[] = [];
+    for (let j = 0; j < height; j += 1) {
+      let line = "";
+      cells.forEach((lines, k) => {
+        const piece = lines[j] ?? "";
+        if (k === cells.length - 1) {
+          line += k === 0 ? piece : piece === "" ? " |" : ` | ${piece}`;
+        } else {
+          const padded = piece + " ".repeat(widths[k]! - width(piece));
+          line += k === 0 ? padded : ` | ${padded}`;
+        }
+      });
+      rowLines.push(line);
+    }
+    out.push(...rowLines);
+    if (isHeaderRow(row) && r < table.rows.length - 1) out.push("-".repeat(Math.max(3, ...rowLines.map(width))));
+  });
+  return out;
+}
+
+/** UTF-8 text, \n line endings, top-level blocks separated by an empty line, ending with one \n. */
 function emailText(doc: RenderDoc): string {
-  return `${blockChunks(doc.blocks).join("\n\n")}\n`;
+  return `${blocksLines(doc.blocks, true).join("\n")}\n`;
 }
 
 // ── The adapter ──────────────────────────────────────────────────────────────
 
-/** Subject and preheader are single lines: any newline or run of whitespace becomes one space. */
-const oneLine = (value: string) => value.replace(/\s+/g, " ").trim();
+/**
+ * Subject and preheader come resolved (resolveInlineField): one line, ends trimmed, runs of spaces
+ * kept. They are returned as they are; a line break, which a resolved field never holds, would
+ * become a space, so no caller can ever start a new mail header.
+ */
+const oneLine = (value: string) => value.replace(/\r\n|[\n\r\u2028\u2029]/g, " ").trim();
 
 export function renderEmail(doc: RenderDoc, fields: EmailFields): EmailRender {
   const subject = oneLine(fields.subject);

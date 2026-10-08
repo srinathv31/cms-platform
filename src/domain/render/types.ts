@@ -1,21 +1,37 @@
 // The render contract: the channel-neutral RenderDoc, the render route's request and response, and
-// the errors it can return. Pure TypeScript, shaped like the future Java API.
+// the errors it can return. Pure TypeScript, shaped like the future Java API. docs/render-spec.md is
+// the specification a second engine is built from; this file is its TypeScript form.
 //
-// The pipeline (src/server/render/render-template.ts):
+// The pipeline (src/server/render/render-template.ts, with the engine in src/server/render/engine.ts):
 //   load version → version rules (version-rules.ts) → channel check → validate values (validate.ts)
-//   → resolve TipTap JSON into a RenderDoc (resolve.ts) → channel adapter → render_log row
+//   → check the document (schema-check.ts) → resolve TipTap JSON into a RenderDoc (resolve.ts)
+//   → channel adapter → render_log row
 //
 // The editor preview, the review screen and the simulator all call the same route, so what an
 // approver sees is exactly what a customer gets. render_log NEVER holds variable values.
 
+import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/list-markers";
 import type { Channel, Variable, VariableType, VariableValues } from "../types";
 
+export type { BulletStyle, MarkerDelimiter, MarkerFormat };
+
 // ── RenderDoc: a resolved document, before any channel ───────────────────────
+//
+// Everything a channel prints is decided here, once: which blocks exist (removals are done), every
+// list marker's text, every value's display text, every link's normalized href. Adapters only
+// choose how it looks; they never drop, add, reorder, renumber or rewrite content. The invariants
+// below hold for every RenderDoc the resolver produces (docs/render-spec.md, "The RenderDoc").
 
 /**
- * Inline text with its marks. Variables are already resolved: a chip becomes a run with the value
- * formatted for its type (`formatValue`), and `variable` holds its key (adapters may use it, e.g. to
- * keep a long value from breaking mid-word). Text never contains "\n"; a hard break is a `break`.
+ * A run of text with its marks. Variables are already resolved: a chip becomes a run holding the
+ * value's display text (`formatValue`), and `variable` holds its key (adapters may use it, e.g. to
+ * keep a short value from wrapping). Invariants:
+ *   - `text` is never empty and is NFC-normalized;
+ *   - it never contains a line break (U+000A, U+000D, U+2028, U+2029: those become `break`s), a tab
+ *     (a tab becomes one space), other C0/C1 controls, or the zero-width characters U+200B–U+200D,
+ *     U+2060, U+FEFF (those render as nothing);
+ *   - spaces are exactly as typed: leading, trailing and repeated U+0020 and U+00A0 are content;
+ *   - adjacent runs with identical marks are merged, except that a variable's run never merges.
  */
 export interface RenderText {
   type: "text";
@@ -23,52 +39,137 @@ export interface RenderText {
   bold?: true;
   italic?: true;
   underline?: true;
-  /** Link mark. Only http(s), mailto and tel survive resolution; anything else drops the link, keeps the text. */
+  /** Link target, already normalized (`normalizeLink` in @/editor/model/links). A link that fails the check is dropped and its text kept. */
   href?: string;
-  /** Set when the run is a resolved variable. */
+  /** Set when the run is a resolved variable: the variable's key. */
   variable?: string;
 }
 
+/** A hard line break. Paragraph and heading content never ends with one (they are stripped). */
 export interface RenderBreak {
   type: "break";
 }
 
 export type RenderInline = RenderText | RenderBreak;
 
-/** Block ids are the document's stable block ids (`attrs.id`); null only for nested blocks without one. */
-export type RenderBlock =
-  | { type: "paragraph"; id: string | null; content: RenderInline[] }
-  | {
-      type: "heading";
-      id: string | null;
-      level: 1 | 2 | 3;
-      /** The required section's key (`requiredKey`), e.g. "legal_notices"; null for ordinary headings. */
-      section: string | null;
-      content: RenderInline[];
-    }
-  | { type: "list"; id: string | null; ordered: boolean; start: number; items: RenderListItem[] }
-  | { type: "table"; id: string | null; rows: RenderTableRow[] }
-  | { type: "callout"; id: string | null; content: RenderBlock[] }
-  | { type: "rule"; id: string | null };
+/**
+ * A paragraph. Its lines are its content split at breaks. A paragraph whose content is empty, or
+ * only spaces and breaks, is a blank line the author typed: every channel shows it as blank
+ * line(s) of the paragraph's height. (Paragraphs made only of optional variables without a value
+ * are removed by the resolver and never appear here.)
+ */
+export interface RenderParagraph {
+  type: "paragraph";
+  id: string | null;
+  content: RenderInline[];
+}
 
+/** A heading. Empty or blank headings render as a blank line in the heading's style. */
+export interface RenderHeading {
+  type: "heading";
+  id: string | null;
+  level: 1 | 2 | 3;
+  /** The required section's key (`requiredKey`), e.g. "legal_notices"; null for ordinary headings. */
+  section: string | null;
+  content: RenderInline[];
+}
+
+/**
+ * A bulleted list. `bullet` is resolved from the list's bullet depth (bulletList ancestors only):
+ * disc, circle, square, repeating. Every item's `marker` is the style's glyph (• ◦ ▪).
+ */
+export interface RenderBulletList {
+  type: "list";
+  id: string | null;
+  ordered: false;
+  bullet: BulletStyle;
+  /** At least one item. */
+  items: RenderListItem[];
+}
+
+/**
+ * A numbered list, with its style resolved: the author's `markerFormat` / `markerDelimiter`, or the
+ * default for its ordered depth (orderedList ancestors only): decimal → lower-alpha → lower-roman,
+ * repeating, with "period". Item i (from 0) is number `start + i` and its `marker` is
+ * `formatMarker(start + i, format, delimiter)`. Items removed by the resolver are already gone, so
+ * the numbers run on without a gap.
+ */
+export interface RenderOrderedList {
+  type: "list";
+  id: string | null;
+  ordered: true;
+  /** The first item's number, 0–9999, exactly as stored (absent in the JSON means 1). */
+  start: number;
+  format: MarkerFormat;
+  delimiter: MarkerDelimiter;
+  /** At least one item. */
+  items: RenderListItem[];
+}
+
+export type RenderList = RenderBulletList | RenderOrderedList;
+
+/**
+ * A list item. `marker` is the exact text every channel prints before the item's first line:
+ * "•", "◦", "▪", "1.", "iv.", "(b)", "12)". No surrounding spaces; each channel sets its own gap.
+ * `content` has at least one block.
+ */
 export interface RenderListItem {
-  content: RenderBlock[];
-}
-
-export interface RenderTableRow {
-  cells: RenderTableCell[];
-}
-
-export interface RenderTableCell {
-  header: boolean;
-  colspan: number;
-  rowspan: number;
+  marker: string;
   content: RenderBlock[];
 }
 
 /**
+ * A table: a rectangular grid of `columns` columns (1–12). Every row, counting the cells that
+ * rowspans from rows above carry into it, covers exactly `columns` columns.
+ */
+export interface RenderTable {
+  type: "table";
+  id: string | null;
+  columns: number;
+  /** At least one row. */
+  rows: RenderTableRow[];
+}
+
+export interface RenderTableRow {
+  /** The cells that start in this row, left to right. */
+  cells: RenderTableCell[];
+}
+
+/** What a table cell may hold: paragraphs and lists (whose items may hold any block). */
+export type RenderCellBlock = RenderParagraph | RenderList;
+
+/**
+ * A cell. `content` may be empty: a cell is never removed, so a cell whose only paragraph was
+ * removed stays, empty.
+ */
+export interface RenderTableCell {
+  header: boolean;
+  /** 1 or more; never runs past the table's last column. */
+  colspan: number;
+  /** 1 or more; never runs past the table's last row. */
+  rowspan: number;
+  content: RenderCellBlock[];
+}
+
+/** A callout: at least one paragraph. A callout whose paragraphs were all removed is removed. */
+export interface RenderCallout {
+  type: "callout";
+  id: string | null;
+  content: RenderParagraph[];
+}
+
+export interface RenderRule {
+  type: "rule";
+  id: string | null;
+}
+
+/** Block ids are the document's stable block ids (`attrs.id`); null only for nested blocks without one. */
+export type RenderBlock = RenderParagraph | RenderHeading | RenderList | RenderTable | RenderCallout | RenderRule;
+
+/**
  * What every channel adapter receives. `templateName` is internal metadata (PDF title, HTML <title>);
  * the adapters never print it in the body: the customer-facing title, if any, is in the document.
+ * The top-level `blocks` never end with an empty paragraph (the editor's trailing line is dropped).
  */
 export interface RenderDoc {
   templateId: string;
@@ -183,6 +284,8 @@ export interface Base64ResponseBody {
  * | 422    | missing_variables     | "Missing required variables: first_name, purchase_apr."                   |
  * | 422    | invalid_values        | "purchase_apr must be a percentage, like 21.99."                          |
  * | 500    | render_failed         | "The PDF couldn't be rendered. Try again."                                |
+ * |        |                       | "The PDF couldn't be rendered. Tables can have at most 12 columns." (document check) |
+ * |        |                       | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ)." |
  *
  * When values are both missing and invalid, the code is `missing_variables` and the message is the
  * missing sentence followed by the invalid ones. `details` for both value codes is ValueErrorDetails.
@@ -232,6 +335,13 @@ export interface ValueErrorDetails {
   invalid: InvalidValue[];
 }
 
+/**
+ * `details` of a render_failed the caller can act on (docs/render-spec.md, "Errors"): the stored
+ * document failed the document check, or the PDF font can't draw some characters ("U+1EA1", in the
+ * order they first appear). An unexpected failure has no details.
+ */
+export type RenderFailedDetails = { reason: "document" } | { reason: "glyphs"; characters: string[] };
+
 export interface VersionErrorDetails {
   version: number;
   activeVersion: number | null;
@@ -242,7 +352,7 @@ export interface VersionErrorDetails {
 export interface RenderError {
   code: RenderErrorCode;
   message: string;
-  details?: ValueErrorDetails | VersionErrorDetails | Record<string, unknown>;
+  details?: ValueErrorDetails | VersionErrorDetails | RenderFailedDetails | Record<string, unknown>;
 }
 
 export interface RenderErrorBody {

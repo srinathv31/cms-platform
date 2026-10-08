@@ -1,12 +1,17 @@
 // RenderBlock → HTML, shared by the web and email adapters. The structure (escaping, links, marks,
-// lists, tables, callouts) lives here once; each adapter supplies a flavor that says how elements
-// are styled: the web adapter with a few class names and one <style> block, the email adapter with
-// inline styles on every element because mail clients strip <style>.
+// blank lines, tables, callouts) lives here once; each adapter supplies a flavor that says how
+// elements are styled and laid out: the web adapter with a few class names and one <style> block,
+// the email adapter with inline styles on every element because mail clients strip <style>.
 //
-// Customer output, not UCOMP UI: the adapters take every raw color from PALETTE (look.ts), the one
+// Adapters print the RenderDoc as it is (docs/render-spec.md, "Channels"): every block, in order;
+// every list item's marker as text (never the browser's or mail client's numbering); blank
+// paragraphs as blank lines; spaces and hard breaks exactly as typed.
+//
+// Customer output, not Stencil UI: the adapters take every raw color from PALETTE (look.ts), the one
 // constants block all three channels read.
 
 import type { RenderBlock, RenderInline, RenderTableRow, RenderText } from "@/domain/render/types";
+import { normalizeLink } from "@/editor/model/links";
 
 // ── Type (customer output only) ──────────────────────────────────────────────
 
@@ -21,46 +26,60 @@ const ESCAPES: Record<string, string> = {
   ">": "&gt;",
   '"': "&quot;",
   "'": "&#39;",
+  "\u00A0": "&nbsp;",
 };
 
-/** Escapes text for element content and for double- or single-quoted attribute values. */
+/**
+ * Escapes text for element content and for double- or single-quoted attribute values. A no-break
+ * space (U+00A0) is written `&nbsp;`; every other character is written as itself.
+ */
 export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => ESCAPES[ch]!);
+  return value.replace(/[&<>"'\u00A0]/g, (ch) => ESCAPES[ch]!);
 }
 
-const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:)/i;
-// Whitespace, controls and the invisible separators a hostile URL can hide behind.
-const UNSAFE_HREF_CHARS = /[\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/;
+// ── Spaces (email) ───────────────────────────────────────────────────────────
 
 /**
- * Resolution already drops links that aren't http(s), mailto or tel. The adapters check again so a
- * RenderDoc from anywhere can never put `javascript:` (or anything else) in an href.
+ * The no-break space technique for one line of text (spec section 4): mail clients collapse runs of
+ * spaces and ignore `white-space`, so a U+0020 becomes U+00A0 when it is the line's first or last
+ * character, or when the character written just before it is a U+0020. "a···b" → "a␠⍽␠b",
+ * "··Lead" → "⍽␠Lead", "End··" → "End␠⍽", "···" → "⍽␠⍽" (⍽ = U+00A0, ␠ = U+0020).
  */
-export function safeHref(href: string | undefined): string | null {
-  if (!href) return null;
-  const trimmed = href.trim();
-  if (!SAFE_HREF.test(trimmed) || UNSAFE_HREF_CHARS.test(trimmed)) return null;
-  return trimmed;
+export function noBreakSpaces(line: string): string {
+  let out = "";
+  const last = line.length - 1;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!;
+    out += ch === " " && (i === 0 || i === last || out.endsWith(" ")) ? "\u00A0" : ch;
+  }
+  return out;
+}
+
+/** Applies `noBreakSpaces` to each line of inline content (its runs between breaks, taken together). */
+export function keepSpaces(content: readonly RenderInline[]): RenderInline[] {
+  const out = content.map((item): RenderInline => (item.type === "text" ? { ...item } : item));
+  let line: RenderText[] = [];
+  const flush = () => {
+    const spaced = noBreakSpaces(line.map((run) => run.text).join(""));
+    let at = 0;
+    for (const run of line) {
+      const length = run.text.length;
+      run.text = spaced.slice(at, at + length);
+      at += length;
+    }
+    line = [];
+  };
+  for (const item of out) {
+    if (item.type === "break") flush();
+    else line.push(item);
+  }
+  flush();
+  return out;
 }
 
 // ── Flavors ──────────────────────────────────────────────────────────────────
 
-export type HtmlRole =
-  | "p"
-  | "h1"
-  | "h2"
-  | "h3"
-  | "ul"
-  | "ol"
-  | "li"
-  | "table"
-  | "th"
-  | "td"
-  | "hr"
-  | "a"
-  | "strong"
-  | "em"
-  | "u";
+export type HtmlRole = "p" | "h1" | "h2" | "h3" | "table" | "th" | "td" | "hr" | "a" | "strong" | "em" | "u";
 
 /** Where a block sits. Email uses it for spacing; the web stylesheet gets the same from selectors. */
 export interface Place {
@@ -71,16 +90,72 @@ export interface Place {
   last: boolean;
 }
 
+/** A list item, rendered: its marker (escaped text) and its content (HTML). */
+export interface HtmlItem {
+  marker: string;
+  content: string;
+  place: Place;
+}
+
 export interface HtmlFlavor {
   /**
    * Extra attributes for an element, with a leading space (` class="…"`, ` style="…"`, layout
    * attributes), or "". Flavors return constants only, never document text.
    */
   attrs(role: HtmlRole, place: Place): string;
+  /**
+   * How spaces survive as typed: "pre-wrap" leaves them to the stylesheet (`white-space: pre-wrap`
+   * on text containers); "nbsp" writes the no-break space technique into the text.
+   */
+  spaces: "pre-wrap" | "nbsp";
+  /**
+   * What an empty last line holds so it still takes its line: "<br>" or "&nbsp;". Browsers and mail
+   * clients collapse a block's final <br>, so an empty paragraph or heading, and the line after a
+   * hard break that ends one, would otherwise vanish.
+   */
+  emptyLine: string;
+  /** Whether a list item or table cell holding a single paragraph gets its inline content without a <p>. */
+  bareParagraph: boolean;
+  /** Lays out a list: each item's marker as text before its content, as a hanging indent. */
+  list(ordered: boolean, items: readonly HtmlItem[], place: Place): string;
   /** Wraps a table: the web scrolls it sideways on phones; email adds its spacing. */
   wrapTable(table: string, place: Place): string;
   /** Builds a callout around its rendered content. */
   callout(content: string, place: Place): string;
+}
+
+// ── Links ────────────────────────────────────────────────────────────────────
+
+/** Consecutive pieces that share a link, so "Read **our terms**" becomes one anchor. */
+export interface LinkGroup {
+  href: string | null;
+  items: RenderInline[];
+}
+
+/**
+ * Groups inline content by link. Every href goes through normalizeLink, the one link rule, so a
+ * RenderDoc from anywhere can never put `javascript:` (or anything else) in an href. A hard break
+ * joins a link only when the runs on both sides of it carry that link; otherwise it stands outside.
+ */
+export function groupByLink(content: readonly RenderInline[]): LinkGroup[] {
+  const hrefs = content.map((item) => (item.type === "text" ? normalizeLink(item.href) : null));
+  // For each position, the href of the next text run at or after it.
+  const ahead: (string | null)[] = new Array(content.length + 1).fill(null);
+  for (let i = content.length - 1; i >= 0; i -= 1) {
+    ahead[i] = content[i]!.type === "text" ? (hrefs[i] ?? null) : (ahead[i + 1] ?? null);
+  }
+  const groups: LinkGroup[] = [];
+  content.forEach((item, i) => {
+    const last = groups[groups.length - 1];
+    let href: string | null = hrefs[i] ?? null;
+    if (item.type === "break") {
+      const before = last?.href ?? null;
+      href = before !== null && before === ahead[i + 1] ? before : null;
+    }
+    if (last && last.href === href) last.items.push(item);
+    else groups.push({ href, items: [item] });
+  });
+  return groups;
 }
 
 // ── Inline ───────────────────────────────────────────────────────────────────
@@ -93,68 +168,45 @@ function runHtml(run: RenderText, flavor: HtmlFlavor, place: Place): string {
   return html;
 }
 
-/** Consecutive pieces that share a link, so "Read **our terms**" becomes one anchor. */
-interface LinkGroup {
-  href: string | null;
-  items: RenderInline[];
-}
-
-export function groupByLink(content: readonly RenderInline[]): LinkGroup[] {
-  const groups: LinkGroup[] = [];
-  for (const item of content) {
-    const last = groups.at(-1);
-    // A hard break stays with whatever comes before it, so it never splits a link in two.
-    const href = item.type === "break" ? (last?.href ?? null) : safeHref(item.href);
-    if (last && last.href === href) last.items.push(item);
-    else groups.push({ href, items: [item] });
-  }
-  return groups;
-}
-
+/**
+ * Inline content as HTML. An empty last line (empty content, or content that ends with a hard break)
+ * holds the flavor's `emptyLine`, so every line the author made takes its line.
+ */
 export function inlineHtml(content: readonly RenderInline[], flavor: HtmlFlavor, place: Place): string {
-  return groupByLink(content)
+  if (content.length === 0) return flavor.emptyLine;
+  const spaced = flavor.spaces === "nbsp" ? keepSpaces(content) : content;
+  const html = groupByLink(spaced)
     .map(({ href, items }) => {
-      const inner = items
-        .map((item) => (item.type === "break" ? "<br>" : runHtml(item, flavor, place)))
-        .join("");
+      const inner = items.map((item) => (item.type === "break" ? "<br>" : runHtml(item, flavor, place))).join("");
       return href === null ? inner : `<a href="${escapeHtml(href)}"${flavor.attrs("a", place)}>${inner}</a>`;
     })
     .join("");
-}
-
-/** True when a paragraph has nothing to show (empty, whitespace, or only breaks). */
-export function isBlankInline(content: readonly RenderInline[]): boolean {
-  return content.every((item) => item.type === "break" || item.text.trim() === "");
+  return content[content.length - 1]!.type === "break" ? html + flavor.emptyLine : html;
 }
 
 // ── Blocks ───────────────────────────────────────────────────────────────────
 
-/**
- * Renders blocks in order. Blank paragraphs are dropped: in the editor they are spacing, and an
- * optional variable with no value can leave one behind.
- */
+/** Renders every block, in order. Blank paragraphs are lines the author typed: they render too. */
 export function blocksHtml(
   blocks: readonly RenderBlock[],
   flavor: HtmlFlavor,
   container: Place["in"] = "root",
 ): string {
-  const visible = blocks.filter((b) => !(b.type === "paragraph" && isBlankInline(b.content)));
-  return visible
-    .map((block, i) => blockHtml(block, flavor, { in: container, first: i === 0, last: i === visible.length - 1 }))
+  return blocks
+    .map((block, i) => blockHtml(block, flavor, { in: container, first: i === 0, last: i === blocks.length - 1 }))
     .join("\n");
 }
 
 /**
- * List items and table cells that hold a single paragraph get its inline content directly, without
- * a <p>: tighter markup, and email clients add no stray paragraph margins.
+ * A list item's or table cell's content. With `bareParagraph` (email), a single paragraph's inline
+ * content goes in directly, without a <p>: tighter markup, and no stray paragraph margins.
  */
 function flowHtml(blocks: readonly RenderBlock[], flavor: HtmlFlavor, container: "list" | "cell"): string {
-  const visible = blocks.filter((b) => !(b.type === "paragraph" && isBlankInline(b.content)));
-  const only = visible[0];
-  if (visible.length === 1 && only?.type === "paragraph") {
+  const only = blocks[0];
+  if (flavor.bareParagraph && blocks.length === 1 && only?.type === "paragraph") {
     return inlineHtml(only.content, flavor, { in: container, first: true, last: true });
   }
-  return blocksHtml(visible, flavor, container);
+  return blocksHtml(blocks, flavor, container);
 }
 
 function blockHtml(block: RenderBlock, flavor: HtmlFlavor, place: Place): string {
@@ -166,15 +218,14 @@ function blockHtml(block: RenderBlock, flavor: HtmlFlavor, place: Place): string
       return `<${tag}${flavor.attrs(tag, place)}>${inlineHtml(block.content, flavor, place)}</${tag}>`;
     }
     case "list": {
-      const tag = block.ordered ? "ol" : "ul";
-      const start = block.ordered && block.start !== 1 ? ` start="${Math.trunc(block.start)}"` : "";
-      const items = block.items
-        .map((item, i) => {
-          const itemPlace: Place = { in: "list", first: i === 0, last: i === block.items.length - 1 };
-          return `<li${flavor.attrs("li", itemPlace)}>${flowHtml(item.content, flavor, "list")}</li>`;
-        })
-        .join("\n");
-      return `<${tag}${start}${flavor.attrs(tag, place)}>\n${items}\n</${tag}>`;
+      const items = block.items.map(
+        (item, i): HtmlItem => ({
+          marker: escapeHtml(item.marker),
+          content: flowHtml(item.content, flavor, "list"),
+          place: { in: "list", first: i === 0, last: i === block.items.length - 1 },
+        }),
+      );
+      return flavor.list(block.ordered, items, place);
     }
     case "table":
       return flavor.wrapTable(tableHtml(block.rows, flavor, place), place);
@@ -185,7 +236,7 @@ function blockHtml(block: RenderBlock, flavor: HtmlFlavor, place: Place): string
   }
 }
 
-const isHeaderRow = (row: RenderTableRow) => row.cells.length > 0 && row.cells.every((c) => c.header);
+export const isHeaderRow = (row: RenderTableRow) => row.cells.length > 0 && row.cells.every((c) => c.header);
 
 function tableHtml(rows: readonly RenderTableRow[], flavor: HtmlFlavor, place: Place): string {
   // Leading rows made only of header cells become <thead>, so screen readers announce columns.

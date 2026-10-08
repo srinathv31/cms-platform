@@ -12,8 +12,11 @@ import {
   joinWithAnd,
   missingVariables,
   previewForbidden,
+  codePointLabel,
   renderError,
   renderFailed,
+  renderFailedDocument,
+  renderFailedGlyphs,
   templateNotFound,
   unknownConsumer,
   valuesError,
@@ -95,6 +98,41 @@ describe("fixed messages", () => {
   it("every code has a status", () => {
     expect(RENDER_ERROR_STATUS[templateNotFound("UC-1").code]).toBe(404);
     expect(RENDER_ERROR_STATUS[renderFailed("pdf").code]).toBe(500);
+  });
+});
+
+describe("render_failed with a reason the caller can act on", () => {
+  it("a stored document the check refuses: the check's sentence, after the channel's subject", () => {
+    expect(renderFailedDocument("pdf", "Tables can have at most 12 columns.")).toEqual({
+      code: "render_failed",
+      message: "The PDF couldn't be rendered. Tables can have at most 12 columns.",
+      details: { reason: "document" },
+    });
+    expect(renderFailedDocument("email", "Headings can only be levels 1 to 3.").message).toBe(
+      "The email couldn't be rendered. Headings can only be levels 1 to 3.",
+    );
+  });
+
+  it("characters the PDF's fonts can't draw: each once, in order, as U+ code points", () => {
+    expect(renderFailedGlyphs(["ạ", "₹"])).toEqual({
+      code: "render_failed",
+      message: "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹).",
+      details: { reason: "glyphs", characters: ["U+1EA1", "U+20B9"] },
+    });
+    expect(renderFailedGlyphs(["😀", "é", "😀"]).message).toBe(
+      "The PDF couldn't be rendered. Its font can't show these characters: U+1F600 (😀), U+00E9 (é).",
+    );
+    expect(codePointLabel("A")).toBe("U+0041");
+  });
+
+  it("names ten characters and counts the rest", () => {
+    const characters = [..."ẠạẢảẤấẦầẨẩẪẫẬ"];
+    const error = renderFailedGlyphs(characters);
+    expect(error.message).toBe(
+      "The PDF couldn't be rendered. Its font can't show these characters: " +
+        "U+1EA0 (Ạ), U+1EA1 (ạ), U+1EA2 (Ả), U+1EA3 (ả), U+1EA4 (Ấ), U+1EA5 (ấ), U+1EA6 (Ầ), U+1EA7 (ầ), U+1EA8 (Ẩ), U+1EA9 (ẩ) and 3 more.",
+    );
+    expect(error.details).toEqual({ reason: "glyphs", characters: characters.map(codePointLabel) });
   });
 });
 

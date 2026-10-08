@@ -9,6 +9,7 @@ import type {
   InvalidValue,
   RenderError,
   RenderErrorCode,
+  RenderFailedDetails,
   ValueErrorDetails,
   VersionErrorDetails,
 } from "./types";
@@ -210,7 +211,44 @@ const RENDER_FAILED_SUBJECT: Readonly<Record<Channel, string>> = {
   email: "The email",
 };
 
-/** "The PDF couldn't be rendered. Try again." */
+/** "The PDF couldn't be rendered. Try again." Anything that fails in stages 7–9 without a reason of its own. */
 export function renderFailed(channel: Channel): RenderError {
   return renderError("render_failed", `${RENDER_FAILED_SUBJECT[channel]} couldn't be rendered. Try again.`);
+}
+
+/**
+ * The stored document failed the document check, or the resolver refused it:
+ * "The PDF couldn't be rendered. Tables can have at most 12 columns." `sentence` is the check's
+ * own sentence (docs/render-spec.md §3), which never quotes the document or a value.
+ */
+export function renderFailedDocument(channel: Channel, sentence: string): RenderError {
+  const details: RenderFailedDetails = { reason: "document" };
+  return renderError("render_failed", `${RENDER_FAILED_SUBJECT[channel]} couldn't be rendered. ${sentence}`, details);
+}
+
+/** A character's code point as `U+` and at least four uppercase hex digits: "U+00E9", "U+1F600". */
+export function codePointLabel(character: string): string {
+  return `U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+}
+
+/** The glyphs message names at most this many characters; it counts the rest. */
+const NAMED_CHARACTERS = 10;
+
+/**
+ * The PDF's fonts can't draw some characters:
+ * "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹)."
+ * Each character once, in the order given (the order they first appear in the document); past ten,
+ * the list ends "… and 3 more". `details.characters` lists them all, as code points. This is the one
+ * message that may show characters from a value: single characters, never a value.
+ */
+export function renderFailedGlyphs(characters: readonly string[]): RenderError {
+  const unique = [...new Map(characters.map((c) => [codePointLabel(c), c])).entries()];
+  const named = unique.slice(0, NAMED_CHARACTERS).map(([label, c]) => `${label} (${c})`);
+  const more = unique.length > NAMED_CHARACTERS ? ` and ${unique.length - NAMED_CHARACTERS} more` : "";
+  const details: RenderFailedDetails = { reason: "glyphs", characters: unique.map(([label]) => label) };
+  return renderError(
+    "render_failed",
+    `${RENDER_FAILED_SUBJECT.pdf} couldn't be rendered. Its font can't show these characters: ${named.join(", ")}${more}.`,
+    details,
+  );
 }

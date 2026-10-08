@@ -61,7 +61,7 @@ interface Ctx {
   width: number;
   /** Paragraph type here: body, table or callout. */
   spec: TypeSpec;
-  /** List nesting depth, for markers. */
+  /** List nesting depth. */
   depth: number;
 }
 
@@ -262,41 +262,13 @@ function layHeading(block: Extract<RenderBlock, { type: "heading" }>, ctx: Ctx):
 
 // ── Lists ────────────────────────────────────────────────────────────────────
 
-const BULLETS = ["•", "◦", "▪"]; // • ◦ ▪, like the editor's disc, circle, square
-
-function marker(ordered: boolean, depth: number, n: number): string {
-  if (!ordered) return BULLETS[depth % 3];
-  if (depth % 3 === 1) return `${alpha(n)}.`;
-  if (depth % 3 === 2) return `${roman(n)}.`;
-  return `${n}.`;
-}
-
-function alpha(n: number): string {
-  let s = "";
-  for (let x = Math.max(1, n); x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(97 + ((x - 1) % 26)) + s;
-  return s;
-}
-
-const ROMAN: [number, string][] = [
-  [1000, "m"], [900, "cm"], [500, "d"], [400, "cd"], [100, "c"], [90, "xc"],
-  [50, "l"], [40, "xl"], [10, "x"], [9, "ix"], [5, "v"], [4, "iv"], [1, "i"],
-];
-
-function roman(n: number): string {
-  let x = Math.max(1, n);
-  let s = "";
-  for (const [value, digits] of ROMAN) {
-    for (; x >= value; x -= value) s += digits;
-  }
-  return s;
-}
-
 /** Items up to this many lines move to the next page whole instead of splitting. */
 const KEEP_ITEM_LINES = 5;
 
 function layList(block: Extract<RenderBlock, { type: "list" }>, ctx: Ctx): Laid {
   const spec = ctx.spec;
-  const markers = block.items.map((_, i) => marker(block.ordered, ctx.depth, block.start + i));
+  // Every item's marker is resolved in the RenderDoc (docs/render-spec.md): printed as given.
+  const markers = block.items.map((item) => item.marker);
   const widest = Math.max(0, ...markers.map((m) => measure(m, { family: spec.family, weight: 400, italic: false }, spec.size)));
   // Hanging indent: markers right-aligned in their own column, text aligned after it.
   const column = Math.max(LIST.minMarker, Math.ceil(widest + LIST.markerGap));
