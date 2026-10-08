@@ -1,0 +1,65 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Lines led by mixed spaces",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "    Space, no-break, space, no-break lead this paragraph."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "    No-break, space, no-break, space lead this one."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "    Two spaces, then two no-break spaces."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b4",
+      "level": 3,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "  A heading led by a no-break space and a space"
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b5",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "  Inside a callout."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

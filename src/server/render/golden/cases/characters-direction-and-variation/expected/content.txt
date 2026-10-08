@@ -1,0 +1,4 @@
+Lefttoright and righttoleft marks join the words.
+Variation selectors: ©, ®, 1 and the letter a.
+## A heading with a mark in it
+• A list item that starts with a mark

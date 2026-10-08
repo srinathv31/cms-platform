@@ -1,0 +1,27 @@
+Value formats
+=============
+
+Variable | Shown
+----------------
+currency_whole | $95
+currency_cents | $1,000.5
+currency_decorated | -$1,234.5
+currency_zeros | $1,000,000.00
+currency_huge | $1,000,000,000,000,000,000,000
+currency_tiny | $0.000001
+percent_three | 6.875%
+percent_zero | 21.90%
+percent_symbol | 21.99%
+percent_json | 21.90%
+number_long | 1.999999
+number_grouped | 1,234,567.891
+number_json | 20,000
+date_us | March 4, 2027
+date_words | September 30, 2027
+date_iso | February 29, 2028
+state_code | New Jersey
+state_name | New Jersey
+text_lines | Maya Chen
+text_spaces | two  spaces  inside
+
+In running text: 6.875% APR on $1,000.5 from September 30, 2027 in New Jersey.

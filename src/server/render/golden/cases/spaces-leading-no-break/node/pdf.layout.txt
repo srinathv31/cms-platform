@@ -1,0 +1,12 @@
+%PDF pages=1 Title="Lines led by no-break spaces" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+ Three no-break spaces lead this paragraph.
+
+Text between.
+
+ ## Two no-break spaces lead this heading
+A hard break, then
+ two no-break spaces lead the next line.
+
+ • One no-break space leads this bullet.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

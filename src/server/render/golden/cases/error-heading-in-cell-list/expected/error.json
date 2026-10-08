@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. Table cells can hold only paragraphs and lists.",
+  "details": {
+    "reason": "document"
+  }
+}

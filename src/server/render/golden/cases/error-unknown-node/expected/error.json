@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. This document has content Stencil doesn't support.",
+  "details": {
+    "reason": "document"
+  }
+}

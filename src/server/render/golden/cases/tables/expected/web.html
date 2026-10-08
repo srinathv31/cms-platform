@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Tables</title>
+<style>*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;background:#ffffff;color:#1f2328;font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;font-size:1.0625rem;line-height:1.6;overflow-wrap:anywhere}.doc{max-width:42rem;margin:0 auto;padding:clamp(1.5rem,5vw,3.5rem) clamp(1rem,5vw,2rem)}.doc>:first-child{margin-top:0}.doc>:last-child{margin-bottom:0}p{margin:0 0 1rem}p,h1,h2,h3{white-space:pre-wrap}h1,h2,h3{color:#1f2328;font-weight:650;letter-spacing:-0.01em;overflow-wrap:break-word}h1{font-size:clamp(1.75rem,1.45rem + 1.4vw,2.25rem);line-height:1.2;margin:2.5rem 0 1.25rem}h2{font-size:clamp(1.3rem,1.2rem + 0.5vw,1.5rem);line-height:1.3;margin:2.25rem 0 0.75rem}h3{font-size:1.125rem;line-height:1.4;margin:1.75rem 0 0.5rem}h1+h2,h2+h3,h1+h3{margin-top:0}a{color:#0b57d0;text-decoration:underline;text-underline-offset:0.15em}ul,ol{list-style:none;margin:0 0 1rem;padding:0;display:grid;grid-template-columns:minmax(1.5em,max-content) minmax(0,1fr);column-gap:0.5em}li{grid-column:1/-1;display:grid;grid-template-columns:minmax(1.5em,max-content) minmax(0,1fr);grid-template-columns:subgrid;margin:0}li+li{margin-top:0.375rem}.marker{text-align:right;white-space:nowrap}li>div{min-width:0}li>div>*{margin:0 0 0.5rem}li>div>:last-child{margin-bottom:0}.table-wrap{margin:1.25rem 0 1.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;border-collapse:collapse;font-size:0.9375rem;line-height:1.5;overflow-wrap:break-word}th,td{border:1px solid #d0d7de;padding:0.5rem 0.75rem;text-align:left;vertical-align:top}th{background:#f3f5f7;font-weight:600}th>p,td>p{margin:0 0 0.5rem}th>:last-child,td>:last-child{margin-bottom:0}.callout{position:relative;margin:1.5rem 0;padding:0.9em 1.2em 0.9em 3em;background:#f9f7f4;border:1px solid #d9d4cb;border-radius:0.4em}.callout-glyph{position:absolute;left:1.1em;top:1.175em;width:1.05em;height:1.05em;color:#6f6b65}.callout>:first-child{margin-top:0}.callout>:last-child{margin-bottom:0}hr{border:0;border-top:1px solid #d8dee4;margin:2rem 0}strong{font-weight:650}</style>
+</head>
+<body>
+<main class="doc">
+<h1>Tables</h1>
+<p>A header row, a spanning cell, a tall cell, and cells of several kinds:</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th scope="col"><p>Fee</p></th><th scope="col"><p>Amount</p></th><th scope="col"><p>Applies</p></th><th scope="col"><p>Notes</p></th></tr>
+</thead>
+<tbody>
+<tr><td><p>Annual fee</p></td><td><p>$95</p></td><td><p>Yearly</p></td><td><p>Billed once a year.</p></td></tr>
+<tr><td colspan="3"><p>Two paragraphs spanning three columns.</p>
+<p>The second paragraph.</p></td><td><p>Right</p></td></tr>
+<tr><td rowspan="2"><p>Tall cell</p></td><td><p>Row three, b</p></td><td><p>Row three, c</p></td><td><p><a href="https://coral.example/fees">Fee schedule</a></p></td></tr>
+<tr><td><p>Row four, b</p></td><td><p>APR 21.99%</p></td><td><p><br></p></td></tr>
+<tr><th scope="row"><p>Row header</p></th><td><p>Late fee</p></td><td><p>Up to $40</p></td><td><p>Never more than the minimum payment due.</p></td></tr>
+</tbody>
+</table>
+</div>
+<p>A header column and a header spanning two columns:</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th scope="col" colspan="2"><p>Rates</p></th><th scope="col"><p>Notes</p></th></tr>
+</thead>
+<tbody>
+<tr><th scope="row"><p>Purchases</p></th><td><p>21.99%</p></td><td><p>Variable</p></td></tr>
+<tr><th scope="row"><p>Cash advances</p></th><td><p>29.99%</p></td><td><p>Variable</p></td></tr>
+</tbody>
+</table>
+</div>
+<p>Lists and bold text in cells:</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th scope="col"><p>Step</p></th><th scope="col"><p>Detail</p></th></tr>
+</thead>
+<tbody>
+<tr><td><p>Open</p></td><td><ul>
+<li><span class="marker">•</span><div><p>Sign in</p></div></li>
+<li><span class="marker">•</span><div><p>Choose the account</p></div></li>
+</ul></td></tr>
+<tr><td><p>Pay</p></td><td><ol>
+<li><span class="marker">1.</span><div><p>Pick an amount</p>
+<ol>
+<li><span class="marker">a.</span><div><p>Statement balance</p></div></li>
+<li><span class="marker">b.</span><div><p>Minimum payment</p></div></li>
+</ol></div></li>
+<li><span class="marker">2.</span><div><p>Confirm</p></div></li>
+</ol>
+<p>Payments post the same day.</p></td></tr>
+<tr><td><p><strong>Bold cell</strong></p></td><td><p>Mixed <strong>bold</strong> and <em>italic</em> text.</p></td></tr>
+</tbody>
+</table>
+</div>
+<p>A single cell, and a header row with no body:</p>
+<div class="table-wrap">
+<table>
+<tbody>
+<tr><td><p>Only cell</p></td></tr>
+</tbody>
+</table>
+</div>
+<div class="table-wrap">
+<table>
+<tbody>
+<tr><th scope="row"><p>Header only</p></th><th scope="row"><p>No body</p></th></tr>
+</tbody>
+</table>
+</div>
+</main>
+</body>
+</html>

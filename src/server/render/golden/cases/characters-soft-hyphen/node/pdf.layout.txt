@@ -1,0 +1,7 @@
+%PDF pages=1 Title="A soft hyphen, then minus signs and hyphens" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+Versicherung and interest are one word each. A balance of -$1,234.50, a change of -25 and a call to
+800-555-0100.
+
+The next paragraph: -$1,234.50 again, -0.5 points, and 800-555-0100.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

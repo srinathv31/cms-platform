@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. A numbered list can start at 0 to 9999.",
+  "details": {
+    "reason": "document"
+  }
+}

@@ -1,0 +1,362 @@
+{
+  "templateId": "UC-D3R0YG",
+  "templateName": "Rate Change Notice",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b_c9qsf4",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer details"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_0lla80",
+      "content": [
+        {
+          "type": "text",
+          "text": "Notice of change in terms for "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "Chen",
+          "variable": "last_name"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_9qluie",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", the purchase APR on your Coral account is changing. Your new purchase APR is "
+        },
+        {
+          "type": "text",
+          "text": "21.99%",
+          "variable": "purchase_apr"
+        },
+        {
+          "type": "text",
+          "text": ", effective "
+        },
+        {
+          "type": "text",
+          "text": "November 3, 2026",
+          "variable": "effective_date"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_gkedbk",
+      "content": [
+        {
+          "type": "text",
+          "text": "This change applies to new purchases made on or after the effective date. Your existing balance isn't affected."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_bs7khm",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates and fees"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b_w74vbs",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Rate"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Your account"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "New purchase APR"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "21.99%",
+                      "variable": "purchase_apr"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Effective date"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "November 3, 2026",
+                      "variable": "effective_date"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cash advance APR"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "No change"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Annual fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "No change"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_ay0iq1",
+      "level": 2,
+      "section": "legal_notices",
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_abqql2",
+      "content": [
+        {
+          "type": "text",
+          "text": "You can reject this change before it takes effect by calling the number on the back of your card. If you reject it, you can keep paying off your balance under your current terms, but you can't make new purchases."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b_ypzaw2",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "State-specific terms for "
+            },
+            {
+              "type": "text",
+              "text": "New Jersey",
+              "variable": "home_state"
+            },
+            {
+              "type": "text",
+              "text": " residents are in your cardmember agreement."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_eascvd",
+      "content": [
+        {
+          "type": "text",
+          "text": "Coral Bank, N.A. Member FDIC."
+        }
+      ]
+    }
+  ]
+}

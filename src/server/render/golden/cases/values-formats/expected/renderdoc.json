@@ -1,0 +1,890 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Variable value formats",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Value formats"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b2",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Variable"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Shown"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_whole"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$95",
+                      "variable": "currency_whole"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_cents"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$1,000.5",
+                      "variable": "currency_cents"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_decorated"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "-$1,234.5",
+                      "variable": "currency_decorated"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_zeros"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$1,000,000.00",
+                      "variable": "currency_zeros"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_huge"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$1,000,000,000,000,000,000,000",
+                      "variable": "currency_huge"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "currency_tiny"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$0.000001",
+                      "variable": "currency_tiny"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "percent_three"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "6.875%",
+                      "variable": "percent_three"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "percent_zero"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "21.90%",
+                      "variable": "percent_zero"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "percent_symbol"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "21.99%",
+                      "variable": "percent_symbol"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "percent_json"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "21.90%",
+                      "variable": "percent_json"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "number_long"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "1.999999",
+                      "variable": "number_long"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "number_grouped"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "1,234,567.891",
+                      "variable": "number_grouped"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "number_json"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "20,000",
+                      "variable": "number_json"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "date_us"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "March 4, 2027",
+                      "variable": "date_us"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "date_words"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "September 30, 2027",
+                      "variable": "date_words"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "date_iso"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "February 29, 2028",
+                      "variable": "date_iso"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "state_code"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "New Jersey",
+                      "variable": "state_code"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "state_name"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "New Jersey",
+                      "variable": "state_name"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "text_lines"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Maya Chen",
+                      "variable": "text_lines"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "text_spaces"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "two  spaces  inside",
+                      "variable": "text_spaces"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "In running text: "
+        },
+        {
+          "type": "text",
+          "text": "6.875%",
+          "variable": "percent_three"
+        },
+        {
+          "type": "text",
+          "text": " APR on "
+        },
+        {
+          "type": "text",
+          "text": "$1,000.5",
+          "variable": "currency_cents"
+        },
+        {
+          "type": "text",
+          "text": " from "
+        },
+        {
+          "type": "text",
+          "text": "September 30, 2027",
+          "variable": "date_words"
+        },
+        {
+          "type": "text",
+          "text": " in "
+        },
+        {
+          "type": "text",
+          "text": "New Jersey",
+          "variable": "state_name"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    }
+  ]
+}

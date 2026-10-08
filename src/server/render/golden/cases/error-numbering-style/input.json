@@ -1,0 +1,39 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A numbering style Stencil doesn't know",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "orderedList",
+        "attrs": {
+          "id": "b1",
+          "start": 1,
+          "markerFormat": "greek"
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Alpha"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

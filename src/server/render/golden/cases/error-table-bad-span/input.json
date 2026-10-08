@@ -1,0 +1,46 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A stored table with a colspan of 0",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 0,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

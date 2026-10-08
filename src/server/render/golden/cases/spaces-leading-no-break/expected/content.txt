@@ -1,0 +1,5 @@
+Three no-break spaces lead this paragraph.
+Text between.
+## Two no-break spaces lead this heading
+A hard break, then two no-break spaces lead the next line.
+• One no-break space leads this bullet.

@@ -1,0 +1,445 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Spaces and hard breaks",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Spaces and breaks"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Two  spaces, three   spaces, and four    spaces inside a line."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "   Three leading spaces."
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Trailing spaces follow this.    "
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "    "
+          },
+          {
+            "type": "text",
+            "text": "Spaces before a bold run: "
+          },
+          {
+            "type": "text",
+            "text": "   bold with its own leading spaces",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "   and after."
+          }
+        ],
+        "attrs": {
+          "id": "b5"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Line one"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "Line two"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "Line three"
+          }
+        ],
+        "attrs": {
+          "id": "b6"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "Starts with a hard break."
+          }
+        ],
+        "attrs": {
+          "id": "b7"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Two breaks in a row"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "end the line."
+          }
+        ],
+        "attrs": {
+          "id": "b8"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Ends with two hard breaks, so two empty lines follow."
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "hardBreak"
+          }
+        ],
+        "attrs": {
+          "id": "b9"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b10",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "A heading"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "on two lines"
+          }
+        ]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Bullet"
+                  },
+                  {
+                    "type": "hardBreak"
+                  },
+                  {
+                    "type": "text",
+                    "text": "continued"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "   Bullet with leading spaces"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b11"
+        }
+      },
+      {
+        "type": "orderedList",
+        "attrs": {
+          "id": "b12",
+          "start": 1
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Number"
+                  },
+                  {
+                    "type": "hardBreak"
+                  },
+                  {
+                    "type": "text",
+                    "text": "continued"
+                  },
+                  {
+                    "type": "hardBreak"
+                  },
+                  {
+                    "type": "hardBreak"
+                  },
+                  {
+                    "type": "text",
+                    "text": "after a blank line"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Cell"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Cell"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Cell"
+                      },
+                      {
+                        "type": "hardBreak"
+                      },
+                      {
+                        "type": "text",
+                        "text": "two lines"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "  Indented cell"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b13"
+        }
+      },
+      {
+        "type": "callout",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Callout"
+              },
+              {
+                "type": "hardBreak"
+              },
+              {
+                "type": "text",
+                "text": "two lines"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "   Indented callout text."
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b14"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A\ttab becomes one space."
+          }
+        ],
+        "attrs": {
+          "id": "b15"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Line breaks\r\ninside\ntext\rnodes become breaks."
+          }
+        ],
+        "attrs": {
+          "id": "b16"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Control characters \u0001\u0007 are removed."
+          }
+        ],
+        "attrs": {
+          "id": "b17"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

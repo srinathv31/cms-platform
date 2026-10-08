@@ -1,0 +1,26 @@
+Lists with other blocks
+=======================
+
+1. Item with a second paragraph
+   The second paragraph of the first item.
+2. Item with a hard break
+   continued on a new line
+3.
+4. Item after an empty item
+5. Item for Maya, with a link (https://coral.example/terms) and bold.
+
+• Bullet, then numbers below it
+  A. Alpha one
+     ◦ Bullet in A.
+  B. Alpha two
+• Bullet two
+
+1. A list straight after another list
+
+Where | Steps
+-------------
+In a cell | 1. Step one
+          |    a. Sub-step
+          | 2. Step two
+
+• Bullet in a cell's sibling list

@@ -1,0 +1,5 @@
+Space, no-break, space, no-break lead this paragraph.
+No-break, space, no-break, space lead this one.
+Two spaces, then two no-break spaces.
+### A heading led by a no-break space and a space
+Inside a callout.

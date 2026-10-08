@@ -1,0 +1,47 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "An email subject with a hard break",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The PDF and the web page render; the email is refused for its subject."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "emailSubject": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Your rate"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "is changing"
+          }
+        ]
+      }
+    ]
+  },
+  "emailPreheader": null
+}

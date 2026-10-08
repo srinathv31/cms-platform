@@ -1,0 +1,156 @@
+Cardmember Agreement
+====================
+
+Section 1: account terms
+------------------------
+
+Transfer advance and annual apply to your fee as described in this section, and rate may change without notice before the next variable. Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum.
+
+Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum. Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate.
+
+Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate. Rate statement and interest apply to your fee as described in this section, and credit may change without notice before the next transaction. Variable cycle and transaction apply to your credit as described in this section, and purchase may change without notice before the next interest.
+
+Section 2: balance terms
+------------------------
+
+Interest account and balance apply to your statement as described in this section, and payment may change without notice before the next billing. Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit.
+
+Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit. Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment.
+
+Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment. Payment fee and transfer apply to your statement as described in this section, and minimum may change without notice before the next penalty. Billing prime and penalty apply to your minimum as described in this section, and limit may change without notice before the next transfer.
+
+Item | Rate or fee | Applies when
+---------------------------------
+balance 1 | 2.25% | Balance transaction and prime apply to your fee as described in this section, an
+statement 2 | 3.25% | Statement transfer and statement apply to your credit as described in this secti
+payment 3 | 4.25% | Payment fee and transfer apply to your statement as described in this section, a
+billing 4 | 5.25% | Billing prime and penalty apply to your minimum as described in this section, an
+cycle 5 | 6.25% | Cycle limit and payment apply to your fee as described in this section, and tran
+transaction 6 | 7.25% | Transaction balance and advance apply to your credit as described in this sectio
+minimum 7 | 8.25% | Minimum billing and credit apply to your statement as described in this section,
+purchase 8 | 9.25% | Purchase minimum and billing apply to your minimum as described in this section,
+transfer 9 | 10.25% | Transfer advance and annual apply to your fee as described in this section, and 
+advance 10 | 11.25% | Advance rate and limit apply to your credit as described in this section, and bi
+annual 11 | 12.25% | Annual penalty and cycle apply to your statement as described in this section, a
+fee 12 | 13.25% | Fee interest and fee apply to your minimum as described in this section, and tra
+
+Section 3: statement terms
+--------------------------
+
+Transfer advance and annual apply to your fee as described in this section, and rate may change without notice before the next variable. Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum.
+
+Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum. Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate.
+
+Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate. Rate statement and interest apply to your fee as described in this section, and credit may change without notice before the next transaction. Variable cycle and transaction apply to your credit as described in this section, and purchase may change without notice before the next interest.
+
+1. Cycle limit and payment apply to your fee as described in this section, and transfer may change without notice before the next statement.
+2. Transaction balance and advance apply to your credit as described in this section, and account may change without notice before the next prime.
+3. Minimum billing and credit apply to your statement as described in this section, and annual may change without notice before the next purchase.
+   • A sub-point.
+   • Another sub-point.
+4. Purchase minimum and billing apply to your minimum as described in this section, and statement may change without notice before the next balance.
+5. Transfer advance and annual apply to your fee as described in this section, and rate may change without notice before the next variable.
+
+Section 4: payment terms
+------------------------
+
+Interest account and balance apply to your statement as described in this section, and payment may change without notice before the next billing. Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit.
+
+Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit. Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment.
+
+Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment. Payment fee and transfer apply to your statement as described in this section, and minimum may change without notice before the next penalty. Billing prime and penalty apply to your minimum as described in this section, and limit may change without notice before the next transfer.
+
+Item | Rate or fee | Applies when
+---------------------------------
+payment 1 | 4.25% | Payment fee and transfer apply to your statement as described in this section, a
+billing 2 | 5.25% | Billing prime and penalty apply to your minimum as described in this section, an
+cycle 3 | 6.25% | Cycle limit and payment apply to your fee as described in this section, and tran
+transaction 4 | 7.25% | Transaction balance and advance apply to your credit as described in this sectio
+minimum 5 | 8.25% | Minimum billing and credit apply to your statement as described in this section,
+purchase 6 | 9.25% | Purchase minimum and billing apply to your minimum as described in this section,
+transfer 7 | 10.25% | Transfer advance and annual apply to your fee as described in this section, and 
+advance 8 | 11.25% | Advance rate and limit apply to your credit as described in this section, and bi
+annual 9 | 12.25% | Annual penalty and cycle apply to your statement as described in this section, a
+fee 10 | 13.25% | Fee interest and fee apply to your minimum as described in this section, and tra
+rate 11 | 14.25% | Rate statement and interest apply to your fee as described in this section, and 
+variable 12 | 15.25% | Variable cycle and transaction apply to your credit as described in this section
+
+Section 5: billing terms
+------------------------
+
+Transfer advance and annual apply to your fee as described in this section, and rate may change without notice before the next variable. Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum.
+
+Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum. Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate.
+
+Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate. Rate statement and interest apply to your fee as described in this section, and credit may change without notice before the next transaction. Variable cycle and transaction apply to your credit as described in this section, and purchase may change without notice before the next interest.
+
++---------------------------------------
+| Penalty annual and account apply to your minimum as described in this section, and advance may change without notice before the next cycle.
+|
+| Credit variable and minimum apply to your fee as described in this section, and balance may change without notice before the next limit.
++---------------------------------------
+
+Section 6: cycle terms
+----------------------
+
+Interest account and balance apply to your statement as described in this section, and payment may change without notice before the next billing. Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit.
+
+Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit. Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment.
+
+Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment. Payment fee and transfer apply to your statement as described in this section, and minimum may change without notice before the next penalty. Billing prime and penalty apply to your minimum as described in this section, and limit may change without notice before the next transfer.
+
+Item | Rate or fee | Applies when
+---------------------------------
+cycle 1 | 6.25% | Cycle limit and payment apply to your fee as described in this section, and tran
+transaction 2 | 7.25% | Transaction balance and advance apply to your credit as described in this sectio
+minimum 3 | 8.25% | Minimum billing and credit apply to your statement as described in this section,
+purchase 4 | 9.25% | Purchase minimum and billing apply to your minimum as described in this section,
+transfer 5 | 10.25% | Transfer advance and annual apply to your fee as described in this section, and 
+advance 6 | 11.25% | Advance rate and limit apply to your credit as described in this section, and bi
+annual 7 | 12.25% | Annual penalty and cycle apply to your statement as described in this section, a
+fee 8 | 13.25% | Fee interest and fee apply to your minimum as described in this section, and tra
+rate 9 | 14.25% | Rate statement and interest apply to your fee as described in this section, and 
+variable 10 | 15.25% | Variable cycle and transaction apply to your credit as described in this section
+prime 11 | 16.25% | Prime purchase and rate apply to your statement as described in this section, an
+penalty 12 | 17.25% | Penalty annual and account apply to your minimum as described in this section, a
+
+1. Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account.
+2. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate.
+3. Rate statement and interest apply to your fee as described in this section, and credit may change without notice before the next transaction.
+   • A sub-point.
+   • Another sub-point.
+4. Variable cycle and transaction apply to your credit as described in this section, and purchase may change without notice before the next interest.
+5. Prime purchase and rate apply to your statement as described in this section, and interest may change without notice before the next fee.
+
+Section 7: transaction terms
+----------------------------
+
+Transfer advance and annual apply to your fee as described in this section, and rate may change without notice before the next variable. Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum.
+
+Advance rate and limit apply to your credit as described in this section, and billing may change without notice before the next minimum. Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate.
+
+Annual penalty and cycle apply to your statement as described in this section, and prime may change without notice before the next account. Fee interest and fee apply to your minimum as described in this section, and transaction may change without notice before the next rate. Rate statement and interest apply to your fee as described in this section, and credit may change without notice before the next transaction. Variable cycle and transaction apply to your credit as described in this section, and purchase may change without notice before the next interest.
+
+Section 8: minimum terms
+------------------------
+
+Interest account and balance apply to your statement as described in this section, and payment may change without notice before the next billing. Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit.
+
+Account payment and purchase apply to your minimum as described in this section, and variable may change without notice before the next credit. Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment.
+
+Balance transaction and prime apply to your fee as described in this section, and cycle may change without notice before the next advance. Statement transfer and statement apply to your credit as described in this section, and penalty may change without notice before the next payment. Payment fee and transfer apply to your statement as described in this section, and minimum may change without notice before the next penalty. Billing prime and penalty apply to your minimum as described in this section, and limit may change without notice before the next transfer.
+
+Item | Rate or fee | Applies when
+---------------------------------
+minimum 1 | 8.25% | Minimum billing and credit apply to your statement as described in this section,
+purchase 2 | 9.25% | Purchase minimum and billing apply to your minimum as described in this section,
+transfer 3 | 10.25% | Transfer advance and annual apply to your fee as described in this section, and 
+advance 4 | 11.25% | Advance rate and limit apply to your credit as described in this section, and bi
+annual 5 | 12.25% | Annual penalty and cycle apply to your statement as described in this section, a
+fee 6 | 13.25% | Fee interest and fee apply to your minimum as described in this section, and tra
+rate 7 | 14.25% | Rate statement and interest apply to your fee as described in this section, and 
+variable 8 | 15.25% | Variable cycle and transaction apply to your credit as described in this section
+prime 9 | 16.25% | Prime purchase and rate apply to your statement as described in this section, an
+penalty 10 | 17.25% | Penalty annual and account apply to your minimum as described in this section, a
+credit 11 | 18.25% | Credit variable and minimum apply to your fee as described in this section, and 
+limit 12 | 19.25% | Limit credit and variable apply to your credit as described in this section, and

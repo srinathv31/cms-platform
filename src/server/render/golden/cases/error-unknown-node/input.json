@@ -1,0 +1,32 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A node the editor doesn't have",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "blockquote",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Quoted."
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

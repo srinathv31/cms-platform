@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. This table's cells don't line up into rows and columns.",
+  "details": {
+    "reason": "document"
+  }
+}

@@ -1,0 +1,19 @@
+%PDF pages=1 Title="Callouts and rules" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+     A callout first.
+
+## Notices
+
+     State terms for New Jersey are in your agreement.
+
+     Important: interest starts on the transaction date.
+
+     See point two.
+
+     A second callout straight after the first.
+
+After a horizontal rule.
+
+     A callout last.
+--- footer: UC-GOLDEN · v1 Page 1 of 1
+--- link: https://coral.example/p2  <-  "point two"

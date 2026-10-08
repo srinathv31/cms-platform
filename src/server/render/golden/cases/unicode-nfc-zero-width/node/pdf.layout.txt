@@ -1,0 +1,17 @@
+%PDF pages=1 Title="Unicode normalization and invisible characters" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+# Unicode
+Decomposed: Café, niño, Ångström, Zürich.
+
+A value with decomposed letters: Zoë Nüñez.
+
+Zero-width characters render as nothing: zerowidthjoinwordjoinend.
+
+No-break space and narrow stay: a b.
+
+Typographic: “curly quotes”, ‘single’, en–dash, em—dash, ellipsis…, © ® ™ € £ ¥ ± × ÷ ½ ° § ¶ •.
+
+Latin Extended and others: Łódź, Győr, Çelik, Ñandú, ΑΒΓ αβγ, АБВ абв.
+
+Ligature words: office financial benefit affluent waffle fluff.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

@@ -1,0 +1,171 @@
+{
+  "templateId": "UC-4CMSGW",
+  "templateName": "Statement Insert — Annual Privacy Notice",
+  "versionNumber": null,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "home_state": "NJ"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_imrtsg",
+          "level": 2,
+          "requiredKey": "offer_details"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Offer details"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", once a year we remind you how we collect, use and protect your personal information."
+          }
+        ],
+        "attrs": {
+          "id": "b_hh9um5"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Read the full notice at "
+          },
+          {
+            "type": "text",
+            "text": "coral.example/privacy",
+            "marks": [
+              {
+                "type": "link",
+                "attrs": {
+                  "href": "https://coral.example/privacy"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b_jjybr8"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_88czhg",
+          "level": 2,
+          "requiredKey": "rates_and_fees"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Rates and fees"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "There is no fee associated with this notice."
+          }
+        ],
+        "attrs": {
+          "id": "b_28ubd6"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_l9kxcg",
+          "level": 2,
+          "requiredKey": "legal_notices"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Legal notices"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "State-specific terms for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "home_state"
+            }
+          },
+          {
+            "type": "text",
+            "text": " residents are in your cardmember agreement."
+          }
+        ],
+        "attrs": {
+          "id": "b_sgmb4u"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Coral Bank, N.A. Member FDIC."
+          }
+        ],
+        "attrs": {
+          "id": "b_tfz541"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

@@ -1,0 +1,79 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Lines led by no-break spaces",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "   Three no-break spaces lead this paragraph."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Text between."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b3",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "  Two no-break spaces lead this heading"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "A hard break, then"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "  two no-break spaces lead the next line."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b5",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": " One no-break space leads this bullet."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

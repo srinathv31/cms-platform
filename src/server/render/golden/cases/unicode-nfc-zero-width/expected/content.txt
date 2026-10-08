@@ -1,0 +1,8 @@
+# Unicode
+Decomposed: Café, niño, Ångström, Zürich.
+A value with decomposed letters: Zoë Nüñez.
+Zero-width characters render as nothing: zerowidthjoinwordjoinend.
+No-break space and narrow stay: a b.
+Typographic: “curly quotes”, ‘single’, en–dash, em—dash, ellipsis…, © ® ™ € £ ¥ ± × ÷ ½ ° § ¶ •.
+Latin Extended and others: Łódź, Győr, Çelik, Ñandú, ΑΒΓ αβγ, АБВ абв.
+Ligature words: office financial benefit affluent waffle fluff.

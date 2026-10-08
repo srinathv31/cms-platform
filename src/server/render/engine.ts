@@ -17,8 +17,8 @@ import { checkDocument, checkField, RenderDocumentError } from "./schema-check";
 
 // The render engine: stages 6 to 9 of the pipeline (docs/render-spec.md §1), and nothing that needs
 // the database, the clock or the request. The render route (render-template.ts) runs it once it has
-// found the template and version and checked who is asking; tests run it on frozen inputs
-// (testing/fresh-process.ts). One implementation, so what a test renders is what the API returns.
+// found the template and version and checked who is asking; the golden files (golden/pipeline.ts)
+// run it on frozen inputs. One implementation, so a golden file is what the API returns.
 //
 //   6 values                                                    → 422 missing_variables / invalid_values
 //   7 the document check: the body; for email, subject and preheader too → 500 render_failed

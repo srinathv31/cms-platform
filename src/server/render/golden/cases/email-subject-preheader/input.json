@@ -1,0 +1,142 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Email subject and preheader",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true,
+      "sample": "2026-11-03"
+    },
+    {
+      "key": "promo",
+      "label": "Promo",
+      "type": "text",
+      "required": false,
+      "sample": ""
+    }
+  ],
+  "values": {
+    "first_name": "Zoë",
+    "effective_date": "2027-03-04"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Your rate is changing"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hello "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ". Effective "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "effective_date"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      }
+    ]
+  },
+  "emailSubject": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "  Zoë, your rate changes on   "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "effective_date"
+            }
+          },
+          {
+            "type": "text",
+            "text": "  "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "promo"
+            }
+          },
+          {
+            "type": "text",
+            "text": " — please read & act ✓ (and then some more words so the subject is long enough to need wrapping in a mail client)  "
+          }
+        ]
+      }
+    ]
+  },
+  "emailPreheader": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ",   here is what is changing.  "
+          }
+        ]
+      }
+    ]
+  }
+}

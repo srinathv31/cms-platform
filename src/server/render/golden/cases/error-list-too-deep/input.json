@@ -1,0 +1,248 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Lists nested 10 levels",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [],
+  "values": {},
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Before."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      },
+      {
+        "type": "orderedList",
+        "attrs": {
+          "id": "b2",
+          "start": 1
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Level 1"
+                  }
+                ]
+              },
+              {
+                "type": "orderedList",
+                "attrs": {
+                  "start": 1
+                },
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Level 2"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "orderedList",
+                        "attrs": {
+                          "start": 1
+                        },
+                        "content": [
+                          {
+                            "type": "listItem",
+                            "content": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Level 3"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "orderedList",
+                                "attrs": {
+                                  "start": 1
+                                },
+                                "content": [
+                                  {
+                                    "type": "listItem",
+                                    "content": [
+                                      {
+                                        "type": "paragraph",
+                                        "content": [
+                                          {
+                                            "type": "text",
+                                            "text": "Level 4"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "type": "orderedList",
+                                        "attrs": {
+                                          "start": 1
+                                        },
+                                        "content": [
+                                          {
+                                            "type": "listItem",
+                                            "content": [
+                                              {
+                                                "type": "paragraph",
+                                                "content": [
+                                                  {
+                                                    "type": "text",
+                                                    "text": "Level 5"
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "type": "orderedList",
+                                                "attrs": {
+                                                  "start": 1
+                                                },
+                                                "content": [
+                                                  {
+                                                    "type": "listItem",
+                                                    "content": [
+                                                      {
+                                                        "type": "paragraph",
+                                                        "content": [
+                                                          {
+                                                            "type": "text",
+                                                            "text": "Level 6"
+                                                          }
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "orderedList",
+                                                        "attrs": {
+                                                          "start": 1
+                                                        },
+                                                        "content": [
+                                                          {
+                                                            "type": "listItem",
+                                                            "content": [
+                                                              {
+                                                                "type": "paragraph",
+                                                                "content": [
+                                                                  {
+                                                                    "type": "text",
+                                                                    "text": "Level 7"
+                                                                  }
+                                                                ]
+                                                              },
+                                                              {
+                                                                "type": "orderedList",
+                                                                "attrs": {
+                                                                  "start": 1
+                                                                },
+                                                                "content": [
+                                                                  {
+                                                                    "type": "listItem",
+                                                                    "content": [
+                                                                      {
+                                                                        "type": "paragraph",
+                                                                        "content": [
+                                                                          {
+                                                                            "type": "text",
+                                                                            "text": "Level 8"
+                                                                          }
+                                                                        ]
+                                                                      },
+                                                                      {
+                                                                        "type": "orderedList",
+                                                                        "attrs": {
+                                                                          "start": 1
+                                                                        },
+                                                                        "content": [
+                                                                          {
+                                                                            "type": "listItem",
+                                                                            "content": [
+                                                                              {
+                                                                                "type": "paragraph",
+                                                                                "content": [
+                                                                                  {
+                                                                                    "type": "text",
+                                                                                    "text": "Level 9"
+                                                                                  }
+                                                                                ]
+                                                                              },
+                                                                              {
+                                                                                "type": "orderedList",
+                                                                                "attrs": {
+                                                                                  "start": 1
+                                                                                },
+                                                                                "content": [
+                                                                                  {
+                                                                                    "type": "listItem",
+                                                                                    "content": [
+                                                                                      {
+                                                                                        "type": "paragraph",
+                                                                                        "content": [
+                                                                                          {
+                                                                                            "type": "text",
+                                                                                            "text": "Level ten"
+                                                                                          }
+                                                                                        ]
+                                                                                      }
+                                                                                    ]
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            ]
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ]
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

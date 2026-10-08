@@ -1,0 +1,5 @@
+%PDF pages=1 Title="Email subject and preheader" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+# Your rate is changing
+Hello Zoë. Effective March 4, 2027.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

@@ -1,0 +1,18 @@
+%PDF pages=1 Title="A table of 12 columns" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+# Twelve columns
+ H1 | H2 | H3 | H4 | H5 | H6 | H7 | H8 | H9 | H10 | H11 | H12
+
+ c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 | c9 | c10 | c11 | c12
+
+ Word | Word | Word | Word | Word | Word | Word | Word | Word | Word | Word | Word
+ 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+ wrap | wrap | wrap | wrap | wrap | wrap | wrap | wrap | wrap | wrap | wrap | wrap
+ s | s | s | s | s | s | s | s | s | s | s | s
+
+ A cell across all twelve columns.
+
+ Six | and six
+
+After the table.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

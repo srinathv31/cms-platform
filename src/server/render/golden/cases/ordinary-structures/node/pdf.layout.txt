@@ -1,0 +1,39 @@
+%PDF pages=1 Title="Ordinary structures" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+A cell of two paragraphs beside another cell, the lines the same length:
+
+ one | six
+
+ two
+
+ ten | won
+
+A bar inside a cell:
+
+ a | b | c |
+
+ | d | e
+                                        |
+
+ • A list item with a heading after its first paragraph
+   ## The heading
+   And a paragraph after it.
+
+1. An ordered item
+
+   ### A level three heading in it
+
+A link whose text is only spaces: (the address shows in text).
+
+----------------------------------------
+
+A paragraph of forty dashes is above, and one of three is below:
+
+---
+
+A line, then dashes after a hard break
+===
+
+A zero-width space after a hard break leaves the empty line
+--- footer: UC-GOLDEN · v1 Page 1 of 1
+--- link: https://coral.example/blank  <-  ""

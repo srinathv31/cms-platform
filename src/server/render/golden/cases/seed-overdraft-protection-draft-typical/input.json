@@ -1,0 +1,328 @@
+{
+  "templateId": "UC-1FY7CY",
+  "templateName": "Overdraft Protection — Terms",
+  "versionNumber": null,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    },
+    {
+      "key": "minimum_balance",
+      "label": "Minimum balance",
+      "type": "currency",
+      "required": true,
+      "sample": "1000"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "home_state": "NJ",
+    "minimum_balance": "1000"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_2o7i4b",
+          "level": 2,
+          "requiredKey": "offer_details"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Offer details"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", overdraft protection links your checking account to your savings account so a transfer covers any shortfall."
+          }
+        ],
+        "attrs": {
+          "id": "b_d5cptw"
+        }
+      },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "We check your checking balance when a payment posts."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "If it's short, we move the difference from your linked savings account."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "We email you the same day with the amount transferred."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_1ygve3"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_8abcim",
+          "level": 2,
+          "requiredKey": "rates_and_fees"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Rates and fees"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Fee"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Amount"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Overdraft transfer fee"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "$0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Minimum linked savings balance"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "minimum_balance"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_yyopdw"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_uggngc",
+          "level": 2,
+          "requiredKey": "legal_notices"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Legal notices"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category."
+          }
+        ],
+        "attrs": {
+          "id": "b_l9max7"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Account terms for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "home_state"
+            }
+          },
+          {
+            "type": "text",
+            "text": " residents are in your deposit account agreement."
+          }
+        ],
+        "attrs": {
+          "id": "b_t8kikh"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

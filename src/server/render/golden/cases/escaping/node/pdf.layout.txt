@@ -1,0 +1,19 @@
+%PDF pages=1 Title="Hostile text and values" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+## Escaping & <entities>
+<script>alert(1)</script>
+
+Hi "><img src=x onerror=alert(1)> & friends, it's "quoted".
+
+-->]]> &amp; &lt; \ 100% %s {0} ${x} $1 'single' {{first_name}}
+
+ Key | Value
+
+ a | <script>alert(1)</script>
+
+ b | "><img src=x onerror=alert(1)>
+
+     "><img src=x onerror=alert(1)>
+
+ • <script>alert(1)</script>
+--- footer: UC-GOLDEN · v1 Page 1 of 1

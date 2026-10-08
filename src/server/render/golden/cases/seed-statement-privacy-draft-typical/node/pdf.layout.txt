@@ -1,0 +1,16 @@
+%PDF pages=1 Title="Statement Insert — Annual Privacy Notice" Subject="UC-4CMSGW · Draft" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+## Offer details
+Hi Maya, once a year we remind you how we collect, use and protect your personal information.
+
+Read the full notice at coral.example/privacy.
+
+## Rates and fees
+There is no fee associated with this notice.
+
+## Legal notices
+State-specific terms for New Jersey residents are in your cardmember agreement.
+
+Coral Bank, N.A. Member FDIC.
+--- footer: UC-4CMSGW · Draft Page 1 of 1
+--- link: https://coral.example/privacy  <-  "coral.example/privacy"

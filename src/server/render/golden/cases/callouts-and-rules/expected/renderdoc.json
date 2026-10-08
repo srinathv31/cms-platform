@@ -1,0 +1,144 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Callouts and rules",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "callout",
+      "id": "b1",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "A callout first."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b2",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Notices"
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b3",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "State terms for "
+            },
+            {
+              "type": "text",
+              "text": "New Jersey",
+              "variable": "home_state"
+            },
+            {
+              "type": "text",
+              "text": " are in your agreement."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Important:",
+              "bold": true
+            },
+            {
+              "type": "text",
+              "text": " interest starts on the transaction date."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "See "
+            },
+            {
+              "type": "text",
+              "text": "point two",
+              "href": "https://coral.example/p2"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b4",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "A second callout straight after the first."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "id": "b5"
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "After a horizontal rule."
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "id": "b7"
+    },
+    {
+      "type": "callout",
+      "id": "b8",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "A callout last."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

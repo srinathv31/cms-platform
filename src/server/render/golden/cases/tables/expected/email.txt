@@ -1,0 +1,39 @@
+Tables
+======
+
+A header row, a spanning cell, a tall cell, and cells of several kinds:
+
+Fee | Amount | Applies | Notes
+------------------------------
+Annual fee | $95 | Yearly | Billed once a year.
+Two paragraphs spanning three columns. | Right
+The second paragraph.                  |
+Tall cell | Row three, b | Row three, c | Fee schedule (https://coral.example/fees)
+Row four, b | APR 21.99% |
+Row header | Late fee | Up to $40 | Never more than the minimum payment due.
+
+A header column and a header spanning two columns:
+
+Rates | Notes
+-------------
+Purchases | 21.99% | Variable
+Cash advances | 29.99% | Variable
+
+Lists and bold text in cells:
+
+Step | Detail
+-------------
+Open | • Sign in
+     | • Choose the account
+Pay | 1. Pick an amount
+    |    a. Statement balance
+    |    b. Minimum payment
+    | 2. Confirm
+    | Payments post the same day.
+Bold cell | Mixed bold and italic text.
+
+A single cell, and a header row with no body:
+
+Only cell
+
+Header only | No body

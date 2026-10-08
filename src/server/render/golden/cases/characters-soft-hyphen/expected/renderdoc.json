@@ -1,0 +1,45 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A soft hyphen, then minus signs and hyphens",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "Versicherung and interest are one word each. A balance of "
+        },
+        {
+          "type": "text",
+          "text": "-$1,234.50",
+          "variable": "balance"
+        },
+        {
+          "type": "text",
+          "text": ", a change of -25 and a call to 800-555-0100."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "The next paragraph: "
+        },
+        {
+          "type": "text",
+          "text": "-$1,234.50",
+          "variable": "balance"
+        },
+        {
+          "type": "text",
+          "text": " again, -0.5 points, and 800-555-0100."
+        }
+      ]
+    }
+  ]
+}

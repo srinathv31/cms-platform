@@ -1,0 +1,329 @@
+{
+  "templateId": "UC-50FKPA",
+  "templateName": "High-Yield Savings — Rate Disclosure",
+  "versionNumber": 2,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b_llsrf2",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer details"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_6mtfbe",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Al",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", your High-Yield Savings account earns "
+        },
+        {
+          "type": "text",
+          "text": "0.10%",
+          "variable": "apy"
+        },
+        {
+          "type": "text",
+          "text": " annual percentage yield (APY) on balances of "
+        },
+        {
+          "type": "text",
+          "text": "$500",
+          "variable": "minimum_balance"
+        },
+        {
+          "type": "text",
+          "text": " or more."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b_uqgb02",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Interest compounds daily and is credited monthly."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "There is no monthly maintenance fee."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Transfers between your Coral accounts are free."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_sn7s8a",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates and fees"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b_uzv5ez",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Balance tier"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "APY"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Under "
+                    },
+                    {
+                      "type": "text",
+                      "text": "$500",
+                      "variable": "minimum_balance"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "0.10%"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$500",
+                      "variable": "minimum_balance"
+                    },
+                    {
+                      "type": "text",
+                      "text": " and over"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "0.10%",
+                      "variable": "apy"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_08sovz",
+      "content": [
+        {
+          "type": "text",
+          "text": "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_tzj4kj",
+      "level": 2,
+      "section": "legal_notices",
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_ige56x",
+      "content": [
+        {
+          "type": "text",
+          "text": "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b_e1oqf2",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Rates are variable and accurate as of "
+            },
+            {
+              "type": "text",
+              "text": "October 11, 2026",
+              "variable": "effective_date"
+            },
+            {
+              "type": "text",
+              "text": ". They may change after you open your account."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_pulkka",
+      "content": [
+        {
+          "type": "text",
+          "text": "Account terms for "
+        },
+        {
+          "type": "text",
+          "text": "Ohio",
+          "variable": "home_state"
+        },
+        {
+          "type": "text",
+          "text": " residents are in your deposit account agreement."
+        }
+      ]
+    }
+  ]
+}

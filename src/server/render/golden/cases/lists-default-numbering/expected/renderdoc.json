@@ -1,0 +1,743 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Default numbering by depth",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Default numbering"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Ordered inside ordered inside ordered inside ordered: 1. a. i. then 1. again."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b3",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Level one, first"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": true,
+              "start": 1,
+              "format": "lower-alpha",
+              "delimiter": "period",
+              "items": [
+                {
+                  "marker": "a.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Level two"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": true,
+                      "start": 1,
+                      "format": "lower-roman",
+                      "delimiter": "period",
+                      "items": [
+                        {
+                          "marker": "i.",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Level three"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "list",
+                              "id": null,
+                              "ordered": true,
+                              "start": 1,
+                              "format": "decimal",
+                              "delimiter": "period",
+                              "items": [
+                                {
+                                  "marker": "1.",
+                                  "content": [
+                                    {
+                                      "type": "paragraph",
+                                      "id": null,
+                                      "content": [
+                                        {
+                                          "type": "text",
+                                          "text": "Level four, back to decimal"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Level one, second"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Bullets inside bullets: disc, circle, square, then disc again."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b5",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet one"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": false,
+              "bullet": "circle",
+              "items": [
+                {
+                  "marker": "◦",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Bullet two"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": false,
+                      "bullet": "square",
+                      "items": [
+                        {
+                          "marker": "▪",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Bullet three"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "list",
+                              "id": null,
+                              "ordered": false,
+                              "bullet": "disc",
+                              "items": [
+                                {
+                                  "marker": "•",
+                                  "content": [
+                                    {
+                                      "type": "paragraph",
+                                      "id": null,
+                                      "content": [
+                                        {
+                                          "type": "text",
+                                          "text": "Bullet four"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet one, again"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "Only ordered ancestors count for an ordered list: ordered, bullet, ordered gives 1. then a."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b7",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ordered"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": false,
+              "bullet": "disc",
+              "items": [
+                {
+                  "marker": "•",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Bullet in ordered"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": true,
+                      "start": 1,
+                      "format": "lower-alpha",
+                      "delimiter": "period",
+                      "items": [
+                        {
+                          "marker": "a.",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Ordered in bullet in ordered"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Only bullet ancestors count for a bullet: bullet, ordered, bullet, bullet gives disc, 1., circle, square."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b9",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": true,
+              "start": 1,
+              "format": "decimal",
+              "delimiter": "period",
+              "items": [
+                {
+                  "marker": "1.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ordered in bullet"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": false,
+                      "bullet": "circle",
+                      "items": [
+                        {
+                          "marker": "◦",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Bullet at depth one"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "list",
+                              "id": null,
+                              "ordered": false,
+                              "bullet": "square",
+                              "items": [
+                                {
+                                  "marker": "▪",
+                                  "content": [
+                                    {
+                                      "type": "paragraph",
+                                      "id": null,
+                                      "content": [
+                                        {
+                                          "type": "text",
+                                          "text": "Bullet at depth two"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b10",
+      "content": [
+        {
+          "type": "text",
+          "text": "A styled parent does not change the child: (a) then a."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b11",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-alpha",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(a)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Styled parent"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": true,
+              "start": 1,
+              "format": "lower-alpha",
+              "delimiter": "period",
+              "items": [
+                {
+                  "marker": "a.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Unstyled child"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b12",
+      "content": [
+        {
+          "type": "text",
+          "text": "Nine levels deep (the limit):"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b13",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Level 1"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": true,
+              "start": 1,
+              "format": "lower-alpha",
+              "delimiter": "period",
+              "items": [
+                {
+                  "marker": "a.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Level 2"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": true,
+                      "start": 1,
+                      "format": "lower-roman",
+                      "delimiter": "period",
+                      "items": [
+                        {
+                          "marker": "i.",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Level 3"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "list",
+                              "id": null,
+                              "ordered": true,
+                              "start": 1,
+                              "format": "decimal",
+                              "delimiter": "period",
+                              "items": [
+                                {
+                                  "marker": "1.",
+                                  "content": [
+                                    {
+                                      "type": "paragraph",
+                                      "id": null,
+                                      "content": [
+                                        {
+                                          "type": "text",
+                                          "text": "Level 4"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "list",
+                                      "id": null,
+                                      "ordered": true,
+                                      "start": 1,
+                                      "format": "lower-alpha",
+                                      "delimiter": "period",
+                                      "items": [
+                                        {
+                                          "marker": "a.",
+                                          "content": [
+                                            {
+                                              "type": "paragraph",
+                                              "id": null,
+                                              "content": [
+                                                {
+                                                  "type": "text",
+                                                  "text": "Level 5"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "list",
+                                              "id": null,
+                                              "ordered": true,
+                                              "start": 1,
+                                              "format": "lower-roman",
+                                              "delimiter": "period",
+                                              "items": [
+                                                {
+                                                  "marker": "i.",
+                                                  "content": [
+                                                    {
+                                                      "type": "paragraph",
+                                                      "id": null,
+                                                      "content": [
+                                                        {
+                                                          "type": "text",
+                                                          "text": "Level 6"
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "list",
+                                                      "id": null,
+                                                      "ordered": true,
+                                                      "start": 1,
+                                                      "format": "decimal",
+                                                      "delimiter": "period",
+                                                      "items": [
+                                                        {
+                                                          "marker": "1.",
+                                                          "content": [
+                                                            {
+                                                              "type": "paragraph",
+                                                              "id": null,
+                                                              "content": [
+                                                                {
+                                                                  "type": "text",
+                                                                  "text": "Level 7"
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "type": "list",
+                                                              "id": null,
+                                                              "ordered": true,
+                                                              "start": 1,
+                                                              "format": "lower-alpha",
+                                                              "delimiter": "period",
+                                                              "items": [
+                                                                {
+                                                                  "marker": "a.",
+                                                                  "content": [
+                                                                    {
+                                                                      "type": "paragraph",
+                                                                      "id": null,
+                                                                      "content": [
+                                                                        {
+                                                                          "type": "text",
+                                                                          "text": "Level 8"
+                                                                        }
+                                                                      ]
+                                                                    },
+                                                                    {
+                                                                      "type": "list",
+                                                                      "id": null,
+                                                                      "ordered": true,
+                                                                      "start": 1,
+                                                                      "format": "lower-roman",
+                                                                      "delimiter": "period",
+                                                                      "items": [
+                                                                        {
+                                                                          "marker": "i.",
+                                                                          "content": [
+                                                                            {
+                                                                              "type": "paragraph",
+                                                                              "id": null,
+                                                                              "content": [
+                                                                                {
+                                                                                  "type": "text",
+                                                                                  "text": "Level nine"
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

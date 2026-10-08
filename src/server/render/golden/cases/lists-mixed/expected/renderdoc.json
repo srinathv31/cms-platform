@@ -1,0 +1,430 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Lists with other blocks",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Lists with other blocks"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b2",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item with a second paragraph"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The second paragraph of the first item."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item with a hard break"
+                },
+                {
+                  "type": "break"
+                },
+                {
+                  "type": "text",
+                  "text": "continued on a new line"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "3.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": []
+            }
+          ]
+        },
+        {
+          "marker": "4.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item after an empty item"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "5.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item for "
+                },
+                {
+                  "type": "text",
+                  "text": "Maya",
+                  "variable": "first_name"
+                },
+                {
+                  "type": "text",
+                  "text": ", with a "
+                },
+                {
+                  "type": "text",
+                  "text": "link",
+                  "href": "https://coral.example/terms"
+                },
+                {
+                  "type": "text",
+                  "text": " and "
+                },
+                {
+                  "type": "text",
+                  "text": "bold",
+                  "bold": true
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b3",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet, then numbers below it"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "id": null,
+              "ordered": true,
+              "start": 1,
+              "format": "upper-alpha",
+              "delimiter": "period",
+              "items": [
+                {
+                  "marker": "A.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Alpha one"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "list",
+                      "id": null,
+                      "ordered": false,
+                      "bullet": "circle",
+                      "items": [
+                        {
+                          "marker": "◦",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "id": null,
+                              "content": [
+                                {
+                                  "type": "text",
+                                  "text": "Bullet in A."
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "marker": "B.",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "id": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Alpha two"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet two"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b4",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A list straight after another list"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b5",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Where"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Steps"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "In a cell"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "list",
+                  "id": null,
+                  "ordered": true,
+                  "start": 1,
+                  "format": "decimal",
+                  "delimiter": "period",
+                  "items": [
+                    {
+                      "marker": "1.",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "id": null,
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Step one"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "list",
+                          "id": null,
+                          "ordered": true,
+                          "start": 1,
+                          "format": "lower-alpha",
+                          "delimiter": "period",
+                          "items": [
+                            {
+                              "marker": "a.",
+                              "content": [
+                                {
+                                  "type": "paragraph",
+                                  "id": null,
+                                  "content": [
+                                    {
+                                      "type": "text",
+                                      "text": "Sub-step"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "marker": "2.",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "id": null,
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Step two"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b6",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet in a cell's sibling list"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

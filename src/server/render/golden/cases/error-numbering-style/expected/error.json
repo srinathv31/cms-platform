@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. This list's numbering style isn't one Stencil knows.",
+  "details": {
+    "reason": "document"
+  }
+}

@@ -1,0 +1,268 @@
+{
+  "templateId": "UC-1FY7CY",
+  "templateName": "Overdraft Protection — Terms",
+  "versionNumber": null,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b_2o7i4b",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer details"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_d5cptw",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", overdraft protection links your checking account to your savings account so a transfer covers any shortfall."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b_1ygve3",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "We check your checking balance when a payment posts."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "If it's short, we move the difference from your linked savings account."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "3.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "We email you the same day with the amount transferred."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_8abcim",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates and fees"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b_yyopdw",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Amount"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Overdraft transfer fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$0"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Minimum linked savings balance"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$1,000",
+                      "variable": "minimum_balance"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_uggngc",
+      "level": 2,
+      "section": "legal_notices",
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_l9max7",
+      "content": [
+        {
+          "type": "text",
+          "text": "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_t8kikh",
+      "content": [
+        {
+          "type": "text",
+          "text": "Account terms for "
+        },
+        {
+          "type": "text",
+          "text": "New Jersey",
+          "variable": "home_state"
+        },
+        {
+          "type": "text",
+          "text": " residents are in your deposit account agreement."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "code": "missing_variables",
+  "message": "Missing required variables: first_name. purchase_apr must be a percentage, like 21.99. annual_fee must be an amount, like 1000 or 1000.50. cash_fee must be an amount, like 1000 or 1000.50.",
+  "details": {
+    "missing": [
+      "first_name"
+    ],
+    "invalid": [
+      {
+        "key": "purchase_apr",
+        "expected": "percent"
+      },
+      {
+        "key": "annual_fee",
+        "expected": "currency"
+      },
+      {
+        "key": "cash_fee",
+        "expected": "currency"
+      }
+    ]
+  }
+}

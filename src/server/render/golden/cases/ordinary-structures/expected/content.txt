@@ -1,0 +1,22 @@
+A cell of two paragraphs beside another cell, the lines the same length:
+one
+two
+six
+ten
+won
+A bar inside a cell:
+a | b
+c |
+| d
+e |
+• A list item with a heading after its first paragraph
+## The heading
+And a paragraph after it.
+1. An ordered item
+### A level three heading in it
+A link whose text is only spaces: (the address shows in text).
+----------------------------------------
+A paragraph of forty dashes is above, and one of three is below:
+---
+A line, then dashes after a hard break ===
+A zero-width space after a hard break leaves the empty line

@@ -1,0 +1,435 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Spaces and hard breaks",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Spaces and breaks"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Two  spaces, three   spaces, and four    spaces inside a line."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "   Three leading spaces."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Trailing spaces follow this.    "
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b5",
+      "content": [
+        {
+          "type": "text",
+          "text": "    Spaces before a bold run: "
+        },
+        {
+          "type": "text",
+          "text": "   bold with its own leading spaces",
+          "bold": true
+        },
+        {
+          "type": "text",
+          "text": "   and after."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "Line one"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "Line two"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "Line three"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b7",
+      "content": [
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "Starts with a hard break."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Two breaks in a row"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "end the line."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b9",
+      "content": [
+        {
+          "type": "text",
+          "text": "Ends with two hard breaks, so two empty lines follow."
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "break"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b10",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "A heading"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "on two lines"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b11",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet"
+                },
+                {
+                  "type": "break"
+                },
+                {
+                  "type": "text",
+                  "text": "continued"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "   Bullet with leading spaces"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b12",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Number"
+                },
+                {
+                  "type": "break"
+                },
+                {
+                  "type": "text",
+                  "text": "continued"
+                },
+                {
+                  "type": "break"
+                },
+                {
+                  "type": "break"
+                },
+                {
+                  "type": "text",
+                  "text": "after a blank line"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b13",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cell"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cell"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cell"
+                    },
+                    {
+                      "type": "break"
+                    },
+                    {
+                      "type": "text",
+                      "text": "two lines"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "  Indented cell"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b14",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Callout"
+            },
+            {
+              "type": "break"
+            },
+            {
+              "type": "text",
+              "text": "two lines"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "   Indented callout text."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b15",
+      "content": [
+        {
+          "type": "text",
+          "text": "A tab becomes one space."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b16",
+      "content": [
+        {
+          "type": "text",
+          "text": "Line breaks"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "inside"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "text"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "nodes"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "become"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "breaks."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b17",
+      "content": [
+        {
+          "type": "text",
+          "text": "Control characters  are removed."
+        }
+      ]
+    }
+  ]
+}

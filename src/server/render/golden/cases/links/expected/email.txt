@@ -1,0 +1,36 @@
+Links
+=====
+
+Allowed: https (https://coral.example/terms), http (http://coral.example/plain), email (help@coral.example?subject=Card%20terms), phone (+18005550100).
+
+Normalized: scheme case (https://Coral.Example/Terms), trimmed (https://coral.example/trim), accent (https://coral.example/caf%C3%A9?q=%C3%A9), mailto case (Help@Coral.Example).
+
+Refused, text stays: script, relative, no scheme, ftp, data, empty.
+
+Refused: space, user info, international host, backslash, bare tel.
+
+One link in three runs: read the rewards rules (https://coral.example/rewards).
+
+A link across a break: line one
+line two (https://coral.example/a).
+
+https://coral.example/privacy and coral.example (https://coral.example/) and help@coral.example show no address twice.
+
+A variable that is a link: coral.example (https://coral.example/site).
+
+Heading with a link (https://coral.example/heading)
+---------------------------------------------------
+
+• Bullet with a link (https://coral.example/bullet)
+
+Link | Where
+------------
+in a cell (https://coral.example/cell) | Cell
+
++---------------------------------------
+| Callout with a link (https://coral.example/callout).
++---------------------------------------
+
+A very long link: https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef.
+
+A very long word that must be cut without any hyphen: SupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidocious

@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The email couldn't be rendered. The email subject and preheader can hold only one line of text and variables.",
+  "details": {
+    "reason": "document"
+  }
+}

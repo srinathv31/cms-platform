@@ -1,0 +1,371 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Ordinary structures",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "A cell of two paragraphs beside another cell, the lines the same length:"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b2",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "one"
+                    }
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "two"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "six"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "ten"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "won"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "A bar inside a cell:"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b4",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "a | b"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "c |"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "| d"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "e"
+                    },
+                    {
+                      "type": "break"
+                    },
+                    {
+                      "type": "text",
+                      "text": "|"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b5",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A list item with a heading after its first paragraph"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "id": null,
+              "level": 2,
+              "section": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The heading"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And a paragraph after it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b6",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "An ordered item"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "id": null,
+              "level": 3,
+              "section": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A level three heading in it"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b7",
+      "content": [
+        {
+          "type": "text",
+          "text": "A link whose text is only spaces: "
+        },
+        {
+          "type": "text",
+          "text": "   ",
+          "href": "https://coral.example/blank"
+        },
+        {
+          "type": "text",
+          "text": " (the address shows in text)."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "----------------------------------------"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b9",
+      "content": [
+        {
+          "type": "text",
+          "text": "A paragraph of forty dashes is above, and one of three is below:"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b10",
+      "content": [
+        {
+          "type": "text",
+          "text": "---"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b11",
+      "content": [
+        {
+          "type": "text",
+          "text": "A line, then dashes after a hard break"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "==="
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b12",
+      "content": [
+        {
+          "type": "text",
+          "text": "A zero-width space after a hard break leaves the empty line"
+        },
+        {
+          "type": "break"
+        }
+      ]
+    }
+  ]
+}

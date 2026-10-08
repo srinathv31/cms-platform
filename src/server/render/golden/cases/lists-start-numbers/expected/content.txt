@@ -1,0 +1,33 @@
+# Start numbers
+Start 0, decimal:
+0. Zero
+1. One
+Start 5, a): e) f) g)
+e) Fifth
+f) Sixth
+g) Seventh
+Start 25, (a): (y) (z) (aa) (ab)
+(y) y
+(z) z
+(aa) aa
+(ab) ab
+Start 702, a.: zz. aaa.
+zz. zz
+aaa. aaa
+Start 3998, I.: roman ends at 3999, then digits.
+MMMCMXCVIII. MMMCMXCVIII
+MMMCMXCIX. MMMCMXCIX
+4000. Digits
+4001. Digits again
+Start 1994, i.:
+mcmxciv. Year
+mcmxcv. Next year
+Start 0 in letters and roman falls back to digits, keeping the delimiter:
+0. Zero in letters
+a. One in letters
+(0) Zero in roman
+(i) One in roman
+Start 9999, 1): 10000) follows.
+9999) Largest start
+10000) Past it
+10001) And on
