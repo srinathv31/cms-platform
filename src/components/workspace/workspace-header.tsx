@@ -59,7 +59,7 @@ export async function WorkspaceHeader({
                 ·
               </span>
             ) : null}
-            <SaveStatus />
+            <SaveStatus templateId={t.id} basedOn={t.basedOnNumber} activeNumber={t.activeNumber} />
           </>
         ) : null}
         {!t.canEdit ? (

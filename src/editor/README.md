@@ -15,6 +15,7 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 [Performance](#performance) · [Lifting it into another app](#lifting-it-into-another-app) ·
 [Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
 [Changes since Phase 3](#changes-since-phase-3) · [Changes since Phase 4](#changes-since-phase-4) ·
+[Changes since Phase 7a](#changes-since-phase-7a) ·
 [How it's built](#how-its-built)
 
 ## Public API (frozen for Phase 2)
@@ -24,13 +25,13 @@ route compiles only the parts of the editor it uses. The entry modules:
 
 | Module | Exports |
 | --- | --- |
-| `@/editor/components/editor-root` | `EditorRoot`, `useContractState` |
+| `@/editor/components/editor-root` | `EditorRoot`, `useContractState`, `useEditorHistory` |
 | `@/editor/components/document-editor` | `DocumentEditor` |
 | `@/editor/components/variables-panel` | `VariablesPanel` |
 | `@/editor/components/inline-variable-field` | `InlineVariableField` |
 | `@/editor/components/static-document` | `StaticDocument` |
 | `@/editor/components/variable-chip` | `VariableChipView`, `VariableChipViewProps` |
-| `@/editor/types` | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`. |
+| `@/editor/types` | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`, `EditorHistory`. |
 | `@/editor/model/types` | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`. |
 | `@/editor/model/contract` | `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` |
 | `@/editor/model/variables` | `formatValue`, `validateValue`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types |
@@ -55,6 +56,7 @@ Server and domain code use only the server-safe ones: `schema`, `model/*` and `p
 | `StaticDocument` | Server-safe render of a document (no JS), identical markup to the live editor. |
 | `VariableChipView` | The presentational chip, to show a variable outside the editor the same way. |
 | `useContractState()` | Inside a root: `{ variables, changes }`, the live contract diff against `baseline`. |
+| `useEditorHistory()` | Inside a root: `{ canUndo, canRedo, undo, redo }` for a host's own undo and redo buttons. They act on the last-focused field (the document until another field has had focus), where ⌘Z would, without scrolling to the change; read-only, both are false. |
 
 ### Props
 
@@ -490,6 +492,25 @@ nothing above changed or went away).
 - **New internals**: `extensions/section-paste.ts` (`SectionPaste`, in the client extension list at
   priority 1001, just ahead of the required-section guard); the field binding's
   `clipboardTextParser` for the document. No new props, handle methods or dependencies.
+
+## Changes since Phase 7a
+
+Undo and redo a host can show as buttons, and undo history that survives a hidden route (additive
+only; nothing above changed or went away).
+
+- **New exports**: `useEditorHistory()` (`components/editor-root.tsx`) and its `EditorHistory` type
+  (`types.ts`). The root runtime gains `history` (a store of `{ canUndo, canRedo }`), `undo()`,
+  `redo()` and `noteHistory(fieldId)`, which the field binding calls on every update.
+- **Behavior**: `undo()` / `redo()` take one step in the last-focused field, as ⌘Z / ⇧⌘Z do, but
+  leave the scroll position alone (⌘Z scrolls to the change): a button pressed while reading one
+  part of the document doesn't carry the page off to another.
+- **Undo history across a hidden route**: Next destroys a hidden route's editors and builds new ones
+  when it shows again. `lib/history-carry.ts` captures the documents each undo and redo leads to as
+  the old editor goes, and replays them into the new editor's history, so ⌘Z still reaches back past a
+  tab switch (document and one-line fields). Each step lands on the same document as before; a step
+  is one replace of the range that changed, so the caret after an undo can sit at the start of a
+  change rather than exactly where it was.
+- No new props, handle methods or dependencies.
 
 ## How it's built
 

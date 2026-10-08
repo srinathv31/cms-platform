@@ -8,10 +8,11 @@
 // One line: Enter never adds a line, and a multi-line paste joins its lines with spaces
 // (extensions/single-line.ts). `{{key}}` in pasted text becomes chips, as in the document.
 
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useStore } from "zustand";
 import { cx } from "../lib/cx";
+import { captureHistory, restoreHistory, type HistoryCarry } from "../lib/history-carry";
 import { useHydrated } from "../lib/use-hydrated";
 import { NODE, type JSONContent, type Variable } from "../model/types";
 import { inlineFieldExtensions } from "../schema";
@@ -102,8 +103,11 @@ function LiveField({
     [label, readOnly],
   );
 
-  // Like the document: a field destroyed while its route is hidden comes back with its latest value.
+  // Like the document: a field destroyed while its route is hidden comes back with its latest value,
+  // and its undo history.
   const [snapshot, setSnapshot] = useState<JSONContent>(initial);
+  const carry = useRef<HistoryCarry | null>(null);
+  const live = useRef<Editor | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -116,6 +120,11 @@ function LiveField({
     onBeforeCreate: ({ editor: next }) => {
       if (latestRef.current) next.setOptions({ content: latestRef.current });
     },
+    onCreate: ({ editor: ready }) => {
+      live.current = ready;
+      if (carry.current) restoreHistory(ready.view, carry.current);
+      carry.current = null;
+    },
     onUpdate: ({ editor: updated }) => {
       if (!updated.isInitialized) return;
       const doc = updated.getJSON();
@@ -123,6 +132,8 @@ function LiveField({
       onChangeRef.current?.(doc);
     },
     onDestroy: () => {
+      if (live.current) carry.current = captureHistory(live.current.state);
+      live.current = null;
       if (latestRef.current) setSnapshot(latestRef.current);
     },
   });

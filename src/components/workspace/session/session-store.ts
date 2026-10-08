@@ -11,6 +11,11 @@
 //   - the preview's state (open, which view the widened rail shows, channel, sample set, device), so the
 //     tab bar's Preview button and the rail agree.
 //   - a save "tick" that counts the saves that have landed, so an open preview knows when to re-render.
+//   - undo and redo for the header's buttons, from the Content page's editor root while it is on screen.
+//   - what changed since the page opened (the latest value of every field saved), and the parts of
+//     the page that can show other values, so the header's "Revert to when you opened it" can put
+//     everything back, "Revert to v3" can put another version's content in, and their toast's Undo
+//     can put the changes back again.
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -55,6 +60,28 @@ export interface PreviewState {
   device: PreviewDevice;
 }
 
+/** Undo and redo for the header's buttons: the Content page's editor root, while it is on screen. */
+export interface HistoryControls {
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+}
+
+/**
+ * A part of the page that shows saved fields (the Content page, the name field) and can be made to
+ * show other values: a revert, or undoing one. Saving those values is the session's job.
+ */
+export interface RestoreTarget {
+  /** The fields it shows, as they were when the page opened. Its keys are the fields it owns. */
+  opening: SaveFields;
+  /**
+   * Show new values. `fields` are the ones changing (a target owning none of them has nothing to
+   * do); `values` is every field as it now stands, for a part that shows several at once.
+   */
+  restore: (fields: SaveFields, values: SaveFields) => void;
+}
+
 export const INITIAL_PREVIEW: PreviewState = {
   open: false,
   view: "preview",
@@ -77,6 +104,17 @@ export interface WorkspaceSession {
    * An open preview re-renders when it changes, because the saved draft is what the route renders.
    */
   getSaveTick: () => number;
+  /** Undo and redo for the header, or null when no editor is on screen (another tab, read-only). */
+  getHistory: () => HistoryControls | null;
+  /**
+   * There are changes since the page opened, and every changed field has a part of the page on
+   * screen that can show its opening value again: "Revert to when you opened it" can be offered.
+   */
+  getCanRevert: () => boolean;
+  /** When the draft was bound (Date.now()): "when you opened it". */
+  getOpenedAt: () => number;
+  /** The fields some part of the page on screen can show other values of, sorted and comma-joined (a stable snapshot). */
+  getOwnedFields: () => string;
 
   /** The Content page says which draft is editable, or null when the page is read-only. Idempotent per version. */
   bind: (binding: DraftBinding | null) => void;
@@ -99,6 +137,24 @@ export interface WorkspaceSession {
    * submitting, previewing.
    */
   flush: () => Promise<void>;
+
+  /** The Content page's editor root hands over its undo and redo (null when it goes). */
+  setHistory: (controls: HistoryControls | null) => void;
+  /** A part of the page that can show other values joins revert. Returns the function that takes it out again. */
+  addRestoreTarget: (target: RestoreTarget) => () => void;
+  /**
+   * Puts every field changed since the page opened back to its opening value, on screen and in
+   * autosave. Returns the values it replaced (hand them to `restore` to undo it), or null when it
+   * can't (see `getCanRevert`).
+   */
+  revert: () => SaveFields | null;
+  /** Shows and saves these values: undoing a revert. */
+  restore: (fields: SaveFields) => void;
+  /**
+   * Shows and saves `fields` as an edit like any other ("Revert to v3"). Returns the values they
+   * replaced (hand them to `restore` to undo it), or null when a field has no part on screen to show it.
+   */
+  replace: (fields: SaveFields) => SaveFields | null;
 
   /** Ref callback for the document editor. */
   setEditor: (handle: DocumentEditorHandle | null) => void;
@@ -136,6 +192,14 @@ export function createWorkspaceSession(): WorkspaceSession {
   let railTab: RailTab | null = null;
   let preview: PreviewState = INITIAL_PREVIEW;
   let saveTick = 0;
+  let history: HistoryControls | null = null;
+  // The latest value of every field saved since the page opened (null: nothing changed).
+  let edited: SaveFields | null = null;
+  // Set when a draft is bound (an effect): the store itself is made during render, where the clock can't be read.
+  let openedAt = 0;
+  let canRevert = false;
+  let ownedFields = "";
+  const targets = new Set<RestoreTarget>();
   let sink: ((fields: SaveFields) => void) | null = null;
   let flusher: (() => Promise<void>) | null = null;
   let held: SaveFields | null = null;
@@ -152,6 +216,36 @@ export function createWorkspaceSession(): WorkspaceSession {
     if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => next[key] === preview[key])) return;
     preview = next;
     emit();
+  };
+  const owned = () => new Set([...targets].flatMap((target) => Object.keys(target.opening)));
+  /** The targets changed: the owned fields, and so whether a revert can be offered, may have too. */
+  const syncTargets = () => {
+    const next = [...owned()].sort().join(",");
+    const changed = next !== ownedFields;
+    ownedFields = next;
+    return syncCanRevert() || changed;
+  };
+  const syncCanRevert = () => {
+    const next = edited !== null && binding !== null && Object.keys(edited).every((key) => owned().has(key));
+    if (next === canRevert) return false;
+    canRevert = next;
+    return true;
+  };
+  /** Hands fields to autosave (now, or once the host connects). */
+  const send = (fields: SaveFields) => {
+    if (sink) sink(fields);
+    else held = mergeFields(held, fields);
+  };
+  const openingValues = () => {
+    const opening: SaveFields = {};
+    for (const target of targets) Object.assign(opening, target.opening);
+    return opening;
+  };
+  /** Shows `fields` everywhere they are shown, and saves them. Call it before `edited` takes them in. */
+  const apply = (fields: SaveFields) => {
+    const values = { ...openingValues(), ...edited, ...fields };
+    for (const target of [...targets]) target.restore(fields, values);
+    send(fields);
   };
   const releaseWaiting = () => {
     const release = waiting;
@@ -172,6 +266,10 @@ export function createWorkspaceSession(): WorkspaceSession {
     getRailTab: () => railTab,
     getPreview: () => preview,
     getSaveTick: () => saveTick,
+    getHistory: () => history,
+    getCanRevert: () => canRevert,
+    getOpenedAt: () => openedAt,
+    getOwnedFields: () => ownedFields,
 
     bind(next) {
       if (next === null) {
@@ -179,6 +277,8 @@ export function createWorkspaceSession(): WorkspaceSession {
         binding = null;
         status = SAVED;
         held = null;
+        edited = null;
+        syncCanRevert();
         releaseWaiting();
         emit();
         return;
@@ -187,6 +287,9 @@ export function createWorkspaceSession(): WorkspaceSession {
       if (binding?.versionId === next.versionId) return;
       binding = next;
       status = SAVED;
+      edited = null;
+      openedAt = Date.now();
+      syncCanRevert();
       emit();
     },
 
@@ -217,8 +320,10 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     save(fields) {
-      if (sink) sink(fields);
-      else held = mergeFields(held, fields);
+      send(fields);
+      if (binding === null) return;
+      edited = mergeFields(edited, fields);
+      if (syncCanRevert()) emit();
     },
 
     flush() {
@@ -230,6 +335,53 @@ export function createWorkspaceSession(): WorkspaceSession {
         });
       }
       return Promise.resolve();
+    },
+
+    setHistory(next) {
+      if (next === history) return;
+      if (next && history && next.canUndo === history.canUndo && next.canRedo === history.canRedo && next.undo === history.undo && next.redo === history.redo) return;
+      history = next;
+      emit();
+    },
+
+    addRestoreTarget(target) {
+      targets.add(target);
+      if (syncTargets()) emit();
+      return () => {
+        if (!targets.delete(target)) return;
+        if (syncTargets()) emit();
+      };
+    },
+
+    revert() {
+      if (!canRevert || edited === null) return null;
+      const changed = edited;
+      const opening = openingValues();
+      // Only what changed goes back: a field nobody touched stays out of the save.
+      const back = Object.fromEntries(Object.keys(changed).map((key) => [key, opening[key as keyof SaveFields]])) as SaveFields;
+      apply(back);
+      edited = null;
+      syncCanRevert();
+      emit();
+      return changed;
+    },
+
+    restore(fields) {
+      apply(fields);
+      if (binding === null) return;
+      edited = mergeFields(edited, fields);
+      if (syncCanRevert()) emit();
+    },
+
+    replace(fields) {
+      const mine = owned();
+      if (binding === null || !Object.keys(fields).every((key) => mine.has(key))) return null;
+      const current: SaveFields = { ...openingValues(), ...edited };
+      const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, current[key as keyof SaveFields]])) as SaveFields;
+      apply(fields);
+      edited = mergeFields(edited, fields);
+      if (syncCanRevert()) emit();
+      return previous;
     },
 
     setEditor(handle) {

@@ -366,3 +366,102 @@ describe("the imported original", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe("revert to when the page opened", () => {
+  const body = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+
+  function setup() {
+    const session = createWorkspaceSession();
+    const save = vi.fn();
+    session.bind({ versionId: "v_1", rev: 0 });
+    session.attach(save);
+    const content = vi.fn();
+    const name = vi.fn();
+    session.addRestoreTarget({ opening: { body: body("Opening"), channels: ["pdf"] }, restore: content });
+    session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: name });
+    return { session, save, content, name };
+  }
+
+  it("is offered once something changed, and only while every changed field can be shown again", () => {
+    const { session } = setup();
+    expect(session.getCanRevert()).toBe(false);
+
+    session.save({ body: body("Edited") });
+    expect(session.getCanRevert()).toBe(true);
+
+    // Sample sets have no part of the page on screen that can show them again (here): nothing to offer.
+    session.save({ sampleSets: [] });
+    expect(session.getCanRevert()).toBe(false);
+  });
+
+  it("puts back and saves only what changed, and hands back what it replaced", () => {
+    const { session, save, content, name } = setup();
+    session.save({ body: body("Edited") });
+    session.save({ name: "Renamed" });
+    save.mockClear();
+
+    const previous = session.revert();
+    expect(previous).toEqual({ body: body("Edited"), name: "Renamed" });
+    expect(save).toHaveBeenCalledWith({ body: body("Opening"), name: "Card agreement" });
+    // Each part gets what changed, and everything as it now stands.
+    expect(content).toHaveBeenCalledWith(
+      { body: body("Opening"), name: "Card agreement" },
+      { body: body("Opening"), channels: ["pdf"], name: "Card agreement" },
+    );
+    expect(name).toHaveBeenCalledTimes(1);
+    expect(session.getCanRevert()).toBe(false);
+    expect(session.revert()).toBeNull();
+  });
+
+  it("undoes a revert by putting the changes back", () => {
+    const { session, save, content } = setup();
+    session.save({ body: body("Edited") });
+    const previous = session.revert()!;
+    save.mockClear();
+    content.mockClear();
+
+    session.restore(previous);
+    expect(save).toHaveBeenCalledWith({ body: body("Edited") });
+    expect(content).toHaveBeenCalledWith({ body: body("Edited") }, { body: body("Edited"), channels: ["pdf"], name: "Card agreement" });
+    expect(session.getCanRevert()).toBe(true);
+  });
+
+  it("puts another version's content in as an edit, and hands back what it replaced", () => {
+    const { session, save, content } = setup();
+    session.save({ body: body("Edited") });
+    save.mockClear();
+    expect(session.getOwnedFields()).toBe("body,channels,name");
+
+    const previous = session.replace({ body: body("v3"), channels: ["pdf", "email"] });
+    expect(previous).toEqual({ body: body("Edited"), channels: ["pdf"] });
+    expect(save).toHaveBeenCalledWith({ body: body("v3"), channels: ["pdf", "email"] });
+    expect(content).toHaveBeenLastCalledWith(
+      { body: body("v3"), channels: ["pdf", "email"] },
+      { body: body("v3"), channels: ["pdf", "email"], name: "Card agreement" },
+    );
+    // Still a change since the page opened: the revert to it stays on offer.
+    expect(session.getCanRevert()).toBe(true);
+
+    session.restore(previous!);
+    expect(save).toHaveBeenLastCalledWith({ body: body("Edited"), channels: ["pdf"] });
+
+    // A field nothing on screen can show isn't replaced.
+    expect(session.replace({ sampleSets: [] })).toBeNull();
+  });
+
+  it("starts over for a new version, and stops offering once the page's part is gone", () => {
+    const session = createWorkspaceSession();
+    session.bind({ versionId: "v_1", rev: 0 });
+    const remove = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
+    session.save({ body: body("Edited") });
+    expect(session.getCanRevert()).toBe(true);
+
+    remove();
+    expect(session.getCanRevert()).toBe(false);
+
+    session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
+    expect(session.getCanRevert()).toBe(true);
+    session.bind({ versionId: "v_2", rev: 0 });
+    expect(session.getCanRevert()).toBe(false);
+  });
+});

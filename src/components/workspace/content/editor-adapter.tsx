@@ -5,6 +5,7 @@
 //   <EditorRoot variables onVariablesChange baseline requiredSections readOnly>
 //     <DocumentEditor content onChange ref align />      the document column
 //     <VariablesPanel />                                   in the rail
+//     useEditorHistory()                                   the header's undo and redo
 //   </EditorRoot>
 //
 // Tree order matters: the document renders BEFORE the panel and inside the same Suspense boundary
@@ -15,12 +16,12 @@
 // The root reads `variables` once. A different version is a different root: the server component
 // that renders ContentWorkspace passes `key={versionId}`, which remounts everything below.
 
-import type { Ref } from "react";
+import { useLayoutEffect, type Ref } from "react";
 import { DocumentEditor } from "@/editor/components/document-editor";
-import { EditorRoot } from "@/editor/components/editor-root";
+import { EditorRoot, useEditorHistory } from "@/editor/components/editor-root";
 import { VariablesPanel } from "@/editor/components/variables-panel";
 import type { JSONContent, RequiredSection, Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import type { CommentRequest, DocumentEditorHandle, EditorHistory, ThreadAnchor } from "@/editor/types";
 
 export interface EditorScopeProps {
   /** The template's variable list (the consumer contract); the root owns it from the first render. */
@@ -92,4 +93,17 @@ export function DocumentBody({ content, onChange, editorRef, comments }: Documen
 /** The variables panel, in the rail. */
 export function VariablesSection() {
   return <VariablesPanel />;
+}
+
+/**
+ * Hands the root's undo and redo (the last-focused field's, the document's until another has had
+ * focus) to `onChange` as they change, and null when it goes. Renders nothing; place it inside the scope.
+ */
+export function HistoryBridge({ onChange }: { onChange: (history: EditorHistory | null) => void }) {
+  const history = useEditorHistory();
+  useLayoutEffect(() => {
+    onChange(history);
+  }, [history, onChange]);
+  useLayoutEffect(() => () => onChange(null), [onChange]);
+  return null;
 }

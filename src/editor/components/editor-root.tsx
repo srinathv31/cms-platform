@@ -10,7 +10,7 @@ import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
 import { diffVariables } from "../model/contract";
 import type { RequiredSection } from "../model/types";
 import { createEditorRootRuntime, type EditorRootRuntime } from "../state/editor-root";
-import type { ContractState, EditorRootProps } from "../types";
+import type { ContractState, EditorHistory, EditorRootProps } from "../types";
 
 const EditorRootContext = createContext<EditorRootRuntime | null>(null);
 
@@ -83,4 +83,16 @@ export function useContractState(): ContractState {
     }),
     [variables, renames, baseline],
   );
+}
+
+/**
+ * Undo and redo for a host's own buttons. They act on the last-focused field of the root (the
+ * document until a field has had focus), the field ⌘Z would undo in, and `canUndo` / `canRedo`
+ * follow it. Read-only, both are false and the actions do nothing.
+ */
+export function useEditorHistory(): EditorHistory {
+  const root = useEditorRoot("useEditorHistory");
+  const canUndo = useStore(root.history, (s) => s.canUndo);
+  const canRedo = useStore(root.history, (s) => s.canRedo);
+  return useMemo(() => ({ canUndo, canRedo, undo: root.undo, redo: root.redo }), [canUndo, canRedo, root]);
 }
