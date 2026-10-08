@@ -39,6 +39,7 @@ route compiles only the parts of the editor it uses. The entry modules:
 | `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
 | `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
 | `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
+| `@/editor/model/normalize`, `model/document-check`, `model/table-grid`, `model/characters` | `normalizeDocument`, `normalizeField`, `normalizeFragment`, `HEADING_LEVELS`, `CELL_BLOCKS`, `MAX_SPLIT_COLUMNS`; `documentProblem`, `fieldProblem`, `normalizeAndCheckBody`, `normalizeAndCheckField`, `DOCUMENT_MESSAGES`; `tableGrid`, `linesUp`, `spanValue`, `MAX_TABLE_COLUMNS` (the one export); `LINE_BREAKS`, `CONTROL_CHARACTERS`, `cleanCharacters` (the text rules save normalization and the resolver share) |
 
 Server and domain code use only the server-safe ones: `schema`, `model/*` and `paste/*`.
 `model/*` and `paste/*` load no React at all; `schema` reaches only the chip's node view (through
@@ -139,6 +140,9 @@ interface DocumentEditorHandle {
 | `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
 | `chipsInJSON(doc)`, `variableKeys(doc)` | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses. |
+| `normalizeDocument(doc)`, `normalizeField(doc)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
+| `documentProblem(doc)`, `fieldProblem(doc)`, `DOCUMENT_MESSAGES` | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences. `src/server/render/schema-check.ts` adds the schema parse. |
+| `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)` | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them. |
 | `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
 | `looksLikeMarkdown(text)`, `markdownToHtml(markdown)` | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import. |
 | Component types | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`. |
@@ -177,7 +181,11 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
 - `heading { level: 1|2|3, requiredKey?: string|null }`; HTML `data-required="<key>"`. A
   `requiredKey` appears at most once per document; pasted copies never carry one.
 - `callout` → `paragraph+`; HTML `<div data-callout>`.
-- `table` → `tableRow` → `tableHeader | tableCell` → blocks.
+- `bulletList` / `orderedList` → `listItem` → `paragraph` then blocks. `orderedList { start,
+  markerFormat, markerDelimiter }`: the numbering style the author chose (null = the default for the
+  list's depth); HTML `start`, `data-marker-format`, `data-marker-delimiter`.
+- `table` → `tableRow` → `tableHeader | tableCell` → `(paragraph | bulletList | orderedList)+`; at
+  most 12 columns (the table menu disables "Insert column" at 12, with the reason).
 - Inline `variable { key }`; HTML `<span data-variable="key">Label</span>`; plain text `{{key}}`.
   The node never stores label or type: those come from the variable list.
 - Marks: `bold`, `italic`, `underline`, `link { href }`.
@@ -228,7 +236,23 @@ Legal notices) can't be deleted, renamed, retyped, reformatted or moved:
 ### Blocks
 
 - **Block handle**: hovering a block shows + and ⋮⋮. + adds a line below and opens the `/` menu
-  there (Esc right away takes the line back out). ⋮⋮ drags. Required headings show the + only.
+  there (Esc right away takes the line back out). ⋮⋮ drags; clicked (no drag), it opens the block
+  menu. Required headings show the + only.
+- **Block menu** (⋮⋮ click, a second click closes it; or Alt+F10 from the caret: a focused button in
+  the gutter, Enter opens it), named "Block options". For a numbered list: **Numbering** lists
+  Default (the style by depth, previewed) and the ten styles, each previewed ("1. 2. 3.",
+  "(a) (b) (c)"…), the list's own checked; **Start at…** swaps its row for a small number field
+  (0–9999; Enter applies, anything else is explained and not applied; Esc goes back to the item,
+  and focus moving to another row cancels it). Each choice is one undo step and an ordinary edit
+  (autosaved). The list is the one the caret is in when the caret is inside the block (so a nested
+  level is reached by clicking into it; the menu names the level), else the block itself, else the
+  first numbered list inside it. Any other block: both items disabled, with the reason. Nothing
+  scrolls; focus goes back to the text.
+- **Lists**: every item's marker is the text `model/list-markers.ts` writes ("1.", "(b)", "iv)",
+  "•"), the same string every channel prints: default 1. → a. → i. by numbered-list depth, bullets
+  • ◦ ▪ by bulleted-list depth, the author's style and start, out-of-range numbers in digits. Drawn
+  as text (`data-list-marker`), never by CSS counters, in the live editor and the static paint alike,
+  in a column as wide as the list's widest marker (never into the handle's gutter).
 - **`/` menu**: Text, Heading 1–3, Bulleted and Numbered list, Table, Callout, Divider, with keycap
   shortcuts. **Menus** (`/`, `{{`) open from typing only (undo bringing back a `/query` or
   `{{query` doesn't reopen them), open below the caret (scrolling to make room first; flipping
@@ -300,10 +324,10 @@ Mechanics only: the editor highlights, reports and asks; the host stores threads
 
 | Where | Keys |
 | --- | --- |
-| Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Home/End line start/end · ⌘Z / ⇧⌘Z |
+| Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Alt+F10: block options for the caret's block (Enter opens the menu, Esc back to the text) · Home/End line start/end · ⌘Z / ⇧⌘Z |
 | Highlights | arrows into a highlight report it (`onCaretThreadChange`) |
 | Chip | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove |
-| Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell) |
+| Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell); in a numbered list inside a cell, block options instead |
 | Required heading | Enter at its start adds a line above · edits show the note |
 | Panel | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels |
 
@@ -524,8 +548,10 @@ only; nothing above changed or went away).
 | Chip popover | Base UI `Popover` parts, anchored to the chip, never taking focus (`chip-popover.tsx`) |
 | Panel, forms, dialogs, table menu | shadcn `Button`, `Input`, `Select`, `Switch`, `AlertDialog`, `DropdownMenu` |
 | ⋮⋮ handle | `@tiptap/extension-drag-handle-react` + our `+` (`components/block-handle.tsx`) |
+| Block menu (numbering) | Base UI `Menu` with a submenu and radio items (`components/block-menu.tsx`); target list, previews and edits in `lib/list-numbering.ts` |
+| List markers | `model/list-markers.ts` text, drawn as a decoration (`data-list-marker`) live and as an attribute in the static paint (`extensions/list-markers.ts`); `::before` in `styles.css`, never CSS counters |
 | Dragged-block highlight | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`) |
-| Format toolbar (+ Comment) | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`); Base UI `Tooltip` |
+| Format toolbar (+ Comment) | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`, its link field `components/link-field.tsx`); Base UI `Tooltip` |
 | Review-thread highlights | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute |
 | Thread placement for hosts | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container) |
 | Placeholder | `Placeholder` from `@tiptap/extensions` |

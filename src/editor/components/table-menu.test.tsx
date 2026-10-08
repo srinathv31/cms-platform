@@ -28,14 +28,14 @@ const TABLE = {
   ],
 };
 
-function setup() {
+function setup(table: object = TABLE) {
   const frame = document.createElement("div");
   frame.className = "ucomp-editor";
   const element = document.createElement("div");
   const host = document.createElement("div");
   frame.append(element, host);
   document.body.appendChild(frame);
-  const editor = new Editor({ element, extensions: editorExtensions({ store: createVariableStore([]) }), content: doc(p("Before"), TABLE) });
+  const editor = new Editor({ element, extensions: editorExtensions({ store: createVariableStore([]) }), content: doc(p("Before"), table) });
   let root: Root;
   act(() => {
     root = createRoot(host);
@@ -89,5 +89,42 @@ describe("TableMenu", () => {
       editor.commands.setTextSelection(editor.state.doc.child(0).nodeSize + 4);
     });
     expect(trigger(frame)).toBeNull();
+  });
+
+  it("at 12 columns, Insert column left and right are disabled and say why; rows can still be added", async () => {
+    const wide = {
+      type: "table",
+      content: [0, 1].map(() => ({ type: "tableRow", content: Array.from({ length: 12 }, () => ({ type: "tableCell", content: [p("x")] })) })),
+    };
+    const { editor, frame } = setup(wide);
+    act(() => {
+      editor.commands.setTextSelection(editor.state.doc.child(0).nodeSize + 4);
+    });
+    await act(async () => {
+      trigger(frame)!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const item = (label: string) => [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes(label));
+    for (const label of ["Insert column left", "Insert column right"]) {
+      const element = item(label);
+      expect(element?.hasAttribute("data-disabled"), label).toBe(true);
+      const reason = frame.querySelector(`#${CSS.escape(element?.getAttribute("aria-describedby") ?? "")}`);
+      expect(reason?.textContent).toBe("Tables can have at most 12 columns.");
+    }
+    expect(item("Insert row below")?.hasAttribute("data-disabled")).toBe(false);
+  });
+
+  it("below 12 columns, Insert column is available and nothing is explained", async () => {
+    const { editor, frame } = setup();
+    act(() => {
+      editor.commands.setTextSelection(editor.state.doc.child(0).nodeSize + 4);
+    });
+    await act(async () => {
+      trigger(frame)!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const insert = [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes("Insert column right"));
+    expect(insert?.hasAttribute("data-disabled")).toBe(false);
+    expect(frame.textContent).not.toContain("at most 12 columns");
   });
 });
