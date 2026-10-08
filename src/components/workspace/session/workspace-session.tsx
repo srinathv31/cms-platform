@@ -6,6 +6,7 @@ import {
   createWorkspaceSession,
   INITIAL_PREVIEW,
   type DraftBinding,
+  type HistoryControls,
   type PreviewState,
   type RailTab,
   type SessionStatus,
@@ -89,4 +90,24 @@ export function usePreviewState(): PreviewState {
 export function useSaveTick(): number {
   const session = useWorkspaceSession();
   return useSyncExternalStore(session.subscribe, session.getSaveTick, () => 0);
+}
+
+/** Undo and redo for the header's buttons, or null when no editor is on screen. */
+export function useHistoryControls(): HistoryControls | null {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getHistory, () => null);
+}
+
+/** "Revert to when you opened it" can be offered: something changed, and all of it can be put back. */
+export function useCanRevert(): boolean {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getCanRevert, () => false);
+}
+
+/** Some part of the page on screen can show other values of every one of `fields` (the Content tab, editable, for the content fields). */
+export function useOwnsFields(fields: readonly string[]): boolean {
+  const session = useWorkspaceSession();
+  const owned = useSyncExternalStore(session.subscribe, session.getOwnedFields, () => "");
+  const set = new Set(owned.split(","));
+  return fields.every((field) => set.has(field));
 }

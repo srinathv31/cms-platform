@@ -51,6 +51,25 @@ function EditableName({ name }: { name: string }) {
   const startName = useRef(name);
   /** The last non-empty name handed to autosave: what an emptied field falls back to. */
   const lastGood = useRef(name);
+  /** The name when the page opened: what "Revert to when you opened it" puts back. */
+  const [openingName] = useState(name);
+
+  // The header's revert (and undoing it) can hand the field a name to show; the session saves it.
+  useEffect(
+    () =>
+      session.addRestoreTarget({
+        opening: { name: openingName },
+        restore: ({ name: next }) => {
+          if (next === undefined) return;
+          lastGood.current = next;
+          startName.current = next;
+          const el = field.current;
+          if (el) el.value = next;
+          setMirror(next);
+        },
+      }),
+    [session, openingName],
+  );
 
   // A new template: focus the name with all of it selected. The flag is taken as it is read, so this
   // happens once, on arrival; a re-run of the effect (Strict Mode, the page shown again after Back and

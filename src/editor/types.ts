@@ -203,6 +203,21 @@ export interface ContractState {
   changes: ContractChange[];
 }
 
+// ── Undo and redo (useEditorHistory) ─────────────────────────
+
+/**
+ * Undo and redo for a host's own buttons, on the root's last-focused field (the document until a
+ * field has had focus): the same field ⌘Z and ⇧⌘Z act on.
+ */
+export interface EditorHistory {
+  canUndo: boolean;
+  canRedo: boolean;
+  /** One step back, as ⌘Z, but the page stays where it is (⌘Z scrolls to the change). False when there was nothing to undo. */
+  undo: () => boolean;
+  /** One step forward again, as ⇧⌘Z, without scrolling. */
+  redo: () => boolean;
+}
+
 export interface StaticDocumentProps {
   content: JSONContent;
   variables: readonly Variable[];

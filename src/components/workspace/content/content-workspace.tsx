@@ -17,9 +17,12 @@ import { takeJustImported } from "../just-imported";
 import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
-import { DocumentBody, EditorScope, VariablesSection } from "./editor-adapter";
+import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
 import { EmailDetails } from "./email-details";
 import { Rail } from "./rail";
+
+/** The fields this page shows, which a revert can put back. */
+const CONTENT_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
 
 export interface ContentWorkspaceProps {
   templateId: string;
@@ -70,6 +73,11 @@ export interface ContentWorkspaceProps {
  * preview's header), and one `useReviewThreads` state ties them: the active thread, and the composer
  * the editor's Comment button opens. A click on a highlight or a marker brings the thread's card into
  * the rail (switching it to Comments); choosing a card scrolls the document to the quote.
+ *
+ * Undo and redo for the header's buttons come from the editor root (`HistoryBridge`). "Revert to when
+ * you opened it" (the header's save status menu) puts this page's fields back to how they were when
+ * it mounted: the session hands the values over (`restore`), and everything inside the editor root
+ * remounts with them (`shown.gen` is its key), since the root and the fields read their values once.
  */
 export function ContentWorkspace({
   templateId,
@@ -113,6 +121,11 @@ export function ContentWorkspace({
 
   const [channels, setChannels] = useState(initialChannels);
 
+  // What the editor root and its fields mount with: the page's values as it opened, then whatever a
+  // revert (or undoing one) hands over. `gen` remounts them. Later props (a refresh) don't reset a draft being edited.
+  const [opening] = useState(() => ({ body, variables, channels: initialChannels, emailSubject, emailPreheader, sampleSets }));
+  const [shown, setShown] = useState(() => ({ gen: 0, ...opening }));
+
   // ── Review comments: the state the document's highlights and markers, and the rail's list, share.
   const review = useReviewThreads(threads);
   const { setActive, openComposer, closeComposer, activeThreadId, trackDocument } = review;
@@ -141,6 +154,28 @@ export function ContentWorkspace({
     },
     [session],
   );
+
+  useEffect(() => {
+    if (!editable) return;
+    return session.addRestoreTarget({
+      opening,
+      restore: (fields, values) => {
+        if (!CONTENT_FIELDS.some((key) => key in fields)) return;
+        const next = {
+          body: values.body ?? opening.body,
+          variables: values.variables ?? opening.variables,
+          channels: values.channels ?? opening.channels,
+          emailSubject: values.emailSubject === undefined ? opening.emailSubject : values.emailSubject,
+          emailPreheader: values.emailPreheader === undefined ? opening.emailPreheader : values.emailPreheader,
+          sampleSets: values.sampleSets ?? opening.sampleSets,
+        };
+        liveBody.current = next.body;
+        trackDocument(next.body);
+        setChannels(next.channels);
+        setShown((prev) => ({ gen: prev.gen + 1, ...next }));
+      },
+    });
+  }, [session, editable, opening, trackDocument]);
 
   const open = openCount(review.threads);
   const hasComments = review.threads.length > 0 || review.composer !== null;
@@ -203,20 +238,22 @@ export function ContentWorkspace({
     [closeComposer],
   );
   const blockPosition = useCallback((blockId: string) => editorHandle.current?.getBlockRect(blockId)?.top ?? null, []);
-  const labels = useMemo(() => new Map(variables.map((v) => [v.key, v.label])), [variables]);
+  const labels = useMemo(() => new Map(shown.variables.map((v) => [v.key, v.label])), [shown.variables]);
   const blockText = useCallback((blockId: string) => blockTextOf(liveBody.current, blockId, labels), [labels]);
 
   return (
     <EditorScope
-      variables={variables}
+      key={shown.gen}
+      variables={shown.variables}
       baseline={baseline}
       requiredSections={requiredSections}
       readOnly={!editable}
       onVariablesChange={onVariablesChange}
     >
+      {editable ? <HistoryBridge onChange={session.setHistory} /> : null}
       <div data-slot="editor" className={cn(WS.doc, "relative")}>
         <DocumentBody
-          content={body}
+          content={shown.body}
           onChange={editable ? onBodyChange : undefined}
           editorRef={setEditor}
           comments={{
@@ -271,8 +308,8 @@ export function ContentWorkspace({
           <EmailDetails
             on={channels.includes("email")}
             editable={editable}
-            subject={emailSubject}
-            preheader={emailPreheader}
+            subject={shown.emailSubject}
+            preheader={shown.emailPreheader}
           />
         }
         original={importOriginal !== null}
@@ -286,7 +323,7 @@ export function ContentWorkspace({
             teamName={teamName}
             channels={channels}
             editable={editable}
-            sampleSets={sampleSets}
+            sampleSets={shown.sampleSets}
             today={today}
             commentsCount={hasComments ? open : null}
             original={importOriginal}

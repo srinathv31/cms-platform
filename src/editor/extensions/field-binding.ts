@@ -1,6 +1,7 @@
 // Binds one editor (the document body, or an inline field) to its <EditorRoot>:
 //   • usage: tells the root when the document changed (counted on the next frame)
-//   • focus: the root remembers the last-focused field for click-to-insert
+//   • focus: the root remembers the last-focused field for click-to-insert, undo and redo
+//   • history: tells the root when the field's undo history may have changed
 //   • drop:  a variable dragged from the panel (our own MIME type) lands as a chip, one transaction
 //   • chips: click, or Enter/Space on a selected chip, opens its popover; Esc closes it
 //   • paste: Word / Google Docs / web HTML is normalized (paste/normalize-html.ts); in the document,
@@ -131,6 +132,8 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
                 root.noteDoc(fieldId, next.state.doc);
               }
               if (next.state.selection !== prev.selection) followSelection(next.state, chip);
+              // Every update: an edit, an undo, or the history handed over after a rebuild (lib/history-carry.ts).
+              root.noteHistory(fieldId);
             },
             destroy: () => {
               // The view is going (destroy, or a hidden route torn down): nothing anchors a popover.

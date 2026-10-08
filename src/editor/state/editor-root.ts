@@ -5,8 +5,14 @@
 // Fields register themselves; the body is labelled "Document". Usage is recomputed at most once
 // per frame, from each field's latest document, and published per key (a panel row re-renders
 // only when its own numbers change).
+//
+// Undo and redo from outside the fields (a host's buttons) act on the last-focused field, the
+// body until one has had focus: the same field ⌘Z would undo in. `history` says whether there is
+// anything to undo or redo there. Unlike ⌘Z they leave the scroll position alone: a button pressed
+// while reading one part of the document shouldn't carry the page off to wherever the change was.
 
 import type { Editor } from "@tiptap/core";
+import { redoDepth, redoNoScroll, undoDepth, undoNoScroll } from "@tiptap/pm/history";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
@@ -51,6 +57,12 @@ export interface UsageState {
   ready: boolean;
 }
 
+/** Whether the field undo and redo act on (the last-focused one) has anything to undo or redo. */
+export interface HistoryAvailability {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
 export interface RootInit {
   variables: readonly Variable[];
   baseline?: readonly Variable[] | null;
@@ -63,6 +75,7 @@ export interface EditorRootRuntime {
   readonly variables: VariableStore;
   readonly usage: StoreApi<UsageState>;
   readonly config: StoreApi<RootConfig>;
+  readonly history: StoreApi<HistoryAvailability>;
 
   // ── Fields ──
   /** Adds a field. `content` seeds its usage before its editor exists (server paint, first frame). */
@@ -72,8 +85,10 @@ export interface EditorRootRuntime {
   detachEditor: (id: string, editor: Editor) => void;
   /** A field's document changed. Usage catches up on the next frame (`sync` computes it now). */
   noteDoc: (id: string, doc: PMNode, sync?: boolean) => void;
-  /** A field received focus: click-to-insert targets it from now on. */
+  /** A field received focus: click-to-insert, undo and redo target it from now on. */
   noteFocus: (id: string) => void;
+  /** A field's editor state changed (its history may have): `history` catches up now. */
+  noteHistory: (id: string) => void;
   /** Computes pending usage now (tests, and before reading counts synchronously). */
   flushUsage: () => void;
 
@@ -90,6 +105,12 @@ export interface EditorRootRuntime {
    * section's body.
    */
   insertVariable: (key: string, options?: { fieldId?: string }) => boolean;
+
+  // ── Undo and redo (the last-focused field, else the body) ──
+  /** One undo step, as ⌘Z, without scrolling the page to the change. False when there was nothing to undo. */
+  undo: () => boolean;
+  /** One redo step, as ⇧⌘Z, without scrolling. */
+  redo: () => boolean;
 
   /** Called with the new list after every change (wired to `onVariablesChange`). */
   setListener: (listener: ((variables: Variable[]) => void) | null) => void;
@@ -108,6 +129,7 @@ interface FieldRecord extends FieldInfo {
 
 const EMPTY_USAGE: FieldUsage = new Map();
 const NO_SECTIONS: readonly RequiredSection[] = [];
+const NO_HISTORY: HistoryAvailability = { canUndo: false, canRedo: false };
 
 export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   const variables = createVariableStore(init.variables);
@@ -118,6 +140,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     requiredSections: init.requiredSections ?? NO_SECTIONS,
     requiredNote: init.requiredNote ?? DEFAULT_REQUIRED_NOTE,
   }));
+  const history = createStore<HistoryAvailability>()(() => NO_HISTORY);
 
   const fields = new Map<string, FieldRecord>();
   let seq = 0;
@@ -190,10 +213,38 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     return ordered().find((f) => f.kind === "body" && f.editor) ?? ordered().find((f) => f.editor);
   };
 
+  /** The live, editable editor undo and redo act on. */
+  const historyEditor = (): Editor | null => {
+    const editor = pickField()?.editor;
+    return editor && !editor.isDestroyed && editor.isEditable && !config.getState().readOnly ? editor : null;
+  };
+
+  const publishHistory = () => {
+    const editor = historyEditor();
+    const canUndo = !!editor && undoDepth(editor.state) > 0;
+    const canRedo = !!editor && redoDepth(editor.state) > 0;
+    const prev = history.getState();
+    if (prev.canUndo !== canUndo || prev.canRedo !== canRedo) history.setState({ canUndo, canRedo });
+  };
+
+  const unsubscribeConfig = config.subscribe((state, prev) => {
+    if (state.readOnly !== prev.readOnly) publishHistory();
+  });
+
+  const step = (which: "undo" | "redo"): boolean => {
+    const editor = historyEditor();
+    if (!editor) return false;
+    const { view } = editor;
+    const done = (which === "undo" ? undoNoScroll : redoNoScroll)(view.state, view.dispatch);
+    publishHistory();
+    return done;
+  };
+
   const runtime: EditorRootRuntime = {
     variables,
     usage,
     config,
+    history,
     markCommitted: () => {
       committed = true;
     },
@@ -220,6 +271,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
       if (!fields.delete(id)) return;
       if (lastFocused === id) lastFocused = null;
       publish();
+      publishHistory();
     },
 
     attachEditor(id, editor) {
@@ -230,7 +282,9 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
 
     detachEditor(id, editor) {
       const field = fields.get(id);
-      if (field?.editor === editor) field.editor = null;
+      if (field?.editor !== editor) return;
+      field.editor = null;
+      publishHistory();
     },
 
     noteDoc(id, doc, sync = false) {
@@ -242,7 +296,14 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     },
 
     noteFocus(id) {
-      if (fields.has(id)) lastFocused = id;
+      if (!fields.has(id)) return;
+      lastFocused = id;
+      publishHistory();
+    },
+
+    noteHistory(id) {
+      // Only the target's history shows; any other field's changes leave it as it is.
+      if (pickField()?.id === id) publishHistory();
     },
 
     flushUsage,
@@ -293,6 +354,9 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
       return editor.chain().insertVariable(key).focus(undefined, { scrollIntoView: true }).run();
     },
 
+    undo: () => step("undo"),
+    redo: () => step("redo"),
+
     setListener(next) {
       listener = next;
     },
@@ -300,6 +364,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     dispose() {
       cancelFrame();
       unsubscribe();
+      unsubscribeConfig();
       listener = null;
       fields.clear();
     },

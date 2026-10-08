@@ -3,6 +3,7 @@
 // transaction that undo/redo covers, chips stay whole, and list changes reach the chips.
 
 import { Editor, type JSONContent } from "@tiptap/core";
+import { closeHistory } from "@tiptap/pm/history";
 import { Slice } from "@tiptap/pm/model";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { SuggestionProps } from "@tiptap/suggestion";
@@ -10,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { VARIABLE_DRAG_TYPE } from "../extensions/field-binding";
 import type { PickerItem, VariablePickerRender } from "../extensions/variable-picker";
 import type { Variable } from "../model/types";
-import { editorExtensions } from "../schema";
+import { editorExtensions, inlineFieldExtensions } from "../schema";
 import { createChipPopoverStore } from "./chip-popover";
 import { createEditorRootRuntime, type EditorRootRuntime } from "./editor-root";
 
@@ -384,5 +385,71 @@ describe("read-only and selection details", () => {
     editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, end - 5, end)));
     root.insertVariable("first_name");
     expect(line(editor, 0)).toBe("{{first_name}}");
+  });
+});
+
+describe("undo and redo for a host's buttons", () => {
+  /** Types `value` at the end of the editor's first block, as its own undo step. */
+  function type(editor: Editor, value: string) {
+    const end = editor.state.doc.child(0).nodeSize - 1;
+    editor.view.dispatch(closeHistory(editor.state.tr.insertText(value, end)));
+  }
+
+  function inlineField(root: EditorRootRuntime, id: string, value: string): Editor {
+    const content: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [text(value)] }] };
+    root.registerField({ id, label: "Email subject", kind: "inline" }, content);
+    const editor = new Editor({
+      element: document.createElement("div"),
+      extensions: inlineFieldExtensions({ store: root.variables, binding: { fieldId: id, kind: "inline", root, chip: createChipPopoverStore() } }),
+      content,
+    });
+    editors.push(editor);
+    return editor;
+  }
+
+  it("follows the document's history, and steps back and forward through it", () => {
+    const { root, editor } = setup();
+    expect(root.history.getState()).toEqual({ canUndo: false, canRedo: false });
+
+    type(editor, " and more");
+    expect(root.history.getState()).toEqual({ canUndo: true, canRedo: false });
+
+    expect(root.undo()).toBe(true);
+    expect(line(editor, 0)).toBe("Intro");
+    expect(root.history.getState()).toEqual({ canUndo: false, canRedo: true });
+    expect(root.undo()).toBe(false);
+
+    expect(root.redo()).toBe(true);
+    expect(line(editor, 0)).toBe("Intro and more");
+    expect(root.history.getState()).toEqual({ canUndo: true, canRedo: false });
+  });
+
+  it("acts on the last-focused field, as ⌘Z does", () => {
+    const { root, editor } = setup();
+    const subject = inlineField(root, "subject", "Your statement");
+    type(editor, " (body)");
+    type(subject, " is ready");
+
+    // The document until another field has had focus.
+    root.undo();
+    expect(line(editor, 0)).toBe("Intro");
+    expect(subject.state.doc.textContent).toBe("Your statement is ready");
+
+    root.noteFocus("subject");
+    expect(root.history.getState()).toEqual({ canUndo: true, canRedo: false });
+    root.undo();
+    expect(subject.state.doc.textContent).toBe("Your statement");
+
+    root.noteFocus("body");
+    expect(root.history.getState()).toEqual({ canUndo: false, canRedo: true });
+  });
+
+  it("does nothing read-only", () => {
+    const { root, editor } = setup();
+    type(editor, " and more");
+    root.config.setState({ readOnly: true });
+    expect(root.history.getState()).toEqual({ canUndo: false, canRedo: false });
+    expect(root.undo()).toBe(false);
+    expect(line(editor, 0)).toBe("Intro and more");
   });
 });

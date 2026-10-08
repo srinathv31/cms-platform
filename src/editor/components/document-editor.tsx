@@ -28,6 +28,7 @@ import {
 } from "react";
 import { useStore } from "zustand";
 import { modKey } from "../lib/platform";
+import { captureHistory, restoreHistory, type HistoryCarry } from "../lib/history-carry";
 import { focusFirstSection } from "../lib/sections";
 import { blockRequestAt, commentTarget, variableLeafText, type LeafText } from "../lib/threads";
 import type { JSONContent, Variable } from "../model/types";
@@ -283,9 +284,11 @@ function LiveEditor({
 
   // Next keeps hidden routes alive in <Activity> but runs effect cleanups, and useEditor destroys
   // the editor then; when the route shows again a new editor is created. `latestRef` hands it the
-  // current document (not the initial one), and `snapshot` keeps the static fallback current.
+  // current document (not the initial one), `snapshot` keeps the static fallback current, and
+  // `carry` hands it the undo history (lib/history-carry.ts), so undo still reaches back past the switch.
   const [snapshot, setSnapshot] = useState<JSONContent>(initialContent);
   const created = useRef(false);
+  const carry = useRef<HistoryCarry | null>(null);
 
   const onChangeRef = useRef(onChange);
   useLayoutEffect(() => {
@@ -322,6 +325,8 @@ function LiveEditor({
       pendingFocusRef.current = null;
       if (pending) applyFocus(ready, pending);
       bridge.connect(ready);
+      if (carry.current) restoreHistory(ready.view, carry.current);
+      carry.current = null;
     },
     onTransaction: ({ transaction }) => {
       if (transaction.docChanged) bridge.docChanged(transaction.before, transaction.doc);
@@ -335,6 +340,8 @@ function LiveEditor({
       onChangeRef.current?.(doc);
     },
     onDestroy: () => {
+      const gone = editorRef.current;
+      if (gone) carry.current = captureHistory(gone.state);
       editorRef.current = null;
       bridge.connect(null);
       if (latestRef.current) setSnapshot(latestRef.current);
