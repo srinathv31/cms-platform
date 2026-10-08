@@ -1,0 +1,133 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Unicode normalization and invisible characters",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "name",
+      "label": "Name",
+      "type": "text",
+      "required": true,
+      "sample": "Zoë"
+    }
+  ],
+  "values": {
+    "name": "Zoë Nüñez"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Unicode"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Decomposed: Café, niño, Ångström, Zürich."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A value with decomposed letters: "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "name"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Zero-width characters render as nothing: zero​width‌join‍word⁠join﻿end."
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "No-break space and narrow stay: a  b."
+          }
+        ],
+        "attrs": {
+          "id": "b5"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Typographic: “curly quotes”, ‘single’, en–dash, em—dash, ellipsis…, © ® ™ € £ ¥ ± × ÷ ½ ° § ¶ •."
+          }
+        ],
+        "attrs": {
+          "id": "b6"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Latin Extended and others: Łódź, Győr, Çelik, Ñandú, ΑΒΓ αβγ, АБВ абв."
+          }
+        ],
+        "attrs": {
+          "id": "b7"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Ligature words: office financial benefit affluent waffle fluff."
+          }
+        ],
+        "attrs": {
+          "id": "b8"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

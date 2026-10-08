@@ -1,0 +1,186 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Headings and text marks",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "A very long document title that will not fit on a single line of the page in any reasonable typeface or size"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b2",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer for "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b3",
+      "level": 3,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "A level three heading"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Text under it."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b5",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates",
+          "href": "https://coral.example/rates"
+        },
+        {
+          "type": "text",
+          "text": " and fees"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b6",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b7",
+      "content": [
+        {
+          "type": "text",
+          "text": "Bold",
+          "bold": true
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "italic",
+          "italic": true
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "underline",
+          "underline": true
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "bold italic",
+          "bold": true,
+          "italic": true
+        },
+        {
+          "type": "text",
+          "text": " "
+        },
+        {
+          "type": "text",
+          "text": "all three",
+          "bold": true,
+          "italic": true,
+          "underline": true
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Fee: "
+        },
+        {
+          "type": "text",
+          "text": "$95",
+          "bold": true,
+          "variable": "annual_fee"
+        },
+        {
+          "type": "text",
+          "text": " for "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "italic": true,
+          "underline": true,
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b9",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Marks in a "
+        },
+        {
+          "type": "text",
+          "text": "heading",
+          "bold": true,
+          "italic": true
+        }
+      ]
+    }
+  ]
+}

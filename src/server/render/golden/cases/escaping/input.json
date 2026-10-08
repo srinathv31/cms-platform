@@ -1,0 +1,315 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Hostile text and values",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "a",
+      "label": "A",
+      "type": "text",
+      "required": true,
+      "sample": "a"
+    },
+    {
+      "key": "b",
+      "label": "B",
+      "type": "text",
+      "required": true,
+      "sample": "b"
+    },
+    {
+      "key": "c",
+      "label": "C",
+      "type": "text",
+      "required": true,
+      "sample": "c"
+    }
+  ],
+  "values": {
+    "a": "<script>alert(1)</script>",
+    "b": "\"><img src=x onerror=alert(1)>",
+    "c": "-->]]> &amp; &lt; \\ 100% %s {0} ${x} $1 'single' {{first_name}}"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Escaping & <entities>"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "a"
+            }
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "b"
+            }
+          },
+          {
+            "type": "text",
+            "text": " & friends, it's \"quoted\"."
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "c"
+            }
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Key"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Value"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "a"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "a"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "b"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "b"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b5"
+        }
+      },
+      {
+        "type": "callout",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "b"
+                }
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b6"
+        }
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "variable",
+                    "attrs": {
+                      "key": "a"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b7"
+        }
+      }
+    ]
+  },
+  "emailSubject": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi <b>there</b> & welcome "
+          }
+        ]
+      }
+    ]
+  },
+  "emailPreheader": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "\"quoted\" & <tags> "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "a"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

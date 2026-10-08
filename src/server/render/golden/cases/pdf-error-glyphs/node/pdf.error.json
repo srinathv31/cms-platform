@@ -1,0 +1,16 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. Its font can't show these characters: U+1EC5 (ễ), U+1ECB (ị), U+1ED9 (ộ), U+1EC7 (ệ), U+1EA1 (ạ), U+20B9 (₹), U+20A9 (₩).",
+  "details": {
+    "reason": "glyphs",
+    "characters": [
+      "U+1EC5",
+      "U+1ECB",
+      "U+1ED9",
+      "U+1EC7",
+      "U+1EA1",
+      "U+20B9",
+      "U+20A9"
+    ]
+  }
+}

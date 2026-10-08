@@ -1,0 +1,98 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Unicode normalization and invisible characters",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Unicode"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Decomposed: Café, niño, Ångström, Zürich."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "A value with decomposed letters: "
+        },
+        {
+          "type": "text",
+          "text": "Zoë Nüñez",
+          "variable": "name"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Zero-width characters render as nothing: zerowidthjoinwordjoinend."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b5",
+      "content": [
+        {
+          "type": "text",
+          "text": "No-break space and narrow stay: a  b."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "Typographic: “curly quotes”, ‘single’, en–dash, em—dash, ellipsis…, © ® ™ € £ ¥ ± × ÷ ½ ° § ¶ •."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b7",
+      "content": [
+        {
+          "type": "text",
+          "text": "Latin Extended and others: Łódź, Győr, Çelik, Ñandú, ΑΒΓ αβγ, АБВ абв."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Ligature words: office financial benefit affluent waffle fluff."
+        }
+      ]
+    }
+  ]
+}

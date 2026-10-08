@@ -1,0 +1,505 @@
+{
+  "templateId": "UC-D3R0YG",
+  "templateName": "Rate Change Notice",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "last_name",
+      "label": "Last name",
+      "type": "text",
+      "required": true,
+      "sample": "Chen"
+    },
+    {
+      "key": "purchase_apr",
+      "label": "Purchase APR",
+      "type": "percent",
+      "required": true,
+      "sample": "21.99"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true,
+      "sample": "2026-11-03"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "last_name": "Chen",
+    "purchase_apr": "21.99",
+    "home_state": "NJ",
+    "effective_date": "2026-11-03"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_c9qsf4",
+          "level": 2,
+          "requiredKey": "offer_details"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Offer details"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Notice of change in terms for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "last_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b_0lla80"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", the purchase APR on your Coral account is changing. Your new purchase APR is "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "purchase_apr"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", effective "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "effective_date"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b_9qluie"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "This change applies to new purchases made on or after the effective date. Your existing balance isn't affected."
+          }
+        ],
+        "attrs": {
+          "id": "b_gkedbk"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_bs7khm",
+          "level": 2,
+          "requiredKey": "rates_and_fees"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Rates and fees"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Rate"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Your account"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "New purchase APR"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "purchase_apr"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Effective date"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "effective_date"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Cash advance APR"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "No change"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Annual fee"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "No change"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_w74vbs"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_ay0iq1",
+          "level": 2,
+          "requiredKey": "legal_notices"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Legal notices"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "You can reject this change before it takes effect by calling the number on the back of your card. If you reject it, you can keep paying off your balance under your current terms, but you can't make new purchases."
+          }
+        ],
+        "attrs": {
+          "id": "b_abqql2"
+        }
+      },
+      {
+        "type": "callout",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "State-specific terms for "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "home_state"
+                }
+              },
+              {
+                "type": "text",
+                "text": " residents are in your cardmember agreement."
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_ypzaw2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Coral Bank, N.A. Member FDIC."
+          }
+        ],
+        "attrs": {
+          "id": "b_eascvd"
+        }
+      }
+    ]
+  },
+  "emailSubject": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Your purchase APR is changing on "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "effective_date"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "emailPreheader": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", here is what is changing on your Coral account."
+          }
+        ]
+      }
+    ]
+  }
+}

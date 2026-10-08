@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. Headings can only be levels 1 to 3.",
+  "details": {
+    "reason": "document"
+  }
+}

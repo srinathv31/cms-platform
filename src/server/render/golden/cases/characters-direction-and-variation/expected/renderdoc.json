@@ -1,0 +1,62 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Direction marks and variation selectors",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "paragraph",
+      "id": "b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "Lefttoright and righttoleft marks join the words."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Variation selectors: ©, ®, 1 and the letter a."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b3",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "A heading with a mark in it"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b4",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A list item that starts with a mark"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

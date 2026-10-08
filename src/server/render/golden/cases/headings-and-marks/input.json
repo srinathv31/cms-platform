@@ -1,0 +1,282 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Headings and text marks",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "annual_fee",
+      "label": "Annual fee",
+      "type": "currency",
+      "required": true,
+      "sample": "95"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "annual_fee": "95"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "A very long document title that will not fit on a single line of the page in any reasonable typeface or size"
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b2",
+          "level": 2,
+          "requiredKey": "offer_details"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Offer for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b3",
+          "level": 3,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "A level three heading"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Text under it."
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b5",
+          "level": 2,
+          "requiredKey": "rates_and_fees"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Rates",
+            "marks": [
+              {
+                "type": "link",
+                "attrs": {
+                  "href": "https://coral.example/rates"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " and fees"
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b6",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Legal notices"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Bold",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "italic",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "underline",
+            "marks": [
+              {
+                "type": "underline"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "bold italic",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "all three",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "italic"
+              },
+              {
+                "type": "underline"
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b7"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Fee: "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "annual_fee"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            },
+            "marks": [
+              {
+                "type": "italic"
+              },
+              {
+                "type": "underline"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b8"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b9",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Marks in a "
+          },
+          {
+            "type": "text",
+            "text": "heading",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "italic"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

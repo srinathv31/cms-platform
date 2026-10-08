@@ -1,0 +1,969 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Numbering styles the author can choose",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Numbering styles"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style 1."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b3",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "3.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "4.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style a."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b5",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-alpha",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "a.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "b.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "c.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "d.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style A."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b7",
+      "ordered": true,
+      "start": 1,
+      "format": "upper-alpha",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "A.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "B.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "C.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "D.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style i."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b9",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-roman",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "i.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "ii.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "iii.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "iv.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b10",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style I."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b11",
+      "ordered": true,
+      "start": 1,
+      "format": "upper-roman",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "I.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "II.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "III.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "IV.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b12",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style (1)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b13",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(1)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(2)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(3)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(4)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b14",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style (a)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b15",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-alpha",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(a)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(b)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(c)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(d)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b16",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style (i)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b17",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-roman",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(i)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(ii)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(iii)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(iv)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b18",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style 1)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b19",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "paren-right",
+      "items": [
+        {
+          "marker": "1)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "3)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "4)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b20",
+      "content": [
+        {
+          "type": "text",
+          "text": "Style a)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b21",
+      "ordered": true,
+      "start": 1,
+      "format": "lower-alpha",
+      "delimiter": "paren-right",
+      "items": [
+        {
+          "marker": "a)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "b)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "c)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "d)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b22",
+      "content": [
+        {
+          "type": "text",
+          "text": "A stored pair the menu does not offer, upper-alpha with parentheses:"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b23",
+      "ordered": true,
+      "start": 1,
+      "format": "upper-alpha",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(A)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(B)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b24",
+      "content": [
+        {
+          "type": "text",
+          "text": "Only the format chosen (delimiter null): the delimiter defaults to a period."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b25",
+      "ordered": true,
+      "start": 1,
+      "format": "upper-roman",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "I.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "II.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b26",
+      "content": [
+        {
+          "type": "text",
+          "text": "Only the delimiter chosen (format null): the format defaults by depth."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b27",
+      "ordered": true,
+      "start": 1,
+      "format": "decimal",
+      "delimiter": "paren-right",
+      "items": [
+        {
+          "marker": "1)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "2)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

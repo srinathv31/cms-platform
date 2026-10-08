@@ -1,0 +1,390 @@
+{
+  "templateId": "UC-J530DX",
+  "templateName": "Cash Back Welcome Bonus — Terms",
+  "versionNumber": 2,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b_s281pe",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer details"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_5x62rn",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", spend $1,000 on purchases in your first 3 months and earn a $200 statement credit. Your purchase APR is "
+        },
+        {
+          "type": "text",
+          "text": "21.99%",
+          "variable": "purchase_apr"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_ef7o07",
+      "content": [
+        {
+          "type": "text",
+          "text": "Open your account by "
+        },
+        {
+          "type": "text",
+          "text": "November 18, 2026",
+          "variable": "offer_end_date"
+        },
+        {
+          "type": "text",
+          "text": " to qualify for this offer."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b_lt1619",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Purchases must post within 3 months of account opening."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Cash advances, balance transfers and fees don't count toward the spend requirement."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The statement credit posts within 2 billing cycles after you qualify."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "id": "b_yl9g86"
+    },
+    {
+      "type": "heading",
+      "id": "b_e1mcis",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates and fees"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b_rlyydi",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Rate or fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "What you pay"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Purchase APR"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "21.99%",
+                      "variable": "purchase_apr"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cash advance fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "5% of each advance, $10 minimum"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Foreign transaction fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "None"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Annual fee"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "$0"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_j9tc5w",
+      "level": 2,
+      "section": "legal_notices",
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_hrm6yg",
+      "content": [
+        {
+          "type": "text",
+          "text": "State-specific terms for "
+        },
+        {
+          "type": "text",
+          "text": "New Jersey",
+          "variable": "home_state"
+        },
+        {
+          "type": "text",
+          "text": " residents are in your cardmember agreement."
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b_bkm4pb",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "The statement credit may be taxable. Talk to a tax advisor about your situation."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_eqm5ly",
+      "content": [
+        {
+          "type": "text",
+          "text": "Coral Bank, N.A. Member FDIC. Credit approval required."
+        }
+      ]
+    }
+  ]
+}

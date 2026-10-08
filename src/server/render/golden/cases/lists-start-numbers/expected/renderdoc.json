@@ -1,0 +1,549 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Start numbers",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Start numbers"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 0, decimal:"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b3",
+      "ordered": true,
+      "start": 0,
+      "format": "decimal",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "0.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Zero"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "1.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "One"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 5, a): e) f) g)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b5",
+      "ordered": true,
+      "start": 5,
+      "format": "lower-alpha",
+      "delimiter": "paren-right",
+      "items": [
+        {
+          "marker": "e)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fifth"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "f)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Sixth"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "g)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Seventh"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 25, (a): (y) (z) (aa) (ab)"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b7",
+      "ordered": true,
+      "start": 25,
+      "format": "lower-alpha",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(y)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "y"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(z)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(aa)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "aa"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(ab)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "ab"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 702, a.: zz. aaa."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b9",
+      "ordered": true,
+      "start": 702,
+      "format": "lower-alpha",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "zz.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "zz"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "aaa.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "aaa"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b10",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 3998, I.: roman ends at 3999, then digits."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b11",
+      "ordered": true,
+      "start": 3998,
+      "format": "upper-roman",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "MMMCMXCVIII.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MMMCMXCVIII"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "MMMCMXCIX.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MMMCMXCIX"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "4000.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Digits"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "4001.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Digits again"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b12",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 1994, i.:"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b13",
+      "ordered": true,
+      "start": 1994,
+      "format": "lower-roman",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "mcmxciv.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "mcmxcv.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Next year"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b14",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 0 in letters and roman falls back to digits, keeping the delimiter:"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b15",
+      "ordered": true,
+      "start": 0,
+      "format": "lower-alpha",
+      "delimiter": "period",
+      "items": [
+        {
+          "marker": "0.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Zero in letters"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "a.",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "One in letters"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b16",
+      "ordered": true,
+      "start": 0,
+      "format": "lower-roman",
+      "delimiter": "parens",
+      "items": [
+        {
+          "marker": "(0)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Zero in roman"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "(i)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "One in roman"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b17",
+      "content": [
+        {
+          "type": "text",
+          "text": "Start 9999, 1): 10000) follows."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b18",
+      "ordered": true,
+      "start": 9999,
+      "format": "decimal",
+      "delimiter": "paren-right",
+      "items": [
+        {
+          "marker": "9999)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Largest start"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "10000)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Past it"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "marker": "10001)",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And on"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Email subject and preheader",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Your rate is changing"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello "
+        },
+        {
+          "type": "text",
+          "text": "Zoë",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ". Effective "
+        },
+        {
+          "type": "text",
+          "text": "March 4, 2027",
+          "variable": "effective_date"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    }
+  ]
+}

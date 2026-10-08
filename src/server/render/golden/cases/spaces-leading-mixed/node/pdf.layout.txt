@@ -1,0 +1,12 @@
+%PDF pages=1 Title="Lines led by mixed spaces" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+  Space, no-break, space, no-break lead this paragraph.
+
+  No-break, space, no-break, space lead this one.
+
+  Two spaces, then two no-break spaces.
+
+ ### A heading led by a no-break space and a space
+
+      Inside a callout.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

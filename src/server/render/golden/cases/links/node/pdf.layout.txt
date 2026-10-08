@@ -1,0 +1,56 @@
+%PDF pages=1 Title="Links, allowed and refused" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+# Links
+Allowed: https, http, email, phone.
+
+Normalized: scheme case, trimmed, accent, mailto case.
+
+Refused, text stays: script, relative, no scheme, ftp, data, empty.
+
+Refused: space, user info, international host, backslash, bare tel.
+
+One link in three runs: read the rewards rules.
+
+A link across a break: line one
+line two.
+
+https://coral.example/privacy and coral.example and help@coral.example show no address twice.
+
+A variable that is a link: coral.example.
+
+## Heading with a link
+ • Bullet with a link
+
+ Link | Where
+
+ in a cell | Cell
+
+     Callout with a link.
+
+A very long link:
+https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=
+agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef.
+
+A very long word that must be cut without any hyphen:
+SupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSu
+percalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidocious
+--- footer: UC-GOLDEN · v1 Page 1 of 1
+--- link: https://coral.example/terms  <-  "https"
+--- link: http://coral.example/plain  <-  "http"
+--- link: mailto:help@coral.example?subject=Card%20terms  <-  "email"
+--- link: tel:+18005550100  <-  "phone"
+--- link: https://Coral.Example/Terms  <-  "scheme case"
+--- link: https://coral.example/trim  <-  "trimmed"
+--- link: https://coral.example/caf%C3%A9?q=%C3%A9  <-  "accent"
+--- link: mailto:Help@Coral.Example  <-  "mailto case"
+--- link: https://coral.example/rewards  <-  "read the rewards  rules"
+--- link: https://coral.example/a  <-  "line one line two"
+--- link: https://coral.example/privacy  <-  "https://coral.example/privacy"
+--- link: https://coral.example/  <-  "coral.example"
+--- link: mailto:help@coral.example  <-  "help@coral.example"
+--- link: https://coral.example/site  <-  "coral.example"
+--- link: https://coral.example/heading  <-  "a link"
+--- link: https://coral.example/bullet  <-  "a link"
+--- link: https://coral.example/cell  <-  "in a cell"
+--- link: https://coral.example/callout  <-  "a link"
+--- link: https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef  <-  "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source= agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef"

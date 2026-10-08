@@ -1,0 +1,67 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Values that do not fit",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "purchase_apr",
+      "label": "Purchase APR",
+      "type": "percent",
+      "required": true,
+      "sample": "21.99"
+    },
+    {
+      "key": "annual_fee",
+      "label": "Annual fee",
+      "type": "currency",
+      "required": true,
+      "sample": "95"
+    },
+    {
+      "key": "cash_fee",
+      "label": "Cash fee",
+      "type": "currency",
+      "required": true,
+      "sample": "5"
+    },
+    {
+      "key": "promo",
+      "label": "Promo",
+      "type": "text",
+      "required": false,
+      "sample": ""
+    }
+  ],
+  "values": {
+    "purchase_apr": "1,00",
+    "annual_fee": "007",
+    "cash_fee": 1e3
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "This document is never rendered."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

@@ -1,0 +1,9 @@
+%PDF pages=1 Title="Direction marks and variation selectors" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+Lefttoright and righttoleft marks join the words.
+
+Variation selectors: ©, ®, 1 and the letter a.
+
+## A heading with a mark in it
+ • A list item that starts with a mark
+--- footer: UC-GOLDEN · v1 Page 1 of 1

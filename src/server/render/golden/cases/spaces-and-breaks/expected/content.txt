@@ -1,0 +1,24 @@
+# Spaces and breaks
+Two spaces, three spaces, and four spaces inside a line.
+Three leading spaces.
+Trailing spaces follow this.
+Spaces before a bold run: bold with its own leading spaces and after.
+Line one Line two Line three
+Starts with a hard break.
+Two breaks in a row
+end the line.
+Ends with two hard breaks, so two empty lines follow.
+## A heading on two lines
+• Bullet continued
+• Bullet with leading spaces
+1. Number continued
+after a blank line
+Cell
+Cell
+Cell two lines
+Indented cell
+Callout two lines
+Indented callout text.
+A tab becomes one space.
+Line breaks inside text nodes become breaks.
+Control characters are removed.

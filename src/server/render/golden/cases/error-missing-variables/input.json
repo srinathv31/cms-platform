@@ -1,0 +1,71 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Required values missing",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "purchase_apr",
+      "label": "Purchase APR",
+      "type": "percent",
+      "required": true,
+      "sample": "21.99"
+    },
+    {
+      "key": "promo",
+      "label": "Promo",
+      "type": "text",
+      "required": false,
+      "sample": ""
+    }
+  ],
+  "values": {
+    "promo": "Spring"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", your APR is "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "purchase_apr"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

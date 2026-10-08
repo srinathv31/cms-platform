@@ -1,0 +1,78 @@
+[
+  {
+    "text": "https",
+    "url": "https://coral.example/terms"
+  },
+  {
+    "text": "http",
+    "url": "http://coral.example/plain"
+  },
+  {
+    "text": "email",
+    "url": "mailto:help@coral.example?subject=Card%20terms"
+  },
+  {
+    "text": "phone",
+    "url": "tel:+18005550100"
+  },
+  {
+    "text": "scheme case",
+    "url": "https://Coral.Example/Terms"
+  },
+  {
+    "text": "trimmed",
+    "url": "https://coral.example/trim"
+  },
+  {
+    "text": "accent",
+    "url": "https://coral.example/caf%C3%A9?q=%C3%A9"
+  },
+  {
+    "text": "mailto case",
+    "url": "mailto:Help@Coral.Example"
+  },
+  {
+    "text": "read the rewards rules",
+    "url": "https://coral.example/rewards"
+  },
+  {
+    "text": "line one line two",
+    "url": "https://coral.example/a"
+  },
+  {
+    "text": "https://coral.example/privacy",
+    "url": "https://coral.example/privacy"
+  },
+  {
+    "text": "coral.example",
+    "url": "https://coral.example/"
+  },
+  {
+    "text": "help@coral.example",
+    "url": "mailto:help@coral.example"
+  },
+  {
+    "text": "coral.example",
+    "url": "https://coral.example/site"
+  },
+  {
+    "text": "a link",
+    "url": "https://coral.example/heading"
+  },
+  {
+    "text": "a link",
+    "url": "https://coral.example/bullet"
+  },
+  {
+    "text": "in a cell",
+    "url": "https://coral.example/cell"
+  },
+  {
+    "text": "a link",
+    "url": "https://coral.example/callout"
+  },
+  {
+    "text": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef",
+    "url": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef"
+  }
+]

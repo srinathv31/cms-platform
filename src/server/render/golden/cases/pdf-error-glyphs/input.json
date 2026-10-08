@@ -1,0 +1,95 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Characters the PDF font cannot draw",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "name",
+      "label": "Name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    }
+  ],
+  "values": {
+    "name": "Nguyễn Thị Minh"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Characters"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Draws everywhere: café, Łódź, ΑΒΓ."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The PDF cannot draw: "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", Hà Nội, Việt Nam, ạ and ₹ and ₩."
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Also in a list: ₹500"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      }
+    ]
+  },
+  "emailSubject": null,
+  "emailPreheader": null
+}

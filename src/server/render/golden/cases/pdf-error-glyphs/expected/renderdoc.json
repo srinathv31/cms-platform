@@ -1,0 +1,71 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Characters the PDF font cannot draw",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Characters"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Draws everywhere: café, Łódź, ΑΒΓ."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "The PDF cannot draw: "
+        },
+        {
+          "type": "text",
+          "text": "Nguyễn Thị Minh",
+          "variable": "name"
+        },
+        {
+          "type": "text",
+          "text": ", Hà Nội, Việt Nam, ạ and ₹ and ₩."
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b4",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Also in a list: ₹500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,432 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Links, allowed and refused",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Links"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Allowed: "
+        },
+        {
+          "type": "text",
+          "text": "https",
+          "href": "https://coral.example/terms"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "http",
+          "href": "http://coral.example/plain"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "email",
+          "href": "mailto:help@coral.example?subject=Card%20terms"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "phone",
+          "href": "tel:+18005550100"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b3",
+      "content": [
+        {
+          "type": "text",
+          "text": "Normalized: "
+        },
+        {
+          "type": "text",
+          "text": "scheme case",
+          "href": "https://Coral.Example/Terms"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "trimmed",
+          "href": "https://coral.example/trim"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "accent",
+          "href": "https://coral.example/caf%C3%A9?q=%C3%A9"
+        },
+        {
+          "type": "text",
+          "text": ", "
+        },
+        {
+          "type": "text",
+          "text": "mailto case",
+          "href": "mailto:Help@Coral.Example"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Refused, text stays: script, relative, no scheme, ftp, data, empty."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b5",
+      "content": [
+        {
+          "type": "text",
+          "text": "Refused: space, user info, international host, backslash, bare tel."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b6",
+      "content": [
+        {
+          "type": "text",
+          "text": "One link in three runs: "
+        },
+        {
+          "type": "text",
+          "text": "read the ",
+          "href": "https://coral.example/rewards"
+        },
+        {
+          "type": "text",
+          "text": "rewards",
+          "bold": true,
+          "href": "https://coral.example/rewards"
+        },
+        {
+          "type": "text",
+          "text": " ",
+          "italic": true,
+          "href": "https://coral.example/rewards"
+        },
+        {
+          "type": "text",
+          "text": "rules",
+          "italic": true,
+          "underline": true,
+          "href": "https://coral.example/rewards"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b7",
+      "content": [
+        {
+          "type": "text",
+          "text": "A link across a break: "
+        },
+        {
+          "type": "text",
+          "text": "line one",
+          "href": "https://coral.example/a"
+        },
+        {
+          "type": "break"
+        },
+        {
+          "type": "text",
+          "text": "line two",
+          "href": "https://coral.example/a"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "https://coral.example/privacy",
+          "href": "https://coral.example/privacy"
+        },
+        {
+          "type": "text",
+          "text": " and "
+        },
+        {
+          "type": "text",
+          "text": "coral.example",
+          "href": "https://coral.example/"
+        },
+        {
+          "type": "text",
+          "text": " and "
+        },
+        {
+          "type": "text",
+          "text": "help@coral.example",
+          "href": "mailto:help@coral.example"
+        },
+        {
+          "type": "text",
+          "text": " show no address twice."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b9",
+      "content": [
+        {
+          "type": "text",
+          "text": "A variable that is a link: "
+        },
+        {
+          "type": "text",
+          "text": "coral.example",
+          "href": "https://coral.example/site",
+          "variable": "site"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b10",
+      "level": 2,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading with "
+        },
+        {
+          "type": "text",
+          "text": "a link",
+          "href": "https://coral.example/heading"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "b11",
+      "ordered": false,
+      "bullet": "disc",
+      "items": [
+        {
+          "marker": "•",
+          "content": [
+            {
+              "type": "paragraph",
+              "id": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet with "
+                },
+                {
+                  "type": "text",
+                  "text": "a link",
+                  "href": "https://coral.example/bullet"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "b12",
+      "columns": 2,
+      "rows": [
+        {
+          "cells": [
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Link"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": true,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Where"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "in a cell",
+                      "href": "https://coral.example/cell"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "header": false,
+              "colspan": 1,
+              "rowspan": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "id": null,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Cell"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "callout",
+      "id": "b13",
+      "content": [
+        {
+          "type": "paragraph",
+          "id": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Callout with "
+            },
+            {
+              "type": "text",
+              "text": "a link",
+              "href": "https://coral.example/callout"
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b14",
+      "content": [
+        {
+          "type": "text",
+          "text": "A very long link: "
+        },
+        {
+          "type": "text",
+          "text": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef",
+          "href": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b15",
+      "content": [
+        {
+          "type": "text",
+          "text": "A very long word that must be cut without any hyphen: SupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidocious"
+        }
+      ]
+    }
+  ]
+}

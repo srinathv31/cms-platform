@@ -1,0 +1,39 @@
+%PDF pages=1 Title="Blank lines everywhere" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+First paragraph, after a blank paragraph at the very start.
+∅
+∅
+After two blank paragraphs.
+∅
+∅
+∅
+After a paragraph of spaces, one of a hard break and one of a no-break space.
+
+ • Bullet with a blank paragraph after it
+
+ •
+
+ • Bullet after an empty bullet
+
+1. Number with blank paragraphs around its text
+
+   and more text
+
+2. Second number
+
+     Callout text.
+
+     After a blank line in the callout.
+
+ A | B
+
+ x
+
+                                        y
+
+ after a blank paragraph
+
+ before a blank paragraph | z
+
+Last real paragraph.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

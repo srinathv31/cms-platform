@@ -1,0 +1,120 @@
+{
+  "templateId": "UC-4CMSGW",
+  "templateName": "Statement Insert — Annual Privacy Notice",
+  "versionNumber": null,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b_imrtsg",
+      "level": 2,
+      "section": "offer_details",
+      "content": [
+        {
+          "type": "text",
+          "text": "Offer details"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_hh9um5",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", once a year we remind you how we collect, use and protect your personal information."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_jjybr8",
+      "content": [
+        {
+          "type": "text",
+          "text": "Read the full notice at "
+        },
+        {
+          "type": "text",
+          "text": "coral.example/privacy",
+          "href": "https://coral.example/privacy"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_88czhg",
+      "level": 2,
+      "section": "rates_and_fees",
+      "content": [
+        {
+          "type": "text",
+          "text": "Rates and fees"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_28ubd6",
+      "content": [
+        {
+          "type": "text",
+          "text": "There is no fee associated with this notice."
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": "b_l9kxcg",
+      "level": 2,
+      "section": "legal_notices",
+      "content": [
+        {
+          "type": "text",
+          "text": "Legal notices"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_sgmb4u",
+      "content": [
+        {
+          "type": "text",
+          "text": "State-specific terms for "
+        },
+        {
+          "type": "text",
+          "text": "New Jersey",
+          "variable": "home_state"
+        },
+        {
+          "type": "text",
+          "text": " residents are in your cardmember agreement."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b_tfz541",
+      "content": [
+        {
+          "type": "text",
+          "text": "Coral Bank, N.A. Member FDIC."
+        }
+      ]
+    }
+  ]
+}

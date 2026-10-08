@@ -1,0 +1,72 @@
+%PDF pages=2 Title="Default numbering by depth" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/2 ===
+# Default numbering
+Ordered inside ordered inside ordered inside ordered: 1. a. i. then 1. again.
+
+1. Level one, first
+
+   a. Level two
+
+      i. Level three
+
+        1. Level four, back to decimal
+
+2. Level one, second
+
+Bullets inside bullets: disc, circle, square, then disc again.
+
+ • Bullet one
+
+    ◦ Bullet two
+
+      ▪ Bullet three
+
+         • Bullet four
+
+ • Bullet one, again
+
+Only ordered ancestors count for an ordered list: ordered, bullet, ordered gives 1. then a.
+
+1. Ordered
+
+    • Bullet in ordered
+
+     a. Ordered in bullet in ordered
+
+Only bullet ancestors count for a bullet: bullet, ordered, bullet, bullet gives disc, 1., circle, square.
+
+ • Bullet
+
+   1. Ordered in bullet
+
+      ◦ Bullet at depth one
+
+         ▪ Bullet at depth two
+
+A styled parent does not change the child: (a) then a.
+
+(a) Styled parent
+
+   a. Unstyled child
+
+Nine levels deep (the limit):
+
+1. Level 1
+
+   a. Level 2
+
+      i. Level 3
+--- footer: UC-GOLDEN · v1 Page 1 of 2
+=== page 2/2 ===
+        1. Level 4
+
+          a. Level 5
+
+             i. Level 6
+
+               1. Level 7
+
+                  a. Level 8
+
+                     i. Level nine
+--- footer: UC-GOLDEN · v1 Page 2 of 2

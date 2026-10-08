@@ -649,7 +649,7 @@ The editor's link field shows the link refusal messages of section 6; the editor
 
 ## 13. Golden files
 
-The golden files pin the output (see **Comparison** below). They live in `src/server/render/golden/`:
+The golden files pin the output (see **Comparison** below). They live in `src/server/render/golden/`; how to generate, review and add them is in `src/server/render/golden/README.md`.
 
 ```
 src/server/render/golden/
@@ -669,7 +669,7 @@ src/server/render/golden/
                           absent when the PDF fails)
         error.json        only for a case that must fail before any channel: { "code", "message", "details" }
       node/               Node engine only: depends on fonts and the layout engine
-        pdf.layout.txt    every text line with page, position and width
+        pdf.layout.txt    every text line by page, with its indent and heading level; footer and links
         pdf.json          { "pageCount", "missingGlyphs", "links": [ { "page", "url", "text" } ] }
         pdf.error.json    only when the PDF must fail (for example unrenderable characters)
 ```
@@ -717,7 +717,7 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 - The PDF has zero missing glyphs, and its dates equal `at` to the second.
 - A second run gives identical files and identical PDF bytes; and two fresh processes rendering every case in opposite orders give identical outputs (`determinism.test.ts`, section 12).
 
-**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 40 cases: 32 hand-built (13 of them `error-*`, one `pdf-error-*`) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
+**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 44 cases: 36 hand-built (13 of them `error-*`, one `pdf-error-*`) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
 
 **How Java consumes them:** the Java build reads the same `cases/` directory. For each case it renders `input.json` with its own engine and checks: `renderdoc.json`, `email.json`, `links.json`, `error.json` and `pdf.meta.json` (when present) as JSON; `web.html`, `email.html`, `email.txt` and `content.txt` byte for byte; its own PDF's extracted content against the PDF view (`content.ts` `VIEWS.pdf`, compared as `compareContent` does, each table cell read on its own) and its link annotations against `links.json`; zero missing glyphs. It ignores `node/`.
 

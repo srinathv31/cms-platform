@@ -1,0 +1,461 @@
+{
+  "templateId": "UC-50FKPA",
+  "templateName": "High-Yield Savings — Rate Disclosure",
+  "versionNumber": 2,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    },
+    {
+      "key": "apy",
+      "label": "APY",
+      "type": "percent",
+      "required": true,
+      "sample": "4.25"
+    },
+    {
+      "key": "minimum_balance",
+      "label": "Minimum balance",
+      "type": "currency",
+      "required": true,
+      "sample": "1000"
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true,
+      "sample": "2026-11-03"
+    }
+  ],
+  "values": {
+    "first_name": "Al",
+    "home_state": "OH",
+    "apy": "0.10",
+    "minimum_balance": "500",
+    "effective_date": "2026-10-11"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_llsrf2",
+          "level": 2,
+          "requiredKey": "offer_details"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Offer details"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", your High-Yield Savings account earns "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "apy"
+            }
+          },
+          {
+            "type": "text",
+            "text": " annual percentage yield (APY) on balances of "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "minimum_balance"
+            }
+          },
+          {
+            "type": "text",
+            "text": " or more."
+          }
+        ],
+        "attrs": {
+          "id": "b_6mtfbe"
+        }
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Interest compounds daily and is credited monthly."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "There is no monthly maintenance fee."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Transfers between your Coral accounts are free."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_uqgb02"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_sn7s8a",
+          "level": 2,
+          "requiredKey": "rates_and_fees"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Rates and fees"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Balance tier"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "APY"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Under "
+                      },
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "minimum_balance"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "0.10%"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "minimum_balance"
+                        }
+                      },
+                      {
+                        "type": "text",
+                        "text": " and over"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1,
+                  "colwidth": null
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "variable",
+                        "attrs": {
+                          "key": "apy"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_uzv5ez"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle."
+          }
+        ],
+        "attrs": {
+          "id": "b_08sovz"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b_tzj4kj",
+          "level": 2,
+          "requiredKey": "legal_notices"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Legal notices"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category."
+          }
+        ],
+        "attrs": {
+          "id": "b_ige56x"
+        }
+      },
+      {
+        "type": "callout",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Rates are variable and accurate as of "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "effective_date"
+                }
+              },
+              {
+                "type": "text",
+                "text": ". They may change after you open your account."
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b_e1oqf2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Account terms for "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "home_state"
+            }
+          },
+          {
+            "type": "text",
+            "text": " residents are in your deposit account agreement."
+          }
+        ],
+        "attrs": {
+          "id": "b_pulkka"
+        }
+      }
+    ]
+  },
+  "emailSubject": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Your High-Yield Savings rate: "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "apy"
+            }
+          },
+          {
+            "type": "text",
+            "text": " APY"
+          }
+        ]
+      }
+    ]
+  },
+  "emailPreheader": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", here are the details of your savings rate."
+          }
+        ]
+      }
+    ]
+  }
+}

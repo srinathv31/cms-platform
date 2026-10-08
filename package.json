@@ -11,6 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "golden:update": "GOLDEN_UPDATE=1 vitest run src/server/render/golden/golden.test.ts",
+    "golden:import": "tsx --conditions=react-server scripts/golden-import.ts",
     "e2e": "playwright test",
     "gate:media": "playwright test --project=demo --project=stills-1280 && node e2e/media/collect.mjs",
     "db:generate": "drizzle-kit generate",

@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. Lists can nest at most 9 levels deep.",
+  "details": {
+    "reason": "document"
+  }
+}

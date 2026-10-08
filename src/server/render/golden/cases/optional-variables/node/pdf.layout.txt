@@ -1,0 +1,40 @@
+%PDF pages=1 Title="Optional variable lines" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/1 ===
+# Offer for Maya
+Before the empty optional lines.
+
+The next line keeps its text and loses only the empty value:
+
+Fee:
+
+Earn 2% back.
+
+## Rates
+1. First item stays number 1.
+
+2. Third item becomes number 2.
+
+   a. Nested item becomes a.
+
+   b. Nested item becomes b.
+
+3. a. Nested item of a removed first line keeps its list.
+
+4. Last item becomes number 4.
+
+7. Starts at seven after the removal.
+
+ • Bullet two stays.
+
+A list whose items are all removed disappears:
+
+     A callout keeps its other paragraph.
+
+ Name | Optional
+
+ First row
+
+ Second row | Present
+
+After the optional lines.
+--- footer: UC-GOLDEN · v1 Page 1 of 1

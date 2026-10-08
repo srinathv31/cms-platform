@@ -1,0 +1,4 @@
+# Characters
+Draws everywhere: café, Łódź, ΑΒΓ.
+The PDF cannot draw: Nguyễn Thị Minh, Hà Nội, Việt Nam, ạ and ₹ and ₩.
+• Also in a list: ₹500

@@ -1,0 +1,11 @@
+{
+  "code": "missing_variables",
+  "message": "Missing required variables: first_name, purchase_apr.",
+  "details": {
+    "missing": [
+      "first_name",
+      "purchase_apr"
+    ],
+    "invalid": []
+  }
+}

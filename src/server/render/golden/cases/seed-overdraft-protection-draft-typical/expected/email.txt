@@ -1,0 +1,23 @@
+Offer details
+-------------
+
+Hi Maya, overdraft protection links your checking account to your savings account so a transfer covers any shortfall.
+
+1. We check your checking balance when a payment posts.
+2. If it's short, we move the difference from your linked savings account.
+3. We email you the same day with the amount transferred.
+
+Rates and fees
+--------------
+
+Fee | Amount
+------------
+Overdraft transfer fee | $0
+Minimum linked savings balance | $1,000
+
+Legal notices
+-------------
+
+Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category.
+
+Account terms for New Jersey residents are in your deposit account agreement.

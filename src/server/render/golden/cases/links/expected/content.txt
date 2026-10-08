@@ -1,0 +1,18 @@
+# Links
+Allowed: https, http, email, phone.
+Normalized: scheme case, trimmed, accent, mailto case.
+Refused, text stays: script, relative, no scheme, ftp, data, empty.
+Refused: space, user info, international host, backslash, bare tel.
+One link in three runs: read the rewards rules.
+A link across a break: line one line two.
+https://coral.example/privacy and coral.example and help@coral.example show no address twice.
+A variable that is a link: coral.example.
+## Heading with a link
+• Bullet with a link
+Link
+Where
+in a cell
+Cell
+Callout with a link.
+A very long link: https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef.
+A very long word that must be cut without any hyphen: SupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidociousSupercalifragilisticexpialidocious

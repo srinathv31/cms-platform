@@ -1,0 +1,123 @@
+%PDF pages=3 Title="Numbering styles the author can choose" Subject="UC-GOLDEN · v1" Creator="Stencil" Producer="Stencil" Language="en-US"
+=== page 1/3 ===
+# Numbering styles
+Style 1.
+
+1. First
+
+2. Second
+
+3. Third
+
+4. Fourth
+
+Style a.
+
+a. First
+
+b. Second
+
+c. Third
+
+d. Fourth
+
+Style A.
+
+A. First
+
+B. Second
+
+C. Third
+
+D. Fourth
+
+Style i.
+
+ i. First
+
+ ii. Second
+
+iii. Third
+
+iv. Fourth
+
+Style I.
+
+ I. First
+
+ II. Second
+
+III. Third
+
+IV. Fourth
+
+Style (1)
+
+(1) First
+
+(2) Second
+
+(3) Third
+--- footer: UC-GOLDEN · v1 Page 1 of 3
+=== page 2/3 ===
+(4) Fourth
+
+Style (a)
+
+(a) First
+
+(b) Second
+
+(c) Third
+
+(d) Fourth
+
+Style (i)
+
+ (i) First
+
+ (ii) Second
+
+(iii) Third
+
+(iv) Fourth
+
+Style 1)
+
+1) First
+
+2) Second
+
+3) Third
+
+4) Fourth
+
+Style a)
+
+a) First
+
+b) Second
+
+c) Third
+
+d) Fourth
+
+A stored pair the menu does not offer, upper-alpha with parentheses:
+
+(A) First
+
+(B) Second
+
+Only the format chosen (delimiter null): the delimiter defaults to a period.
+
+ I. First
+
+II. Second
+
+Only the delimiter chosen (format null): the format defaults by depth.
+
+1) First
+--- footer: UC-GOLDEN · v1 Page 2 of 3
+=== page 3/3 ===
+2) Second
+--- footer: UC-GOLDEN · v1 Page 3 of 3

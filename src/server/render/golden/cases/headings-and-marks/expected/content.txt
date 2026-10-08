@@ -1,0 +1,9 @@
+# A very long document title that will not fit on a single line of the page in any reasonable typeface or size
+## Offer for Maya
+### A level three heading
+Text under it.
+## Rates and fees
+## Legal notices
+Bold italic underline bold italic all three
+Fee: $95 for Maya.
+## Marks in a heading

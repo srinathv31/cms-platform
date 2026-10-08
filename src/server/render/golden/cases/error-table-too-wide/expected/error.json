@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The PDF couldn't be rendered. Tables can have at most 12 columns.",
+  "details": {
+    "reason": "document"
+  }
+}

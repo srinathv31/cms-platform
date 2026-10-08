@@ -1,0 +1,11 @@
+Twelve columns
+==============
+
+H1 | H2 | H3 | H4 | H5 | H6 | H7 | H8 | H9 | H10 | H11 | H12
+------------------------------------------------------------
+c1 | c2 | c3 | c4 | c5 | c6 | c7 | c8 | c9 | c10 | c11 | c12
+Word1 wraps | Word2 wraps | Word3 wraps | Word4 wraps | Word5 wraps | Word6 wraps | Word7 wraps | Word8 wraps | Word9 wraps | Word10 wraps | Word11 wraps | Word12 wraps
+A cell across all twelve columns.
+Six | and six
+
+After the table.

@@ -1,0 +1,101 @@
+{
+  "pageCount": 1,
+  "missingGlyphs": 0,
+  "links": [
+    {
+      "page": 1,
+      "url": "https://coral.example/terms",
+      "text": "https"
+    },
+    {
+      "page": 1,
+      "url": "http://coral.example/plain",
+      "text": "http"
+    },
+    {
+      "page": 1,
+      "url": "mailto:help@coral.example?subject=Card%20terms",
+      "text": "email"
+    },
+    {
+      "page": 1,
+      "url": "tel:+18005550100",
+      "text": "phone"
+    },
+    {
+      "page": 1,
+      "url": "https://Coral.Example/Terms",
+      "text": "scheme case"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/trim",
+      "text": "trimmed"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/caf%C3%A9?q=%C3%A9",
+      "text": "accent"
+    },
+    {
+      "page": 1,
+      "url": "mailto:Help@Coral.Example",
+      "text": "mailto case"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/rewards",
+      "text": "read the rewards  rules"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/a",
+      "text": "line one line two"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/privacy",
+      "text": "https://coral.example/privacy"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/",
+      "text": "coral.example"
+    },
+    {
+      "page": 1,
+      "url": "mailto:help@coral.example",
+      "text": "help@coral.example"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/site",
+      "text": "coral.example"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/heading",
+      "text": "a link"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/bullet",
+      "text": "a link"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/cell",
+      "text": "in a cell"
+    },
+    {
+      "page": 1,
+      "url": "https://coral.example/callout",
+      "text": "a link"
+    },
+    {
+      "page": 1,
+      "url": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source=agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef",
+      "text": "https://payments.coral.example/cardmember/servicing/payments/one-time-payment?source= agreement&campaign=spring-travel-rewards-2026&session=0123456789abcdef0123456789abcdef"
+    }
+  ]
+}
