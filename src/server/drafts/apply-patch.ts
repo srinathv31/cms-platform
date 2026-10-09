@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { withWriter } from "@/domain/lifecycle";
-import { PermissionError, assertCan } from "@/domain/permissions";
+import { can } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { auditEvents, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
@@ -16,8 +16,36 @@ import { NAME_MESSAGE, normalizeName } from "./parse-patch";
 // The body and the email fields are stored as src/server/documents/prepare.ts makes them (normalized,
 // checked, with block ids); a document it refuses is `invalid` with the check's sentence.
 
-function fail(error: DraftSaveError, message: string, rev?: number): DraftSaveResponse {
+type Refusal = Extract<DraftSaveResponse, { ok: false }>;
+
+function fail(error: DraftSaveError, message: string, rev?: number): Refusal {
   return rev === undefined ? { ok: false, error, message } : { ok: false, error, rev, message };
+}
+
+const NOT_FOUND = "This draft no longer exists.";
+
+/** `not_found` when there is no such version, `forbidden` when the viewer can't edit its team's drafts, else null. */
+function editRefusal(viewer: Viewer, version: { teamId: string } | undefined): Refusal | null {
+  if (!version) return fail("not_found", NOT_FOUND);
+  const allowed = can(viewer, "draft.edit", { teamId: version.teamId });
+  return allowed.ok ? null : fail("forbidden", allowed.reason);
+}
+
+/**
+ * Whether the viewer may save to this version, from its id alone: the `not_found` or `forbidden`
+ * answer `applyDraftPatch` would give, or null. The route asks this before it reads the body, so a
+ * request from someone who can't edit the draft is answered without buffering or parsing a byte of
+ * it. The save asks again inside its transaction.
+ */
+export async function accessRefusal(db: Db, viewer: Viewer, versionId: string): Promise<Refusal | null> {
+  const version = await db
+    .select({ teamId: templates.teamId })
+    .from(versions)
+    .innerJoin(templates, eq(templates.id, versions.templateId))
+    .where(eq(versions.id, versionId))
+    .limit(1)
+    .then((rows) => rows[0]);
+  return editRefusal(viewer, version);
 }
 
 function isBusy(error: unknown): boolean {
@@ -106,14 +134,9 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       .limit(1)
       .then((rows) => rows[0]);
 
-    if (!row) return fail("not_found", "This draft no longer exists.");
-
-    try {
-      assertCan(viewer, "draft.edit", { teamId: row.teamId });
-    } catch (error) {
-      if (error instanceof PermissionError) return fail("forbidden", error.reason);
-      throw error;
-    }
+    if (!row) return fail("not_found", NOT_FOUND);
+    const forbidden = editRefusal(viewer, row);
+    if (forbidden) return forbidden;
 
     if (row.state !== "draft") return fail("not_draft", "This version is no longer a draft.");
 

@@ -7,9 +7,10 @@
 //   missing, one      "First name needs a value."
 //   missing, several  "First name and Purchase APR need values."  /  "A, B, and C need values."
 //   invalid           "Purchase APR must be a percentage, like 21.99."  (the route's wording, with the label)
+//                     "First name must be at most 1,000 characters."
 //   both              the missing sentence, then the invalid ones.
 
-import { VALUE_NOUNS } from "@/domain/render/errors";
+import { VALUE_NOUNS, invalidSentence } from "@/domain/render/errors";
 import type { RenderError, ValueErrorDetails } from "@/domain/render/types";
 import type { Variable } from "@/domain/types";
 
@@ -48,10 +49,10 @@ export function authorMessage(error: RenderError, variables: readonly Pick<Varia
   const sentences: string[] = [];
   if (missing.length === 1) sentences.push(`${missing[0]} needs a value.`);
   else if (missing.length > 1) sentences.push(`${listAnd(missing)} need values.`);
-  for (const { key, expected } of details.invalid) {
-    const label = labelOf(key);
+  for (const item of details.invalid) {
+    const label = labelOf(item.key);
     if (label === undefined) return error.message;
-    sentences.push(`${label} must be ${VALUE_NOUNS[expected]}.`);
+    sentences.push(invalidSentence(label, item));
   }
   return sentences.join(" ");
 }

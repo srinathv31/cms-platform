@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DraftSaveError } from "@/domain/types";
-import { DRAFT_SAVE_STATUS, statusOf } from "./http";
+import { DRAFT_SAVE_STATUS, TOO_LARGE, TOO_LARGE_STATUS, statusOf } from "./http";
 
 describe("statusOf", () => {
   it("is 200 for a save", () => {
@@ -19,5 +19,10 @@ describe("statusOf", () => {
       expect(statusOf({ ok: false, error: error as DraftSaveError, message: "m" })).toBe(status);
     }
     expect(Object.keys(DRAFT_SAVE_STATUS).sort()).toEqual(Object.keys(table).sort());
+  });
+
+  it("answers a body over the limit with 413 and an ordinary invalid the client already shows", () => {
+    expect(TOO_LARGE_STATUS).toBe(413);
+    expect(TOO_LARGE).toEqual({ ok: false, error: "invalid", message: "The draft is too large to save." });
   });
 });

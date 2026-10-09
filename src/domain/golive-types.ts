@@ -42,6 +42,7 @@ export type _DriftChecks = [
 export const API_ERROR_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   bad_request: 400,
   consumer_required: 400,
+  body_too_large: 413,
   unknown_consumer: 403,
   preview_forbidden: 403,
   template_not_found: 404,

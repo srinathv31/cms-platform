@@ -270,6 +270,7 @@ export function compareUsageRows(a: UsageRow, b: UsageRow): number {
 const ERROR_TEXT: Record<RenderErrorCode, string> = {
   bad_request: "The request wasn't valid.",
   consumer_required: "No consumer ID was sent.",
+  body_too_large: "The request body was too large.",
   unknown_consumer: "The consumer isn't registered.",
   preview_forbidden: "Previews can't be requested by consumers.",
   template_not_found: "The template wasn't found.",

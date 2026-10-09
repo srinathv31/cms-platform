@@ -1,3 +1,4 @@
+import { request as httpRequest } from "node:http";
 import type { Client } from "@libsql/client";
 import { expect, test } from "@playwright/test";
 import {
@@ -30,9 +31,11 @@ import {
 //
 //   1. Each channel's content type, and the headers every 200 carries.
 //   2. The base64 opt-in.
-//   3. Values: missing (listed by key), wrong type (named), both, friendly forms, optional keys.
+//   3. Values: missing (listed by key), wrong type (named), both, friendly forms, optional keys, the
+//      length limit.
 //   4. Channels: not enabled on the version, not allowed by the content type, unknown.
-//   5. Version rules for consumers; the request errors that come before them.
+//   5. Version rules for consumers; the request errors that come before them, the body size limit
+//      among them (declared, and chunked with no Content-Length).
 //   6. Previews: tagged, and only for people who can see the template's team.
 //   7. render_log: one row per render, and never a value.
 //
@@ -358,6 +361,25 @@ test.describe("values", () => {
     expect(res.status()).toBe(200);
   });
 
+  test("a value of 1,000 characters renders exactly as sent; one more is a 422 invalid_values that names the limit, never the value", async ({ request }) => {
+    const v = pick(await versions(), "Active web version with a text variable", (x) => rendersTo("web")(x) && x.variables.some((y) => y.type === "text"));
+    const text = v.variables.find((x) => x.type === "text")!;
+    // 1,000 characters, nearly twice as many UTF-16 units: the limit counts characters, so an emoji is one.
+    const atLimit = `${SENTINEL_TEXT}${"😀".repeat(1000 - SENTINEL_TEXT.length - 1)}!`;
+    expect([...atLimit]).toHaveLength(1000);
+
+    const ok = await render(request, { templateId: v.templateId, body: bodyFor(v, "web", validValues(v.variables, { [text.key]: atLimit })) });
+    expect(ok.res.status()).toBe(200);
+    expect(await ok.res.text()).toContain(atLimit);
+
+    const cid = correlation("too-long");
+    const { res } = await render(request, { templateId: v.templateId, correlationId: cid, body: bodyFor(v, "web", validValues(v.variables, { [text.key]: `${atLimit}!` })) });
+    const error = await expectError(res, 422, "invalid_values", `${text.key} must be at most 1,000 characters.`);
+    expect(error.details).toEqual({ missing: [], invalid: [{ key: text.key, expected: "text", maxLength: 1000 }] });
+    expect(JSON.stringify(error)).not.toContain(SENTINEL_TEXT);
+    expect(await logFor(db, cid)).toEqual([expect.objectContaining({ outcome: "error", error_code: "invalid_values" })]);
+  });
+
   test("text in a value can't break out of the HTML", async ({ request }) => {
     const v = pick(await versions(), "Active web version with a text variable", (x) => rendersTo("web")(x) && x.variables.some((y) => y.type === "text"));
     const text = v.variables.find((x) => x.type === "text")!;
@@ -550,6 +572,52 @@ test.describe("a malformed request is a 400 bad_request", () => {
         throw new Error(`${what}: ${reason instanceof Error ? reason.message : reason}`);
       });
     }
+  });
+});
+
+test.describe("a body over 1,000,000 bytes is a 413 body_too_large", () => {
+  const LIMIT = 1_000_000;
+  const TOO_LARGE = "The body must be at most 1,000,000 bytes.";
+
+  test("declared by Content-Length: one byte over is refused, a body at the limit renders", async ({ request }) => {
+    const v = await activeEverywhere();
+    const json = JSON.stringify(bodyFor(v, "web"));
+    const over = await render(request, { templateId: v.templateId, body: json + " ".repeat(LIMIT - json.length + 1) });
+    await expectError(over.res, 413, "body_too_large", TOO_LARGE);
+    const at = await render(request, { templateId: v.templateId, body: json + " ".repeat(LIMIT - json.length) });
+    expect(at.res.status()).toBe(200);
+  });
+
+  test("sent chunked, with no Content-Length: refused once the count passes the limit, and the rest is never read", async ({ baseURL }) => {
+    const v = await activeEverywhere();
+    /** POSTs up to 64 MB of spaces in 1 MB chunks (Transfer-Encoding: chunked); stops when the answer comes. */
+    const sent = await new Promise<{ status: number; body: string; sentMb: number }>((resolve, reject) => {
+      const req = httpRequest(new URL(`/api/v1/templates/${v.templateId}/render`, baseURL), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Consumer-Id": "coral", "Transfer-Encoding": "chunked" },
+      });
+      let sentMb = 0;
+      let answered = false;
+      req.on("response", (res) => {
+        answered = true;
+        let body = "";
+        res.on("data", (d: Buffer) => (body += d.toString()));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body, sentMb }));
+      });
+      req.on("error", (error) => (answered ? undefined : reject(error)));
+      const chunk = Buffer.alloc(1024 * 1024, 0x20);
+      const pump = () => {
+        if (answered) return req.destroy();
+        if (sentMb >= 64) return req.end();
+        sentMb += 1;
+        if (req.write(chunk)) setImmediate(pump);
+        else req.once("drain", pump);
+      };
+      pump();
+    });
+    expect(sent.status).toBe(413);
+    expect(JSON.parse(sent.body)).toEqual({ error: { code: "body_too_large", message: TOO_LARGE } });
+    expect(sent.sentMb).toBeLessThan(64);
   });
 });
 

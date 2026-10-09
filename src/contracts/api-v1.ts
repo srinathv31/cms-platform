@@ -28,6 +28,7 @@ export type ApiErrorCode =
   // the render route's codes (src/domain/render/types.ts RenderErrorCode)
   | "bad_request"
   | "consumer_required"
+  | "body_too_large" // 413: the body is over 1,000,000 bytes
   | "unknown_consumer"
   | "preview_forbidden"
   | "template_not_found"
@@ -54,7 +55,8 @@ export interface ApiError {
 /** missing_variables / invalid_values: keys only, never values. */
 export interface ApiValueErrorDetails {
   missing: string[];
-  invalid: { key: string; expected: ApiVariableType }[];
+  /** `maxLength` is set when the value was longer than that many characters (1000), whatever its type. */
+  invalid: { key: string; expected: ApiVariableType; maxLength?: number }[];
 }
 
 /** version_sunset / version_revoked / version_not_released. */
@@ -224,6 +226,7 @@ export interface ApiJsonSchemaProperty {
   description: string; // "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent."
   type: "string"; // the canonical forms are strings (the route also takes JSON numbers, read from their source text; not advertised)
   minLength?: number; // a required text: 1, with pattern "\\S" (blank counts as missing)
+  maxLength: number; // every value: 1000 characters (Unicode code points); a longer one is 422 invalid_values
   pattern?: string;
   format?: "date";
   enum?: string[]; // us_state: the two-letter codes
@@ -282,7 +285,12 @@ export interface ApiNotice {
 
 // ── POST /api/v1/templates/{id}/render (Phase 3; restated for consumers) ────────
 
-/** The body a consumer sends. `"draft"` and `preview` are CMS-only and not part of the consumer API. */
+/**
+ * The body a consumer sends. `"draft"` and `preview` are CMS-only and not part of the consumer API.
+ * At most 1,000,000 bytes (else 413 body_too_large); each value at most 1000 characters, counted in
+ * Unicode code points (else 422 invalid_values, "first_name must be at most 1,000 characters."). A value
+ * is never cut: it prints exactly as sent, or is refused.
+ */
 export interface ApiRenderRequest {
   version: number;
   channel: ApiChannel;

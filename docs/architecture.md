@@ -98,7 +98,8 @@ variations to avoid.
    debounces edits (800 ms, at most 5 s), sends one request at a time, and flushes on page hide. It runs the
    server's document check first, so a patch the server would refuse is never sent.
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
-   client. It caps the body, parses the patch, and calls `saveDraft`.
+   client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
+   byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.
 3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and email fields with
    [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against the document limits and the editor
    schema, block ids added. Import stores documents through the same function. Then, in one transaction, it checks
@@ -119,8 +120,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    [version-rules.ts](../src/domain/render/version-rules.ts)): Active renders; Superseded renders until its sunset,
    then 410; Revoked is 410; unreleased states are 409.
 3. Channel allowed and enabled (422). The rest is the engine ([engine.ts](../src/server/render/engine.ts)), which
-   needs no database, clock, or request: values valid (422; a JSON number keeps its exact source text), then the
-   document check.
+   needs no database, clock, or request: values valid (422; each at most 1,000 characters, and a JSON number keeps
+   its exact source text), then the document check.
 4. Resolve the TipTap JSON to a `RenderDoc` (`src/domain/render`), then a channel adapter renders web HTML, an email,
    or a PDF.
 5. One `render_log` row, success or error. It never stores the values.

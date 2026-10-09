@@ -5,13 +5,14 @@
 
 import { formatLongDate } from "../dates";
 import { CHANNELS, type Channel, type VariableType, type VersionState } from "../types";
-import type {
-  InvalidValue,
-  RenderError,
-  RenderErrorCode,
-  RenderFailedDetails,
-  ValueErrorDetails,
-  VersionErrorDetails,
+import {
+  MAX_BODY_BYTES,
+  type InvalidValue,
+  type RenderError,
+  type RenderErrorCode,
+  type RenderFailedDetails,
+  type ValueErrorDetails,
+  type VersionErrorDetails,
 } from "./types";
 
 /** An error body's payload. `details` is left out when there are none. */
@@ -44,7 +45,7 @@ function plural(name: string): string {
   return `${name}s`;
 }
 
-// ── 400 / 403 ────────────────────────────────────────────────────────────────
+// ── 400 / 403 / 413 ──────────────────────────────────────────────────────────
 
 /** The fixed bad_request sentences. */
 export const BAD_REQUEST_MESSAGES = {
@@ -59,6 +60,11 @@ export function badRequest(message: string): RenderError {
 
 export function consumerRequired(): RenderError {
   return renderError("consumer_required", "X-Consumer-Id is required.");
+}
+
+/** 413: "The body must be at most 1,000,000 bytes." Declared by Content-Length, or counted as it's read. */
+export function bodyTooLarge(): RenderError {
+  return renderError("body_too_large", `The body must be at most ${MAX_BODY_BYTES.toLocaleString("en-US")} bytes.`);
 }
 
 /** `Consumer "acme" isn't registered.` */
@@ -180,8 +186,17 @@ function missingSentence(missing: readonly string[]): string {
   return `Missing required variables: ${missing.join(", ")}.`;
 }
 
+/**
+ * One invalid value's sentence: "{name} must be {noun}.", or for a value over the length limit
+ * "{name} must be at most 1,000 characters." The route names the key; the CMS preview, the label.
+ */
+export function invalidSentence(name: string, { expected, maxLength }: Pick<InvalidValue, "expected" | "maxLength">): string {
+  if (maxLength !== undefined) return `${name} must be at most ${maxLength.toLocaleString("en-US")} characters.`;
+  return `${name} must be ${VALUE_NOUNS[expected]}.`;
+}
+
 function invalidSentences(invalid: readonly InvalidValue[]): string[] {
-  return invalid.map(({ key, expected }) => `${key} must be ${VALUE_NOUNS[expected]}.`);
+  return invalid.map((item) => invalidSentence(item.key, item));
 }
 
 /**

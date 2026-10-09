@@ -221,6 +221,8 @@ export interface ResolveContext {
  * `preview` is the CMS's own preview: the persona cookie must be able to view the template, any
  * version state renders (version rules are skipped), and the render_log row is tagged as a preview
  * with no consumer, so it never counts toward usage.
+ *
+ * The body is at most MAX_BODY_BYTES, and each value at most MAX_VALUE_LENGTH characters.
  */
 export interface RenderRequestBody {
   version: number | "draft";
@@ -231,6 +233,20 @@ export interface RenderRequestBody {
   encoding?: "base64";
   preview?: boolean;
 }
+
+/**
+ * The largest body the route reads, in bytes. A larger one is 413 body_too_large, whether its
+ * Content-Length says so or the count passes it while the body is read (a chunked body has no length).
+ */
+export const MAX_BODY_BYTES = 1_000_000;
+
+/**
+ * The most characters one value may have, as sent, counted in Unicode code points (what JSON Schema's
+ * `maxLength` counts; Java: `codePointCount`). A longer value is invalid_values, never cut: values
+ * print exactly as sent. A variable holds a name, an amount, a sentence or an address, not a document
+ * (docs/decisions/0011-cap-each-render-value.md).
+ */
+export const MAX_VALUE_LENGTH = 1_000;
 
 /**
  * Success. Every 200 carries these headers:
@@ -272,6 +288,7 @@ export interface Base64ResponseBody {
  * | 400    | bad_request           | "The body must be JSON with version, channel and values."                 |
  * |        |                       | "channel must be one of pdf, web, email."  "version must be a version number." |
  * | 400    | consumer_required     | "X-Consumer-Id is required."                                              |
+ * | 413    | body_too_large        | "The body must be at most 1,000,000 bytes."                              |
  * | 403    | unknown_consumer      | "Consumer \"acme\" isn't registered."                                     |
  * | 403    | preview_forbidden     | "You can't preview this template."                                        |
  * | 404    | template_not_found    | "Template UC-4F7K2Q doesn't exist."                                       |
@@ -283,6 +300,7 @@ export interface Base64ResponseBody {
  * | 422    | channel_not_enabled   | "Version 2 doesn't render to Email. Its channels are PDF and Web."        |
  * | 422    | missing_variables     | "Missing required variables: first_name, purchase_apr."                   |
  * | 422    | invalid_values        | "purchase_apr must be a percentage, like 21.99."                          |
+ * |        |                       | "first_name must be at most 1,000 characters." (longer than MAX_VALUE_LENGTH) |
  * | 500    | render_failed         | "The PDF couldn't be rendered. Try again."                                |
  * |        |                       | "The PDF couldn't be rendered. Tables can have at most 12 columns." (document check) |
  * |        |                       | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ)." |
@@ -293,6 +311,7 @@ export interface Base64ResponseBody {
 export type RenderErrorCode =
   | "bad_request"
   | "consumer_required"
+  | "body_too_large"
   | "unknown_consumer"
   | "preview_forbidden"
   | "template_not_found"
@@ -309,6 +328,7 @@ export type RenderErrorCode =
 export const RENDER_ERROR_STATUS: Readonly<Record<RenderErrorCode, number>> = {
   bad_request: 400,
   consumer_required: 400,
+  body_too_large: 413,
   unknown_consumer: 403,
   preview_forbidden: 403,
   template_not_found: 404,
@@ -326,6 +346,8 @@ export const RENDER_ERROR_STATUS: Readonly<Record<RenderErrorCode, number>> = {
 export interface InvalidValue {
   key: string;
   expected: VariableType;
+  /** Set when the value is longer than this many characters (MAX_VALUE_LENGTH), whatever its type. */
+  maxLength?: number;
 }
 
 export interface ValueErrorDetails {

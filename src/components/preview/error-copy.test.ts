@@ -55,6 +55,12 @@ describe("authorMessage", () => {
     );
   });
 
+  it("says a value is too long, with the label and the limit", () => {
+    const error = invalidValues({ missing: [], invalid: [{ key: "first_name", expected: "text", maxLength: 1000 }] });
+    expect(error.message).toBe("first_name must be at most 1,000 characters.");
+    expect(authorMessage(error, VARIABLES)).toBe("First name must be at most 1,000 characters.");
+  });
+
   it("says the missing sentence, then the invalid ones, when both are wrong", () => {
     const error = missingVariables({
       missing: ["first_name"],

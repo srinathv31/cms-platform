@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import type { NextRequest } from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Base64ResponseBody, EmailResponseBody, RenderErrorBody } from "@/domain/render/types";
+import { MAX_BODY_BYTES, MAX_VALUE_LENGTH, type Base64ResponseBody, type EmailResponseBody, type RenderErrorBody } from "@/domain/render/types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { contentTypes, renderLog, versions } from "@/server/db/schema/ucomp";
@@ -65,14 +65,32 @@ beforeEach(() => {
 const CUSTOMER = { first_name: "Maya", last_name: "Chen", purchase_apr: "21.99", home_state: "NJ" };
 const CORAL = { "X-Consumer-Id": "coral" };
 
-function post(template: string, body: unknown, headers: Record<string, string> = CORAL) {
-  const templateId = ids[template] ?? template;
-  const request = new Request(`http://localhost/api/v1/templates/${templateId}/render`, {
+function requestOf(templateId: string, body: BodyInit, headers: Record<string, string> = CORAL) {
+  return new Request(`http://localhost/api/v1/templates/${templateId}/render`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
-    body: typeof body === "string" ? body : JSON.stringify(body),
-  }) as NextRequest;
+    body,
+    duplex: "half",
+  } as RequestInit) as NextRequest;
+}
+
+function post(template: string, body: unknown, headers: Record<string, string> = CORAL) {
+  const templateId = ids[template] ?? template;
+  const request = requestOf(templateId, typeof body === "string" ? body : JSON.stringify(body), headers);
   return POST(request, { params: Promise.resolve({ templateId }) });
+}
+
+/** A body with no Content-Length (as a chunked request): `megabytes` of 1 MB chunks, counting what was pulled. */
+function chunkedBody(megabytes: number) {
+  const pulled = { mb: 0 };
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pulled.mb >= megabytes) return controller.close();
+      pulled.mb += 1;
+      controller.enqueue(new Uint8Array(1024 * 1024).fill(0x20));
+    },
+  });
+  return { stream, pulled };
 }
 
 async function expectError(res: Response, status: number, code: string, message?: string) {
@@ -278,6 +296,60 @@ describe("POST …/render: 400 bad requests", () => {
     expect(res.headers.get("X-Correlation-Id")).toMatch(/^req_[0-9a-z]{12}$/);
     const odd = await post("balance-transfer", good, { ...CORAL, "X-Correlation-Id": "x".repeat(200) });
     expect(odd.headers.get("X-Correlation-Id")).toMatch(/^req_/);
+  });
+});
+
+describe("POST …/render: 413 body_too_large", () => {
+  const TOO_LARGE = "The body must be at most 1,000,000 bytes.";
+
+  it("when Content-Length says the body is too large, before reading it", async () => {
+    const templateId = ids["balance-transfer"]!;
+    const body = JSON.stringify({ version: 2, channel: "web", values: CUSTOMER });
+    const request = requestOf(templateId, body, { ...CORAL, "Content-Length": String(MAX_BODY_BYTES + 1) });
+    await expectError(await POST(request, { params: Promise.resolve({ templateId }) }), 413, "body_too_large", TOO_LARGE);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("for a chunked body with no Content-Length, as soon as it passes the limit: the rest is never read", async () => {
+    const templateId = ids["balance-transfer"]!;
+    const { stream, pulled } = chunkedBody(64);
+    const res = await POST(requestOf(templateId, stream, { ...CORAL, "X-Correlation-Id": "chunked" }), { params: Promise.resolve({ templateId }) });
+    await expectError(res, 413, "body_too_large", TOO_LARGE);
+    expect(pulled.mb).toBeLessThan(4); // the limit is 1,000,000 bytes: one 1 MB chunk and a bit
+    expect(await logRows("chunked")).toEqual([]);
+  });
+
+  it("counts bytes, not characters: a body one byte over is refused, a body at the limit is read", async () => {
+    const json = JSON.stringify({ version: 2, channel: "web", values: CUSTOMER });
+    await expectError(await post("balance-transfer", json + " ".repeat(MAX_BODY_BYTES - json.length + 1)), 413, "body_too_large");
+    expect((await post("balance-transfer", json + " ".repeat(MAX_BODY_BYTES - json.length))).status).toBe(200);
+    // 500,000 two-byte characters: half the limit counted in characters, over it in bytes.
+    const wide = { version: 2, channel: "web", values: { ...CUSTOMER, unused: "é".repeat(500_000) } };
+    await expectError(await post("balance-transfer", wide), 413, "body_too_large");
+  });
+});
+
+describe("POST …/render: the value length limit", () => {
+  it("a value at the limit renders, exactly as sent, in every channel the version has", async () => {
+    const name = `${"Maya".repeat(MAX_VALUE_LENGTH / 4 - 1)}Chen`;
+    expect([...name]).toHaveLength(MAX_VALUE_LENGTH);
+    const web = await post("balance-transfer", { version: 2, channel: "web", values: { ...CUSTOMER, first_name: name } });
+    expect(web.status).toBe(200);
+    expect(await web.text()).toContain(name);
+    const pdf = await post("balance-transfer", { version: 2, channel: "pdf", values: { ...CUSTOMER, first_name: name } });
+    expect(pdf.status).toBe(200);
+  }, 30_000);
+
+  it("a value one character over is 422 invalid_values that names the limit, never the value, and isn't cut", async () => {
+    const res = await post(
+      "balance-transfer",
+      { version: 2, channel: "web", values: { ...CUSTOMER, first_name: `Zq9${"x".repeat(MAX_VALUE_LENGTH - 2)}` } },
+      { ...CORAL, "X-Correlation-Id": "too-long" },
+    );
+    const error = await expectError(res, 422, "invalid_values", "first_name must be at most 1,000 characters.");
+    expect(error.details).toEqual({ missing: [], invalid: [{ key: "first_name", expected: "text", maxLength: 1000 }] });
+    expect(JSON.stringify(error)).not.toContain("Zq9");
+    expect(await logRows("too-long")).toEqual([expect.objectContaining({ outcome: "error", errorCode: "invalid_values" })]);
   });
 });
 

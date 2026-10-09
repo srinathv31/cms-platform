@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { BAD_REQUEST_MESSAGES, badRequest, consumerRequired, renderFailed } from "@/domain/render";
+import { BAD_REQUEST_MESSAGES, MAX_BODY_BYTES, badRequest, bodyTooLarge, consumerRequired, renderFailed } from "@/domain/render";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
+import { readBodyCapped } from "@/server/import/read-body";
 import { renderTemplate, type RenderResult } from "@/server/render/render-template";
 import { getViewer } from "@/server/viewer";
 
@@ -13,9 +14,10 @@ import { getViewer } from "@/server/viewer";
 //
 // A POST handler always runs at request time, Cache Components or not (only GET handlers can be
 // prerendered or cached), so reading the body, the headers and the persona cookie here is fine.
-
-/** A render request is a version, a channel and a few values: far under this. */
-const MAX_BODY_SIZE = 1_000_000;
+//
+// The body is read with a byte counter (`readBodyCapped`) that stops at MAX_BODY_BYTES: a declared
+// Content-Length is only a hint, and a chunked body has none. The route is anonymous, so nothing past
+// the limit is ever buffered.
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -131,12 +133,12 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
   const { templateId } = await params;
   const correlationId = correlationIdOf(request);
 
-  const declared = Number(request.headers.get("content-length"));
-  if (declared > MAX_BODY_SIZE) return errorResponse(badRequest("The body is too large."), correlationId);
-  const text = await request.text();
-  if (text.length > MAX_BODY_SIZE) return errorResponse(badRequest("The body is too large."), correlationId);
+  // Too large: refused from the declared length when there is one, else as soon as the count passes it.
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return errorResponse(bodyTooLarge(), correlationId);
+  const body = await readBodyCapped(request.body, MAX_BODY_BYTES);
+  if (!body.ok) return errorResponse(bodyTooLarge(), correlationId);
 
-  const parsed = parseBody(text);
+  const parsed = parseBody(new TextDecoder().decode(body.bytes));
   if (!parsed.ok) return errorResponse(parsed.error, correlationId);
   const { version, channel, values, encoding } = parsed.body;
   const preview = parsed.body.preview === true;
