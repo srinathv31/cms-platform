@@ -4,7 +4,7 @@ import { readNoticeCursor } from "@/domain/golive/cursor";
 import type { ApiNoticeList } from "@/domain/golive-types";
 import { correlationIdOf, errorResponse, jsonResponse, withDemoDate } from "@/server/api/http";
 import { now } from "@/server/clock";
-import { findConsumer, listNotices, requireConsumer } from "@/server/queries/consumer-api";
+import { findConsumer, listNotices, noticeEpoch, requireConsumer } from "@/server/queries/consumer-api";
 
 // GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=: UCOMP's outbox for one
 // consumer, oldest first, paged with an opaque cursor. Contract: ApiNoticeList in src/contracts/api-v1.ts.
@@ -24,13 +24,14 @@ export const GET = withDemoDate(async function get(request: NextRequest, { param
   if (caller.consumer.id !== consumerId) return errorResponse(consumerMismatch(consumerId), correlationId);
 
   const templateId = search.get("templateId")?.trim() || undefined;
-  const after = readNoticeCursor(search.get("after"), { consumerId, templateId: templateId ?? null });
+  const epoch = await noticeEpoch();
+  const after = readNoticeCursor(search.get("after"), { consumerId, templateId: templateId ?? null, epoch });
   if (!after.ok) return errorResponse(after.error, correlationId);
   const limit = parseLimit(search.get("limit"), NOTICE_LIMIT, QUERY_MESSAGES.noticeLimit);
   if (!limit.ok) return errorResponse(limit.error, correlationId);
 
   const at = await now();
-  const page = await listNotices(consumerId, { after: after.value, templateId, limit: limit.value });
+  const page = await listNotices(consumerId, { after: after.value, templateId, limit: limit.value, epoch });
   const body: ApiNoticeList = { consumerId, asOf: at.toISOString(), ...page };
   return jsonResponse(body, correlationId);
 });

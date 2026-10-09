@@ -24,7 +24,7 @@ import {
 } from "@/domain/render";
 import { CHANNELS, type Channel, type VersionState } from "@/domain/types";
 import { db } from "@/server/db/client";
-import { consumerNotices, consumers, contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { consumerNotices, consumers, contentTypes, settings, teams, templates, versions } from "@/server/db/schema/ucomp";
 
 // The consumer API's reads (GET /api/v1/…). No viewer: a consumer is identified by X-Consumer-Id and
 // sees every released version of every template, nothing else. Drafts and versions in review never
@@ -283,16 +283,30 @@ export interface NoticePage {
   nextCursor: string;
 }
 
+/** The settings row the seed writes at every reset: the notice cursors' epoch. */
+const SEEDED_AT_KEY = "seeded_at";
+
+/**
+ * The epoch notice cursors carry: `settings.seeded_at`, which a demo reset rewrites when it starts
+ * the notice numbers again. Null for a database that was never seeded.
+ */
+export async function noticeEpoch(): Promise<string | null> {
+  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, SEEDED_AT_KEY)).limit(1);
+  return typeof row?.value === "string" ? row.value : null;
+}
+
 /**
  * One consumer's notices, oldest first in the order they were written (`seq`), normalized (both
  * payload shapes) and worded: `limit` of them after `after` (a `seq` from the request's cursor; 0 for
  * the first page). The next cursor is the page's last `seq`, or `after` again when the page is empty.
+ * `epoch` is the one the route checked the cursor against; it's read here when not given.
  */
 export async function listNotices(
   consumerId: string,
-  opts: { after?: number; templateId?: string; limit: number },
+  opts: { after?: number; templateId?: string; limit: number; epoch?: string | null },
 ): Promise<NoticePage> {
   const after = opts.after ?? 0;
+  const epoch = opts.epoch === undefined ? await noticeEpoch() : opts.epoch;
   const where: SQL[] = [eq(consumerNotices.consumerId, consumerId), gt(consumerNotices.seq, after)];
   if (opts.templateId) where.push(eq(consumerNotices.templateId, opts.templateId));
   const rows = await db
@@ -305,7 +319,7 @@ export async function listNotices(
   return {
     notices: (await withActiveVersion(items)).map(noticeView),
     hasMore,
-    nextCursor: noticeCursor({ consumerId, templateId: opts.templateId ?? null }, items.at(-1)?.seq ?? after),
+    nextCursor: noticeCursor({ consumerId, templateId: opts.templateId ?? null, epoch }, items.at(-1)?.seq ?? after),
   };
 }
 

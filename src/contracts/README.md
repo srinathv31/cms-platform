@@ -28,7 +28,8 @@ previews.
 The two lists page the same way (`ApiPage`): a call returns `nextCursor` and `hasMore`, and the next call passes
 the cursor back as `after`. Notices come oldest first in the order Stencil wrote them, so a consumer that keeps the
 last `nextCursor` gets every notice once, however many arrive between polls. A cursor is opaque to consumers and
-belongs to its list; anything else is 400 `bad_request`. The cursor format, and why notices page on
+belongs to its list; anything else, or a notices cursor from before a demo reset, is 400 `bad_request`. Search
+compares names and ids by code point, not by locale. The cursor format, and why notices page on
 `consumer_notices.seq` rather than on time, are in
 [decision 0006](../../docs/decisions/0006-page-notices-by-commit-order.md); the code is
 `src/domain/golive/cursor.ts`. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response

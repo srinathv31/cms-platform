@@ -262,9 +262,10 @@ export const renderLog = sqliteTable(
  * UCOMP's outbox to consumers: new version available, sunset scheduled, revoked.
  *
  * `seq` is the order notices were committed in, and the notices API pages on it: 1, 2, 3, … across all
- * consumers, assigned inside the writing transaction (`nextNoticeSeq` in server/effects.ts). Writers
- * take turns, so a notice that becomes visible later always has a higher `seq`. `created_at` is the
- * action's clock, read before its transaction, so it can't order the outbox; ids are random.
+ * consumers, assigned inside the writing transaction (`takeNoticeSeqs` in server/effects.ts). Writers
+ * take turns, so a notice that becomes visible later always has a higher `seq`. The last number taken
+ * is kept in `settings.consumer_notice_seq`, so a deleted notice's number is never reused. `created_at`
+ * is the action's clock, read before its transaction, so it can't order the outbox; ids are random.
  */
 export const consumerNotices = sqliteTable(
   "consumer_notices",

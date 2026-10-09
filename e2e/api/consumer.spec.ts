@@ -58,6 +58,14 @@ async function activeWithSuperseded(): Promise<{ active: SeedVersion; old: SeedV
 
 // ── 1. Search ────────────────────────────────────────────────────────────────
 
+/** The contract's name order: Unicode code points, whatever the server's locale. */
+function byCodePoint(a: string, b: string): number {
+  const x = [...a].map((c) => c.codePointAt(0)!);
+  const y = [...b].map((c) => c.codePointAt(0)!);
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i]! - y[i]!;
+  return x.length - y.length;
+}
+
 test.describe("GET /api/v1/templates", () => {
   test("lists Active templates only, with the no-store and correlation headers", async ({ request }) => {
     const correlationId = `e2e-consumer-${randomUUID().slice(0, 8)}`;
@@ -123,7 +131,7 @@ test.describe("GET /api/v1/templates", () => {
     const ids = walk.map((r) => r.id);
     expect(new Set(ids).size, "no template twice").toBe(ids.length);
     const names = walk.map((r) => r.name);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(names).toEqual([...names].sort(byCodePoint));
     const activeAfter = new Set((await versions()).filter((v) => v.state === "active").map((v) => v.templateId));
     for (const id of activeBefore) if (activeAfter.has(id)) expect(ids, id).toContain(id);
 

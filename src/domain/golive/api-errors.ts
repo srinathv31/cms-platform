@@ -12,6 +12,7 @@ export const QUERY_MESSAGES = {
   since: "since must be a version number.",
   sinceOrder: "since must be lower than version.",
   after: "after must be the nextCursor of an earlier page of this list.",
+  staleAfter: "after is from before the notices were reset. Start again without after.",
 } as const;
 
 export const SEARCH_LIMIT = { min: 1, max: 50, fallback: 20 } as const;

@@ -102,22 +102,33 @@ export async function loadLinkState(api: UcompApi, link: LinkRow): Promise<LinkS
   return { summary: linkSummaryOf(link, detail.data), contract: detail.data.contract, upgrade, error };
 }
 
+/** At most this many pages of notices per load (10,000 notices); more is treated as a bad answer. */
+export const MAX_NOTICE_PAGES = 50;
+
 /**
  * Every Coral notice (one template's with `templateId`), oldest first as the API serves them: reads
  * page after page until `hasMore` is false. Coral keeps no cursor and reads the whole outbox on each
  * page load, which is fine at a simulator's size; a consumer that polls keeps the last `nextCursor`.
+ * An answer that wouldn't end (an empty page that says more follow, or more than MAX_NOTICE_PAGES
+ * pages) is an error, not a loop.
  */
-async function allNotices(api: UcompApi, templateId?: string): Promise<{ ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }> {
+export async function allNotices(
+  api: UcompApi,
+  templateId?: string,
+): Promise<{ ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }> {
   const notices: ApiNotice[] = [];
   let after: string | undefined;
-  for (;;) {
+  for (let pages = 1; pages <= MAX_NOTICE_PAGES; pages++) {
     const page = await api.listNotices({ templateId, limit: 200, after });
     if (!page.ok) return page;
+    if (!page.data.hasMore) return { ok: true, notices: [...notices, ...page.data.notices] };
+    if (page.data.notices.length === 0) {
+      return { ok: false, error: { status: 200, code: "bad_response", message: "Stencil sent an empty page of notices that said more follow." } };
+    }
     notices.push(...page.data.notices);
-    // A cursor that didn't move would ask for the same page forever.
-    if (!page.data.hasMore || page.data.nextCursor === after) return { ok: true, notices };
     after = page.data.nextCursor;
   }
+  return { ok: false, error: { status: 200, code: "bad_response", message: `Stencil sent more than ${MAX_NOTICE_PAGES} pages of notices.` } };
 }
 
 /** Coral's notices, newest first, with Coral's read state and linked offers. */

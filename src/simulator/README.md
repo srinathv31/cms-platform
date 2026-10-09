@@ -120,8 +120,9 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   Relinking reopens the link flow with `?template=` set: What changed, Map new value, Confirm.
 - **Notices** (`NoticesPanel`, `markNoticesRead`). Read from `GET /api/v1/consumers/coral/notices`, page after page
   (`allNotices` follows `nextCursor` until `hasMore` is false), and shown newest first; read state is Coral's own.
-  Coral keeps no cursor and reads the whole outbox on each page load. A consumer that polls would keep the last
-  `nextCursor` instead.
+  Coral keeps no cursor and reads the whole outbox on each page load, at most `MAX_NOTICE_PAGES` (50) pages; an
+  empty page that says more follow, or more pages than that, shows as an API error. A consumer that polls would
+  keep the last `nextCursor` instead.
 
 **Against a different backend.** The simulator knows only the HTTP contract, so pointing it at another
 implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCOMP_API_ORIGIN`. In a real consumer,

@@ -2,8 +2,9 @@ import { rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ApiContract, ApiTemplateDetail, ApiVariable } from "@/contracts/api-v1";
+import type { ApiContract, ApiNotice, ApiNoticeList, ApiTemplateDetail, ApiVariable } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import type { UcompApi } from "./ucomp-api";
 
 // The simulator's actions and read models against a temporary sim database and a fake UCOMP behind
 // fetch. The fake answers like /api/v1: one template, v2 Active (v3 can go Active with a new required
@@ -363,5 +364,44 @@ describe("notices", () => {
     expect(after.unread).toBe(1);
     const page = await queries.getSimOfferPage("offer_spring_travel");
     expect(page?.notices.map((n) => [n.id, n.read])).toEqual([["ntc_2", true]]);
+  });
+});
+
+describe("allNotices: an answer that wouldn't end is an error, not a loop", () => {
+  /** A client whose notices pages come from `page(n)`, n counting from 1. */
+  const pagedApi = (page: (n: number) => Pick<ApiNoticeList, "notices" | "hasMore">) => {
+    let calls = 0;
+    const api = {
+      listNotices: async () => {
+        calls += 1;
+        return { ok: true as const, data: { consumerId: "coral", asOf: "", nextCursor: `c${calls}`, ...page(calls) } };
+      },
+    } as unknown as UcompApi;
+    return { api, calls: () => calls };
+  };
+  const notice = NOTICES[0] as ApiNotice;
+
+  it("an empty page that says more follow", async () => {
+    const { api, calls } = pagedApi((n) => (n === 1 ? { notices: [notice], hasMore: true } : { notices: [], hasMore: true }));
+    expect(await queries.allNotices(api)).toEqual({
+      ok: false,
+      error: { status: 200, code: "bad_response", message: "Stencil sent an empty page of notices that said more follow." },
+    });
+    expect(calls()).toBe(2);
+  });
+
+  it("more than 50 pages", async () => {
+    const { api, calls } = pagedApi(() => ({ notices: [notice], hasMore: true }));
+    expect(await queries.allNotices(api)).toEqual({
+      ok: false,
+      error: { status: 200, code: "bad_response", message: "Stencil sent more than 50 pages of notices." },
+    });
+    expect(calls()).toBe(queries.MAX_NOTICE_PAGES);
+  });
+
+  it("the last of 50 pages is still read", async () => {
+    const { api } = pagedApi((n) => ({ notices: [notice], hasMore: n < 50 }));
+    const result = await queries.allNotices(api);
+    expect(result.ok && result.notices).toHaveLength(50);
   });
 });

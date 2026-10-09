@@ -84,7 +84,8 @@ describe("GET /api/v1/templates", () => {
 
     const seen: string[] = [];
     let after = "";
-    for (;;) {
+    for (let pages = 0; ; pages++) {
+      expect(pages, "the search ends").toBeLessThan(100);
       const page = (await (await get(`?limit=2${after ? `&after=${after}` : ""}`)).json()) as ApiTemplateSearch;
       expect(page.results.length).toBeLessThanOrEqual(2);
       seen.push(...page.results.map((r) => r.id));

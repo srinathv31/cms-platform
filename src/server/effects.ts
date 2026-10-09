@@ -10,6 +10,7 @@ import {
   memberships,
   notifications,
   renderLog,
+  settings,
   teams,
   templates,
   users,
@@ -53,7 +54,7 @@ export interface EffectsWritten {
  *   action. The link becomes an href under the team's slug.
  * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, in the
  *   last 90 days (from the render log). The payload carries version numbers, dates and contract
- *   changes, never variable values. Each row takes the next `seq` (`nextNoticeSeq`), the order the
+ *   changes, never variable values. Each row takes the next `seq` (`takeNoticeSeqs`), the order the
  *   notices API pages in.
  */
 export async function writeEffects(
@@ -124,7 +125,7 @@ export async function writeEffects(
         const consumerIds = await consumerAudience();
         if (consumerIds.length === 0) break;
         const { name } = await templateInfo();
-        const first = await nextNoticeSeq(tx);
+        const first = await takeNoticeSeqs(tx, consumerIds.length);
         await tx.insert(consumerNotices).values(
           consumerIds.map((consumerId, i) => ({
             id: newId("cn"),
@@ -207,15 +208,28 @@ export function notificationHref(teamSlug: string, link: NotificationLink): stri
   }
 }
 
+/** The settings row that holds the last `consumer_notices.seq` handed out. */
+export const NOTICE_SEQ_KEY = "consumer_notice_seq";
+
 /**
- * The next `consumer_notices.seq`: one past the highest written. It is read inside the writing
- * transaction, which holds SQLite's write lock (`BEGIN IMMEDIATE`) until it commits, so notices are
- * numbered in the order they become visible and a consumer paging by `seq` never skips one. The
- * unique index on `seq` refuses a duplicate rather than store one.
+ * Takes `count` consecutive `consumer_notices.seq` numbers and returns the first.
+ *
+ * - **Commit order.** It runs inside the writing transaction, which holds SQLite's write lock
+ *   (`BEGIN IMMEDIATE`) until it commits, so notices are numbered in the order they become visible
+ *   and a consumer paging by `seq` never skips one.
+ * - **Never reused.** The last number handed out is kept in `settings` (`NOTICE_SEQ_KEY`) and only goes
+ *   up, so deleting the newest notices (test cleanup) can't hand their numbers out again to a notice a
+ *   consumer's cursor is already past. The highest stored `seq` is a floor in case the row is missing.
+ *   Only a demo reset starts again, and it changes the cursor epoch (`settings.seeded_at`).
+ * - The unique index on `seq` refuses a duplicate rather than store one.
  */
-export async function nextNoticeSeq(tx: Tx): Promise<number> {
-  const [row] = await tx.select({ last: max(consumerNotices.seq) }).from(consumerNotices);
-  return (row?.last ?? 0) + 1;
+export async function takeNoticeSeqs(tx: Tx, count: number): Promise<number> {
+  const [counter] = await tx.select({ value: settings.value }).from(settings).where(eq(settings.key, NOTICE_SEQ_KEY));
+  const [stored] = await tx.select({ last: max(consumerNotices.seq) }).from(consumerNotices);
+  const last = Math.max(typeof counter?.value === "number" ? counter.value : 0, stored?.last ?? 0);
+  const value = last + count;
+  await tx.insert(settings).values({ key: NOTICE_SEQ_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } });
+  return last + 1;
 }
 
 /** Registered consumers with a non-preview render of the template in the notice window. */

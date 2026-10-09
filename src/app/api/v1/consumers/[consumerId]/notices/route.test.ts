@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ApiErrorBody, ApiNoticeList, ApiTemplateSearch } from "@/domain/golive-types";
-import { consumerNotices } from "@/server/db/schema/ucomp";
+import { consumerNotices, settings } from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { GET as searchGET } from "@/app/api/v1/templates/route";
 import { GET } from "./route";
@@ -59,12 +59,14 @@ const list = async (consumerId: string, query = "") => (await (await get(consume
 /** Every page from `after` (a nextCursor, or none for the start), following nextCursor until hasMore is false. */
 async function pages(query: string, after?: string): Promise<ApiNoticeList[]> {
   const out: ApiNoticeList[] = [];
-  for (;;) {
+  // A loop this long is a paging bug: fail rather than hang.
+  while (out.length < 100) {
     const page = await list("coral", `?${query}${after ? `&after=${after}` : ""}`);
     out.push(page);
     if (!page.hasMore) return out;
     after = page.nextCursor;
   }
+  throw new Error("notices didn't end within 100 pages");
 }
 
 describe("GET /api/v1/consumers/[consumerId]/notices: 200", () => {
@@ -148,5 +150,20 @@ describe("GET /api/v1/consumers/[consumerId]/notices: errors", () => {
     // And the other way round: an unfiltered cursor on the filtered list.
     const unfiltered = (await list("coral", "?limit=1")).nextCursor;
     await expectError(await get("coral", `?templateId=${holiday}&after=${unfiltered}`), 400, "bad_request", message);
+  });
+
+  it("400 bad_request for a cursor from before a reset: the numbers started again, so it would skip notices", async () => {
+    const before = (await list("coral", "?limit=1")).nextCursor;
+    // A reset reseeds, which writes a new seeded_at.
+    const { db } = await import("@/server/db/client");
+    const [seeded] = await db.select().from(settings).where(eq(settings.key, "seeded_at"));
+    await db.update(settings).set({ value: "2026-10-05T08:00:00.000Z" }).where(eq(settings.key, "seeded_at"));
+    try {
+      await expectError(await get("coral", `?after=${before}`), 400, "bad_request", "after is from before the notices were reset. Start again without after.");
+      const fresh = await list("coral", "?limit=1");
+      expect((await list("coral", `?after=${fresh.nextCursor}`)).notices.length).toBeGreaterThan(0);
+    } finally {
+      await db.update(settings).set({ value: seeded!.value }).where(eq(settings.key, "seeded_at"));
+    }
   });
 });

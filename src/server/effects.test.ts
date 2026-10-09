@@ -10,12 +10,12 @@ import type { LifecycleEffect } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
-import { inTransaction, notificationHref, writeEffects, type EffectContext } from "./effects";
+import { inTransaction, NOTICE_SEQ_KEY, notificationHref, takeNoticeSeqs, writeEffects, type EffectContext } from "./effects";
 
 // The effects writer against a temporary database filled by the real seed: Coral Offers has two
 // active approvers (Alex and Jordan), and Coral renders Balance Transfer Intro (not as a preview).
 
-const { auditEvents, consumerNotices, memberships, notifications, versions } = schema;
+const { auditEvents, consumerNotices, memberships, notifications, renderLog, settings, versions } = schema;
 const DAY = 86_400_000;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
@@ -273,10 +273,24 @@ describe("writeEffects: consumer notices", () => {
     expect(JSON.stringify(rows[0]!.payload)).not.toContain("first_name");
   });
 
-  it("numbers notices in the order they are written, past the highest seq, whatever their clock says", async () => {
-    const highest = async () => (await db.select({ seq: consumerNotices.seq }).from(consumerNotices)).reduce((m, r) => Math.max(m, r.seq), 0);
+  /** The settings counter: the last notice number handed out. */
+  const counter = async () => (await db.select().from(settings).where(eq(settings.key, NOTICE_SEQ_KEY)))[0]?.value;
+  const lastTaken = async () => {
+    const value = await counter();
+    expect(typeof value).toBe("number");
+    return value as number;
+  };
+
+  it("carries on from the seed's counter: while nothing is deleted, the counter is the number of notices", async () => {
+    // The seed numbers its notices 1…n and stores n; every write since took the next numbers.
+    const rows = await db.select({ seq: consumerNotices.seq }).from(consumerNotices);
+    expect(await counter()).toBe(rows.length);
+    expect(rows.map((r) => r.seq).sort((a, b) => a - b)).toEqual(rows.map((_, i) => i + 1));
+  });
+
+  it("numbers notices in the order they are written, past the last number taken, whatever their clock says", async () => {
     const v1 = await versionId("balance-transfer", 1);
-    const before = await highest();
+    const before = await lastTaken();
 
     // One action, two notices at the same instant: consecutive numbers.
     const first = context("balance-transfer", { versionId: v1 });
@@ -290,6 +304,59 @@ describe("writeEffects: consumer notices", () => {
     await write([sunsetNotice(v1)], earlier);
     const [late] = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, earlier.at));
     expect(late!.seq).toBe(before + 3);
+  });
+
+  it("a notice to two consumers takes two consecutive numbers, in consumer order", async () => {
+    const v1 = await versionId("balance-transfer", 1);
+    // Deposits Online renders Balance Transfer too, so it joins Coral in the audience.
+    await db.insert(renderLog).values({
+      id: "rl_two_consumers",
+      at: new Date(BASE.getTime() - DAY),
+      templateId: ids["balance-transfer"]!,
+      versionId: v1,
+      versionNumber: 1,
+      consumerId: "deposits-online",
+      channel: "web",
+      isPreview: false,
+      correlationId: "two-consumers",
+      outcome: "ok",
+      errorCode: null,
+      durationMs: 5,
+    });
+    try {
+      const before = await lastTaken();
+      const ctx = context("balance-transfer", { versionId: v1 });
+      expect((await write([sunsetNotice(v1)], ctx)).consumerNotices).toBe(2);
+      const rows = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, ctx.at));
+      expect(rows.map((r) => [r.consumerId, r.seq]).sort((a, b) => Number(a[1]) - Number(b[1]))).toEqual([
+        ["coral", before + 1],
+        ["deposits-online", before + 2],
+      ]);
+      expect(await counter()).toBe(before + 2);
+    } finally {
+      await db.delete(renderLog).where(eq(renderLog.id, "rl_two_consumers"));
+    }
+  });
+
+  it("never hands a number out twice, even after the newest notices are deleted", async () => {
+    const v1 = await versionId("balance-transfer", 1);
+    const gone = context("balance-transfer", { versionId: v1 });
+    await write([sunsetNotice(v1)], gone);
+    const [deleted] = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, gone.at));
+    // Test cleanup removes a template's notices; max(seq) + 1 would now be deleted.seq again.
+    await db.delete(consumerNotices).where(eq(consumerNotices.id, deleted!.id));
+
+    const next = context("balance-transfer", { versionId: v1 });
+    await write([sunsetNotice(v1)], next);
+    const [row] = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, next.at));
+    expect(row!.seq).toBe(deleted!.seq + 1);
+  });
+
+  it("carries on from the highest stored number when the counter row is missing", async () => {
+    const highest = (await db.select({ seq: consumerNotices.seq }).from(consumerNotices)).reduce((m, r) => Math.max(m, r.seq), 0);
+    await db.delete(settings).where(eq(settings.key, NOTICE_SEQ_KEY));
+    expect(await db.transaction((tx) => takeNoticeSeqs(tx, 3))).toBe(highest + 1);
+    expect(await counter()).toBe(highest + 3);
   });
 
   it("ignores preview renders and renders older than 90 days", async () => {

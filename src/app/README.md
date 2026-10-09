@@ -152,11 +152,12 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
   [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
-- Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
-  `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
-  refuse a cursor from another list with `bad_request`.
   Render requires it unless `preview: true`, which uses the persona cookie instead, and checks it in
   [render-template.ts](../server/render/render-template.ts).
+- Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
+  `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
+  refuse a cursor from another list, or a notices cursor from before a demo reset (`noticeEpoch`), with
+  `bad_request`.
 - Render reads a JSON number in `values` as its exact source text (`parseJsonWithNumberText` in
   `src/domain/render/json-number-text.ts`), so `21.90` stays `"21.90"`.
 - Render adds `X-Stencil-Template-Id`, `X-Stencil-Version`, `X-Stencil-Newer-Version` and `X-Stencil-Preview`,

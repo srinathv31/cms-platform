@@ -78,7 +78,9 @@ export interface ApiErrorBody {
  * - `hasMore`: true when more items follow this page right now.
  * A cursor is opaque: keep it as is, don't build or edit one. It belongs to the list it came from (the
  * same consumer and `templateId`, or the same `q`); any other `after` is 400 bad_request
- * ("after must be the nextCursor of an earlier page of this list.").
+ * ("after must be the nextCursor of an earlier page of this list."). A notices cursor from before the
+ * demo was reset is 400 bad_request too ("after is from before the notices were reset. Start again
+ * without after."): the notices were renumbered, so read them again from the start.
  */
 export interface ApiPage {
   /** Pass as `after` to continue where this page ended. */
@@ -96,7 +98,8 @@ export interface ApiPage {
  * - `limit` (optional): results per page, 1–50, default 20.
  * - `after` (optional): the `nextCursor` of an earlier page for the same `q` (ApiPage).
  * Order: an exact id match first, then names that start with the query, then the rest; ties by name,
- * then id. Pages follow that order and never overlap.
+ * then id, both compared by Unicode code point (capitals before lower case; not a locale's collation).
+ * Pages follow that order and never overlap.
  * Errors: 400 consumer_required, 403 unknown_consumer, 400 bad_request ("limit must be a number from 1 to 50.",
  * or ApiPage's sentence for a bad `after`).
  */

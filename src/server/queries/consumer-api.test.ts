@@ -9,10 +9,12 @@ import type { VariableType } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
-import { readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
+import { compareCodePoints, readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
+import { takeNoticeSeqs } from "@/server/effects";
 import {
   getTemplateDetail,
   listNotices,
+  noticeEpoch,
   requireConsumer,
   searchActiveTemplates,
   templateIdFromQuery,
@@ -89,11 +91,14 @@ describe("requireConsumer", () => {
 /** One page's results. */
 const search = async (q: string, limit = 20) => (await searchActiveTemplates(q, limit)).results;
 
+/** A paging loop that runs this long is a bug: fail rather than hang. */
+const MAX_PAGES = 100;
+
 /** Every page of a search, `limit` at a time, following each nextCursor until hasMore is false. */
 async function searchPages(q: string, limit: number): Promise<SearchPage[]> {
   const pages: SearchPage[] = [];
   let after: SearchKey | null = null;
-  for (;;) {
+  while (pages.length < MAX_PAGES) {
     const page = await searchActiveTemplates(q, limit, after);
     pages.push(page);
     if (!page.hasMore) return pages;
@@ -101,7 +106,11 @@ async function searchPages(q: string, limit: number): Promise<SearchPage[]> {
     if (!next.ok) throw new Error(next.error.message);
     after = next.value;
   }
+  throw new Error(`search "${q}" didn't end within ${MAX_PAGES} pages`);
 }
+
+/** Names in the search's order (code points, not the machine's locale). */
+const byCodePoint = (names: string[]) => [...names].sort(compareCodePoints);
 
 describe("searchActiveTemplates", () => {
   it("an empty query lists every template with an Active version, by name", async () => {
@@ -112,7 +121,7 @@ describe("searchActiveTemplates", () => {
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(eq(versions.state, "active"));
     expect(results.map((r) => r.id).sort()).toEqual(active.map((a) => a.id).sort());
-    expect(results.map((r) => r.name)).toEqual([...results.map((r) => r.name)].sort((a, b) => a.localeCompare(b)));
+    expect(results.map((r) => r.name)).toEqual(byCodePoint(results.map((r) => r.name)));
     expect(results.map((r) => r.id)).not.toContain(id("annual-fee-waiver"));
   });
 
@@ -154,9 +163,25 @@ describe("searchActiveTemplates", () => {
   it("names that start with the query come first, then the rest by name; limit cuts the list", async () => {
     const names = (await search("rate")).map((r) => r.name);
     expect(names[0]).toBe("Rate Change Notice");
-    expect(names.slice(1)).toEqual([...names.slice(1)].sort((a, b) => a.localeCompare(b)));
+    expect(names.slice(1)).toEqual(byCodePoint(names.slice(1)));
     expect(names).toEqual(expect.arrayContaining(["High-Yield Savings — Rate Disclosure", "Statement Insert — Rate Change"]));
     expect(await search("rate", 1)).toHaveLength(1);
+  });
+
+  it("orders names by code point, not by the server's locale: a lower-case name comes after every capital", async () => {
+    const [template] = await db.select({ id: templates.id, name: templates.name }).from(templates).where(eq(templates.id, id("cash-back")));
+    // "cash Back…" sorts after "Statement…" by code point; any locale collation puts it among the C's.
+    await db.update(templates).set({ name: `c${template!.name.slice(1)}` }).where(eq(templates.id, template!.id));
+    try {
+      const names = (await search("", 50)).map((r) => r.name);
+      expect(names.at(-1)).toBe(`c${template!.name.slice(1)}`);
+      expect(names).toEqual(byCodePoint(names));
+      for (const limit of [1, 2, 3]) {
+        expect((await searchPages("", limit)).flatMap((p) => p.results.map((r) => r.name)), `by ${limit}`).toEqual(names);
+      }
+    } finally {
+      await db.update(templates).set({ name: template!.name }).where(eq(templates.id, template!.id));
+    }
   });
 
   it("pages through every result in order, each page at most limit long, no overlap", async () => {
@@ -338,9 +363,12 @@ describe("JSON Schema against the seed", () => {
 
 // ── Notices ──────────────────────────────────────────────────────────────────
 
+/** The seed's `seeded_at`: the epoch every notice cursor here carries. */
+const EPOCH = BASE.toISOString();
+
 /** The seq a notice cursor continues after (the test's own cursors always read). */
 function seqOf(page: NoticePage, list: { consumerId: string; templateId: string | null }): number {
-  const read = readNoticeCursor(page.nextCursor, list);
+  const read = readNoticeCursor(page.nextCursor, { ...list, epoch: EPOCH });
   if (!read.ok) throw new Error(read.error.message);
   return read.value;
 }
@@ -349,19 +377,21 @@ function seqOf(page: NoticePage, list: { consumerId: string; templateId: string 
 async function pollAll(consumerId: string, limit: number, after = 0, templateId?: string) {
   const list = { consumerId, templateId: templateId ?? null };
   const pages: NoticePage[] = [];
-  for (;;) {
+  while (pages.length < MAX_PAGES) {
     const page = await listNotices(consumerId, { after, templateId, limit });
     pages.push(page);
     after = seqOf(page, list);
     if (!page.hasMore) return { pages, notices: pages.flatMap((p) => p.notices), after };
   }
+  throw new Error(`notices didn't end within ${MAX_PAGES} pages`);
 }
 
 /** Coral's notice rows in the order they were written. */
 const coralRows = () =>
   db.select().from(consumerNotices).where(eq(consumerNotices.consumerId, "coral")).orderBy(asc(consumerNotices.seq));
 
-const highestSeq = async () => (await db.select({ seq: consumerNotices.seq }).from(consumerNotices)).reduce((m, r) => Math.max(m, r.seq), 0);
+/** Takes `count` notice numbers the way writeEffects does, and returns the first. */
+const takeSeqs = (count: number) => db.transaction((tx) => takeNoticeSeqs(tx, count));
 
 /** A live-shaped revoke notice for Coral, written at `at` with number `seq`. */
 const revokeRow = (noticeId: string, seq: number, at: Date) => ({
@@ -430,7 +460,7 @@ describe("listNotices", () => {
     expect(seqOf(empty, { consumerId: "coral", templateId: null })).toBe(end);
 
     const at = new Date(BASE.getTime() + 90_000);
-    const first = (await highestSeq()) + 1;
+    const first = await takeSeqs(2);
     await db.insert(consumerNotices).values([revokeRow("cn_poll_a", first, at), revokeRow("cn_poll_b", first + 1, at)]);
     try {
       const next = await pollAll("coral", 50, end);
@@ -446,7 +476,7 @@ describe("listNotices", () => {
     // order them, `seq` does.
     const { after: end } = await pollAll("coral", 50);
     const at = new Date(BASE.getTime() + 120_000);
-    const first = (await highestSeq()) + 1;
+    const first = await takeSeqs(5);
     const batch = ["cn_same_z", "cn_same_a", "cn_same_m", "cn_same_b", "cn_same_y"];
     await db.insert(consumerNotices).values(batch.map((noticeId, i) => revokeRow(noticeId, first + i, at)));
     try {
@@ -467,15 +497,30 @@ describe("listNotices", () => {
     // Two actions read the clock, then commit in the other order. A cursor on time would skip the
     // second commit; seq is the commit order.
     const { after: end } = await pollAll("coral", 50);
-    const first = (await highestSeq()) + 1;
-    await db.insert(consumerNotices).values(revokeRow("cn_clock_late", first, new Date(BASE.getTime() + 150_000)));
+    await db.insert(consumerNotices).values(revokeRow("cn_clock_late", await takeSeqs(1), new Date(BASE.getTime() + 150_000)));
     try {
       const seen = await pollAll("coral", 50, end);
       expect(seen.notices.map((n) => n.id)).toEqual(["cn_clock_late"]);
-      await db.insert(consumerNotices).values(revokeRow("cn_clock_early", first + 1, new Date(BASE.getTime() + 149_000)));
+      await db.insert(consumerNotices).values(revokeRow("cn_clock_early", await takeSeqs(1), new Date(BASE.getTime() + 149_000)));
       expect((await pollAll("coral", 50, seen.after)).notices.map((n) => n.id)).toEqual(["cn_clock_early"]);
     } finally {
       await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_clock_late", "cn_clock_early"]));
+    }
+  });
+
+  it("deleting the newest notices never hands their numbers out again: a consumer past them still gets the next one", async () => {
+    const at = new Date(BASE.getTime() + 160_000);
+    await db.insert(consumerNotices).values([revokeRow("cn_gone_a", await takeSeqs(1), at), revokeRow("cn_gone_b", await takeSeqs(1), at)]);
+    // The consumer reads both, then a cleanup (as the e2e helpers do) deletes them.
+    const { after: past } = await pollAll("coral", 50);
+    await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_gone_a", "cn_gone_b"]));
+    const next = await takeSeqs(1);
+    expect(next).toBe(past + 1);
+    await db.insert(consumerNotices).values(revokeRow("cn_after_cleanup", next, at));
+    try {
+      expect((await pollAll("coral", 50, past)).notices.map((n) => n.id)).toEqual(["cn_after_cleanup"]);
+    } finally {
+      await db.delete(consumerNotices).where(eq(consumerNotices.id, "cn_after_cleanup"));
     }
   });
 
@@ -484,9 +529,20 @@ describe("listNotices", () => {
     const { pages, notices } = await pollAll("coral", 1, 0, templateId);
     expect(notices.map((n) => n.kind)).toEqual(["new_version", "revoked"]);
     expect(pages).toHaveLength(2);
-    const list = { consumerId: "coral", templateId };
+    const list = { consumerId: "coral", templateId, epoch: EPOCH };
     expect(readNoticeCursor(pages[0]!.nextCursor, list).ok).toBe(true);
-    expect(readNoticeCursor(pages[0]!.nextCursor, { consumerId: "coral", templateId: null }).ok).toBe(false);
+    expect(readNoticeCursor(pages[0]!.nextCursor, { ...list, templateId: null }).ok).toBe(false);
+  });
+
+  it("cursors carry the outbox's epoch, the seed's seeded_at: one from before a reset is refused", async () => {
+    expect(await noticeEpoch()).toBe(EPOCH);
+    const { nextCursor } = await listNotices("coral", { limit: 1 });
+    const list = { consumerId: "coral", templateId: null };
+    expect(readNoticeCursor(nextCursor, { ...list, epoch: EPOCH })).toEqual({ ok: true, value: expect.any(Number) });
+    expect(readNoticeCursor(nextCursor, { ...list, epoch: "2026-12-01T00:00:00.000Z" })).toEqual({
+      ok: false,
+      error: { code: "bad_request", message: "after is from before the notices were reset. Start again without after." },
+    });
   });
 
   it("a live-shaped row reads the same way", async () => {
@@ -494,7 +550,7 @@ describe("listNotices", () => {
     const { after: end } = await pollAll("coral", 50);
     await db.insert(consumerNotices).values({
       id: "cn_live_test",
-      seq: (await highestSeq()) + 1,
+      seq: await takeSeqs(1),
       consumerId: "coral",
       templateId: id("cash-back"),
       versionId: "v_test",

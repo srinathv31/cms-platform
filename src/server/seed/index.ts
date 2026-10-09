@@ -89,7 +89,10 @@ export async function seedDatabase(db: Db, opts: { base: Date }): Promise<SeedRe
   ctx.sink.settings.push(
     { key: "clock_offset_days", value: 0 },
     { key: "seed_version", value: SEED_VERSION },
+    // The notice cursor's epoch: a reset writes a new one, so cursors from before it are refused.
     { key: "seeded_at", value: opts.base.toISOString() },
+    // The last consumer_notices.seq handed out (numberNotices gives 1…n); takeNoticeSeqs carries on from it.
+    { key: "consumer_notice_seq", value: ctx.sink.consumerNotices.length },
   );
 
   await insertAll(db, ctx.sink);
