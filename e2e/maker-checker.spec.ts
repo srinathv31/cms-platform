@@ -26,8 +26,8 @@ import {
 //   1. Maya makes a template.
 //   2. Priya adds a sentence to Maya's draft; it autosaves.
 //   3. Maya submits it as v1.
-//   4. Priya opens v1: Approve and Request changes are disabled, the reason says why, and v1 doesn't wait
-//      on her in the queue.
+//   4. Priya opens v1: Approve and Request changes are disabled, the reason says why (Tab reaches both, and
+//      each is described by it), and v1 doesn't wait on her in the queue.
 //   5. Jordan, who wrote none of it, may decide it.
 //
 // Self-contained: afterAll removes the template and everything it wrote.
@@ -153,6 +153,20 @@ test("someone who edited a draft another author submitted can't approve it or se
     await expect(requestButton(page)).toBeDisabled();
     await expect(decision(page).getByText(WROTE)).toBeVisible();
     await expect(approveButton(page)).toHaveAccessibleDescription(WROTE);
+
+    // From the keyboard (I13): the blocked pair stays in the Tab order, and each announces why. A click on
+    // the stepper's stage starts keyboard navigation there; Approve is the next stop.
+    await decision(page).locator('[data-step="current"]').click();
+    await page.keyboard.press("Tab");
+    await expect(approveButton(page), "Tab reaches the blocked Approve").toBeFocused();
+    await expect(approveButton(page)).toHaveAttribute("aria-describedby", "decision-blocked");
+    await expect(page.locator("#decision-blocked")).toHaveText(WROTE);
+    await expect(page.locator('[data-slot="tooltip-content"]').filter({ visible: true }), "and shows why").toHaveText(WROTE);
+    await page.keyboard.press("Tab");
+    await expect(requestButton(page)).toBeFocused();
+    await expect(requestButton(page)).toHaveAccessibleDescription(WROTE);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog"), "pressing it opens nothing").toHaveCount(0);
 
     await page.goto(`/${TEAM}/review`);
     await expect(page.getByRole("heading", { level: 1, name: "Review" })).toBeVisible();

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { REASONS } from "@/domain/permissions";
 import type { StepView } from "@/domain/review-types";
 import type { DecisionAccess } from "./decision-model";
 import { DecisionBar } from "./decision-bar";
@@ -9,6 +10,20 @@ import { BLOCKED_ID, DecisionRail } from "./decision-rail";
 
 const STEPS: StepView[] = [{ position: 0, name: "Team approver", status: "current" }];
 const NOW = "2026-10-05T02:29:00.000Z";
+
+// Tests that need focus or ids put their markup in the document; each starts from an empty one.
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+/** The text of the elements an element's `aria-describedby` names (it must be in the document). */
+function description(el: Element): string {
+  return (el.getAttribute("aria-describedby") ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((id) => document.getElementById(id)?.textContent ?? "")
+    .join(" ");
+}
 
 function rail(access: DecisionAccess, line: string | null = null) {
   const host = document.createElement("div");
@@ -47,15 +62,48 @@ describe("DecisionRail: one geometry for every viewer", () => {
     expect(step).toContain("Waiting for a decision");
   });
 
-  it("the author gets them dim, and the reason stands where the stage says it is waiting, described by the buttons", () => {
-    const host = rail({ kind: "blocked", reason: "You submitted this version." });
-    const { region, buttons, step } = rows(host);
-    expect(region.className).toContain("h-8");
-    expect(buttons.map((b) => b.disabled)).toEqual([true, true]);
-    expect(step).toContain("You submitted this version.");
-    expect(step).not.toContain("Waiting for a decision");
-    for (const b of buttons) expect(b.getAttribute("aria-describedby")).toBe(BLOCKED_ID);
-    expect(host.querySelector(`#${BLOCKED_ID}`)?.textContent).toBe("You submitted this version.");
+  it.each([REASONS.ownVersion, REASONS.wroteVersion, "Waiting on Legal reviewer."])(
+    "blocked (%s): both are greyed but take focus, and the reason on the stage line describes them",
+    (reason) => {
+      const host = rail({ kind: "blocked", reason });
+      document.body.append(host);
+      const { region, buttons, step } = rows(host);
+      expect(region.className).toContain("h-8");
+      expect(buttons.map((b) => b.textContent)).toEqual(["Approve", "Request changes"]);
+      for (const b of buttons) {
+        // Marked disabled for assistive technology and for styling, never with the native attribute.
+        expect([b.disabled, b.getAttribute("aria-disabled"), b.hasAttribute("data-disabled")]).toEqual([false, "true", true]);
+        b.focus();
+        expect(document.activeElement, `${b.textContent} takes focus`).toBe(b);
+        expect(b.getAttribute("aria-describedby")).toBe(BLOCKED_ID);
+        expect(description(b)).toBe(reason);
+      }
+      expect(step).toContain(reason);
+      expect(step).not.toContain("Waiting for a decision");
+    },
+  );
+
+  it("blocked with no stage waiting: each button carries the reason itself", () => {
+    const host = document.createElement("div");
+    host.innerHTML = renderToStaticMarkup(
+      <DecisionRail
+        steps={[{ position: 0, name: "Team approver", status: "done" }]}
+        nowIso={NOW}
+        access={{ kind: "blocked", reason: REASONS.ownVersion }}
+        line={null}
+        onApprove={() => {}}
+        onRequest={() => {}}
+        approveRef={createRef()}
+        requestRef={createRef()}
+        regionRef={createRef()}
+      >
+        <p>body</p>
+      </DecisionRail>,
+    );
+    document.body.append(host);
+    const buttons = [...host.querySelectorAll("[data-rail-head] button")] as HTMLButtonElement[];
+    expect(host.querySelector(`#${BLOCKED_ID}`)).toBeNull();
+    for (const b of buttons) expect(description(b)).toBe(REASONS.ownVersion);
   });
 
   it("someone who isn't an approver gets no buttons, and the row stays", () => {
@@ -100,10 +148,20 @@ describe("DecisionBar (the stacked layout)", () => {
     ]);
   });
 
-  it("dims them for the author, with the reason beside them", () => {
-    const host = bar({ kind: "blocked", reason: "You submitted this version." });
-    expect([...host.querySelectorAll("button")].map((b) => b.disabled)).toEqual([true, true]);
-    expect(host.textContent).toContain("You submitted this version.");
+  it("greys them for the author but keeps them focusable, described by the reason beside them", () => {
+    const host = bar({ kind: "blocked", reason: REASONS.wroteVersion });
+    document.body.append(host);
+    const buttons = [...host.querySelectorAll("button")];
+    expect(buttons.map((b) => [b.textContent, b.disabled, b.getAttribute("aria-disabled")])).toEqual([
+      ["Approve", false, "true"],
+      ["Request changes", false, "true"],
+    ]);
+    for (const b of buttons) {
+      b.focus();
+      expect(document.activeElement).toBe(b);
+      expect(description(b)).toBe(REASONS.wroteVersion);
+    }
+    expect(host.textContent).toContain(REASONS.wroteVersion);
   });
 
   it("is absent for someone who isn't an approver, and for a version that was decided before", () => {

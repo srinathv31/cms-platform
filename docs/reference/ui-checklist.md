@@ -13,7 +13,7 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
   - Chips are `rounded-md`.
 - **One black primary button per screen.** Secondary actions are outline. Tertiary actions are ghost.
 - **Disabled means unusable.** A control that would act on stale or missing data is disabled (e.g. Download while an error shows), not silently acting on old data.
-- **Disabled, not hidden.** A control that's unavailable right now stays in place, visibly greyed, with a tooltip saying why ("Nothing to undo"). Don't hide one of a pair (undo and redo). Base UI's `focusableWhenDisabled` sets `data-disabled`, not the native `disabled` attribute, so style it with `data-disabled:` variants; shadcn's `disabled:` classes won't match. Check the greyed state in a screenshot.
+- **Disabled, not hidden.** A control that's unavailable right now stays in place, visibly greyed, with a tooltip saying why ("Nothing to undo"). Don't hide one of a pair (undo and redo). Base UI's `focusableWhenDisabled` sets `data-disabled`, not the native `disabled` attribute, so style it with `data-disabled:` variants; shadcn's `disabled:` classes won't match. Never the native `disabled` on a blocked action: Tab skips it, and its reason with it. `BlockedButton` (`src/components/primitives/blocked-button.tsx`) does all of this. Check the greyed state in a screenshot.
 - **Buttons don't scroll the page.** An action started from a button doesn't scroll to its effect (the undo and redo buttons use `undoNoScroll` and `redoNoScroll`). Keyboard shortcuts may.
 
 ## Layout
@@ -36,6 +36,7 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
 - **Esc closes the topmost thing only** (menu, then popover, then dialog, then mode).
 - **Initial focus.** Base UI dialogs and popovers set initial focus a frame after opening. Choose the initial focus deliberately: the first field, or the safe action in a destructive dialog.
 - Every control is reachable by Tab and has a visible focus ring.
+- **No chart value is hover-only.** A chart's marks are one Tab stop with arrow keys between them, each showing its tooltip on focus; a chart whose values aren't printed is followed by an sr-only table of them; series differ by hue, not lightness (`src/components/usage/charts.tsx`).
 
 ## Network and console
 - **Zero console errors in normal use.** Chrome logs every 4xx/5xx fetch as a console error, and the e2e console fixture fails on it. Validate on the client with the same domain function the server uses before sending, and don't send requests you know will be refused.

@@ -2,6 +2,7 @@
 
 import type { ReactNode, Ref } from "react";
 import { Check, CornerUpLeft } from "lucide-react";
+import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/components/versions/format";
 import type { StepView } from "@/domain/review-types";
@@ -16,8 +17,8 @@ import { SectionLabel } from "./rail-sections";
 // comments.
 //
 // The pinned head is one height for everyone (151px with one stage): the decision row is always
-// there, 32px, whatever stands in it: the two buttons (theirs to press, or dim when the version is
-// their own), a line once it is decided, or nothing when the viewer isn't an approver. So the content
+// there, 32px, whatever stands in it: the two buttons (theirs to press, or greyed when they can't
+// decide it), a line once it is decided, or nothing when the viewer isn't an approver. So the content
 // below never moves when the persona changes, and the skeleton has the same height.
 
 // ── Approval chain ───────────────────────────────────────────────
@@ -29,7 +30,7 @@ const STEP_ICON: Record<StepView["status"], string> = {
   returned: "bg-status-changes text-status-changes-text",
 };
 
-/** The id of the line that says why Approve and Request changes are dim. */
+/** The id of the line that says why Approve and Request changes are blocked: it describes them. */
 export const BLOCKED_ID = "decision-blocked";
 
 function StepRow({
@@ -107,7 +108,8 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
  * The decision row, under the stepper: 32px for everyone.
  * - Open: Approve and Request changes.
  * - Blocked (the viewer wrote this version, or is an approver the stage doesn't wait on): the same two,
- *   dim. The reason is the current stage's own line above them (the stepper), so the row has nothing to add.
+ *   greyed but still focusable, so a keyboard user reaches them. The reason is the current stage's own
+ *   line above them (the stepper), which describes both; each also shows it as a tooltip.
  * - Hidden (the viewer isn't an approver on the team and wrote none of it): the row stays, empty, so the
  *   head keeps its height.
  * - Decided, or not in review: a line (what was decided, or the version's state) stands where the buttons
@@ -117,6 +119,7 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
 function Decision({
   access,
   line,
+  describedBy,
   onApprove,
   onRequest,
   approveRef,
@@ -126,6 +129,8 @@ function Decision({
   access: DecisionAccess;
   /** Replaces the buttons. */
   line: string | null;
+  /** The id of the stepper's line that gives a blocked pair its reason, when that line is on screen. */
+  describedBy: string | undefined;
   onApprove: () => void;
   onRequest: () => void;
   approveRef: Ref<HTMLButtonElement>;
@@ -133,7 +138,6 @@ function Decision({
   /** Where focus goes when the button that opened a dialog is gone (the decision was made). */
   regionRef: Ref<HTMLDivElement>;
 }) {
-  const open = access.kind === "open";
   return (
     <div
       ref={regionRef}
@@ -145,29 +149,25 @@ function Decision({
     >
       {line ? (
         line
-      ) : access.kind === "hidden" ? null : (
+      ) : access.kind === "open" ? (
         <div className="flex w-full gap-2">
-          <Button
-            ref={approveRef}
-            className="flex-1"
-            disabled={!open}
-            aria-describedby={access.kind === "blocked" ? BLOCKED_ID : undefined}
-            onClick={onApprove}
-          >
+          <Button ref={approveRef} className="flex-1" onClick={onApprove}>
             Approve
           </Button>
-          <Button
-            ref={requestRef}
-            variant="outline"
-            className="flex-1 bg-surface"
-            disabled={!open}
-            aria-describedby={access.kind === "blocked" ? BLOCKED_ID : undefined}
-            onClick={onRequest}
-          >
+          <Button ref={requestRef} variant="outline" className="flex-1 bg-surface" onClick={onRequest}>
             Request changes
           </Button>
         </div>
-      )}
+      ) : access.kind === "blocked" ? (
+        <div className="flex w-full gap-2">
+          <BlockedButton ref={approveRef} variant="default" className="flex-1" reason={access.reason} describedBy={describedBy}>
+            Approve
+          </BlockedButton>
+          <BlockedButton ref={requestRef} className="flex-1 bg-surface" reason={access.reason} describedBy={describedBy}>
+            Request changes
+          </BlockedButton>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -198,13 +198,16 @@ export function DecisionRail({
   /** The scrolling part: the note, the contract, the comments. */
   children: ReactNode;
 }) {
+  // A blocked pair's reason stands on the stage the version waits at, and the two buttons point to it.
+  const reason = access.kind === "blocked" && line === null && steps.some((s) => s.status === "current") ? access.reason : null;
   return (
     <aside aria-label="Decision" data-slot="rail" className={RV.rail}>
       <div data-rail-head="" className={RV.railHead}>
-        <Approval steps={steps} now={new Date(nowIso)} blocked={access.kind === "blocked" && line === null ? access.reason : null} />
+        <Approval steps={steps} now={new Date(nowIso)} blocked={reason} />
         <Decision
           access={access}
           line={line}
+          describedBy={reason === null ? undefined : BLOCKED_ID}
           onApprove={onApprove}
           onRequest={onRequest}
           approveRef={approveRef}

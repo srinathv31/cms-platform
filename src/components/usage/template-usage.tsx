@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
 import { renderCount } from "@/components/versions/format";
-import { Legend, StackedBars, type StackSeries } from "./charts";
+import { Legend, SERIES, StackedBars, type StackSeries } from "./charts";
 import { ConsumersTable } from "./consumers-table";
 import { formatDayShort, formatLastRender } from "./format";
 import { Panel, PanelHead, TrendPill } from "./panel";
@@ -35,19 +35,14 @@ export const USAGE_CELL = cn(
 );
 export const USAGE_COLUMNS = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]";
 
-// Newest version darkest; older ones step lighter. Written out so the class scanner sees them.
-const VERSION_SERIES: Pick<StackSeries, "fill" | "bg">[] = [
-  { fill: "fill-brand-4", bg: "bg-brand-4" },
-  { fill: "fill-brand-3", bg: "bg-brand-3" },
-  { fill: "fill-brand-2", bg: "bg-brand-2" },
-  { fill: "fill-brand-1", bg: "bg-brand-1" },
-];
+// The newest version takes the first series hue, the one before it the second, and so on; past the
+// fourth, older versions are taupe.
 const OLDEST = { fill: "fill-heat-empty", bg: "bg-heat-empty" };
 
 function versionSeries(versions: number[]): StackSeries[] {
   return versions.map((v, i) => {
     const age = versions.length - 1 - i;
-    return { label: `v${v}`, ...(VERSION_SERIES[age] ?? OLDEST) };
+    return { label: `v${v}`, ...(SERIES[age] ?? OLDEST) };
   });
 }
 
@@ -113,6 +108,7 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
           <div className="mt-4">
             <StackedBars
               label="Renders by version, by week"
+              periodHeader="Week of"
               height={TEMPLATE_BARS_HEIGHT}
               series={series}
               data={d.weekly.map((w, i) => ({

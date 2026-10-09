@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 6 | 26 | 12 | 44 |
+| Open | 0 | 6 | 25 | 12 | 43 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 16 | 9 | 2 | 28 |
+| Fixed | 1 | 16 | 10 | 2 | 29 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -423,7 +423,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I13 · Medium: Blocked decisions and charts aren't accessible
 
-- **Status:** Open
+- **Status:** Fixed. Blocked Approve and Request changes (rail and stacked bar) are the new `BlockedButton` primitive, greyed but focusable with the reason as tooltip and description; every chart with unprinted values has an sr-only table, its marks are one Tab stop with arrow keys and tooltips on focus, and series use four validated hues ([decision 0014](decisions/0014-chart-values-never-hover-only.md)).
 - **Where:** `src/components/review/decision-rail.tsx` line 152; `src/components/usage/charts.tsx` line 332
 - **What happens:** Blocked Approve and Request changes use native `disabled`, so the reason can't be reached by keyboard, against the repo's own `aria-disabled` convention. Stacked bars and the rate line expose only a short label; series differ by lightness of one hue; values are hover-only.
 - **Fix:** `focusableWhenDisabled` as elsewhere; `sr-only` tables for every chart, like the heatmap has.
