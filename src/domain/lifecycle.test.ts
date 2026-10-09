@@ -15,6 +15,7 @@ import {
   isAfterToday,
   planDraftStart,
   requestChanges,
+  reviewBaseline,
   revokePending,
   setSunset,
   startRevoke,
@@ -363,6 +364,58 @@ describe("contractBaseline", () => {
     expect(contractBaseline([v("d", "draft", null)], NOW)).toBeNull();
     expect(contractBaseline([v("v1", "superseded", 1, passed), v("v2", "revoked", 2), v("d", "draft", null)], NOW)).toBeNull();
     expect(contractBaseline([v("v1", "changes_requested", 1), v("v2", "in_review", 2)], NOW)).toBeNull();
+  });
+});
+
+describe("reviewBaseline", () => {
+  const DAY = 86_400_000;
+  const v = (id: string, state: VersionState, number: number | null, basedOnVersionId: string | null = null, sunsetAt: Date | null = null) => ({
+    id,
+    state,
+    number,
+    sunsetAt,
+    basedOnVersionId,
+  });
+  const later = new Date(NOW.getTime() + 30 * DAY);
+  const passed = new Date(NOW.getTime() - DAY);
+
+  it("is the Active version when there is one, whatever the version was based on; none on the Active version itself", () => {
+    const list = [v("v1", "revoked", 1), v("v2", "active", 2, "v1"), v("v3", "in_review", 3, "v1")];
+    expect(reviewBaseline(list, "v3", NOW)?.id).toBe("v2");
+    expect(reviewBaseline(list, "v1", NOW)?.id, "an older record is compared with the Active version, as before").toBe("v2");
+    expect(reviewBaseline(list, "v2", NOW)).toBeNull();
+  });
+
+  it("after a revoke, is the revoked version the correction started from, not the newest that still renders", () => {
+    const list = [v("v1", "superseded", 1, null, later), v("v2", "revoked", 2, "v1"), v("v3", "in_review", 3, "v2")];
+    expect(reviewBaseline(list, "v3", NOW)).toMatchObject({ id: "v2", state: "revoked", number: 2 });
+    // The same when the Active version is revoked while its correction is in review.
+    expect(reviewBaseline([v("v1", "revoked", 1), v("v2", "in_review", 2, "v1")], "v2", NOW)?.id).toBe("v1");
+  });
+
+  it("walks back through change-request rounds to the revoked version they all correct", () => {
+    const list = [
+      v("v2", "revoked", 2),
+      v("v3", "changes_requested", 3, "v2"),
+      v("v4", "changes_requested", 4, "v3"),
+      v("v5", "in_review", 5, "v4"),
+    ];
+    expect(reviewBaseline(list, "v5", NOW)?.id).toBe("v2");
+  });
+
+  it("falls back to the newest version that still renders when the based-on version is missing", () => {
+    const superseded = v("v1", "superseded", 1, null, later);
+    expect(reviewBaseline([superseded, v("v2", "revoked", 2), v("v3", "in_review", 3)], "v3", NOW)?.id, "no based-on version").toBe("v1");
+    expect(reviewBaseline([superseded, v("v3", "in_review", 3, "v_gone")], "v3", NOW)?.id, "a based-on row that's gone").toBe("v1");
+    expect(reviewBaseline([superseded, v("v3", "in_review", 3, "v3")], "v3", NOW)?.id, "never the version itself").toBe("v1");
+  });
+
+  it("is null for a first version, a change-request round of one, or when nothing renders", () => {
+    expect(reviewBaseline([v("v1", "in_review", 1)], "v1", NOW)).toBeNull();
+    expect(reviewBaseline([v("v1", "changes_requested", 1), v("v2", "in_review", 2, "v1")], "v2", NOW), "nothing was ever released").toBeNull();
+    expect(reviewBaseline([v("v1", "superseded", 1, null, passed), v("v2", "revoked", 2), v("v3", "in_review", 3)], "v3", NOW)).toBeNull();
+    // The version is itself the newest that still renders: nothing to compare it with.
+    expect(reviewBaseline([v("v1", "superseded", 1, null, later), v("v2", "revoked", 2)], "v1", NOW)).toBeNull();
   });
 });
 

@@ -45,5 +45,7 @@ when nothing is Active.
 - A revoked Active version no longer freezes its template; the fix goes through review like any other version.
 - The review screen's redline and its "vs vN" label still compare with the Active version only, so a correction
   after a revoke shows no redline. Its contract changes come from submit, against the baseline above.
+  [Decision 0031](0031-a-correction-is-redlined-against-the-revoked-version.md) later had the redline compare
+  with the revoked version the correction started from.
 - The integration panel's error table no longer assumes an Active version: a `version_sunset` or `version_revoked`
   consumer moves to the Active version, or waits for a new one if none is Active.

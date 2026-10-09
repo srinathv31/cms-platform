@@ -146,7 +146,8 @@ describe("getReviewScreen", () => {
       submittedAt: expect.stringMatching(ISO),
       contractLines: ["v3 adds required `annual_fee` (Currency)."],
     });
-    expect(screen.baseline).toMatchObject({ number: 2 });
+    expect(screen.baseline).toMatchObject({ number: 2, state: "active" });
+    expect(screen.previousNumber, "approving v3 replaces the Active v2").toBe(2);
     expect(screen.liveName).toBe("Cash Back Welcome Bonus — Terms");
     expect(screen.steps).toEqual([{ position: 0, name: "Team approver", status: "current" }]);
     expect(screen.can).toEqual({ approve: { ok: true }, requestChanges: { ok: true }, comment: { ok: true } });
@@ -176,6 +177,7 @@ describe("getReviewScreen", () => {
     as("jordan");
     const active = await getReviewScreen("coral-offers", ids["cash-back"]!, 2);
     expect(active.baseline).toBeNull(); // the Active version is this one
+    expect(active.previousNumber).toBeNull();
     expect(active.can.approve).toEqual({ ok: false, ...REFUSALS.notInReview });
     // A decided version is a record: nobody comments on it, and the screen says why.
     expect(active.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
@@ -236,13 +238,61 @@ describe("getReviewScreen", () => {
     await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
     try {
       const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
-      expect(screen.baseline, "nothing is Active: no redline").toBeNull();
       expect(screen.liveName, "v1 still renders").toBe("Cash Back Welcome Bonus — 2025 Terms");
     } finally {
       await db.update(versions).set({ state: v2.state, revoke: v2.revoke }).where(versionOf(2));
       await db.update(versions).set({ name: v1.name }).where(versionOf(1));
     }
     expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 2)).liveName, "v2 is the live one").toBeNull();
+  });
+
+  describe("the redline's baseline when nothing is Active", () => {
+    // Cash Back: v1 Superseded (it still renders), v2 Active, v3 In review based on v2. Each test revokes v2.
+    const versionOf = (number: number) => and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, number));
+    const revoke = { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() };
+
+    async function withV2Revoked(change: () => Promise<unknown>, check: () => Promise<void>) {
+      const [v1, v2, v3] = await Promise.all([1, 2, 3].map((n) => db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!)));
+      await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
+      try {
+        await change();
+        await check();
+      } finally {
+        await db.update(versions).set({ state: v1.state, sunsetAt: v1.sunsetAt }).where(versionOf(1));
+        await db.update(versions).set({ state: v2.state, revoke: v2.revoke }).where(versionOf(2));
+        await db.update(versions).set({ basedOnVersionId: v3.basedOnVersionId }).where(versionOf(3));
+      }
+    }
+
+    it("is the revoked version the correction started from, with its state; Approve still replaces nothing", async () => {
+      as("jordan");
+      const v2 = (await db.query.versions.findFirst({ where: versionOf(2) }))!;
+      await withV2Revoked(
+        async () => {},
+        async () => {
+          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+          expect(screen.baseline).toEqual({ id: v2.id, number: 2, state: "revoked", body: v2.body, variables: v2.variables });
+          expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
+        },
+      );
+    });
+
+    it("falls back to the newest version that still renders when the based-on version is missing, then to none", async () => {
+      as("jordan");
+      const v1 = (await db.query.versions.findFirst({ where: versionOf(1) }))!;
+      await withV2Revoked(
+        () => db.update(versions).set({ basedOnVersionId: null }).where(versionOf(3)),
+        async () => {
+          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+          expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
+          expect(screen.previousNumber).toBeNull();
+
+          // v1's sunset passes too: nothing renders, so nothing to compare with, as for a first version.
+          await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - 1000) }).where(versionOf(1));
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3)).baseline).toBeNull();
+        },
+      );
+    });
   });
 });
 

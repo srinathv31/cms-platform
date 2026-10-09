@@ -28,9 +28,9 @@
 //     inserted, when the content itself didn't change, such as a level change).
 //
 // Decisions:
-//   - No base (nothing Active yet): every block is "unchanged" and the counts are zero. Calling the
-//     whole document "added" would paint a first version solid green and count every block as a
-//     change; the UI knows the base is null and says there is nothing to compare with yet.
+//   - No base (a first version, nothing to compare with): every block is "unchanged" and the counts
+//     are zero. Calling the whole document "added" would paint a first version solid green and count
+//     every block as a change; the UI knows the base is null and says there is nothing to compare with yet.
 //   - A moved block whose content changed too is "changed", with `movedFrom`. Counts tally statuses,
 //     so it counts once, as changed (the counts always add up to changesOnly(doc).length).
 //   - Trailing empty paragraphs (the editor's trailing line) are left out on both sides, as the

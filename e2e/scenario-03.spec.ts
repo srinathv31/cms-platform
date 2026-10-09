@@ -40,8 +40,8 @@ import {
 //      Variables" with the change request and Jordan's comment, which is anchored to its block (marker in
 //      the gutter, highlight in the text). She fixes the sentence, resolves Jordan's thread and resubmits:
 //      v2 is In review, and resubmitting answers the change request (it resolves as hers, with an audit row).
-//   4. Jordan opens v2 from the queue. There is no Active version to compare with, so the screen has no
-//      "Show changes". The rail has no open comment: the change request and Maya's resolved thread are
+//   4. Jordan opens v2 from the queue. Nothing was ever released to compare with (v1 was sent back), so the
+//      screen has no "Show changes". The rail has no open comment: the change request and Maya's resolved thread are
 //      both under "Resolved (2)". He approves: the dialog says v2 becomes Active (and has no sunset row,
 //      since there is no previous Active); the go-live moment plays; the header shows Active and the SHARE ring.
 //   5. The Activity tab tells the whole story (submitted twice, changes requested, commented, resolved,
@@ -712,7 +712,8 @@ test.describe("scenario 3: the review loop", () => {
       await expect(decision(page)).toContainText(NOTE_V2);
       await expect(documentEditor(page)).toContainText(FIX.trim());
 
-      // The Active version is what a version is compared with, and there is none: no switches at all.
+      // Nothing is Active and nothing was released before (v2's draft came from v1, sent back): nothing to
+      // compare with, as for a first version, so no switches at all.
       await expect(page.locator("[data-change-toggles]")).toHaveCount(0);
       await expect(page.getByRole("switch", { name: /Show changes/ })).toHaveCount(0);
       await expect(page.getByRole("switch", { name: /Changes only/ })).toHaveCount(0);

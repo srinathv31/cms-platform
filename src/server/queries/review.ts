@@ -6,7 +6,7 @@ import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
@@ -220,6 +220,18 @@ function decideOnScreen(check: PermissionResult, state: string): PermissionResul
   return state === "in_review" ? check : refuse(REFUSALS.notInReview);
 }
 
+/** The baseline's document, for the redline: only the chosen version's body is read. */
+async function loadBaseline(
+  base: { id: string; number: number | null; state: VersionState } | null,
+): Promise<ReviewScreenData["baseline"]> {
+  if (!base || base.number === null) return null;
+  const row = await db.query.versions.findFirst({
+    columns: { body: true, variables: true },
+    where: eq(versions.id, base.id),
+  });
+  return row ? { id: base.id, number: base.number, state: base.state, body: row.body, variables: row.variables } : null;
+}
+
 /** Everything `/{team}/review/{templateId}/{n}` shows. 404 when the version doesn't exist or isn't visible. */
 export const getReviewScreen = cache(
   async (spaceSlug: string, templateId: string, versionNumber: number): Promise<ReviewScreenData> => {
@@ -228,13 +240,16 @@ export const getReviewScreen = cache(
 
     const nowDate = await demoNow();
     const zone = await getBusinessZone();
-    const [active, others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
-      db.query.versions.findFirst({
-        columns: { id: true, number: true, body: true, variables: true },
-        where: and(eq(versions.templateId, template.id), eq(versions.state, "active")),
-      }),
+    const [others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
       db
-        .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt, name: versions.name })
+        .select({
+          id: versions.id,
+          number: versions.number,
+          state: versions.state,
+          sunsetAt: versions.sunsetAt,
+          name: versions.name,
+          basedOnVersionId: versions.basedOnVersionId,
+        })
         .from(versions)
         .where(eq(versions.templateId, template.id)),
       loadChain(db, template.contentTypeId),
@@ -263,6 +278,10 @@ export const getReviewScreen = cache(
     // What a rename is shown against: the name customers get today, the Active version's or, with none
     // Active, the newest that still renders (as submit's contract changes compare). Not this version's own.
     const live = contractBaseline(others, nowDate);
+    // What the redline compares with: the Active version or, after a revoke, the revoked text the draft
+    // corrects (decision 0031). The Approve dialog's previous version stays the Active one.
+    const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
+    const active = others.find((v) => v.state === "active");
 
     return {
       template: {
@@ -289,10 +308,8 @@ export const getReviewScreen = cache(
         contractChanges,
         contractLines: describeChanges(contractChanges, number),
       },
-      baseline:
-        active && active.id !== version.id && active.number !== null
-          ? { id: active.id, number: active.number, body: active.body, variables: active.variables }
-          : null,
+      baseline,
+      previousNumber: active && active.id !== version.id ? active.number : null,
       liveName: live && live.id !== version.id ? live.name : null,
       steps: stepperState(
         own,

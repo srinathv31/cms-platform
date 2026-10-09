@@ -287,7 +287,7 @@ export function ReviewWorkspace({
       />
     ) : baseline ? (
       <ChangeToggles
-        baselineNumber={baseline.number}
+        baseline={baseline}
         showChanges={showChanges}
         onShowChanges={setShowChanges}
         changesOnly={changesOnly}
@@ -419,7 +419,7 @@ export function ReviewWorkspace({
         onOpenChange={(open) => !open && setDialog(null)}
         templateId={template.id}
         versionNumber={version.number}
-        previousNumber={baseline?.number ?? null}
+        previousNumber={data.previousNumber}
         contractChanges={version.contractChanges}
         stage={stage}
         usage={consumerUsage}

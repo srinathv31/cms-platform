@@ -42,8 +42,10 @@ import {
 //      variable flags compare with v1, the newest version that still renders. She fixes the sentence.
 //   3. The submit dialog lists the contract change against v1 ("v3 makes `offer_end_date` optional."), not
 //      "No contract changes from v2". She submits v3.
-//   4. Jordan approves v3 on the review screen: it goes live over nothing (no sunset to set), v2 stays
-//      Revoked, v1 stays Superseded, and Coral gets the usual new-version notice. v3 renders with the fix.
+//   4. Jordan opens v3 on the review screen. Show changes redlines it against the revoked v2, the text it
+//      corrects ("vs v2 (revoked)", decision 0031): the fix is the one change. He approves v3: it goes live
+//      over nothing (no sunset to set), v2 stays Revoked, v1 stays Superseded, and Coral gets the usual
+//      new-version notice. v3 renders with the fix.
 //
 // Self-contained: the fixture template and every row that points at it are removed in afterAll.
 
@@ -235,7 +237,7 @@ test("after the Active version is revoked, an author corrects it from its conten
 
   // ── 4. Approve and render ──────────────────────────────────────────────────
 
-  await test.step("4.1 Jordan approves v3: it goes live over nothing, with no sunset to set", async () => {
+  await test.step("4.1 Jordan's review screen redlines v3 against the revoked v2: the fix is the one change", async () => {
     await asPersona(page, "jordan");
     await page.goto(`/${TEAM}/review/${templateId}/3`);
     await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
@@ -244,6 +246,28 @@ test("after the Active version is revoked, an author corrects it from its conten
     await expect(decision(page).getByRole("region", { name: "Contract changes" })).toContainText("v3 makes offer_end_date optional.");
     await expect(documentEditor(page)).toContainText(FIX.trim());
 
+    // Nothing is Active, so the redline is against the version the correction started from, not v1 (what still renders).
+    const toggles = page.locator("[data-change-toggles]").filter({ visible: true });
+    const showChanges = page.getByRole("switch", { name: "Show changes" });
+    await expect(toggles.locator('label[title="Show changes"] span[title]'), "one change: the fixed paragraph").toHaveText("1");
+    await click(showChanges);
+    await expect(showChanges).toBeChecked();
+    await expect(toggles.locator('[data-slot="baseline-label"]')).toHaveText("vs v2 (revoked)");
+    const redline = page.locator("[data-redline-document]").filter({ visible: true });
+    await expect(redline).toBeVisible();
+    const changed = redline.locator('[data-redline="changed"]');
+    await expect(changed).toHaveCount(1);
+    await expect(changed).toContainText(GREETING);
+    await expect(changed.locator("ins")).toContainText(FIX.trim());
+    await expect(changed.locator("del"), "the sentence was added to, nothing taken out").toHaveCount(0);
+    await expect(redline.locator('[data-redline="added"], [data-redline="removed"], [data-redline="moved"]')).toHaveCount(0);
+
+    await click(showChanges);
+    await expect(showChanges).not.toBeChecked();
+    await expect(documentEditor(page)).toContainText(FIX.trim());
+  });
+
+  await test.step("4.2 Jordan approves v3: it goes live over nothing, with no sunset to set", async () => {
     await click(decision(page).getByRole("button", { name: "Approve", exact: true }));
     const dialog = page.getByRole("dialog", { name: "Approve v3" });
     await expect(dialog).toBeVisible();
@@ -255,7 +279,7 @@ test("after the Active version is revoked, an author corrects it from its conten
     await expect(statusBadge(page)).toHaveText("Active", { timeout: 20_000 });
   });
 
-  await test.step("4.2 The database: v3 Active, v2 still Revoked, v1 still Superseded; Coral is told about v3", async () => {
+  await test.step("4.3 The database: v3 Active, v2 still Revoked, v1 still Superseded; Coral is told about v3", async () => {
     const list = await rows(db, "SELECT id, number, state, sunset_at FROM versions WHERE template_id = ? ORDER BY number", [templateId]);
     expect(list).toEqual([
       { id: v1Id, number: 1, state: "superseded", sunset_at: null },
@@ -279,7 +303,7 @@ test("after the Active version is revoked, an author corrects it from its conten
     });
   });
 
-  await test.step("4.3 Coral renders v3, with the fix; v2 stays refused", async () => {
+  await test.step("4.4 Coral renders v3, with the fix; v2 stays refused", async () => {
     const v3 = await coralRender(request, spring, 3, "revoke-recovery-v3");
     expect(v3.res.status()).toBe(200);
     expect(v3.res.headers()["x-stencil-version"]).toBe("3");
