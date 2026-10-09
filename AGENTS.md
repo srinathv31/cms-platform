@@ -152,7 +152,7 @@ bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those 
 
 ## Known issues
 
-[docs/handoff-review.md](docs/handoff-review.md) lists every open finding from the October 2026 codebase review, with where it is and how to fix it. Pick work from its "Fix first" list, in order. Findings under "Waits for the enterprise work" get fixed with real sign-in, the Java API or the enterprise font, not before. When a change fixes a finding, update that finding's Status line in the same change.
+[docs/handoff-review.md](docs/handoff-review.md) lists every open finding from the October 2026 codebase review, with where it is and how to fix it. Its "Fix first" list is done. Pick work from "Found while fixing" by severity, and from "Alongside: tooling and hygiene". Findings under "Waits for the enterprise work" get fixed with real sign-in, the Java API or the enterprise font, not before. When a change fixes a finding, update that finding's Status line in the same change.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
