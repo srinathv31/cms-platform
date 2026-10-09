@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 20 | 11 | 34 |
+| Open | 0 | 3 | 20 | 10 | 33 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 19 | 15 | 3 | 38 |
+| Fixed | 1 | 19 | 15 | 4 | 39 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -431,7 +431,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I14 · Low: Every ⌘B in the editor also toggles the hidden sidebar
 
-- **Status:** Open
+- **Status:** Fixed. The listener is removed from `src/components/ui/sidebar.tsx`, the edit is noted in the components README, and `ui/sidebar.test.tsx` fails if a `shadcn add` brings it back.
 - **Where:** `src/components/ui/sidebar.tsx` line 97
 - **What happens:** The stock shadcn provider registers a window-level ⌘B listener that ignores `defaultPrevented`. Bold also toggles sidebar state and writes the `sidebar_state` cookie; the sidebar is `collapsible="none"`, so nothing visible happens.
 - **Fix:** Remove the listener (this is a deliberate edit to a generated file; note it).

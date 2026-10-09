@@ -26,6 +26,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0018](0018-settings-screens-render-decisions.md) | Settings screens render decisions; the domain makes them | Accepted |
 | [0019](0019-on-demand-reads-are-get-routes.md) | Reads a screen loads on demand are GET routes; only mutations are server actions | Accepted |
 | [0020](0020-autosave-never-drops-edits-silently.md) | Autosave never drops an edit without saying so: the header binds it, a stopped save holds the page, leaving unsaved asks | Accepted |
+| [0021](0021-the-sidebar-has-no-keyboard-shortcut.md) | The sidebar has no keyboard shortcut, an edit to a generated file | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.
