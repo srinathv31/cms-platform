@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Editor, type JSONContent } from "@tiptap/core";
+import { AllSelection, TextSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Variable } from "../model/types";
 import { editorExtensions, inlineFieldExtensions } from "../schema";
@@ -114,6 +115,64 @@ describe("normalizePastedHtml", () => {
   it("leaves HTML copied from the editor itself alone", () => {
     const own = '<p data-pm-slice="1 1 []">Hi <span data-variable="first_name" class="x">First name</span></p>';
     expect(normalizePastedHtml(own)).toBe(own);
+  });
+
+  it("recognizes what a ProseMirror editor really puts on the clipboard, as the browser wraps it", () => {
+    const { editor } = mount("body", {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Intro " }, { type: "variable", attrs: { key: "first_name" } }] },
+        { type: "orderedList", attrs: { start: 3 }, content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Third" }] }] }] },
+        {
+          type: "table",
+          content: [{ type: "tableRow", content: [{ type: "tableCell", attrs: { colspan: 2 }, content: [{ type: "paragraph", content: [{ type: "text", text: "Wide" }] }] }] }],
+        },
+      ],
+    });
+    const { state, view } = editor;
+    const at = (text: string) => {
+      let pos = -1;
+      state.doc.descendants((node, offset) => {
+        if (pos < 0 && node.isText && node.text?.includes(text)) pos = offset + node.text.indexOf(text);
+      });
+      return pos;
+    };
+    const whole = view.serializeForClipboard(new AllSelection(state.doc).content()).dom.innerHTML;
+    // From inside the list item to inside the cell: an open slice, which carries its context.
+    const open = view.serializeForClipboard(TextSelection.create(state.doc, at("hird"), at("ide")).content()).dom.innerHTML;
+    expect(whole).toMatch(/^<p data-pm-slice="0 0 \[\]">/);
+    expect(open).toMatch(/^<ol start="3" data-pm-slice="3 4 \[\]">/);
+
+    for (const html of [whole, open]) {
+      for (const clipboard of [
+        html,
+        `<meta charset='utf-8'>${html}`, // macOS
+        `<html><body>\n<!--StartFragment-->${html}<!--EndFragment-->\n</body></html>`, // Windows
+      ]) {
+        expect(normalizePastedHtml(clipboard)).toBe(clipboard);
+      }
+    }
+  });
+
+  it("cleans HTML whose text, or an attribute's value, only mentions data-pm-slice", () => {
+    const html =
+      '<p class="MsoNormal" style="color:red">Copying sets <span style="font-weight:700">data-pm-slice</span> on the first node.</p>' +
+      '<ol start="5" style="margin:0"><li>Five</li></ol>' +
+      '<table><tr><td colspan="2" style="width:200px">Wide</td></tr></table>' +
+      '<p><span title="data-pm-slice">&lt;p data-pm-slice="1 1 []"&gt;</span></p>';
+    expect(normalizePastedHtml(html)).toBe(
+      "<p>Copying sets <strong>data-pm-slice</strong> on the first node.</p>" +
+        "<ol><li>Five</li></ol>" +
+        '<table><tr><td colspan="2">Wide</td></tr></table>' +
+        '<p>&lt;p data-pm-slice="1 1 []"&gt;</p>',
+    );
+  });
+
+  it("cleans the same HTML pasted into the editor: the list starts at 1", () => {
+    const { editor } = mount();
+    editor.view.pasteHTML('<p>About data-pm-slice</p><ol start="5"><li>Five</li></ol>');
+    const list = (editor.getJSON().content ?? []).find((node) => node.type === "orderedList");
+    expect(list?.attrs?.start).toBe(1);
   });
 
   it("drops empty &nbsp; paragraphs, colors and images; keeps bold from styles", () => {

@@ -12,7 +12,8 @@
 // bold/italic/underline whether they're tags or inline styles. Google Docs: unwraps its
 // `<b id="docs-internal-guid-…" style="font-weight:normal">` wrapper.
 // Everything else (colors, fonts, sizes, line heights, images, empty `&nbsp;` paragraphs) goes.
-// HTML copied from a ProseMirror editor (data-pm-slice) is passed through untouched.
+// HTML copied from a ProseMirror editor (an element with a data-pm-slice attribute, found the way
+// ProseMirror's own paste finds it) is passed through untouched. Text that only mentions it is cleaned.
 // Table cells keep only paragraphs and lists, at every depth (a heading, callout, rule or table in a
 // cell, or in a list item in a cell, becomes content a cell can hold), and links keep only targets
 // the link check accepts (model/links.ts).
@@ -25,7 +26,8 @@ export interface NormalizeHtmlOptions {
   parse?: (html: string) => Document;
 }
 
-const PM_SLICE = /data-pm-slice/;
+/** ProseMirror marks the clipboard HTML it writes with this attribute (prosemirror-view, parseFromClipboard). */
+const PM_SLICE = "[data-pm-slice]";
 const WORD = /urn:schemas-microsoft-com:office|class="?Mso|mso-[a-z-]+:/i;
 
 /** Elements whose content is never wanted. */
@@ -41,10 +43,10 @@ const BLOCKS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li
 const HEADING_CLASS: Record<string, string> = { msotitle: "h1", msoheading1: "h1", msoheading2: "h2", msoheading3: "h3" };
 
 export function normalizePastedHtml(html: string, options: NormalizeHtmlOptions = {}): string {
-  if (!html || PM_SLICE.test(html)) return html;
+  if (!html) return html;
   const doc = (options.parse ?? parseWithDomParser)(html);
   const body = doc.body;
-  if (!body) return html;
+  if (!body || doc.querySelector(PM_SLICE)) return html;
 
   if (WORD.test(html)) convertWordLists(body);
   stripListMarkers(body); // numbered headings and any marker left outside a list

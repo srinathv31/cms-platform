@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 4 | 23 | 12 | 39 |
+| Open | 0 | 4 | 23 | 11 | 38 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 18 | 12 | 2 | 33 |
+| Fixed | 1 | 18 | 12 | 3 | 34 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -521,7 +521,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### R8 · Low: Paste and import cleanup is skipped if a document mentions "data-pm-slice"
 
-- **Status:** Open
+- **Status:** Fixed. `normalizePastedHtml` parses first and passes HTML through untouched only when an element carries `data-pm-slice`, as ProseMirror's own paste checks, so text that mentions it is cleaned.
 - **Where:** `src/editor/paste/normalize-html.ts` line 22
 - **What happens:** The normalizer checks for the substring anywhere in the HTML, including plain text. The schema parser still sanitizes markup, but `colspan` and `start` come through raw.
 - **Fix:** Check for the attribute on an element.
