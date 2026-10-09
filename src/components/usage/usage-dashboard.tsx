@@ -5,7 +5,7 @@ import type { UsageDashboard } from "@/domain/golive-types";
 import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
 import { renderCount } from "@/components/versions/format";
-import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, StackedBars, type RatePoint, type StackSeries } from "./charts";
+import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, SERIES, StackedBars, type RatePoint, type StackSeries } from "./charts";
 import { ConsumersCard } from "./consumers-card";
 import { formatDayShort, sunsetPhrase, versionCount } from "./format";
 import { BARS_HEIGHT, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
@@ -17,10 +17,11 @@ import { UsageTabs } from "./usage-tabs";
 // Renders over time and the failure rate. Consumers: renders by consumer and who renders what. The
 // numbers are `getUsageDashboard`'s; this file only lays them out. Reads inside the page's <Stream>.
 
+/** PDF, Web, Email: the same hues here and in the channel mix. */
 const CHANNEL_SERIES: StackSeries[] = [
-  { label: CHANNEL_LABELS.pdf, fill: "fill-brand-4", bg: "bg-brand-4" },
-  { label: CHANNEL_LABELS.web, fill: "fill-brand-3", bg: "bg-brand-3" },
-  { label: CHANNEL_LABELS.email, fill: "fill-brand-2", bg: "bg-brand-2" },
+  { label: CHANNEL_LABELS.pdf, ...SERIES[0] },
+  { label: CHANNEL_LABELS.web, ...SERIES[1] },
+  { label: CHANNEL_LABELS.email, ...SERIES[2] },
 ];
 
 const NF = new Intl.NumberFormat("en-US");
@@ -116,6 +117,7 @@ function Overview({ d, nowDate }: { d: UsageDashboard; nowDate: Date }) {
         <div className="mt-5">
           <StackedBars
             label="Renders over time, by channel"
+            periodHeader="Week of"
             height={BARS_HEIGHT}
             series={CHANNEL_SERIES}
             data={d.weekly.map((w, i) => ({

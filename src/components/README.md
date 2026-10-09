@@ -81,6 +81,7 @@ Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` 
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
 | `TemplateId` | [template-id.tsx](primitives/template-id.tsx) | A template ID with a copy button (client). |
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
+| `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, the Versions tab's passed sunset (client). |
 | `StatCard` | [stat-card.tsx](primitives/stat-card.tsx) | Caps label over a big numeral. Only `/design` uses it today (see [Don't copy](#dont-copy)). |
 
 The `/design` gallery (`src/app/(dev)/design`) imports these, so a change shows there too. It also holds mock
@@ -96,6 +97,12 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 `border-hairline`, `text-text-muted`, `text-label`, `bg-selected`, `bg-brand`, `text-danger-text`, `bg-chip`,
 `bg-status-review` (one set per lifecycle state; to show a state, use `StatusBadge`), and the shadcn names
 (`bg-primary`, `border-border`). Light theme only: `globals.css` defines no dark theme, so don't add `dark:` classes.
+
+- **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
+  use `series-1…4`, four hues in a fixed order, checked as a set for colour-blind separation
+  ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)). No value is hover-only: a chart's
+  readable marks are one Tab stop with arrow keys between them (`usage/chart-keys.tsx`), and a chart whose values
+  aren't printed is followed by an sr-only table of them.
 
 - **Radius:** `rounded-md` 6px chips, `rounded-lg` 8px controls, `rounded-xl` 14px cards, `rounded-2xl` 18px
   large cards, `rounded-3xl` 22px modals, `rounded-4xl` 24px the canvas panel (`xs` 4px, `sm` 5px).
@@ -167,6 +174,8 @@ Anything else that has to stop edits for a while takes a hold the same way.
 | --- | --- | --- |
 | Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain constant, as `access/request-access.tsx` does with `ACCESS_REASON_MAX`. |
 | Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*`; `rows.tsx` renders refusals. |
+| Show an action the viewer can't take, with why | `BlockedButton` in [review/decision-rail.tsx](review/decision-rail.tsx) | Greyed and focusable; `describedBy` points at a visible reason when there is one. |
+| Make a chart readable without a pointer | `StackedBars` in [usage/charts.tsx](usage/charts.tsx) | `markProps` on each hit area inside `ChartKeys`, then a `ChartTable`. |
 | Update optimistically | [comments/use-review-threads.ts](comments/use-review-threads.ts) with [thread-list.tsx](comments/thread-list.tsx) | Pure reducer in `thread-state.ts`, tested. |
 | Stream a section | [versions/page.tsx](../app/(product)/[team]/templates/[templateId]/versions/page.tsx) with [versions-content.tsx](versions/versions-content.tsx) | Skeleton and content share `TOOLBAR`. |
 | Stream viewer-dependent parts into a static frame | [app-shell/app-frame.tsx](app-shell/app-frame.tsx) with [sidebar-holes.tsx](app-shell/sidebar-holes.tsx) | |

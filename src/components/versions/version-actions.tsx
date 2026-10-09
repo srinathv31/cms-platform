@@ -1,10 +1,10 @@
 "use client";
 
-import { useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { BlockedButton } from "@/components/primitives/blocked-button";
 import { cn } from "@/lib/utils";
 import { REASONS } from "@/domain/permissions";
 import type { ConsumerUsage, VersionTimelineItem } from "@/domain/review-types";
@@ -84,7 +84,7 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
       {showSunset && !sunset.ok ? (
-        <BlockedButton label={`${sunsetLabel} for v${number}`} reason={sunset.reason}>
+        <BlockedButton aria-label={`${sunsetLabel} for v${number}`} reason={sunset.reason} className="gap-1.5 bg-surface">
           <CalendarClock aria-hidden strokeWidth={1.75} />
           {sunsetLabel}
         </BlockedButton>
@@ -147,40 +147,6 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
         </>
       ) : null}
     </div>
-  );
-}
-
-/**
- * An outline action that can't be taken: in place and greyed, still focusable, with the reason in a
- * tooltip and as its description.
- */
-function BlockedButton({ label, reason, children }: { label: string; reason: string; children: ReactNode }) {
-  const reasonId = useId();
-  return (
-    <>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="outline"
-              aria-label={label}
-              aria-describedby={reasonId}
-              // Focusable, so the reason can be reached from the keyboard. It is marked `data-disabled`
-              // (not the native `disabled`), so that is what greys it out.
-              disabled
-              focusableWhenDisabled
-              className="gap-1.5 bg-surface data-disabled:cursor-default data-disabled:opacity-50 data-disabled:hover:bg-surface"
-            />
-          }
-        >
-          {children}
-        </TooltipTrigger>
-        <TooltipContent>{reason}</TooltipContent>
-      </Tooltip>
-      <span id={reasonId} className="sr-only">
-        {reason}
-      </span>
-    </>
   );
 }
 
