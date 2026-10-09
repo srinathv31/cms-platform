@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 7 | 29 | 12 | 48 |
+| Open | 0 | 6 | 29 | 12 | 47 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 15 | 6 | 2 | 24 |
+| Fixed | 1 | 16 | 6 | 2 | 25 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -351,7 +351,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I4 · High: A panel drop followed by a block move orphans comment threads
 
-- **Status:** Open
+- **Status:** Fixed. The panel drop is handled in `handleDOMEvents.drop` by a plugin ordered ahead of UniqueID's, so UniqueID never marks it and the next block moved by its grip keeps its id (and its threads).
 - **Where:** `src/editor/extensions/field-binding.ts` line 90
 - **What happens:** Dropping a variable row from the panel sets UniqueID's private paste flag, and the custom drop handler consumes the event before the flag is reset. The next drag-handle move strips the moved block's ids. Threads anchored to it fall to "On removed content" and the redline sees a delete plus an insert.
 - **Fix:** Handle the panel drop in `handleDOMEvents.drop` ahead of UniqueID, or add a `text/plain` payload so the flag is consumed. Add a regression test.

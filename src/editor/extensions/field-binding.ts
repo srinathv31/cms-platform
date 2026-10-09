@@ -2,7 +2,8 @@
 //   • usage: tells the root when the document changed (counted on the next frame)
 //   • focus: the root remembers the last-focused field for click-to-insert, undo and redo
 //   • history: tells the root when the field's undo history may have changed
-//   • drop:  a variable dragged from the panel (our own MIME type) lands as a chip, one transaction
+//   • drop:  a variable dragged from the panel (our own MIME type) lands as a chip, one transaction,
+//     handled ahead of UniqueID so the drop never costs a block its id (PanelDrop, below)
 //   • chips: click, or Enter/Space on a selected chip, opens its popover; Esc closes it
 //   • paste: Word / Google Docs / web HTML is normalized (paste/normalize-html.ts); in the document,
 //     plain text that looks like Markdown is parsed as Markdown (paste/markdown.ts); `{{key}}` in
@@ -13,6 +14,7 @@
 // No React here; the popover and panel subscribe to the stores this writes.
 
 import { Extension, type KeyboardShortcutCommand } from "@tiptap/core";
+import { UniqueID } from "@tiptap/extension-unique-id";
 import { isHistoryTransaction } from "@tiptap/pm/history";
 import { DOMParser, Fragment, Slice, type ResolvedPos } from "@tiptap/pm/model";
 import { NodeSelection, Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
@@ -42,11 +44,66 @@ export interface FieldBindingOptions {
 
 export const fieldBindingPluginKey = new PluginKey("fieldBinding");
 
+/**
+ * A panel row dropped on the field lands as a chip at the drop point, in one transaction.
+ *
+ * It is handled in `handleDOMEvents.drop`, by a plugin that runs ahead of UniqueID's, so UniqueID never
+ * sees the drop. UniqueID marks every drop from outside the editor (and every "copy" drop) so that the
+ * next `transformPasted` strips the dropped blocks' ids, and only `transformPasted` clears that mark. A
+ * row's drag carries nothing but our MIME type, so ProseMirror's own drop parses no slice and never
+ * calls `transformPasted`: the mark would outlive the panel drop and strip the ids of the next block
+ * moved by its ⋮⋮ grip. Its comment threads would fall to "On removed content", and the redline would
+ * see a delete and an insert (handoff review I4).
+ *
+ * Giving the row a `text/plain` payload would also clear the mark, but only because of when UniqueID
+ * resets a private flag, and the row would then drop as `{{key}}` text into any input on the page.
+ * Going first relies only on public behavior: TipTap orders plugins by `priority`, and ProseMirror
+ * stops at the first DOM handler that returns true.
+ */
+const PanelDrop = Extension.create<FieldBindingOptions>({
+  name: "fieldBindingPanelDrop",
+  priority: (UniqueID.config.priority ?? 0) + 1,
+
+  addOptions() {
+    return { binding: null };
+  },
+
+  addProseMirrorPlugins() {
+    if (!this.options.binding) return [];
+    const editor = this.editor;
+    return [
+      new Plugin({
+        key: new PluginKey("fieldBindingPanelDrop"),
+        props: {
+          handleDOMEvents: {
+            drop: (view, event) => {
+              const key = event.dataTransfer?.getData(VARIABLE_DRAG_TYPE);
+              if (!key) return false; // a block move, a file, text from elsewhere: ProseMirror's own drop
+              event.preventDefault();
+              if (!view.editable) return true;
+              const hit = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              if (!hit) return true;
+              const node = view.state.schema.nodes[NODE.variable].create({ key });
+              const at = dropPoint(view.state.doc, hit.pos, new Slice(Fragment.from(node), 0, 0)) ?? hit.pos;
+              editor.chain().insertVariable(key, { from: at, to: at }).focus(undefined, { scrollIntoView: false }).run();
+              return true;
+            },
+          },
+        },
+      }),
+    ];
+  },
+});
+
 export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
   name: "fieldBinding",
 
   addOptions() {
     return { binding: null };
+  },
+
+  addExtensions() {
+    return [PanelDrop.configure({ binding: this.options.binding })];
   },
 
   addKeyboardShortcuts(): Record<string, KeyboardShortcutCommand> {
@@ -86,18 +143,6 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
           transformPastedHTML: (html) => normalizePastedHtml(html),
           ...(binding.kind === "body" ? { clipboardTextParser: parseMarkdownText } : {}),
           transformPasted: (slice, view) => chipsFromText(slice, view.state.schema),
-
-          handleDrop: (view, event) => {
-            const key = event.dataTransfer?.getData(VARIABLE_DRAG_TYPE);
-            if (!key) return false;
-            if (!view.editable) return true;
-            const hit = view.posAtCoords({ left: event.clientX, top: event.clientY });
-            if (!hit) return true;
-            const node = view.state.schema.nodes[NODE.variable].create({ key });
-            const at = dropPoint(view.state.doc, hit.pos, new Slice(Fragment.from(node), 0, 0)) ?? hit.pos;
-            editor.chain().insertVariable(key, { from: at, to: at }).focus(undefined, { scrollIntoView: false }).run();
-            return true;
-          },
 
           handleClickOn: (_view, _pos, node, nodePos, _event, direct) => {
             if (direct && node.type.name === NODE.variable) chip.getState().open(nodePos);
