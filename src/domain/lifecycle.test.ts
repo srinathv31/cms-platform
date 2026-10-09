@@ -386,6 +386,14 @@ describe("submit", () => {
     expect(result.ok && result.effects.filter((e) => e.kind === "notification")).toEqual([reviewRequested(1)]);
   });
 
+  it("asks nobody who wrote the draft, with or without a chain", () => {
+    const allWriters: Recipients = { kind: "team_role", role: "approver", exceptUserIds: ["priya", "maya"] };
+    expect(run({ writers: ["priya"] })).toMatchObject({ effects: [submitted(1), reviewRequested(1, { to: allWriters })] });
+    expect(run({ writers: ["priya"] }, { chain: CHAIN_1 })).toMatchObject({
+      effects: [submitted(1), reviewRequested(1, { to: allWriters })],
+    });
+  });
+
   it("asks whoever the chain's first stage names, when the chain is given", () => {
     const legalFirst: ApprovalStage[] = [
       { position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
@@ -1047,6 +1055,12 @@ describe("approve", () => {
         to: APPROVERS_BUT("maya"),
         title: "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
       });
+
+      const coWritten = run({ chain: teamSecond, version: { ...v2, writers: ["priya", "maya"] }, actorId: "dana", actorName: "Dana Park" });
+      expect(coWritten.ok && coWritten.effects[1]).toMatchObject({
+        notification: "review_requested",
+        to: { kind: "team_role", role: "approver", exceptUserIds: ["priya", "maya"] },
+      });
     });
 
     it("refuses someone who approved an earlier stage of the same round", () => {
@@ -1511,6 +1525,18 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", 1);
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
     expect(decide(v2, "jordan").approve).toMatchObject({ ok: true, wentLive: true });
+  });
+
+  it("whoever submitted round one stays barred from round two, even without editing", () => {
+    const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
+    const v1 = submitAs(draft, "priya", 0);
+    expect(v1.writers).toEqual(["maya", "priya"]);
+
+    const returned = decide(v1, "jordan").requestChanges;
+    if (!returned.ok) throw new Error(returned.reason);
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", 1);
+    expect(v2.submittedBy).toBe("maya");
+    expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
   });
 
   it("the approver who sent it back becomes a writer only by editing the next round", () => {

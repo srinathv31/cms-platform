@@ -515,9 +515,14 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     await edit("priya", templateId, "Priya's sentence.");
     expect((await draftOf(templateId))?.writers).toEqual(["maya", "priya"]);
 
-    as("maya");
+    const submittedAt = as("maya");
     expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
     expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
+    // Priya holds Approver, but she isn't asked to review what she wrote.
+    expect((await notificationsAt(submittedAt)).map((n) => [n.userId, n.kind])).toEqual([
+      ["alex", "review_requested"],
+      ["jordan", "review_requested"],
+    ]);
 
     const at = as("priya");
     expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual(wrote);
@@ -557,6 +562,53 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
     as("jordan");
     expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+  });
+
+  it("whoever submitted round one stays barred from round two, even without editing it", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    as("priya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
+
+    as("jordan");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    await edit("maya", templateId, "The APR is 21.99%.");
+    const resubmitted = as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 2 });
+    expect(await version(templateId, 2)).toMatchObject({ submittedBy: "maya", writers: ["maya", "priya"] });
+    expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual(["alex", "jordan"]);
+
+    as("priya");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 2, reason: "x" })).toEqual(wrote);
+  });
+
+  it("a change request that finds a draft already open merges the version's writers into it", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await edit("priya", templateId, "Priya's sentence.");
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    // Nothing in the app opens a draft while a version is in review; put one there to check the guard.
+    const v1 = (await version(templateId, 1))!;
+    await db.insert(versions).values({
+      ...v1,
+      id: `v_open_${templateId}`,
+      number: null,
+      state: "draft",
+      basedOnVersionId: v1.id,
+      submittedBy: null,
+      submittedAt: null,
+      submitNote: null,
+      writers: ["maya"],
+    });
+
+    as("jordan");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    const drafts = await db
+      .select({ id: versions.id, writers: versions.writers })
+      .from(versions)
+      .where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+    expect(drafts).toEqual([{ id: `v_open_${templateId}`, writers: ["maya", "priya"] }]);
   });
 
   it("an approver who only sent it back becomes a writer once they edit the next round", async () => {

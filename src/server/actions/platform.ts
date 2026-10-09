@@ -332,7 +332,7 @@ export async function saveApprovalChain(input: {
         versionId: versions.id,
         currentStage: versions.currentStage,
         number: versions.number,
-        submittedBy: versions.submittedBy,
+        writers: versions.writers,
         templateId: templates.id,
         templateName: templates.name,
         teamId: templates.teamId,
@@ -384,7 +384,7 @@ export async function saveApprovalChain(input: {
           {
             kind: "notification",
             notification: "review_requested",
-            to: stageRecipients(after, v.submittedBy),
+            to: stageRecipients(after, v.writers),
             title: `${v.templateName} v${v.number} is waiting on ${after.name}.`,
             link: { to: "review", templateId: v.templateId, versionNumber: v.number },
           },

@@ -30,9 +30,11 @@ export function reasonProblem(reason: string): string | null {
 /**
  * What the decision area shows this viewer:
  * - open: Approve and Request changes are theirs to press;
- * - blocked: they are an approver, but not for this version (it is their own: maker-checker; or the stage
- *   waits on someone else): the pair is there, dim, and `reason` says why;
- * - hidden: they aren't an approver on the team at all, so there is nothing to decide and no dead buttons.
+ * - blocked: the pair is there, dim, and `reason` says why. Either they wrote this version (maker-checker:
+ *   the submitter or another writer, Approver or not, since a self-block explains itself to anyone on the
+ *   team), or they are an approver and it isn't theirs to decide (the stage waits on someone else);
+ * - hidden: they aren't an approver on the team and wrote none of it, so there is nothing to decide and no
+ *   dead buttons.
  */
 export type DecisionAccess = { kind: "open" } | { kind: "blocked"; reason: string } | { kind: "hidden" };
 

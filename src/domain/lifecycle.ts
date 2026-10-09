@@ -308,8 +308,8 @@ export interface SubmitInput {
 
 /**
  * Draft → In review, as the template's next version: a version number, the contract changes, the note,
- * an audit event, and a `review_requested` notification to the first stage's approvers (never the
- * submitter).
+ * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone
+ * who wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
@@ -342,6 +342,7 @@ export function submit(input: SubmitInput): SubmitResult {
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
   const submitNote = trimmed(input.note);
   const firstStage = input.chain ? stageAt(input.chain, 0) : null;
+  const writers = withWriter(draft.writers, submittedBy);
 
   return {
     ok: true,
@@ -350,7 +351,7 @@ export function submit(input: SubmitInput): SubmitResult {
       number,
       submittedBy,
       submittedAt: now,
-      writers: withWriter(draft.writers, submittedBy),
+      writers,
       submitNote,
       currentStage: 0,
       contractChanges,
@@ -368,7 +369,7 @@ export function submit(input: SubmitInput): SubmitResult {
       },
       notify({
         notification: "review_requested",
-        to: firstStage ? stageRecipients(firstStage, submittedBy) : teamApproversExcept(submittedBy),
+        to: firstStage ? stageRecipients(firstStage, writers) : teamApproversExcept(...writers),
         title: `${input.submitterName} submitted ${input.templateName} v${number} for review.`,
         body: submitNote,
         link: { to: "review", templateId: input.templateId, versionNumber: number },
@@ -626,7 +627,7 @@ export function approve(input: {
       },
       notify({
         notification: "review_requested",
-        to: stageRecipients(next, version.submittedBy),
+        to: stageRecipients(next, version.writers),
         title: `${templateName} v${number} is waiting on ${next.name}.`,
         link: review,
       }),
@@ -989,8 +990,8 @@ function utcDay(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
-function teamApproversExcept(userId: string): Recipients {
-  return { kind: "team_role", role: "approver", exceptUserIds: [userId] };
+function teamApproversExcept(...userIds: string[]): Recipients {
+  return { kind: "team_role", role: "approver", exceptUserIds: userIds };
 }
 
 /** A notification effect; `body` is left out when there is none. */

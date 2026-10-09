@@ -401,6 +401,27 @@ describe("saveApprovalChain", () => {
     as("riley");
     expect(await saveApprovalChain({ contentTypeId: CT, stages: stages(TEAM_RULE) })).toEqual({ ok: true });
   });
+
+  it("when a waiting stage goes back to the team's approvers, nobody who wrote the version is told", async () => {
+    const templateId = await submitted("coral-offers", "maya");
+    // Alex holds Approver on Coral Offers; say he edited Maya's draft too.
+    await db
+      .update(versions)
+      .set({ writers: ["maya", "alex"] })
+      .where(and(eq(versions.templateId, templateId), eq(versions.number, 1)));
+    const legalId = (await chain())[1]!.id;
+    const stages = (rule: ApproverRule) => [
+      { id: TEAM_STAGE, name: "Team approver", rule },
+      { id: legalId, ...LEGAL },
+    ];
+    as("riley");
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: stages({ kind: "user", userId: "naomi" }) })).toEqual({ ok: true });
+
+    const at = as("riley");
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: stages(TEAM_RULE) })).toEqual({ ok: true });
+    const told = (await notificationsAt(at)).filter((n) => n.kind === "review_requested" && n.href?.includes(templateId));
+    expect(told.map((n) => n.userId)).toEqual(["jordan"]);
+  });
 });
 
 // ── Two-stage approval, end to end ────────────────────────────

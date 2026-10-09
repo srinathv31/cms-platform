@@ -13,6 +13,7 @@ import {
   startRevoke as startRevokeTransition,
   submit,
   sunsetPassed,
+  withWriter,
   REFUSALS,
   type DraftFields,
   type ReviewVersion,
@@ -396,13 +397,21 @@ export async function requestChanges(input: {
     await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
 
     // A template has at most one open draft. There is none while a version is in review, but if one
-    // exists the author keeps working in it rather than the request failing.
+    // exists the author keeps working in it rather than the request failing. It takes on the returned
+    // version's writers, so none of them can decide what it becomes (maker-checker). Content isn't
+    // touched, so `rev` stays and an autosave in flight still lands.
     const openDraft = await tx.query.versions.findFirst({
-      columns: { id: true },
+      columns: { id: true, writers: true },
       where: and(eq(versions.templateId, found.templateId), eq(versions.state, "draft")),
     });
     if (!openDraft) {
       await tx.insert(versions).values(draftRow(outcome.newDraft, { id: newId("v"), templateId: found.templateId }));
+    } else {
+      const writers = outcome.newDraft.writers.reduce((all, userId) => withWriter(all, userId), openDraft.writers);
+      await tx
+        .update(versions)
+        .set({ writers })
+        .where(and(eq(versions.id, openDraft.id), eq(versions.state, "draft")));
     }
 
     const threadId = newId("th");

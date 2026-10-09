@@ -16,7 +16,7 @@ review.
 The owner's rule: anyone who wrote a version can't approve it or request changes on it. Writing means either of
 these, in this review round or an earlier request-changes round of the same submission:
 
-- starting the draft: New template, Import, Edit, or Start draft;
+- starting the draft: New template, Import, or Edit on an Active template;
 - saving any edit to it.
 
 The submitter stays barred, as before. Holding Author and Approver on one team stays allowed.
@@ -27,9 +27,9 @@ How the code holds it:
   ([ucomp.ts](../../src/server/db/schema/ucomp.ts)). A new draft starts with whoever started it
   (`createDraft`, `editActive`). Each autosave adds its saver inside the save's transaction
   ([apply-patch.ts](../../src/server/drafts/apply-patch.ts)), and `submit` adds the submitter. Request changes copies
-  the in-review version's writers into the new draft. The approver who asked for changes isn't a writer unless they
-  later edit it. A draft started from the Active version starts a fresh set, so having written an earlier released
-  version bars nobody.
+  the in-review version's writers into the new draft, or merges them into a draft that is already open. The
+  approver who asked for changes isn't a writer unless they later edit it. A draft started from the Active version
+  starts a fresh set, so having written an earlier released version bars nobody.
 - **One rule in the domain**: `makerCheckerRefusal` in [permissions.ts](../../src/domain/permissions.ts). The
   `version.decide` guard in `can()` and the `approve` and `requestChanges` transitions in
   [lifecycle.ts](../../src/domain/lifecycle.ts) all ask it. The submitter reads "You submitted this version.";
@@ -38,6 +38,9 @@ How the code holds it:
 - **Every place that decides passes the writers in**: the review actions, and the review queue and screen through
   `decideCheck`. Approve and Request changes show disabled with the reason, and the version stays out of the
   writer's "Waiting on me".
+- **Nobody is asked to review what they wrote**: `stageRecipients` leaves a team role's writers out of the "review
+  requested" notifications, at submit, when an earlier stage approves, and when a Platform Admin changes the rule of
+  a stage versions wait on. A stage that names one person still tells them.
 - **Rows from before the column** are backfilled by the migration
   ([0004_version_writers.sql](../../src/server/db/migrations/0004_version_writers.sql)). Each version gets its
   creator, its submitter, and its `draft.edited` actors, plus those of every change-requested version its draft was
@@ -50,8 +53,8 @@ How the code holds it:
   another service ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)), and a
   permission shouldn't depend on it.
 - **A join table** (`version_writers`). It would work as well. The column won because the version row already
-  reaches every place that decides, the set is a handful of ids, and every change to it lands on a write that
-  already compare-and-sets the row's `rev`. A Spring Boot port can map it to a list, or move it to a join table,
+  reaches every place that decides, the set is a handful of ids, and every change to it happens in a transaction
+  that already reads and writes that row. A Spring Boot port can map it to a list, or move it to a join table,
   without changing the rule.
 - **Forbid Author and Approver on one team.** Rejected by the owner: approving an access request can add the role,
   and that's normal.
@@ -64,5 +67,5 @@ How the code holds it:
   `withWriter` in the same transaction as the edit.
 - A co-author without the Approver role sees Approve and Request changes disabled with the reason, as the submitter
   does.
-- The "review requested" notification still goes to every approver except the submitter, so an approver who wrote
-  part of the version is told about one they can't decide.
+- A stage that names one person who wrote the version, or a team where every approver wrote it, leaves the version
+  undecidable. A Platform Admin changing the stage's rule, or a Team Admin adding an approver, unblocks it.
