@@ -1,12 +1,12 @@
 import "server-only";
 import { cache } from "react";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { stepperState } from "@/domain/approval-chain";
+import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/domain/approval-chain";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
-import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData } from "@/domain/review-types";
+import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -19,13 +19,12 @@ import {
   getPeople,
   iso,
   isoOrUndefined,
-  loadApprovedBy,
   loadChain,
   loadConsumerUsage,
+  loadDecisions,
   personOf,
   requireReviewVersion,
   stageApproverIds,
-  waitingStage,
   type People,
 } from "./review-shared";
 import { requireSpace, type SpaceContext } from "./spaces";
@@ -48,6 +47,7 @@ const queueColumns = {
   writers: versions.writers,
   createdBy: versions.createdBy,
   createdAt: versions.createdAt,
+  stages: versions.stages,
   currentStage: versions.currentStage,
   contractChanges: versions.contractChanges,
   templateId: templates.id,
@@ -67,6 +67,7 @@ interface QueueVersion {
   writers: string[];
   createdBy: string;
   createdAt: Date;
+  stages: VersionStage[] | null;
   currentStage: number;
   contractChanges: ContractChange[] | null;
   templateId: string;
@@ -102,9 +103,10 @@ function queueRow(
   };
 }
 
-function currentStageOf(chain: readonly ApprovalStage[], currentStage: number) {
-  const stage = waitingStage(chain, currentStage);
-  return { position: stage.position, name: stage.name, count: chain.length };
+/** The queue's "Stage 2 of 3": a position in the version's own stages, with the name it recorded. */
+function queueStage(v: { stages: VersionStage[] | null }, chain: readonly ApprovalStage[], position: number) {
+  const own = ownStages(v.stages, chain);
+  return { position, name: own[position]?.name ?? "", count: own.length };
 }
 
 const newestSubmitted = (a: ReviewQueueRow, b: ReviewQueueRow) =>
@@ -131,15 +133,15 @@ const loadInReview = cache(async (spaceSlug: string) => {
   const inSpace = (v: QueueVersion) => space.isAll || v.teamId === space.teamId;
   const namedElsewhere = (v: QueueVersion) =>
     !canSeeSpace(viewer, v.teamSlug) &&
-    stageApproverIds(waitingStage(chainFor(chains, v.contentTypeId), v.currentStage)).includes(viewer.userId);
+    stageApproverIds(currentStageOf(v, chainFor(chains, v.contentTypeId))).includes(viewer.userId);
   const rows = all.filter((v) => inSpace(v) || namedElsewhere(v));
-  const approvedBy = await loadApprovedBy(db, rows.map((v) => v.versionId));
+  const decisions = await loadDecisions(db, rows.map((v) => v.versionId));
 
   const waiting: ReviewQueueRow[] = [];
   const submitted: ReviewQueueRow[] = [];
   for (const v of rows) {
     const chain = chainFor(chains, v.contentTypeId);
-    const row = queueRow(v, people, currentStageOf(chain, v.currentStage));
+    const row = queueRow(v, people, queueStage(v, chain, v.currentStage));
     if (v.submittedBy === viewer.userId) {
       if (inSpace(v)) submitted.push(row);
       continue;
@@ -148,8 +150,8 @@ const loadInReview = cache(async (spaceSlug: string) => {
       teamId: v.teamId,
       submittedBy: v.submittedBy,
       writers: v.writers,
-      stage: waitingStage(chain, v.currentStage),
-      approvedBy: approvedBy.get(v.versionId) ?? [],
+      stage: currentStageOf(v, chain),
+      approvedBy: approvedThisRound(decisions.get(v.versionId) ?? []),
     });
     if (check.ok) waiting.push(row);
   }
@@ -193,9 +195,9 @@ export const getReviewQueue = cache(async (spaceSlug: string): Promise<ReviewQue
   for (const r of rows) {
     if (seen.has(r.versionId)) continue; // newest first: the first row is the version's latest decision
     seen.add(r.versionId);
-    const chain = chainFor(chains, r.contentTypeId);
+    const count = ownStages(r.stages, chainFor(chains, r.contentTypeId)).length;
     decided.push({
-      ...queueRow(r, people, { position: r.stagePosition, name: r.stageName, count: chain.length }),
+      ...queueRow(r, people, { position: r.stagePosition, name: r.stageName, count }),
       decision: { kind: r.decision, by: personOf(people, r.decidedBy), at: iso(r.decidedAt) },
     });
   }
@@ -241,12 +243,14 @@ export const getReviewScreen = cache(
     ]);
 
     const submittedBy = version.submittedBy ?? version.createdBy;
-    const stage = waitingStage(chain, version.currentStage);
+    // The version's own stages (recorded at submit), each stage's rule read from the chain now.
+    const own = ownStages(version.stages, chain);
+    const stage = currentStageOf(version, chain);
     const decideInput = { teamId: template.teamId, submittedBy: version.submittedBy, writers: version.writers, stage };
     const decide = decideOnScreen(decideCheck(space.viewer, decideInput), version.state);
     const inReview = version.state === "in_review";
-    // Two stages need two people: someone who approved an earlier stage can't approve this one.
-    const approvedBy = inReview ? decisionRows.filter((d) => d.decision === "approved").map((d) => d.actorId) : [];
+    // Two stages need two people: someone who approved a stage of this version can't approve another.
+    const approvedBy = inReview ? approvedThisRound(decisionRows) : [];
     const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
     const contractChanges = version.contractChanges ?? [];
 
@@ -280,9 +284,9 @@ export const getReviewScreen = cache(
           ? { id: active.id, number: active.number, body: active.body, variables: active.variables }
           : null,
       steps: stepperState(
-        chain,
+        own,
         decisionRows.map((d) => ({
-          stagePosition: d.stagePosition,
+          stageId: d.stageId,
           decision: d.decision,
           by: personOf(people, d.actorId),
           at: iso(d.decidedAt),

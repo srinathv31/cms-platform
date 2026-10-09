@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { canActOnStage } from "@/domain/approval-chain";
+import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } from "@/domain/approval-chain";
 import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
@@ -119,7 +119,7 @@ async function namedOnVersion(
   version: ReviewVersionRow,
 ): Promise<boolean> {
   if (version.state === "in_review") {
-    const stage = waitingStage(await loadChain(db, template.contentTypeId), version.currentStage);
+    const stage = currentStageOf(version, await loadChain(db, template.contentTypeId));
     if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: stageApproverIds(stage) }).ok) return true;
   }
   const decided = await db
@@ -132,17 +132,12 @@ async function namedOnVersion(
 
 // ── The approval chain ────────────────────────────────────────
 
-/** Release 1's chain, used if a content type has no stages configured. */
-export const DEFAULT_CHAIN: readonly ApprovalStage[] = [
-  { position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
-];
-
 type Reader = Pick<Db, "select">;
 
 /** The content type's stages in order (configuration, not code). Never empty. */
 export async function loadChain(reader: Reader, contentTypeId: string): Promise<ApprovalStage[]> {
   const rows = await reader
-    .select({ position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+    .select({ id: approvalStages.id, position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
     .from(approvalStages)
     .where(eq(approvalStages.contentTypeId, contentTypeId))
     .orderBy(asc(approvalStages.position));
@@ -154,6 +149,7 @@ export const getChains = cache(async (): Promise<ReadonlyMap<string, ApprovalSta
   const rows = await db
     .select({
       contentTypeId: approvalStages.contentTypeId,
+      id: approvalStages.id,
       position: approvalStages.position,
       name: approvalStages.name,
       rule: approvalStages.approverRule,
@@ -173,11 +169,6 @@ export function chainFor(chains: ReadonlyMap<string, ApprovalStage[]>, contentTy
   return chains.get(contentTypeId) ?? DEFAULT_CHAIN.map((stage) => ({ ...stage }));
 }
 
-/** The stage a version waits on. A stage index past the end (a chain shortened mid-review) reads as the last. */
-export function waitingStage(chain: readonly ApprovalStage[], currentStage: number): ApprovalStage {
-  return chain[Math.min(Math.max(currentStage, 0), chain.length - 1)]!;
-}
-
 /**
  * The users a stage names (`{kind:"user"}` rules): they may open, decide and comment on the version
  * waiting on it, on any team (`PermissionResource.stageApproverIds`). Empty for a team-role stage.
@@ -186,24 +177,25 @@ export function stageApproverIds(stage: ApprovalStage | null | undefined): strin
   return stage?.rule.kind === "user" ? [stage.rule.userId] : [];
 }
 
-/** Who already approved a stage of each version (the "two stages need two people" guard). */
-export async function loadApprovedBy(reader: Reader, versionIds: readonly string[]): Promise<Map<string, string[]>> {
-  const byVersion = new Map<string, string[]>();
+/** Each version's decisions, by stage id (the "two stages need two people" guard reads them). */
+export async function loadDecisions(reader: Reader, versionIds: readonly string[]): Promise<Map<string, RecordedDecision[]>> {
+  const byVersion = new Map<string, RecordedDecision[]>();
   if (versionIds.length === 0) return byVersion;
   const rows = await reader
-    .select({ versionId: approvals.versionId, actorId: approvals.actorId })
+    .select({ versionId: approvals.versionId, stageId: approvals.stageId, actorId: approvals.actorId, decision: approvals.decision })
     .from(approvals)
-    .where(and(inArray(approvals.versionId, [...versionIds]), eq(approvals.decision, "approved")));
-  for (const r of rows) byVersion.set(r.versionId, [...(byVersion.get(r.versionId) ?? []), r.actorId]);
+    .where(inArray(approvals.versionId, [...versionIds]));
+  for (const { versionId, ...decision } of rows) byVersion.set(versionId, [...(byVersion.get(versionId) ?? []), decision]);
   return byVersion;
 }
 
 /**
- * May the viewer approve, or request changes on, a version at its current stage? The role grant (or
- * being named on the stage) and maker-checker (its submitter and `writers`) come from
- * `can("version.decide")`; the stage's own rule from `canActOnStage`. With `approvedBy` (the approve
- * check), someone who approved an earlier stage of the version is refused. The queue, the review screen
- * and the actions all ask this one question.
+ * May the viewer approve, or request changes on, a version at its current stage (`currentStageOf`;
+ * null when that stage has left the chain)? The role grant (or being named on the stage) and
+ * maker-checker (its submitter and `writers`) come from `can("version.decide")`; the stage's own rule
+ * from `canActOnStage`. With `approvedBy` (the approve check, from `approvedThisRound`), someone who
+ * already approved a stage of the version is refused. The queue, the review screen and the actions all
+ * ask this one question.
  */
 export function decideCheck(
   viewer: Viewer,
@@ -211,7 +203,7 @@ export function decideCheck(
     teamId: string;
     submittedBy: string | null;
     writers: readonly string[];
-    stage: ApprovalStage;
+    stage: ApprovalStage | null;
     approvedBy?: readonly string[];
   },
 ): PermissionResult {
@@ -222,6 +214,7 @@ export function decideCheck(
     stageApproverIds: stageApproverIds(input.stage),
   });
   if (!permitted.ok) return permitted;
+  if (!input.stage) return { ok: false, reason: REFUSALS.stageMissing };
   const onStage = canActOnStage(viewer, input.stage, input.teamId);
   if (!onStage.ok) return onStage;
   return input.approvedBy?.includes(viewer.userId) ? { ok: false, reason: REFUSALS.approvedEarlierStage } : onStage;

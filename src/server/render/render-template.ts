@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
-import { stageAt } from "@/domain/approval-chain";
+import { currentStageOf } from "@/domain/approval-chain";
 import { can, hasActiveTeamAccess } from "@/domain/permissions";
 import {
   BAD_REQUEST_MESSAGES,
@@ -158,11 +158,11 @@ async function previewAllowed(db: Db, viewer: Viewer, template: TemplateRow, ver
   if (can(viewer, "template.view", { teamId: template.teamId }).ok) return true;
   if (version.state === "in_review") {
     const chain = await db
-      .select({ position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+      .select({ id: approvalStages.id, position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
       .from(approvalStages)
       .where(eq(approvalStages.contentTypeId, template.contentTypeId))
       .orderBy(asc(approvalStages.position));
-    const rule = stageAt(chain, version.currentStage)?.rule;
+    const rule = currentStageOf(version, chain)?.rule;
     const named = rule?.kind === "user" ? [rule.userId] : [];
     if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: named }).ok) return true;
   }

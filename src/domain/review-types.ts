@@ -118,9 +118,21 @@ export type LifecycleEffect = AuditEffect | NotificationEffect | ConsumerNoticeE
 // ── Approval chain (configuration, not code) ─────────────────────────────────
 
 export interface ApprovalStage {
-  position: number; // 0-based
+  /** The `approval_stages` row's id: it stays the same when the stage is renamed, moved, or given a new rule. */
+  id: string;
+  position: number; // 0-based: in the chain, or in a version's own stages
   name: string;
   rule: ApproverRule;
+}
+
+/**
+ * One stage of the sequence a version goes through, recorded on it at submit (`versions.stages`): the
+ * chain stage's id and its name then. Editing the chain never changes a recorded sequence; the stage's
+ * rule is read from the chain by id when the version reaches it.
+ */
+export interface VersionStage {
+  id: string;
+  name: string;
 }
 
 export type StepStatus = "done" | "current" | "waiting" | "returned";

@@ -3,7 +3,7 @@
 import { refresh, revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { canActOnStage, stageAt } from "@/domain/approval-chain";
+import { canActOnStage, currentStageOf } from "@/domain/approval-chain";
 import {
   approve,
   cancelRevoke as cancelRevokeTransition,
@@ -27,7 +27,7 @@ import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { loadApprovedBy, loadChain, stageApproverIds, waitingStage } from "@/server/queries/review-shared";
+import { loadChain, loadDecisions, stageApproverIds } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke.
@@ -123,6 +123,7 @@ async function findVersion(templateId: string, number: number) {
       writers: versions.writers,
       revoke: versions.revoke,
       state: versions.state,
+      stages: versions.stages,
       currentStage: versions.currentStage,
     })
     .from(versions)
@@ -140,7 +141,7 @@ async function findVersion(templateId: string, number: number) {
 async function decideResource(found: FoundVersion | undefined): Promise<PermissionResource> {
   if (!found) return { teamId: null };
   const named =
-    found.state === "in_review" ? stageApproverIds(waitingStage(await loadChain(db, found.contentTypeId), found.currentStage)) : [];
+    found.state === "in_review" ? stageApproverIds(currentStageOf(found, await loadChain(db, found.contentTypeId))) : [];
   return { teamId: found.teamId, submittedBy: found.submittedBy, writers: found.writers, stageApproverIds: named };
 }
 
@@ -167,10 +168,10 @@ async function activeVersion(tx: Tx, templateId: string) {
   });
 }
 
-/** The stage's own rule (who it names), asked of the stage the version waits on now. */
+/** The stage's own rule (who it names now), asked of the stage of its own the version waits on. */
 function assertStage(viewer: Viewer, chain: readonly ApprovalStage[], version: ReviewVersion, teamId: string) {
   if (version.state !== "in_review") return; // the transition refuses with its own sentence
-  const stage = stageAt(chain, version.currentStage);
+  const stage = currentStageOf(version, chain);
   if (!stage) return;
   const result = canActOnStage(viewer, stage, teamId);
   if (!result.ok) refuse(result.reason);
@@ -318,6 +319,7 @@ export async function submitVersion(input: {
         submittedAt: changes.submittedAt,
         writers: changes.writers,
         submitNote: changes.submitNote,
+        stages: changes.stages,
         currentStage: changes.currentStage,
         contractChanges: changes.contractChanges,
       },
@@ -458,12 +460,12 @@ const ApproveInput = VersionRef.extend({
 });
 
 /**
- * Approves the stage the version waits on (the content type's chain, from approval_stages). At an
- * earlier stage the version moves on to the next; at the last it goes live: the previous Active
- * version, if there is one, becomes Superseded first (one Active per template), optionally with a
- * sunset date, and the version becomes Active. With none (a first version, or the correction after the
- * Active version was revoked) nothing is superseded and a sunset date is ignored. Consumers that render
- * the template are sent a notice.
+ * Approves the stage the version waits on: one of the stages it recorded at submit, with the rule that
+ * stage has in approval_stages now. At an earlier stage the version moves on to the next of its own; at
+ * the last it goes live: the previous Active version, if there is one, becomes Superseded first (one
+ * Active per template), optionally with a sunset date, and the version becomes Active. With none (a
+ * first version, or the correction after the Active version was revoked) nothing is superseded and a
+ * sunset date is ignored. Consumers that render the template are sent a notice.
  */
 export async function approveVersion(input: {
   templateId: string;
@@ -498,7 +500,7 @@ export async function approveVersion(input: {
       sunsetPrevious,
       sampleSetsSeen: parsed.data.sampleSetsSeen,
       templateName: await templateName(tx, found.templateId),
-      approvedBy: (await loadApprovedBy(tx, [version.id])).get(version.id) ?? [],
+      decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
     });
     if (!outcome.ok) refuse(outcome.reason);
 

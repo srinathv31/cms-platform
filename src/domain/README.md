@@ -43,7 +43,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [status.ts](status.ts) | Label, tone, and icon for each version state. |
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
 | Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with. |
-| Review | [approval-chain.ts](approval-chain.ts) | Stage order, whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
+| Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, for the review screen. |
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
@@ -74,7 +74,8 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Breaking change | A change that breaks consumers of the baseline: a required variable added, a variable removed, a key renamed, a type changed, an optional one made required. `submit` stores the diff as `contractChanges`. | `diffVariables`, `isBreaking` |
 | Consumer | A registered system (`consumers` table; the simulator plays `coral`) that calls `/api/v1` with `X-Consumer-Id` and pins a version number. It receives notices: `new_version`, `sunset_scheduled`, `revoked`. | [golive/](golive/) |
 | Channel | `pdf`, `web`, or `email`. The content type allows it; the version turns it on. New templates start with `DEFAULT_CHANNELS` (`pdf`, `web`). | `CHANNELS` |
-| Approval chain | Ordered `ApprovalStage`s per content type, stored as configuration. A stage's rule names a team role or one user. A version's `currentStage` indexes it. | [approval-chain.ts](approval-chain.ts) |
+| Approval chain | Ordered `ApprovalStage`s per content type, stored as configuration, each with a stable id. A stage's rule names a team role or one user. | [approval-chain.ts](approval-chain.ts) |
+| A version's stages | The chain's stage ids and names, recorded on the version at submit (`VersionStage[]`). It goes through those whatever the chain becomes; each stage's rule is read from the chain by id when the version reaches it. `currentStage` is a position in them. A stage an in-review version still needs can't be removed ([decision 0015](../../docs/decisions/0015-a-version-keeps-the-stages-it-was-submitted-with.md)). | `recordStages`, `stageOf`, `versionsNeeding` |
 | Viewer, persona | `Viewer` is who is acting, built per request from the `ucomp_persona` cookie ([viewer.ts](../server/viewer.ts)). Personas are seeded people ([people.ts](../server/seed/people.ts)). | `Viewer` |
 | Roles | Team roles `viewer`, `author`, `approver`, `team_admin`, held through a membership that is `active`, `suspended`, or `lapsed`. Platform roles `platform_admin` and `auditor` (read-only everywhere). | [types.ts](types.ts) |
 | `can()` | The one permission check: role grants, then guards (maker-checker, two-person revoke, your own access request, your own access). | [permissions.ts](permissions.ts) |
@@ -85,9 +86,9 @@ The lifecycle, as [lifecycle.ts](lifecycle.ts) implements it:
 
 ```text
 createDraft | editLatest (latest Active or Revoked) | requestChanges   → draft
-draft        submit                                       → in_review (numbered)
-in_review    approve, earlier stage                       → in_review, currentStage + 1
-in_review    approve, last stage                          → active; the previous active, if any → superseded
+draft        submit                                       → in_review (numbered, its stages recorded)
+in_review    approve, earlier of its stages               → in_review, currentStage + 1
+in_review    approve, last of its stages                  → active; the previous active, if any → superseded
 in_review    requestChanges                               → changes_requested, plus a new draft
 superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
@@ -136,7 +137,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | Rule | Where it lives today |
 | --- | --- |
 | Re-notifying the people a stage names when its rule changes | `saveApprovalChain` in [actions/platform.ts](../server/actions/platform.ts) |
-| The default chain (`DEFAULT_CHAIN`), the combined decide check (`decideCheck`), and `waitingStage`, which reads an out-of-range stage as the last one where `stageAt` returns null | [queries/review-shared.ts](../server/queries/review-shared.ts) |
+| The combined decide check (`decideCheck`) | [queries/review-shared.ts](../server/queries/review-shared.ts) |
 | A new template's channels (wanted and allowed, else the first allowed) | `conformToContentType` in [templates/create.ts](../server/templates/create.ts) |
 | A version publishes a channel only if the content type still allows it | [queries/consumer-api.ts](../server/queries/consumer-api.ts), [queries/integration.ts](../server/queries/integration.ts), [render-template.ts](../server/render/render-template.ts) |
 | Which states a consumer can see (`RELEASED`: active, superseded, revoked) | [queries/consumer-api.ts](../server/queries/consumer-api.ts) |

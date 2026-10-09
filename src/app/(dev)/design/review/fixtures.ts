@@ -283,10 +283,10 @@ export const CONTRACT_LINES: string[] = [
 // ── Approval chain ───────────────────────────────────────────────
 
 export const CHAIN: Record<StageCount, ApprovalStage[]> = {
-  1: [{ position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }],
+  1: [{ id: "stage_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }],
   2: [
-    { position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
-    { position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+    { id: "stage_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+    { id: "stage_legal", position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
   ],
 };
 

@@ -8,23 +8,27 @@ import { asPersona, beat, demoTimeout, expect, hydrated, liveEditor, openLibrary
 //
 //   1. Riley (Platform Admin) adds a "Legal reviewer" stage to the Disclosure approval chain, naming Dana
 //      Park. The strip shows the chain Now and After and says Dana will review every team's submissions.
-//      Cash Back Welcome Bonus v3 (seeded, in review, submitted by Maya) keeps waiting on stage 1.
-//   2. Jordan (Approver) opens it from his queue: the stepper has two stages and he is on the first. He
+//      Cash Back Welcome Bonus v3 (seeded, in review, submitted by Maya) keeps the one stage it was
+//      submitted with (decision 0015): Jordan's approval makes it Active. Maya then edits Cash Back and
+//      submits v4, which goes through both stages.
+//   2. Jordan (Approver) opens v4 from his queue: the stepper has two stages and he is on the first. He
 //      approves: the dialog says it moves on to the Legal reviewer and is not Active yet. Afterwards the
 //      stepper shows his approval, Dana's stage is current, his queue no longer holds it, and he has no say
 //      on the next stage.
 //   3. Alex (the team's other Approver) sees it waiting on Dana and can't decide it.
 //   4. Dana, who is only a Viewer of the team, has the bell item and the Review badge for it, opens it from
-//      her queue, and approves: the version goes Active (the go-live moment), the previous Active version is
-//      Superseded, and the stepper shows both approvals.
+//      her queue, and approves: the version goes Active (the go-live moment), v3 is Superseded, and the
+//      stepper shows both approvals.
 //   5. The database holds both approvals, in order, by who and at which stage.
 //
 // Cash Back v3 is the seed's own in-review version, so nothing here creates a template; it changes the
-// approval chain, the version's state and the access it grants, so afterAll re-seeds the database.
+// approval chain, the versions' states and the access they grant, so afterEach re-seeds the database.
 // Console and page errors fail it.
 //
-// The last test is the chain editor's own check (domain validateChain): naming one person on two stages
-// shows the reason at the later stage and keeps Save disabled, and nothing is sent.
+// The third test is finding D3 of the October 2026 review: the chain is reordered while v4 is between its
+// stages, and the review still finishes. The last test is the chain editor's own check (domain
+// validateChain): naming one person on two stages shows the reason at the later stage and keeps Save
+// disabled, and nothing is sent.
 
 const TEAM = "coral-offers";
 const NAME = "Cash Back Welcome Bonus — Terms";
@@ -96,21 +100,74 @@ async function expectReviewScreen(page: Page, number: number) {
   await hydrated(page);
 }
 
+/** The seed's in-review version of Cash Back (v3). */
+async function seededInReview() {
+  const [seeded] = await rows(
+    `SELECT v.id, v.template_id, v.number, v.state, v.current_stage, v.stages FROM versions v JOIN templates t ON t.id = v.template_id
+     WHERE t.name = ? AND v.state = 'in_review'`,
+    [NAME],
+  );
+  if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);
+  return { versionId: String(seeded.id), templateId: String(seeded.template_id), number: Number(seeded.number), row: seeded };
+}
+
+/** Approve on the open review screen, through the dialog; at the last stage, wait out the go-live moment. */
+async function approveOnScreen(page: Page, number: number, outcome: "live" | "next") {
+  await click(approveButton(page));
+  const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
+  await expect(dialog).toBeVisible();
+  await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+  await expect(dialog).toBeHidden({ timeout: 20_000 });
+  if (outcome === "live") {
+    await expect(page.locator("[data-go-live]")).toHaveCount(0, { timeout: 20_000 });
+    await expect(statusBadge(page)).toHaveText("Active");
+  } else {
+    await expect(statusBadge(page)).toHaveText("In review");
+  }
+}
+
+/**
+ * v3 was submitted under the seed's one-stage chain and keeps that stage whatever the chain becomes, so
+ * Jordan's approval makes it Active. Maya then presses Edit and submits v4, which records the chain as it
+ * is now. Returns v4.
+ */
+async function goLiveThenResubmit(page: Page, seeded: { templateId: string; number: number }) {
+  await asPersona(page, "jordan");
+  await page.goto(`/${TEAM}/review/${seeded.templateId}/${seeded.number}`);
+  await expectReviewScreen(page, seeded.number);
+  await expect(decision(page).locator("[data-step]"), "v3 has the one stage it was submitted with").toHaveCount(1);
+  await approveOnScreen(page, seeded.number, "live");
+
+  await asPersona(page, "maya");
+  await page.goto(`/${TEAM}/templates/${seeded.templateId}`);
+  await hydrated(page);
+  await click(page.getByRole("button", { name: "Edit", exact: true }));
+  await expect(page.locator("header").filter({ visible: true }).getByText(`Based on v${seeded.number}`, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await liveEditor(page);
+  await hydrated(page);
+  const number = seeded.number + 1;
+  await click(page.getByRole("button", { name: "Submit for review" }));
+  const dialog = page.getByRole("dialog", { name: `Submit v${number} for review` });
+  await expect(dialog).toBeVisible({ timeout: 20_000 });
+  await click(dialog.getByRole("button", { name: `Submit v${number}`, exact: true }));
+  await expect(dialog).toBeHidden({ timeout: 20_000 });
+  await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
+  const [row] = await rows("SELECT id, state, stages FROM versions WHERE template_id = ? AND number = ?", [seeded.templateId, number]);
+  expect(row?.state).toBe("in_review");
+  return { versionId: String(row!.id), number, stages: JSON.parse(String(row!.stages)) as { id: string; name: string }[] };
+}
+
 test.describe("phase 6: two-stage approval", () => {
   test("Riley adds Dana's Legal reviewer stage; Jordan approves stage 1, Dana approves stage 2, the version goes Active", async ({ page }) => {
-    test.setTimeout(demoTimeout(240_000));
+    test.setTimeout(demoTimeout(300_000));
 
-    const [seeded] = await rows(
-      `SELECT v.id, v.template_id, v.number, v.state, v.current_stage FROM versions v JOIN templates t ON t.id = v.template_id
-       WHERE t.name = ? AND v.state = 'in_review'`,
-      [NAME],
-    );
-    if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);
-    const versionId = String(seeded.id);
-    const templateId = String(seeded.template_id);
-    const number = Number(seeded.number);
-    const [previous] = await rows("SELECT number FROM versions WHERE template_id = ? AND state = 'active'", [templateId]);
-    expect(previous, "something is Active for v3 to replace").toBeDefined();
+    const seeded = await seededInReview();
+    const { templateId } = seeded;
+    // v4, once Maya submits it under the two-stage chain (step 1.4).
+    let versionId = "";
+    let number = 0;
 
     // ── 1. Riley adds the stage ──────────────────────────────────────────────
 
@@ -167,7 +224,7 @@ test.describe("phase 6: two-stage approval", () => {
       await closeSettings(page);
     });
 
-    await test.step("1.3 The version in review is still on stage 1 (the stage kept its id)", async () => {
+    await test.step("1.3 The chain has both stages; v3, submitted before, keeps the one stage it was submitted with", async () => {
       const stages = await rows("SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
       expect(stages.map((s) => [s.position, s.name])).toEqual([
         [0, "Team approver"],
@@ -175,9 +232,19 @@ test.describe("phase 6: two-stage approval", () => {
       ]);
       expect(stages[0].id, "the first stage kept its id").toBe("stage_disclosure_0");
       expect(JSON.parse(String(stages[1].approver_rule))).toEqual({ kind: "user", userId: "dana" });
-      const [version] = await rows("SELECT state, current_stage FROM versions WHERE id = ?", [versionId]);
+      const [version] = await rows("SELECT state, current_stage, stages FROM versions WHERE id = ?", [seeded.versionId]);
       expect(version.state).toBe("in_review");
       expect(Number(version.current_stage), "still waiting on the first stage").toBe(0);
+      expect(JSON.parse(String(version.stages)), "a chain edit doesn't change a version in review").toEqual([
+        { id: "stage_disclosure_0", name: "Team approver" },
+      ]);
+    });
+
+    await test.step("1.4 Jordan's approval makes v3 Active; Maya edits Cash Back and submits v4, which records both stages", async () => {
+      const v4 = await goLiveThenResubmit(page, seeded);
+      versionId = v4.versionId;
+      number = v4.number;
+      expect(v4.stages.map((s) => s.name)).toEqual(["Team approver", STAGE]);
     });
 
     // ── 2. Jordan approves stage 1 ───────────────────────────────────────────
@@ -324,16 +391,17 @@ test.describe("phase 6: two-stage approval", () => {
 
     // ── 5. The trail ─────────────────────────────────────────────────────────
 
-    await test.step("5. The database: both approvals in order, v3 Active, the previous version Superseded", async () => {
+    await test.step("5. The database: both approvals in order, v4 Active, v3 Superseded", async () => {
+      const [legal] = await rows("SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' AND name = ?", [STAGE]);
       const approvals = await rows("SELECT * FROM approvals WHERE version_id = ? ORDER BY decided_at, stage_position", [versionId]);
-      expect(approvals.map((a) => [a.actor_id, a.decision, Number(a.stage_position), a.stage_name])).toEqual([
-        ["jordan", "approved", 0, "Team approver"],
-        ["dana", "approved", 1, STAGE],
+      expect(approvals.map((a) => [a.actor_id, a.decision, a.stage_id, Number(a.stage_position), a.stage_name])).toEqual([
+        ["jordan", "approved", "stage_disclosure_0", 0, "Team approver"],
+        ["dana", "approved", legal!.id, 1, STAGE],
       ]);
       const [version] = await rows("SELECT state, activated_at FROM versions WHERE id = ?", [versionId]);
       expect(version.state).toBe("active");
       expect(version.activated_at).not.toBeNull();
-      const [before] = await rows("SELECT state FROM versions WHERE template_id = ? AND number = ?", [templateId, Number(previous.number)]);
+      const [before] = await rows("SELECT state FROM versions WHERE id = ?", [seeded.versionId]);
       expect(before.state, "the version it replaced").toBe("superseded");
       const audit = await rows("SELECT actor_id, action FROM audit_events WHERE version_id = ? ORDER BY at, id", [versionId]);
       expect(audit.filter((a) => /approved|activated/.test(String(a.action))).map((a) => a.actor_id)).toContain("dana");
@@ -341,18 +409,13 @@ test.describe("phase 6: two-stage approval", () => {
   });
 
   test("nobody approves two stages: with a second Approver stage, Jordan can't approve it too; Alex does and it goes Active", async ({ page }) => {
-    test.setTimeout(demoTimeout(180_000));
+    test.setTimeout(demoTimeout(240_000));
     const SECOND = "Second approver";
 
-    const [seeded] = await rows(
-      `SELECT v.id, v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id
-       WHERE t.name = ? AND v.state = 'in_review'`,
-      [NAME],
-    );
-    if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);
-    const versionId = String(seeded.id);
-    const templateId = String(seeded.template_id);
-    const number = Number(seeded.number);
+    const seeded = await seededInReview();
+    const { templateId } = seeded;
+    let versionId = "";
+    let number = 0;
 
     await test.step("1. Riley adds a second stage that any Approver may decide", async () => {
       await asPersona(page, "riley");
@@ -369,6 +432,10 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(consequence).toBeHidden({ timeout: 20_000 });
       await expect(chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem")).toHaveCount(2);
       await closeSettings(page);
+    });
+
+    await test.step("1.1 v3 goes Active on its one stage; Maya submits v4 under the two-stage chain", async () => {
+      ({ versionId, number } = await goLiveThenResubmit(page, seeded));
     });
 
     await test.step("2. Jordan approves stage 1; the version moves on, and he can't approve stage 2", async () => {
@@ -418,6 +485,101 @@ test.describe("phase 6: two-stage approval", () => {
         ["jordan", 0, "Team approver"],
         ["alex", 1, SECOND],
       ]);
+    });
+  });
+
+  test("the chain is reordered while v4 is between its stages, and the review still finishes (finding D3)", async ({ page }) => {
+    test.setTimeout(demoTimeout(240_000));
+    const LEGAL_ID = "stage_e2e_legal";
+    const seeded = await seededInReview();
+    const { templateId } = seeded;
+    let v4 = { versionId: "", number: 0 };
+
+    // The chain starts as [Legal reviewer (Dana), Team approver], set up in the database: the tests above
+    // cover adding a stage in the chain editor. afterEach re-seeds.
+    await rows("UPDATE approval_stages SET position = 1 WHERE id = 'stage_disclosure_0'");
+    await rows("INSERT INTO approval_stages (id, content_type_id, position, name, approver_rule) VALUES (?, 'ct_disclosure', 0, ?, ?)", [
+      LEGAL_ID,
+      STAGE,
+      JSON.stringify({ kind: "user", userId: "dana" }),
+    ]);
+
+    await test.step("1. v3 goes Active on its one stage; Maya submits v4, which records Legal reviewer, then Team approver", async () => {
+      const submitted = await goLiveThenResubmit(page, seeded);
+      v4 = submitted;
+      expect(submitted.stages).toEqual([
+        { id: LEGAL_ID, name: STAGE },
+        { id: "stage_disclosure_0", name: "Team approver" },
+      ]);
+    });
+
+    await test.step("2. Dana approves the Legal stage: v4 moves on to the team's approvers", async () => {
+      await asPersona(page, "dana");
+      await page.goto(`/${TEAM}/review/${templateId}/${v4.number}`);
+      await expectReviewScreen(page, v4.number);
+      await expect(decision(page)).toContainText("Stage 1 of 2");
+      await approveOnScreen(page, v4.number, "next");
+      await expect(step(page, "done")).toContainText("Dana Park");
+      await expect(step(page, "current")).toContainText("Team approver");
+    });
+
+    await test.step("3. Riley moves Team approver first and saves the chain; v4 keeps its own order", async () => {
+      await asPersona(page, "riley");
+      await openLibrary(page, "all");
+      const dialog = await openSettings(page, "Approval chains");
+      const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
+      const stages = chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem");
+      await expect(stages.first()).toContainText(STAGE);
+      // v4 has passed Legal reviewer, so that stage could go; it still needs Team approver, so that one can't.
+      await expect(chain.getByRole("button", { name: `Remove ${STAGE}`, exact: true })).not.toHaveAttribute("aria-disabled", "true");
+      const removeTeam = chain.getByRole("button", { name: "Remove Team approver", exact: true });
+      await expect(removeTeam).toHaveAttribute("aria-disabled", "true");
+      await removeTeam.hover();
+      await expect(page.getByText("1 version in review still needs Team approver.", { exact: true })).toBeVisible();
+      await beat(page, 900);
+      await shoot(page, "riley-remove-blocked");
+      await click(chain.getByRole("button", { name: "Move Team approver up", exact: true }));
+      await expect(stages.first()).toContainText("Team approver");
+      const consequence = strip(chain);
+      await click(consequence.getByRole("button", { name: "Save chain", exact: true }));
+      await expect(consequence).toBeHidden({ timeout: 20_000 });
+      await closeSettings(page);
+
+      const saved = await rows("SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
+      expect(saved.map((s) => s.id)).toEqual(["stage_disclosure_0", LEGAL_ID]);
+      const [version] = await rows("SELECT state, current_stage, stages FROM versions WHERE id = ?", [v4.versionId]);
+      expect(version.state).toBe("in_review");
+      expect(Number(version.current_stage), "still at its second stage").toBe(1);
+      expect((JSON.parse(String(version.stages)) as { id: string }[]).map((s) => s.id), "its own order").toEqual([LEGAL_ID, "stage_disclosure_0"]);
+    });
+
+    await test.step("4. Jordan sees Dana's approval under Legal reviewer and his stage current, and approves: v4 goes Active", async () => {
+      await asPersona(page, "jordan");
+      await page.goto(`/${TEAM}/review/${templateId}/${v4.number}`);
+      await expectReviewScreen(page, v4.number);
+      await expect(decision(page)).toContainText("Stage 2 of 2");
+      await expect(step(page, "done")).toContainText(STAGE);
+      await expect(step(page, "done")).toContainText("Dana Park");
+      await expect(step(page, "current")).toContainText("Team approver");
+      await expect(approveButton(page)).toBeEnabled();
+      await beat(page, 900);
+      await shoot(page, "jordan-after-reorder");
+      await approveOnScreen(page, v4.number, "live");
+      await expect(step(page, "done")).toHaveCount(2);
+      await expect(step(page, "done").nth(0)).toContainText("Dana Park");
+      await expect(step(page, "done").nth(1)).toContainText("Jordan Ellis");
+    });
+
+    await test.step("5. The database: each approval under the stage it was made at", async () => {
+      const approvals = await rows("SELECT actor_id, stage_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY decided_at", [
+        v4.versionId,
+      ]);
+      expect(approvals.map((a) => [a.actor_id, a.stage_id, Number(a.stage_position), a.stage_name])).toEqual([
+        ["dana", LEGAL_ID, 0, STAGE],
+        ["jordan", "stage_disclosure_0", 1, "Team approver"],
+      ]);
+      const [version] = await rows("SELECT state FROM versions WHERE id = ?", [v4.versionId]);
+      expect(version.state).toBe("active");
     });
   });
 

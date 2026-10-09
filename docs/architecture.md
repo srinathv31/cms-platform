@@ -144,7 +144,7 @@ at Turso instead. Two schema files:
   - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
   - **Templates:** `templates`; `versions` (body as TipTap JSON, variables, channels, state, `rev`, `writers`,
-    sunset and revoke fields); `approvals`.
+    the approval `stages` recorded at submit, sunset and revoke fields); `approvals` (each decision's stage id).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
   - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it

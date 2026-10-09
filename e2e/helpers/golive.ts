@@ -169,7 +169,7 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
   await run(db, `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((c) => version[c]));
   await run(
     db,
-    "INSERT INTO approvals (id, version_id, stage_position, stage_name, actor_id, decision, reason, sample_sets_seen, decided_at) VALUES (?, ?, 0, 'Team approver', 'jordan', 'approved', NULL, ?, ?)",
+    "INSERT INTO approvals (id, version_id, stage_id, stage_position, stage_name, actor_id, decision, reason, sample_sets_seen, decided_at) VALUES (?, ?, 'stage_disclosure_0', 0, 'Team approver', 'jordan', 'approved', NULL, ?, ?)",
     [`ap_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`, v2Id, JSON.stringify(sampleSets.map((s) => s.id)), at],
   );
   await run(db, "INSERT INTO audit_events (id, at, actor_id, team_id, template_id, version_id, action, details) VALUES (?, ?, 'jordan', ?, ?, ?, 'version.activated', ?)", [

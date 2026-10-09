@@ -57,7 +57,8 @@ a re-save kept a person who had lost access since.
   so at their stage, so the admin knows what to fix.
 - A Platform Admin named on a stage by another admin can edit the rest of that chain, and reorder or rename their
   stage. Putting themselves on any other stage reads as naming themselves, since it's a different stage id.
-- Chains are still read live by versions in review. Snapshotting the chain on a version at submit is
-  [D3](../handoff-review.md#d3--high-editing-the-approval-chain-mid-review-stalls-or-skips-stages).
+- A version in review goes through the stages it recorded at submit, and reads only each stage's rule live
+  ([0015](0015-a-version-keeps-the-stages-it-was-submitted-with.md)). These checks cover the chain as saved, not
+  each version's own stages.
 - A person can still lose access after the chain is saved. The chain then stalls until an admin edits it; nothing
   warns the admin before they open the editor.
