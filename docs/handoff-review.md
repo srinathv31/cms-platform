@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 13 | 27 | 43 |
+| Open | 0 | 3 | 12 | 27 | 42 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 24 | 5 | 49 |
+| Fixed | 1 | 19 | 25 | 5 | 50 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), and PRs #9–#40 (the Fix first list, October 2026).
@@ -111,7 +111,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N2 · Medium: A failed demo-script run leaves its state to the specs after it
 
-- **Status:** Open
+- **Status:** Fixed. The spec's `afterAll` re-seeds the database (`resetDemoData()`) however the run ended, a timeout included, and scenario-07, which turned Disclosure's Email off and back on in the test body, now puts the rule back in `afterAll` too.
 - **Where:** `e2e/demo-script.spec.ts` (`test.afterAll`)
 - **What happens:** The spec plays the whole demo on one database state: it resets in `beforeAll` and ends on the demo drawer's Reset. When a step fails, `afterAll` only closes the database, so the run's state stays behind: the demo clock moved on, access lapsed (Maya's, in the failed runs), and Coral's offers relinked to the story's versions. The specs after it run on that database, so one failure here cascades into dozens in specs that have nothing to do with it (principles, scenario-04, scenario-05). Its header says the next run starts with a reset, which holds only for the next run of this spec. Seen in the e2e runs of the Fix first PRs.
 - **Fix:** Reset in `afterAll` whatever happened (`resetDemoData()`, as `beforeAll` does), so a failure stays in this spec. Relates to [T7](#t7--medium-slow-and-brittle-test-habits), which would retire or merge the spec.
