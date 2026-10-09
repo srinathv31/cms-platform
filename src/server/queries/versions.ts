@@ -3,6 +3,7 @@ import { cache } from "react";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { describeChanges } from "@/domain/contract";
+import { DAY_MS } from "@/domain/dates";
 import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import { refuse, type Refusal } from "@/domain/refusals";
@@ -21,8 +22,6 @@ import {
 } from "./review-shared";
 
 // The Versions tab: the template's versions as a timeline, with what the viewer may do on each.
-
-const DAY_MS = 86_400_000;
 
 /**
  * What the viewer may do on one version right now: the permission (with its code and reason) first,

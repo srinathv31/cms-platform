@@ -6,7 +6,9 @@
 
 import { recordedSunsetDay } from "../business-zone";
 import { isContractChange } from "../contract";
-import { formatLongDate, joinWithAnd } from "../render/errors";
+import { formatLongDate } from "../dates";
+import { pluralWord } from "../plural";
+import { joinWithAnd } from "../render/errors";
 import type { ApiNotice, ContractChange, NoticeRow } from "../golive-types";
 import { apiChanges } from "./contract-diff";
 
@@ -30,8 +32,6 @@ function isoOf(value: unknown): string | null {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-
 /**
  * What a new version asks of a consumer, as one clause list:
  * "It adds the required variable annual_fee and makes promo_code optional." / "No contract changes."
@@ -44,7 +44,7 @@ export function changeSummary(changes: readonly ContractChange[]): string {
   const add = (list: string[], words: (keys: string) => string) => {
     if (list.length > 0) clauses.push(words(joinWithAnd(list)));
   };
-  const variables = (list: string[]) => plural(list.length, "variable", "variables");
+  const variables = (list: string[]) => pluralWord(list.length, "variable");
 
   const required = (c: ContractChange) => c.kind === "added" && c.required;
   const addedRequired = keys("added", required);

@@ -12,6 +12,7 @@
 // checks that no two entries share one. Import refusals keep their own codes (`IMPORT_REFUSALS`).
 
 import type { ACCESS_REFUSALS } from "./access";
+import { formatCount } from "./numbers";
 import type { STAGE_REFUSALS } from "./approval-chain";
 import type { COMMENT_REFUSALS } from "./comments";
 import type { REFUSALS } from "./lifecycle";
@@ -65,8 +66,8 @@ export const REQUEST_REFUSALS = {
   /** The input doesn't parse. The sentence is the first problem the parser found, when it has one. */
   invalidInput: refusal("invalid_input", (message?: string) => message ?? "Check the form and try again."),
   invalidDate: refusal("invalid_date", "Pick a valid date."),
-  noteTooLong: refusal("note_too_long", (max: number) => `Keep the note under ${max.toLocaleString("en-US")} characters.`),
-  reasonTooLong: refusal("reason_too_long", (max: number) => `Keep the reason under ${max.toLocaleString("en-US")} characters.`),
+  noteTooLong: refusal("note_too_long", (max: number) => `Keep the note under ${formatCount(max)} characters.`),
+  reasonTooLong: refusal("reason_too_long", (max: number) => `Keep the reason under ${formatCount(max)} characters.`),
   templateGone: refusal("template_gone", "This template no longer exists."),
   /** A read's template: not found, or not one the viewer may see (the two read the same). */
   templateUnavailable: refusal("template_unavailable", "This template isn't available."),

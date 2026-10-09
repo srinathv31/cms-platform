@@ -4,7 +4,9 @@ import { rolesLabel } from "@/domain/access";
 import type { InactivityRow, InactivitySection } from "@/domain/access-types";
 import type { PermissionResult } from "@/domain/types";
 import { keepInactive, reinstateMember, suspendInactive } from "@/server/actions/access";
-import { daysUntil, firstName, fmtDay, plural } from "./format";
+import { daysBetween, formatShortDate } from "@/domain/dates";
+import { plural } from "@/domain/plural";
+import { firstName } from "./format";
 import { GroupHeading, RowTable, type RowAct, type RowData } from "./rows";
 
 /** Days idle against the suspend line, the flag line marked. */
@@ -39,7 +41,7 @@ export function InactivityView({ section, today }: { section: InactivitySection;
 
   const flagged: RowData[] = section.flagged.map((m) => {
     const first = firstName(m.person.name);
-    const left = daysUntil(m.suspendsAt, today);
+    const left = daysBetween(today, m.suspendsAt);
     return {
       id: m.membershipId,
       person: m.person,
@@ -53,7 +55,7 @@ export function InactivityView({ section, today }: { section: InactivitySection;
           </div>
         ) : (
           <div key="suspends">
-            <div>{fmtDay(m.suspendsAt, today)}</div>
+            <div>{formatShortDate(m.suspendsAt, today)}</div>
             <div className="text-[13px] text-text-muted">{left > 0 ? `in ${plural(left, "day")}` : "Due now"}</div>
           </div>
         ),
@@ -88,7 +90,7 @@ export function InactivityView({ section, today }: { section: InactivitySection;
     person: m.person,
     sub: rolesLabel(m.roles),
     dim: true,
-    cells: [m.statusReason === "inactivity_auto" ? "Automatically" : "Team Admin", fmtDay(m.suspendsAt, today)],
+    cells: [m.statusReason === "inactivity_auto" ? "Automatically" : "Team Admin", formatShortDate(m.suspendsAt, today)],
     actions: [restore(m)],
   }));
 

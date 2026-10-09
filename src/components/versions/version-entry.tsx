@@ -4,13 +4,16 @@ import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { cn } from "@/lib/utils";
 import type { VersionState } from "@/domain/types";
+import { formatShortDate } from "@/domain/dates";
+import { plural } from "@/domain/plural";
 import type { VersionTimelineItem } from "@/domain/review-types";
+import { formatLastRender } from "@/components/usage/format";
 import { entryHeadingId } from "./entry-ids";
-import { codeSegments, formatDate, formatSunset, formatWhen, renderCount } from "./format";
+import { codeSegments } from "./format";
 import { EntryActions, RevokeBlockActions, type VersionContext } from "./version-actions";
 
 // One version on the timeline (a server component): the dates and sentences are made here, every
-// absolute date in UTC (see format.ts), and the only client parts are the action islands.
+// absolute date in UTC (`@/domain/dates`), and the only client parts are the action islands.
 
 /**
  * The geometry every entry shares, so the skeleton can draw it exactly. The heading row is always the
@@ -86,12 +89,12 @@ const name = (who: string) => <span className="font-medium">{who}</span>;
 /** The key dates of the version, in the order they happened. */
 function keyDates(item: VersionTimelineItem, now: Date): string[] {
   const dates: string[] = [];
-  if (item.state === "draft") return [`Started ${formatDate(item.createdAt, now)}`];
-  if (item.submittedAt) dates.push(`Submitted ${formatDate(item.submittedAt, now)}`);
-  if (item.activatedAt) dates.push(`Activated ${formatDate(item.activatedAt, now)}`);
-  if (item.supersededAt) dates.push(`Superseded ${formatDate(item.supersededAt, now)}`);
-  if (item.sunsetDay && item.sunsetPassed) dates.push(`Sunset passed ${formatSunset(item.sunsetDay, now)}`);
-  if (item.revoke?.confirmedAt) dates.push(`Revoked ${formatDate(item.revoke.confirmedAt, now)}`);
+  if (item.state === "draft") return [`Started ${formatShortDate(item.createdAt, now)}`];
+  if (item.submittedAt) dates.push(`Submitted ${formatShortDate(item.submittedAt, now)}`);
+  if (item.activatedAt) dates.push(`Activated ${formatShortDate(item.activatedAt, now)}`);
+  if (item.supersededAt) dates.push(`Superseded ${formatShortDate(item.supersededAt, now)}`);
+  if (item.sunsetDay && item.sunsetPassed) dates.push(`Sunset passed ${formatShortDate(item.sunsetDay, now)}`);
+  if (item.revoke?.confirmedAt) dates.push(`Revoked ${formatShortDate(item.revoke.confirmedAt, now)}`);
   return dates;
 }
 
@@ -181,11 +184,11 @@ export function VersionEntry({
           {item.decisions.map((d) =>
             d.kind === "approved" ? (
               <Fact key={`${d.at}-${d.by.id}`} icon={Check} tone="positive">
-                Approved by {name(d.by.name)} on {formatDate(d.at, now)}
+                Approved by {name(d.by.name)} on {formatShortDate(d.at, now)}
               </Fact>
             ) : (
               <Fact key={`${d.at}-${d.by.id}`} icon={CornerUpLeft}>
-                {name(d.by.name)} requested changes on {formatDate(d.at, now)}
+                {name(d.by.name)} requested changes on {formatShortDate(d.at, now)}
                 {d.reason ? (
                   <>
                     : <Quoted>{d.reason}</Quoted>
@@ -199,8 +202,8 @@ export function VersionEntry({
           {rendersForConsumers ? (
             <Fact icon={Activity}>
               {item.lastRenderAt
-                ? `Last render ${formatWhen(item.lastRenderAt, now)}. ${
-                    item.renders30d > 0 ? `${renderCount(item.renders30d)} in the last 30 days.` : "No renders in the last 30 days."
+                ? `Last render ${formatLastRender(item.lastRenderAt, now)}. ${
+                    item.renders30d > 0 ? `${plural(item.renders30d, "render")} in the last 30 days.` : "No renders in the last 30 days."
                   }`
                 : "No renders yet."}
             </Fact>
@@ -224,7 +227,7 @@ export function VersionEntry({
           ) : (
             <>
               <p>
-                Revoked {revoke.confirmedAt ? formatDate(revoke.confirmedAt, now) : ""}: <Quoted>{revoke.reason}</Quoted>
+                Revoked {revoke.confirmedAt ? formatShortDate(revoke.confirmedAt, now) : ""}: <Quoted>{revoke.reason}</Quoted>
               </p>
               <p className="mt-0.5 text-[13px] leading-5 opacity-80">
                 Started by {revoke.startedBy.name}

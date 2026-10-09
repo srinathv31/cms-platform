@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import { MessageSquare, MessageSquarePlus } from "lucide-react";
+import { plural } from "@/domain/plural";
 import { DOCUMENT_THREAD, type ThreadView } from "@/domain/review-types";
 import type { DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
@@ -336,7 +337,7 @@ export function GutterMarkers({
                 }}
                 type="button"
                 data-marker={marker.blockId}
-                aria-label={`${marker.count} ${marker.count === 1 ? "comment" : "comments"} ${collapsedKeys?.has(marker.blockId) ? "in unchanged blocks" : "on this block"}`}
+                aria-label={`${plural(marker.count, "comment")} ${collapsedKeys?.has(marker.blockId) ? "in unchanged blocks" : "on this block"}`}
                 aria-pressed={active}
                 tabIndex={marker.blockId === stop ? 0 : -1}
                 onFocus={() => setFocused(marker.blockId)}

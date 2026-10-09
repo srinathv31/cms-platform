@@ -15,7 +15,7 @@
 //     suspended automatically at 120 days.
 //   - Boundaries are inclusive: the instant a deadline or a day count is reached, it applies.
 
-import { formatLongDate, formatShortDate } from "./dates";
+import { DAY_MS, formatLongDate, formatShortDate } from "./dates";
 import { REASONS } from "./permissions";
 import { refusal, refuse, type Refusal } from "./refusals";
 import { joinWithAnd } from "./render/errors";
@@ -43,8 +43,6 @@ import {
   type SweepResult,
 } from "./access-types";
 import { TEAM_ROLES, type MembershipStatus, type MembershipStatusReason, type TeamRole } from "./types";
-
-export const DAY_MS = 86_400_000;
 
 export const ROLE_LABEL: Record<TeamRole, string> = {
   viewer: "Viewer",

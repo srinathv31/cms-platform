@@ -7,6 +7,7 @@ import { duration, ease } from "@/components/motion/presets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatShortDate } from "@/domain/dates";
+import { plural } from "@/domain/plural";
 import type { ImportOriginalRef, ImportOriginalView } from "@/domain/import-types";
 import { DocxSource } from "./docx-source";
 import { OriginalFailed } from "./original-failed";
@@ -21,7 +22,7 @@ type Loaded = { status: "loading" } | { status: "ready"; view: ImportOriginalVie
 
 /** "860 bytes", "24 KB", "1.2 MB". */
 export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} ${bytes === 1 ? "byte" : "bytes"}`;
+  if (bytes < 1024) return plural(bytes, "byte");
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`;
 }

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatCount } from "@/domain/numbers";
 import type { Day } from "./data";
 
 /*
@@ -21,8 +22,6 @@ export function Tip({ children, title, value }: { children: React.ReactElement<R
     </Tooltip>
   );
 }
-
-const nf = new Intl.NumberFormat("en-US");
 
 // ── Gauge ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +57,7 @@ export function HBars({ rows, total, className, labelSide = "right" }: { rows: B
         const pct = Math.round((r.value / sum) * 100);
         const width = Math.max(14, (r.value / max) * 100);
         const bar = (
-          <Tip title={r.label} value={`${nf.format(r.value)} renders · ${pct}%`}>
+          <Tip title={r.label} value={`${formatCount(r.value)} renders · ${pct}%`}>
             <div
               className={cn("flex h-9 items-center rounded-md px-3 text-[14px] font-medium text-white tabular-nums", i === 0 ? "bg-brand-4" : "bg-brand-3")}
               style={{ width: `${labelSide === "right" ? width * 0.55 : width}%` }}
@@ -72,7 +71,7 @@ export function HBars({ rows, total, className, labelSide = "right" }: { rows: B
             {labelSide === "top" ? <span className="truncate text-[13px] text-text">{r.label}</span> : null}
             <div className={labelSide === "right" ? "w-[55%] shrink-0" : "w-full"}>{bar}</div>
             {labelSide === "right" ? (
-              <span className="caps-label min-w-0 truncate">{nf.format(r.value)} · {r.label}</span>
+              <span className="caps-label min-w-0 truncate">{formatCount(r.value)} · {r.label}</span>
             ) : null}
           </li>
         );
@@ -123,7 +122,7 @@ export function Heatmap({ days, cell = 18, gap = 6, labels = true, grow = 1.3 }:
         const col = Math.floor((k + offset) / 7);
         const row = (k + offset) % 7;
         return (
-          <Tip key={d.i} title={d.long} value={`${nf.format(d.total)} renders`}>
+          <Tip key={d.i} title={d.long} value={`${formatCount(d.total)} renders`}>
             <rect x={left + col * (cell + gap)} y={top + row * (cell + gap)} width={cell} height={cell} rx={4} className={HEAT[level(d.total, max)]} />
           </Tip>
         );
@@ -190,7 +189,7 @@ export function StackedBars({
       {ticks.map((t) => (
         <g key={t}>
           <line x1={left} x2={width - 4} y1={y(t)} y2={y(t)} className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"} strokeWidth={1} />
-          <text x={left - 8} y={y(t) + 4} textAnchor="end" className="fill-text-muted text-[11px] tabular-nums">{nf.format(t)}</text>
+          <text x={left - 8} y={y(t) + 4} textAnchor="end" className="fill-text-muted text-[11px] tabular-nums">{formatCount(t)}</text>
         </g>
       ))}
       {data.map((d, i) => {
@@ -211,7 +210,7 @@ export function StackedBars({
               title={d.label}
               value={
                 <span className="flex flex-col gap-0.5">
-                  {series.map((s, k) => <span key={s.label}>{s.label}: {nf.format(d.parts[k])}</span>)}
+                  {series.map((s, k) => <span key={s.label}>{s.label}: {formatCount(d.parts[k])}</span>)}
                 </span>
               }
             >
@@ -303,7 +302,7 @@ export function ChannelMix({ parts, className }: { parts: { label: string; value
     <div className={className}>
       <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full">
         {parts.map((p, i) => (
-          <Tip key={p.label} title={p.label} value={`${nf.format(p.value)} · ${Math.round((p.value / total) * 100)}%`}>
+          <Tip key={p.label} title={p.label} value={`${formatCount(p.value)} · ${Math.round((p.value / total) * 100)}%`}>
             <span className={MIX[i]} style={{ width: `${(p.value / total) * 100}%` }} />
           </Tip>
         ))}

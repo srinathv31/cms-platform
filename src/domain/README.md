@@ -58,7 +58,8 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Render rules | [render/](render/) | Which versions render (`version-rules.ts`), value checks (`validate.ts`), TipTap JSON to `RenderDoc` (`resolve.ts`), JSON numbers kept as their exact source text (`json-number-text.ts`), and the exact error sentences (`errors.ts`). Specified in [docs/render-spec.md](../../docs/render-spec.md). [render/index.ts](render/index.ts) is the only barrel here. |
 | Import and Copilot | [import.ts](import.ts), [copilot.ts](copilot.ts) | What an imported file becomes as a draft; the prompt an author copies into Copilot. |
 | ⌘K palette | [palette.ts](palette.ts) | The palette's one matching rule (`rankByQuery`: every word, name first), and which templates a space lists for a search (`paletteTemplates`: Recent and a first page at rest, the best matches while searching). The server searches with it; the browser ranks the palette's own rows with it ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)). Its types are in [import-types.ts](import-types.ts). |
-| Dates | [dates.ts](dates.ts) | The one way to write a date or time: always UTC; short forms add the year only outside the demo clock's year. A calendar day (`YYYY-MM-DD`) formats as itself. |
+| Dates, numbers, words | [dates.ts](dates.ts) | The one way to write a date or time (always UTC; short forms add the year only outside the demo clock's year; a calendar day `YYYY-MM-DD` formats as itself), to count days (`daysBetween`, calendar days; `utcDay`, `addDays`, `isCalendarDay`, `DAY_MS`), and to say how long ago (`formatAgo`). See [Days and "how long ago"](#days-and-how-long-ago). |
+| | [numbers.ts](numbers.ts), [plural.ts](plural.ts) | Counts as people read them (`formatCount` "1,204", `compactCount` "1.2k"); a count with its noun (`plural` "3 versions", `pluralWord`, `pluralName` "Policies"). A variable's value is not formatted here: it prints as sent (`formatValue` in [variables.ts](../editor/model/variables.ts)). |
 | | [business-zone.ts](business-zone.ts) | The business time zone and what a sunset date means in it: `sunsetInstant`, `sunsetDay`, `todayIn`, `daysUntilSunset`, the zones on offer (`BUSINESS_ZONES`, `DEFAULT_BUSINESS_ZONE`). Only `Intl`. See [The sunset rule](#the-sunset-rule). |
 
 ## Vocabulary
@@ -167,6 +168,21 @@ Every other date stays UTC. In [business-zone.ts](business-zone.ts):
 
 `setSunset` and `approve` take the day and the zone and return the instant, so the rule has one home.
 
+## Days and "how long ago"
+
+"Today", "yesterday" and "3 days ago" count calendar days, never 24-hour periods, and the days are UTC days: the
+days every date on screen shows ([decision 0028](../../docs/decisions/0028-today-and-yesterday-are-utc-calendar-days.md)).
+A render at 23:00 is "yesterday" at 01:00 on every screen. In [dates.ts](dates.ts):
+
+- `daysBetween(from, to)` is the only day count. An instant counts as its UTC day; a `YYYY-MM-DD` day as itself, so
+  a sunset counts in the business time zone by passing that zone's days (`daysUntilSunset`).
+- `formatAgo(value, now, options)` is the only "how long ago": "just now", "12 minutes ago", "3 hours ago" earlier
+  today, then "yesterday", "4 days ago", and from 30 days "2 months ago". `precision: "day"` reads "today" for all
+  of today and keeps counting days ("95 days ago"); `dateFrom` switches to the date; `capitalize` is for a label
+  that stands alone ("Yesterday").
+- `DAY_MS` is for elapsed windows and deadlines ("the last 30 days", "suspended after 120 days"), never for which
+  day something happened.
+
 ## Rules that live outside `src/domain`
 
 Read these before you assume a rule is missing. When you change one, move it here instead of copying it.
@@ -205,14 +221,8 @@ Read these before you assume a rule is missing. When you change one, move it her
   instead; throw only for bugs.
 - **A third `Ok` / `Refused`.** `Refused` is [refusals.ts](refusals.ts)'s, which [lifecycle.ts](lifecycle.ts) and
   [access-types.ts](access-types.ts) re-export; `Ok` is declared in both. Import them.
-- **Dates through `render/errors`.** `lifecycle.ts`, `activity.ts`, `audit.ts`, `consequences.ts`, and
-  `golive/notices.ts` import `formatLongDate` from the re-export in `render/errors.ts`. Import from
-  [dates.ts](dates.ts).
 - **Local copies of small helpers.** "a, b and c" joins: `andList` in `copilot.ts` and `import.ts`, `listKeys` in
-  `lifecycle.ts`; use `joinWithAnd` from [render/errors.ts](render/errors.ts). Count-and-noun `plural` in
-  `import.ts`, `audit.ts`, and `golive/notices.ts`. `DAY_MS` in `access.ts`, `audit.ts`, `consequences.ts`, and
-  `golive/usage.ts`. Relative time as `ago` in `consequences.ts` and again in
-  [queries/format.ts](../server/queries/format.ts). Numbers and plurals have no shared helper yet.
+  `lifecycle.ts`; use `joinWithAnd` from [render/errors.ts](render/errors.ts).
 - **`STATUS_META.renders`** in [status.ts](status.ts). Nothing reads it; the render rule is `checkVersion` in
   [render/version-rules.ts](render/version-rules.ts).
 - **The template name limit in `import.ts`** (`MAX_NAME_LENGTH = 120`) repeats the one in
@@ -220,8 +230,8 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Testing
 
-- Every rule file has a colocated `*.test.ts` (27 files). `dates.ts`, `status.ts`, the types files, and
-  `render/index.ts` have none.
+- Every rule file has a colocated `*.test.ts` (30 files). `status.ts`, the types files, and `render/index.ts`
+  have none.
   Run `npx vitest run src/domain`; it takes under a second in the `node` environment.
 - Tests pin time by passing `now`, never with fake timers: `const NOW = new Date("2026-10-04T12:00:00.000Z")`
   ([lifecycle.test.ts](lifecycle.test.ts)), or offsets from a fixed base (`at(days)` and `ago(days)` in

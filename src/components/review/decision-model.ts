@@ -4,6 +4,7 @@
 // has been decided. No React, so they are tested without the screen.
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
+import { formatCount } from "@/domain/numbers";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 
@@ -21,7 +22,7 @@ export function reasonReady(reason: string): boolean {
  * is required, and its label says so); the dialog just doesn't send it.
  */
 export function reasonProblem(reason: string): string | null {
-  return reason.trim().length > REASON_MAX ? `Keep the reason under ${REASON_MAX.toLocaleString("en-US")} characters.` : null;
+  return reason.trim().length > REASON_MAX ? `Keep the reason under ${formatCount(REASON_MAX)} characters.` : null;
 }
 
 // ── Who may decide ───────────────────────────────────────────────────────────

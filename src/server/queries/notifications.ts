@@ -7,7 +7,7 @@ import { db } from "@/server/db/client";
 import { notifications, teams } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { getViewer } from "@/server/viewer";
-import { dayAgo } from "./format";
+import { formatAgo } from "@/domain/dates";
 
 /** The bell holds this many, newest first. */
 export const NOTIFICATIONS_LIMIT = 30;
@@ -36,7 +36,7 @@ export const getNotifications = cache(async (): Promise<NotificationItem[]> => {
     title: n.title,
     body: n.body,
     href: n.href,
-    ago: dayAgo(n.createdAt, nowDate),
+    ago: formatAgo(n.createdAt, nowDate, { capitalize: true }),
     unread: n.readAt === null,
   }));
 });
@@ -74,7 +74,7 @@ export const getNotificationsData = cache(async (): Promise<NotificationsData> =
       body: n.body,
       href: n.href || fallback.href,
       createdAt: n.createdAt.toISOString(),
-      ago: dayAgo(n.createdAt, nowDate),
+      ago: formatAgo(n.createdAt, nowDate, { capitalize: true }),
       unread: n.readAt === null,
     };
   });

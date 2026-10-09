@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { formatValue } from "@/editor/model/variables";
 import {
   BAD_REQUEST_MESSAGES,
   badRequest,
@@ -7,8 +6,6 @@ import {
   channelNotAllowed,
   channelNotEnabled,
   consumerRequired,
-  formatLongDate,
-  formatShortDate,
   invalidValues,
   joinWithAnd,
   missingVariables,
@@ -38,31 +35,6 @@ describe("renderError", () => {
 
   it("keeps details when given", () => {
     expect(renderError("render_failed", "x", { a: 1 })).toEqual({ code: "render_failed", message: "x", details: { a: 1 } });
-  });
-});
-
-describe("formatLongDate", () => {
-  it("writes the date in words, in UTC", () => {
-    expect(formatLongDate(MARCH_1)).toBe("March 1, 2027");
-    expect(formatLongDate(new Date("2027-03-01T23:59:59.999Z"))).toBe("March 1, 2027");
-    expect(formatLongDate(new Date("2026-09-30T00:00:00.000Z"))).toBe("September 30, 2026");
-  });
-
-  it("matches formatValue's dates", () => {
-    expect(formatLongDate(MARCH_1)).toBe(formatValue("date", "2027-03-01"));
-  });
-});
-
-describe("formatShortDate", () => {
-  it("reads a sunset's midnight UTC as that day, whatever the machine's time zone", () => {
-    expect(formatShortDate(new Date("2026-10-17T00:00:00.000Z"))).toBe("Oct 17");
-    expect(formatShortDate(new Date("2027-03-01T23:59:59.999Z"))).toBe("Mar 1");
-  });
-
-  it("adds the year when it isn't `now`'s year", () => {
-    const now = new Date("2026-10-04T12:00:00.000Z");
-    expect(formatShortDate(new Date("2026-10-17T00:00:00.000Z"), now)).toBe("Oct 17");
-    expect(formatShortDate(new Date("2027-03-01T00:00:00.000Z"), now)).toBe("Mar 1, 2027");
   });
 });
 

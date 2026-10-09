@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DAY_MS } from "./dates";
 import {
   ACCESS_REFUSALS,
-  DAY_MS,
   changeRoles,
   decideAccessRequest,
   decideRecertItem,

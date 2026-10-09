@@ -5,13 +5,15 @@ import { rolesLabel } from "@/domain/access";
 import type { RecertificationSection, RecertView } from "@/domain/access-types";
 import { Button } from "@/components/ui/button";
 import { decideRecertItem, startRecertification } from "@/server/actions/access";
-import { daysAgo, daysUntil, firstName, fmtDay, plural } from "./format";
+import { daysBetween, formatShortDate } from "@/domain/dates";
+import { plural } from "@/domain/plural";
+import { firstName, lastActive } from "./format";
 import { Bar, RowTable, Strip, type RowData } from "./rows";
 
 /** The borrowed stat card: how many are confirmed, and how long is left. The footnote comes worded. */
 function StatCard({ view, today }: { view: RecertView; today: string }) {
   const { progress, phase } = view;
-  const left = daysUntil(view.dueAt, today);
+  const left = daysBetween(today, view.dueAt);
   return (
     <section data-slot="recert-summary" aria-label={`${view.label} review`} className="mb-6 rounded-xl border border-hairline bg-surface-tinted p-6">
       <div className="grid grid-cols-2 gap-8">
@@ -24,13 +26,13 @@ function StatCard({ view, today }: { view: RecertView; today: string }) {
         </div>
         <div>
           <div className="caps-label">
-            {phase === "closed" ? "Closed" : phase === "upcoming" ? "Starts" : `Due ${fmtDay(view.dueAt, today)}`}
+            {phase === "closed" ? "Closed" : phase === "upcoming" ? "Starts" : `Due ${formatShortDate(view.dueAt, today)}`}
           </div>
           <div className="numeral mt-2">
             {phase === "closed"
-              ? fmtDay(view.completedAt ?? view.dueAt, today)
+              ? formatShortDate(view.completedAt ?? view.dueAt, today)
               : phase === "upcoming"
-                ? fmtDay(view.startsAt, today)
+                ? formatShortDate(view.startsAt, today)
                 : plural(Math.max(0, left), "day")}
           </div>
         </div>
@@ -82,7 +84,7 @@ export function RecertificationView({ section }: { section: RecertificationSecti
       sub: i.title,
       dim: i.decision === "remove" || i.membership !== "active",
       settled: i.outcome ?? undefined,
-      cells: [rolesLabel(i.roles) || "—", daysAgo(i.lastActiveAt, today)],
+      cells: [rolesLabel(i.roles) || "—", lastActive(i.lastActiveAt, today)],
       actions: [
         {
           key: "keep",

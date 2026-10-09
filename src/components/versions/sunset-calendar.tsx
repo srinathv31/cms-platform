@@ -5,7 +5,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { PopoverContent } from "@/components/ui/popover";
 import { zoneLabel } from "@/domain/business-zone";
 import { cn } from "@/lib/utils";
-import { addDays, fromYmd, toYmd } from "./format";
+import { addDays } from "@/domain/dates";
+import { fromYmd, toYmd } from "./format";
 
 // The calendar of a sunset date, shared by the Versions tab's sunset dialog and the review screen's
 // approve dialog, so the two behave the same:

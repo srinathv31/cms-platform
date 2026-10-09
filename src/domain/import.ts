@@ -19,6 +19,7 @@ import {
   type SkippedPlaceholder,
 } from "./import-types";
 import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
+import { plural, pluralWord } from "./plural";
 import type { JSONContent, RequiredSection, Variable } from "./types";
 
 /** Template names are 1 to 120 characters (the name field's rule). */
@@ -593,8 +594,6 @@ export function countBlocks(body: JSONContent): ImportReport["counts"] {
 
 // ── The report as lines ──────────────────────────────────────────────────────
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
 function andList(items: readonly string[]): string {
   return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
@@ -693,7 +692,7 @@ export function describeImport(report: ImportReport): ImportReportLines {
   if (lists) detected.push(plural(lists, "list"));
   if (tables) detected.push(plural(tables, "table"));
   const added = report.sections.added;
-  if (added.length) detected.push(`Added empty ${added.length === 1 ? "section" : "sections"}: ${andList(added.map((s) => s.title))}`);
+  if (added.length) detected.push(`Added empty ${pluralWord(added.length, "section")}: ${andList(added.map((s) => s.title))}`);
   // No section was found in the file, so the sections are all new and the text sits above the first.
   if (report.sections.matched.length === 0 && headings === 0 && paragraphs + lists + tables > 0) {
     detected.push("The text stays above the first section");

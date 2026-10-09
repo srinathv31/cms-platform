@@ -3,6 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } from "@/domain/approval-chain";
+import { DAY_MS } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
@@ -16,8 +17,6 @@ import { currentName } from "./template-name";
 
 // Helpers the Phase 4 read models (review, versions, activity, threads) and the review actions
 // share: people, template access, the approval chain, the decide check and the render-log usage.
-
-const DAY_MS = 86_400_000;
 
 // ── People ────────────────────────────────────────────────────
 
@@ -44,11 +43,6 @@ export function iso(date: Date): string {
 
 export function isoOrUndefined(date: Date | null | undefined): string | undefined {
   return date ? date.toISOString() : undefined;
-}
-
-/** YYYY-MM-DD of a demo-clock instant (UTC, as the workspace's `today`). */
-export function dayOf(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
 
 // ── Template access ───────────────────────────────────────────

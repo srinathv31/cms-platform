@@ -6,7 +6,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChannelMix, HeatLegend, Heatmap, Sparkline } from "./charts";
 import { InfoDot, Panel, PanelHead, TrendPill } from "./bits";
 import { ConsumersTable } from "./consumers-table";
-import { DAYS, ERROR_REASONS, ROW_TOTALS, STATS, fmt } from "./data";
+import { DAYS, ERROR_REASONS, ROW_TOTALS, STATS } from "./data";
+import { formatCount } from "@/domain/numbers";
 
 /*
  * B: Table first. The numbers are one quiet strip, the consumers table is the page, and the charts
@@ -37,9 +38,9 @@ export function VariantB() {
       <PageHeader title="Usage" className="pb-6" />
 
       <Panel className="grid grid-cols-2 divide-hairline p-0 lg:grid-cols-4 lg:divide-x">
-        <Kpi label="Renders this month" value={fmt.format(STATS.month)} sub={<TrendPill>{STATS.trendPct}% vs December</TrendPill>} tip="Live renders only. Previews aren't counted." />
+        <Kpi label="Renders this month" value={formatCount(STATS.month)} sub={<TrendPill>{STATS.trendPct}% vs December</TrendPill>} tip="Live renders only. Previews aren't counted." />
         <Kpi label="Active templates" value={String(STATS.activeTemplates)} sub="Across 2 consumers" />
-        <Kpi label="Success rate" value={`${STATS.successPct}%`} sub={`${fmt.format(STATS.failed)} failed renders`} />
+        <Kpi label="Success rate" value={`${STATS.successPct}%`} sub={`${formatCount(STATS.failed)} failed renders`} />
         <Kpi label="Nearing sunset" value={String(STATS.nearingSunset)} sub="Balance Transfer Intro v1, in 21 days" />
       </Panel>
 
@@ -87,7 +88,7 @@ export function VariantB() {
           </div>
         </Panel>
         <Panel>
-          <PanelHead title="Failed renders" size="md" aside={`${fmt.format(STATS.failed)} this month`} />
+          <PanelHead title="Failed renders" size="md" aside={`${formatCount(STATS.failed)} this month`} />
           <ul className="m-0 mt-5 flex list-none flex-col gap-3 p-0">
             {ERROR_REASONS.map((e) => (
               <li key={e.label} className="flex items-center justify-between gap-3 text-[14px]">

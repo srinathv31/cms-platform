@@ -5,7 +5,8 @@ import { PageHeader } from "@/components/primitives/page-header";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HBars, Legend, RateLine, StackedBars } from "./charts";
 import { InfoDot, Panel, PanelHead, TrendPill } from "./bits";
-import { BY_CONSUMER, DAYS, ERROR_REASONS, STATS, TOP_TEMPLATES, WEEKS, fmt } from "./data";
+import { BY_CONSUMER, DAYS, ERROR_REASONS, STATS, TOP_TEMPLATES, WEEKS } from "./data";
+import { formatCount } from "@/domain/numbers";
 import { cn } from "@/lib/utils";
 
 /*
@@ -64,11 +65,11 @@ export function VariantC({ initialMetric }: { initialMetric?: string }) {
 
       <Panel className="p-0">
         <div role="tablist" className="grid grid-cols-3 divide-x divide-hairline border-b border-hairline">
-          <MetricTab on={metric === "renders"} onClick={() => setMetric("renders")} label="Renders this month" value={fmt.format(STATS.month)}>
+          <MetricTab on={metric === "renders"} onClick={() => setMetric("renders")} label="Renders this month" value={formatCount(STATS.month)}>
             <TrendPill>{STATS.trendPct}%</TrendPill>
           </MetricTab>
           <MetricTab on={metric === "errors"} onClick={() => setMetric("errors")} label="Failed renders" value={`${(100 - STATS.successPct).toFixed(1)}%`}>
-            <span className="text-[13px] text-text-muted">{fmt.format(STATS.failed)} of {fmt.format(STATS.month)}</span>
+            <span className="text-[13px] text-text-muted">{formatCount(STATS.failed)} of {formatCount(STATS.month)}</span>
           </MetricTab>
           <MetricTab on={metric === "consumers"} onClick={() => setMetric("consumers")} label="Consumers" value={String(STATS.consumers)}>
             <span className="text-[13px] text-text-muted">{STATS.activeTemplates} active templates</span>

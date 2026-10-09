@@ -2,13 +2,12 @@ import "server-only";
 import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import { daysUntilSunset, sunsetDay } from "@/domain/business-zone";
+import { addDays, dayStartMs } from "@/domain/dates";
+import { compactCount } from "@/domain/numbers";
 import {
-  addDays,
-  compactCount,
   compareUsageRows,
   consumerLabel,
   dayList,
-  dayStartMs,
   errorText,
   heatmap,
   percent,

@@ -6,6 +6,8 @@ import { Stream } from "@/components/primitives/stream";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeFilterCount, parseAuditFilters } from "@/domain/audit";
+import { formatCount } from "@/domain/numbers";
+import { plural } from "@/domain/plural";
 import { getAuditPage } from "@/server/queries/audit";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { AuditFilterBar } from "./audit-filters";
@@ -26,13 +28,13 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
   return <>{space.name}</>;
 }
 
-/** The Export button and its skeleton are one width (10.5rem fits "Export 9999 events"; wider only past that), so nothing shifts as it streams in. */
-const EXPORT_WIDTH = "w-[10.5rem] min-w-fit";
+/** The Export button and its skeleton are one width (10.75rem fits "Export 9,999 events"; wider only past that), so nothing shifts as it streams in. */
+const EXPORT_WIDTH = "w-[10.75rem] min-w-fit";
 
 /** The Export link follows the filters (same query, no page limit); a download, so a plain anchor. */
 async function ExportAction({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
   const data = await load(params, searchParams);
-  const label = `Export ${data.total} ${data.total === 1 ? "event" : "events"}`;
+  const label = `Export ${plural(data.total, "event")}`;
   if (data.total === 0) {
     return (
       <Button variant="outline" disabled className={EXPORT_WIDTH}>
@@ -55,8 +57,8 @@ async function AuditBody({ params, searchParams }: { params: TeamParams; searchP
   const filtered = activeFilterCount(data.applied) > 0;
   const count =
     data.total > data.rows.length
-      ? `Newest ${data.rows.length} of ${data.total} events`
-      : `${data.total} ${data.total === 1 ? "event" : "events"}`;
+      ? `Newest ${formatCount(data.rows.length)} of ${plural(data.total, "event")}`
+      : plural(data.total, "event");
   return (
     <div>
       <AuditFilterBar basePath={basePath} applied={data.applied} options={data.options} clearInEmpty={data.total === 0} />

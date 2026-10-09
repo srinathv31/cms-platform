@@ -4,7 +4,8 @@ import { StatusBadge } from "@/components/primitives/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "./charts";
-import { CONSUMERS, ROW_TOTALS, fmt, type RowTotals } from "./data";
+import { CONSUMERS, ROW_TOTALS, type RowTotals } from "./data";
+import { formatCount } from "@/domain/numbers";
 
 /*
  * Consumer, template, version, renders, last render, and the tag. The version is a StatusBadge, as
@@ -50,10 +51,10 @@ export function ConsumersTable({ className, rows = ROW_TOTALS, sparkline = false
               {bars ? (
                 <span className="relative inline-flex w-44 items-center justify-end">
                   <span className="absolute inset-y-1 left-0 rounded-md bg-brand-1" style={{ width: `${(r.renders / max) * 100}%` }} />
-                  <span className="relative px-2">{fmt.format(r.renders)}</span>
+                  <span className="relative px-2">{formatCount(r.renders)}</span>
                 </span>
               ) : (
-                fmt.format(r.renders)
+                formatCount(r.renders)
               )}
             </TableCell>
             {sparkline ? <TableCell><Sparkline values={r.spark} label={`${CONSUMERS[r.consumer]}, ${r.template}`} /></TableCell> : null}

@@ -131,13 +131,14 @@ Next.js API; Next's own note about it is at the end of this file.
 | Update optimistically | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx) |
 | Load heavy code on demand | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts) |
 | Add an `/api/v1` route | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts) |
-| Format a date | [src/domain/dates.ts](src/domain/dates.ts) |
+| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts) |
+| Format a count or a plural | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts) |
 | Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common ones:
 actions that throw instead of returning a result (`startDraft`, `createTemplate`); private copies of `RefusalError`,
-`check`, and `transact` in three action files; bare `<Suspense>` instead of `<Stream>`; and copied `plural`,
-"days ago", and number formatters. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
+`check`, and `transact` in three action files; and bare `<Suspense>` instead of `<Stream>`. Never copy from
+`src/app/(dev)`: those are design mocks on fixture data.
 
 ## Keeping the docs true
 

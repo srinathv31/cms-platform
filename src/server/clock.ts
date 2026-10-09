@@ -1,13 +1,13 @@
 import "server-only";
 import { connection } from "next/server";
 import { eq } from "drizzle-orm";
+import { DAY_MS } from "@/domain/dates";
 import { db } from "./db/client";
 import { settings } from "./db/schema/ucomp";
 
 // Demo clock: real current time + an "advance N days" offset (Sri, Oct 4).
 // This is the ONLY place that reads the system clock. Domain functions take `now` as an argument.
 
-const DAY_MS = 86_400_000;
 export const CLOCK_OFFSET_KEY = "clock_offset_days";
 
 export async function getClockOffsetDays(): Promise<number> {

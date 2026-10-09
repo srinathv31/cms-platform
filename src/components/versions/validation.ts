@@ -2,7 +2,9 @@
 // is never sent (it would log as a console error, and say nothing the dialog can't say first).
 // Pure, so they are tested without the dialogs.
 
-import { addDays, formatLong, fromYmd } from "./format";
+import { addDays } from "@/domain/dates";
+import { formatCount } from "@/domain/numbers";
+import { formatLong, fromYmd } from "./format";
 
 /** Why a sunset date can't be used, or null. `today` is the demo clock's date. */
 export function validateSunsetDate(ymd: string | null, today: string): string | null {
@@ -22,5 +24,5 @@ export const REVOKE_REASON_MAX = 2000;
 export function validateRevokeReason(reason: string): string | null {
   const length = reason.trim().length;
   if (length === 0) return "Say why this version is being revoked.";
-  return length > REVOKE_REASON_MAX ? `Keep the reason under ${REVOKE_REASON_MAX.toLocaleString("en-US")} characters.` : null;
+  return length > REVOKE_REASON_MAX ? `Keep the reason under ${formatCount(REVOKE_REASON_MAX)} characters.` : null;
 }

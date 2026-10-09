@@ -4,7 +4,7 @@ import type { ReactNode, Ref } from "react";
 import { Check, CornerUpLeft } from "lucide-react";
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
-import { formatRelative } from "@/components/versions/format";
+import { formatAgo } from "@/domain/dates";
 import type { StepView } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
 import type { DecisionAccess } from "./decision-model";
@@ -51,7 +51,7 @@ function StepRow({
   const sub =
     step.status === "done"
       ? step.decidedBy
-        ? `${step.decidedBy.name}${step.decidedAt ? ` · ${formatRelative(step.decidedAt, now)}` : ""}`
+        ? `${step.decidedBy.name}${step.decidedAt ? ` · ${formatAgo(step.decidedAt, now)}` : ""}`
         : "Approved"
       : step.status === "current"
         ? (reason ?? "Waiting for a decision")

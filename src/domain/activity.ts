@@ -7,7 +7,7 @@
 // uses (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
 
 import { recordedSunsetDay } from "./business-zone";
-import { formatLongDate } from "./render/errors";
+import { formatLongDate, formatRecordedDate } from "./dates";
 import type { AuditAction, Person } from "./review-types";
 
 /** Who a null actor is: the platform itself (the seed's activations, the sunset sweep). */
@@ -63,7 +63,7 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       const day = recordedSunsetDay(d);
       const at = day ? formatLongDate(day) : "";
       if (!at) return `${who} set a sunset date for ${v}.`;
-      return date(d.previousSunsetAt)
+      return formatRecordedDate(d.previousSunsetAt)
         ? `${who} moved the sunset of ${v} to ${at}.`
         : `${who} set ${v} to sunset on ${at}.`;
     }
@@ -116,11 +116,4 @@ function text(value: unknown): string {
 
 function numberOr(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/** An ISO date in the long form ("March 1, 2027"), or "" when it isn't one. */
-function date(value: unknown): string {
-  if (typeof value !== "string") return "";
-  const at = new Date(value);
-  return Number.isNaN(at.getTime()) ? "" : formatLongDate(at);
 }

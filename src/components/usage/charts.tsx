@@ -2,11 +2,11 @@ import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { compactCount } from "@/domain/golive/usage";
+import { formatShortDate, formatWeekdayDate } from "@/domain/dates";
+import { compactCount, formatCount } from "@/domain/numbers";
+import { plural } from "@/domain/plural";
 import type { UsageHeatmap } from "@/domain/golive-types";
-import { renderCount } from "@/components/versions/format";
 import { ChartKeys } from "./chart-keys";
-import { formatDay, formatDayShort } from "./format";
 import { hbarsMinHeight } from "./geometry";
 
 /*
@@ -26,8 +26,6 @@ import { hbarsMinHeight } from "./geometry";
  * the axis text is HTML or SVG text at a fixed 11px, so the type never scales with the card. The
  * only scaled drawings are the gauge and the heatmap's squares, which carry no text.
  */
-
-const nf = new Intl.NumberFormat("en-US");
 
 /** The props of a chart's `i`th readable mark, for `ChartKeys`: the first is the chart's one Tab stop. */
 function markProps(i: number, label: string) {
@@ -154,7 +152,7 @@ export function HBars({
         const pct = Math.round(r.share * 100);
         const width = Math.max(14, (r.value / max) * 100);
         const bar = (
-          <Tip title={r.label} value={`${renderCount(r.value)} · ${pct}%`}>
+          <Tip title={r.label} value={`${plural(r.value, "render")} · ${pct}%`}>
             <div
               className={cn(
                 "flex h-9 items-center rounded-md px-3 text-[14px] font-medium tabular-nums",
@@ -178,7 +176,7 @@ export function HBars({
           <li key={r.key} className="flex min-w-0 flex-col gap-1.5">
             <span className="flex h-[1.125rem] min-w-0 items-baseline justify-between gap-3 leading-[1.125rem]">
               {name}
-              <span className="shrink-0 text-[13px] text-text-muted tabular-nums">{nf.format(r.value)}</span>
+              <span className="shrink-0 text-[13px] text-text-muted tabular-nums">{formatCount(r.value)}</span>
             </span>
             {bar}
           </li>
@@ -186,7 +184,7 @@ export function HBars({
           <li key={r.key} className="flex min-w-0 items-center gap-4">
             <div className="w-[55%] shrink-0">{bar}</div>
             <span className="flex min-w-0 items-baseline gap-2">
-              <span className="caps-label shrink-0 tabular-nums">{nf.format(r.value)}</span>
+              <span className="caps-label shrink-0 tabular-nums">{formatCount(r.value)}</span>
               {name}
             </span>
           </li>
@@ -253,11 +251,11 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
             {heat.weeks.flatMap((week, col) =>
               week.map((cell, row) => {
                 if (!cell.inRange) return null;
-                const value = cell.count === 0 ? "No renders" : renderCount(cell.count);
+                const value = cell.count === 0 ? "No renders" : plural(cell.count, "render");
                 return (
-                  <Tip key={cell.date} title={formatDay(cell.date)} value={value}>
+                  <Tip key={cell.date} title={formatWeekdayDate(cell.date)} value={value}>
                     <rect
-                      {...markProps(order.get(cell.date) ?? -1, `${formatDay(cell.date)}: ${value}`)}
+                      {...markProps(order.get(cell.date) ?? -1, `${formatWeekdayDate(cell.date)}: ${value}`)}
                       x={col * HEAT_PITCH}
                       y={row * HEAT_PITCH}
                       width={HEAT_CELL}
@@ -280,8 +278,8 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
           const busiest = days.reduce<(typeof days)[number] | null>((b, c) => (c.count > (b?.count ?? 0) ? c : b), null);
           return {
             key: week[0]!.date,
-            head: formatDayShort(week[0]!.date),
-            cells: [nf.format(days.reduce((sum, c) => sum + c.count, 0)), busiest ? `${formatDayShort(busiest.date)}, ${nf.format(busiest.count)}` : "None"],
+            head: formatShortDate(week[0]!.date),
+            cells: [formatCount(days.reduce((sum, c) => sum + c.count, 0)), busiest ? `${formatShortDate(busiest.date)}, ${formatCount(busiest.count)}` : "None"],
           };
         })}
       />
@@ -398,7 +396,7 @@ export function StackedBars({
   const col = 100 / n;
   const barW = col * 0.62;
   const title = (d: StackDatum) => (d.partial ? `${d.title} (so far)` : d.title);
-  const values = (d: StackDatum) => series.map((s, k) => `${s.label} ${nf.format(d.parts[k] ?? 0)}`).join(", ");
+  const values = (d: StackDatum) => series.map((s, k) => `${s.label} ${formatCount(d.parts[k] ?? 0)}`).join(", ");
   return (
     <>
       <div className="flex" style={{ height }}>
@@ -438,7 +436,7 @@ export function StackedBars({
                   <span className="flex flex-col gap-0.5">
                     {series.map((s, k) => (
                       <span key={s.label}>
-                        {s.label}: {nf.format(d.parts[k] ?? 0)}
+                        {s.label}: {formatCount(d.parts[k] ?? 0)}
                       </span>
                     ))}
                   </span>
@@ -456,7 +454,7 @@ export function StackedBars({
         rows={data.map((d, i) => ({
           key: `${d.label}-${i}`,
           head: d.partial ? `${d.label} (so far)` : d.label,
-          cells: [...series.map((_, k) => nf.format(d.parts[k] ?? 0)), nf.format(total(d))],
+          cells: [...series.map((_, k) => formatCount(d.parts[k] ?? 0)), formatCount(total(d))],
         }))}
       />
     </>
@@ -579,7 +577,7 @@ export function ChannelMix({ parts, className }: { parts: { label: string; value
       <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-heat-empty">
         {parts.map((p, i) =>
           p.value > 0 ? (
-            <Tip key={p.label} title={p.label} value={`${nf.format(p.value)} · ${pct(p.value)}%`}>
+            <Tip key={p.label} title={p.label} value={`${formatCount(p.value)} · ${pct(p.value)}%`}>
               <span className={SERIES[i]?.bg} style={{ width: `${(p.value / total) * 100}%` }} />
             </Tip>
           ) : null,
@@ -596,7 +594,7 @@ export function ChannelMix({ parts, className }: { parts: { label: string; value
       <ChartTable
         caption="Renders by channel"
         columns={["Channel", "Renders", "Share"]}
-        rows={parts.map((p) => ({ key: p.label, head: p.label, cells: [nf.format(p.value), `${pct(p.value)}%`] }))}
+        rows={parts.map((p) => ({ key: p.label, head: p.label, cells: [formatCount(p.value), `${pct(p.value)}%`] }))}
       />
     </div>
   );

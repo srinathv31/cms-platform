@@ -10,6 +10,7 @@ import { fadeRise } from "@/components/motion/presets";
 import { ROLE_LABEL } from "@/domain/access";
 import type { SidebarCardModel } from "@/domain/access-types";
 import { formatShortDate } from "@/domain/dates";
+import { plural, pluralWord } from "@/domain/plural";
 
 const EVENT = "ucomp:card-dismissed";
 
@@ -43,11 +44,11 @@ function contentOf(card: SidebarCardModel): CardContent {
   switch (card.kind) {
     case "access_requests":
       return {
-        title: card.count === 1 ? "Access request pending" : "Access requests pending",
+        title: `${pluralWord(card.count, "Access request")} pending`,
         lines: [
           card.count === 1
             ? `${card.firstName} asked for ${ROLE_LABEL[card.role]} access.`
-            : `${card.firstName} and ${card.count - 1} other${card.count === 2 ? "" : "s"} asked for access.`,
+            : `${card.firstName} and ${plural(card.count - 1, "other")} asked for access.`,
         ],
         action: { label: "Review", href: `/${card.teamSlug}/settings/access-requests` },
       };

@@ -222,11 +222,11 @@ focuses registers the same way.
   `access/role-picker.tsx`. Export the one in `preview/controls.tsx` (or move it to `primitives/`) instead of a fifth copy.
 - **Two action runners.** `useActionRun` and `Strip` exist in both `settings/team/rows.tsx` and
   `settings/platform/ui.tsx`. Reuse one; don't write a third.
-- **Copied formatters.** `plural` exists in several `format.ts` files, `andList` in `access/format.ts`; `new Intl.NumberFormat("en-US")`
-  in six files; "3 minutes ago" as `formatRelative` (`versions/format.ts`) and as `relativeTime`
-  (`src/server/queries/format.ts`); "3 days ago" as `formatWhen` (`versions/format.ts`), `formatLastRender`
-  (`usage/format.ts`), and `daysAgo` (`settings/team/format.ts`); a clipboard fallback in `primitives/template-id.tsx`
-  and `integration/copy-button.tsx`. Take dates from `src/domain/dates.ts` and relative times from `versions/format.ts`.
+- **Copied helpers.** `andList` in `access/format.ts` repeats `joinWithAnd`; a clipboard fallback is in both
+  `primitives/template-id.tsx` and `integration/copy-button.tsx`. Dates, "3 days ago", counts and plurals have one
+  home each: `formatShortDate`, `formatAgo` and the rest in `src/domain/dates.ts`, `formatCount` in
+  `src/domain/numbers.ts`, `plural` in `src/domain/plural.ts`. A screen picks `formatAgo`'s options (or names them
+  once, as `formatLastRender` in `usage/format.ts` does for a render's time); it never counts days itself.
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`. Have the
   query return the result.
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`

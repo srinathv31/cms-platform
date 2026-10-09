@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/primitives/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { UsageRow, UsageTag } from "@/domain/golive-types";
+import { formatCount } from "@/domain/numbers";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "./charts";
 import { formatLastRender } from "./format";
@@ -16,7 +17,6 @@ import { formatLastRender } from "./format";
 // renders", "renders fail").
 
 const HEAD = "h-10 px-2 text-[11px] font-medium tracking-[0.08em] text-label uppercase";
-const NF = new Intl.NumberFormat("en-US");
 
 const TAG_TONE: Record<UsageTag["tone"], string> = {
   neutral: "border-chip-border bg-chip text-chip-text",
@@ -143,7 +143,7 @@ export function ConsumersTable({
                   <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} now={now} />
                 </span>
               </TableCell>
-              <TableCell className="text-right text-text tabular-nums">{NF.format(r.renders30d)}</TableCell>
+              <TableCell className="text-right text-text tabular-nums">{formatCount(r.renders30d)}</TableCell>
               <TableCell>
                 <Sparkline values={r.spark} width={72} label={`${r.consumer.name}, ${r.template.name} v${r.versionNumber}`} />
               </TableCell>

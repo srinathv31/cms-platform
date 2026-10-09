@@ -227,7 +227,7 @@ test.describe("scenario 7: teams and roles", () => {
       for (const row of await rows.all().then((all) => all.slice(1))) await expect(row).toContainText("Riley Brooks");
 
       // A download anchor: Base UI gives it role "button", so find it by what it is.
-      const exportLink = page.locator('a[href*="/audit/export"]').filter({ hasText: /^Export \d+ events?$/ });
+      const exportLink = page.locator('a[href*="/audit/export"]').filter({ hasText: /^Export \d{1,3}(,\d{3})* events?$/ });
       await expect(exportLink).toHaveAttribute("href", /\/all\/audit\/export\?.*person=riley/);
       await beat(page, 900);
       await shoot(page, "taylor-audit-riley");

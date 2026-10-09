@@ -1,5 +1,6 @@
 import "server-only";
 import { and, eq, gte, inArray, max } from "drizzle-orm";
+import { DAY_MS } from "@/domain/dates";
 import type { LifecycleEffect, NotificationLink, Recipients } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import {
@@ -28,7 +29,6 @@ export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /** Consumers that rendered the template (not as a preview) this recently get its notices. */
 export const CONSUMER_NOTICE_WINDOW_DAYS = 90;
-const DAY_MS = 86_400_000;
 
 export interface EffectContext {
   /** The demo clock, read once by the action. The sunset sweep passes the instant the sunset passed. */

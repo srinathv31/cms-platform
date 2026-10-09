@@ -8,7 +8,7 @@ import { teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { ALL_SPACE } from "@/domain/permissions";
 import type { VersionState } from "@/domain/types";
-import { relativeTime } from "./format";
+import { formatAgo } from "@/domain/dates";
 
 export interface LibraryRow {
   id: string;
@@ -99,7 +99,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
         status: latest?.state ?? ("draft" as VersionState),
         sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
         activeNumber: active?.number ?? null,
-        lastEdited: edited ? relativeTime(edited, nowDate) : "—",
+        lastEdited: edited ? formatAgo(edited, nowDate) : "—",
         owner: { name: t.ownerName, initials: t.ownerInitials, hue: t.ownerHue },
       } satisfies LibraryRow,
       editedAt: edited?.getTime() ?? 0,

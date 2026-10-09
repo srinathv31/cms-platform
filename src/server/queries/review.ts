@@ -5,6 +5,7 @@ import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/do
 import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
+import { DAY_MS, utcDay } from "@/domain/dates";
 import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
@@ -16,7 +17,6 @@ import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp"
 import { demoNow } from "./dynamic";
 import {
   chainFor,
-  dayOf,
   decideCheck,
   getChains,
   getPeople,
@@ -34,7 +34,6 @@ import { loadThreads } from "./threads";
 
 // The review queue and the review screen.
 
-const DAY_MS = 86_400_000;
 /** "Recently decided" looks back this far. */
 export const DECIDED_WINDOW_DAYS = 30;
 
@@ -316,7 +315,7 @@ export const getReviewScreen = cache(
         }),
       },
       consumerUsage,
-      today: dayOf(nowDate),
+      today: utcDay(nowDate),
       sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
     };
   },

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { daysBetween } from "../dates";
 import { HEATMAP_WEEKS, type UsageRow } from "../golive-types";
 import {
-  calendarDaysUntil,
-  compactCount,
   compareUsageRows,
   countsAsUsage,
   errorText,
@@ -67,9 +66,9 @@ describe("windows on the demo clock", () => {
     expect(countsAsUsage({ isPreview: false, consumerId: "coral" })).toBe(true);
   });
   it("calendar days count UTC days, not 24-hour spans", () => {
-    expect(calendarDaysUntil(new Date("2026-10-05T00:00:00Z"), NOW)).toBe(1);
-    expect(calendarDaysUntil(new Date("2026-10-04T23:59:00Z"), NOW)).toBe(0);
-    expect(calendarDaysUntil(new Date("2026-10-25T12:00:00Z"), NOW)).toBe(21);
+    expect(daysBetween(NOW, new Date("2026-10-05T00:00:00Z"))).toBe(1);
+    expect(daysBetween(NOW, new Date("2026-10-04T23:59:00Z"))).toBe(0);
+    expect(daysBetween(NOW, new Date("2026-10-25T12:00:00Z"))).toBe(21);
   });
 });
 
@@ -192,13 +191,6 @@ describe("compareUsageRows", () => {
 });
 
 describe("display", () => {
-  it("compactCount", () => {
-    expect(compactCount(1)).toBe("1");
-    expect(compactCount(812)).toBe("812");
-    expect(compactCount(1_234)).toBe("1.2k");
-    expect(compactCount(27_412)).toBe("27.4k");
-    expect(compactCount(1_300_000)).toBe("1.3m");
-  });
   it("errorText reads every code as a sentence", () => {
     expect(errorText("missing_variables")).toBe("Missing required variables.");
     expect(errorText("invalid_values")).toBe("A value had the wrong format.");

@@ -16,6 +16,7 @@
 // threads its screen shows (docs/decisions/0010-comments-are-answered-where-they-show.md).
 
 import type { Outcome } from "./lifecycle";
+import { formatCount } from "./numbers";
 import { can } from "./permissions";
 import { refusal, refuse } from "./refusals";
 import {
@@ -36,7 +37,7 @@ export const QUOTE_MAX = 500;
 /** What a refused comment returns (who may comment at all comes from `REASONS`). */
 export const COMMENT_REFUSALS = {
   empty: refusal("comment_empty", "Write a comment first."),
-  tooLong: refusal("comment_too_long", `Keep a comment under ${COMMENT_MAX.toLocaleString("en-US")} characters.`),
+  tooLong: refusal("comment_too_long", `Keep a comment under ${formatCount(COMMENT_MAX)} characters.`),
   noBlock: refusal("block_gone", "That block isn't in this version any more."),
   closed: refusal("comments_closed", "Only a draft or a version in review takes comments."),
 } as const;

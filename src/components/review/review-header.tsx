@@ -8,7 +8,7 @@ import { m } from "motion/react";
 import { duration, ease } from "@/components/motion/presets";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelative } from "@/components/versions/format";
+import { formatAgo } from "@/domain/dates";
 import { WorkspaceShare } from "@/components/workspace/workspace-share";
 import type { Person } from "@/domain/review-types";
 import type { VersionState } from "@/domain/types";
@@ -87,7 +87,7 @@ export function ReviewHeader({
           <StatusBadge state={state} sunsetDay={sunsetDay} now={nowIso} />
         </m.span>
         <span className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
-          v{versionNumber} by {author.name} · {formatRelative(submittedAt, new Date(nowIso))}
+          v{versionNumber} by {author.name} · {formatAgo(submittedAt, nowIso)}
         </span>
       </div>
       <div

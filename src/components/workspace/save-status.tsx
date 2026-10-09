@@ -15,7 +15,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { runAction } from "@/components/versions/action-dialog";
-import { formatRelative } from "@/components/versions/format";
+import { formatAgo } from "@/domain/dates";
 import { isApple } from "@/editor/lib/platform";
 import { readTemplate } from "@/lib/template-reads";
 import type { BaseVersionContent } from "@/server/queries/base-version";
@@ -275,7 +275,7 @@ function RevertMenu({
     <DropdownMenu
       open={open}
       onOpenChange={(next) => {
-        if (next) setOpened(formatRelative(new Date(session.getOpenedAt()).toISOString(), new Date()));
+        if (next) setOpened(formatAgo(session.getOpenedAt(), new Date()));
         setOpen(next);
       }}
     >
