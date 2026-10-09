@@ -34,6 +34,13 @@ async function insertRows<T extends SQLiteTable>(
   }
 }
 
+/** `seq` 1, 2, 3, … oldest first (then by id), as if each notice had been written live at its time. */
+function numberNotices(rows: Sink["consumerNotices"]) {
+  return [...rows]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((row, i) => ({ ...row, seq: i + 1 }));
+}
+
 // Insert order follows the foreign keys: parents before children.
 async function insertAll(db: Db, s: Sink) {
   await insertRows(db, ucomp.users, s.users);
@@ -48,7 +55,7 @@ async function insertAll(db: Db, s: Sink) {
   await insertRows(db, ucomp.approvals, s.approvals);
   await insertRows(db, ucomp.commentThreads, s.commentThreads);
   await insertRows(db, ucomp.comments, s.comments);
-  await insertRows(db, ucomp.consumerNotices, s.consumerNotices);
+  await insertRows(db, ucomp.consumerNotices, numberNotices(s.consumerNotices));
   await insertRows(db, ucomp.auditEvents, s.auditEvents);
   await insertRows(db, ucomp.notifications, s.notifications);
   await insertRows(db, ucomp.accessRequests, s.accessRequests);
@@ -82,7 +89,10 @@ export async function seedDatabase(db: Db, opts: { base: Date }): Promise<SeedRe
   ctx.sink.settings.push(
     { key: "clock_offset_days", value: 0 },
     { key: "seed_version", value: SEED_VERSION },
+    // The notice cursor's epoch: a reset writes a new one, so cursors from before it are refused.
     { key: "seeded_at", value: opts.base.toISOString() },
+    // The last consumer_notices.seq handed out (numberNotices gives 1…n); takeNoticeSeqs carries on from it.
+    { key: "consumer_notice_seq", value: ctx.sink.consumerNotices.length },
   );
 
   await insertAll(db, ctx.sink);

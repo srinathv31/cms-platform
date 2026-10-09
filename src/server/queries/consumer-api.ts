@@ -1,7 +1,8 @@
 import "server-only";
-import { and, desc, eq, gt, inArray, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, type SQL } from "drizzle-orm";
 import { apiBadRequest, QUERY_MESSAGES } from "@/domain/golive/api-errors";
 import { contractDiff } from "@/domain/golive/contract-diff";
+import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
 import { apiVariables, contractJsonSchema } from "@/domain/golive/json-schema";
 import { noticeView } from "@/domain/golive/notices";
 import type {
@@ -23,7 +24,7 @@ import {
 } from "@/domain/render";
 import { CHANNELS, type Channel, type VersionState } from "@/domain/types";
 import { db } from "@/server/db/client";
-import { consumerNotices, consumers, contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { consumerNotices, consumers, contentTypes, settings, teams, templates, versions } from "@/server/db/schema/ucomp";
 
 // The consumer API's reads (GET /api/v1/…). No viewer: a consumer is identified by X-Consumer-Id and
 // sees every released version of every template, nothing else. Drafts and versions in review never
@@ -76,12 +77,20 @@ export function templateIdFromQuery(q: string): string | null {
   return /^[0-9A-Z]{6}$/.test(code) ? `UC-${code}` : null;
 }
 
+/** One page of a search: `ApiTemplateSearch` without the query and the clock. */
+export interface SearchPage {
+  results: ApiTemplateSummary[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+
 /**
  * Templates with an Active version that match `q`: the id (with or without "UC-", any case) or every
  * word in the name. An exact id first, then names that start with the query, then the rest; ties by
- * name. An empty query lists every Active template.
+ * name, then id (`compareSearchKeys`). An empty query lists every Active template. One page of `limit`
+ * results after the key `after` (from the request's cursor; null for the first page).
  */
-export async function searchActiveTemplates(q: string, limit: number): Promise<ApiTemplateSummary[]> {
+export async function searchActiveTemplates(q: string, limit: number, after: SearchKey | null = null): Promise<SearchPage> {
   const rows = await db
     .select({
       id: templates.id,
@@ -107,19 +116,23 @@ export async function searchActiveTemplates(q: string, limit: number): Promise<A
   const words = query.split(/\s+/).filter(Boolean);
   const exactId = templateIdFromQuery(query);
 
-  const rank = (row: (typeof rows)[number]): number | null => {
-    if (row.id === exactId) return 0;
+  type Row = (typeof rows)[number];
+  const keyOf = (row: Row): SearchKey | null => {
+    const key = (rank: number) => ({ rank, name: row.name, id: row.id });
+    if (row.id === exactId) return key(0);
     const name = row.name.toLowerCase();
     if (!words.every((word) => name.includes(word))) return null;
-    return name.startsWith(query) ? 1 : 2;
+    return key(name.startsWith(query) ? 1 : 2);
   };
 
-  return rows
-    .map((row) => ({ row, rank: rank(row) }))
-    .filter((r): r is { row: (typeof rows)[number]; rank: number } => r.rank !== null)
-    .sort((a, b) => a.rank - b.rank || a.row.name.localeCompare(b.row.name) || a.row.id.localeCompare(b.row.id))
-    .slice(0, limit)
-    .map(({ row }) => ({
+  const matches = rows
+    .map((row) => ({ row, key: keyOf(row) }))
+    .filter((r): r is { row: Row; key: SearchKey } => r.key !== null)
+    .filter((r) => after === null || compareSearchKeys(r.key, after) > 0)
+    .sort((a, b) => compareSearchKeys(a.key, b.key));
+  const { items, hasMore } = cutPage(matches, limit);
+  return {
+    results: items.map(({ row }) => ({
       id: row.id,
       name: row.name,
       team: { id: row.teamId, name: row.teamName },
@@ -129,7 +142,10 @@ export async function searchActiveTemplates(q: string, limit: number): Promise<A
       channels: published(row.channels, row.allowedChannels),
       variableCount: row.variables.length,
       requiredCount: row.variables.filter((v) => v.required).length,
-    }));
+    })),
+    hasMore,
+    nextCursor: searchCursor(q, items.at(-1)?.key ?? after),
+  };
 }
 
 // ── One template ─────────────────────────────────────────────────────────────
@@ -260,21 +276,51 @@ export async function getTemplateDetail(
 
 // ── Notices ──────────────────────────────────────────────────────────────────
 
-/** One consumer's notices, newest first, normalized (both payload shapes) and worded. */
+/** One page of a consumer's notices: `ApiNoticeList` without the consumer and the clock. */
+export interface NoticePage {
+  notices: ApiNotice[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+
+/** The settings row the seed writes at every reset: the notice cursors' epoch. */
+const SEEDED_AT_KEY = "seeded_at";
+
+/**
+ * The epoch notice cursors carry: `settings.seeded_at`, which a demo reset rewrites when it starts
+ * the notice numbers again. Null for a database that was never seeded.
+ */
+export async function noticeEpoch(): Promise<string | null> {
+  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, SEEDED_AT_KEY)).limit(1);
+  return typeof row?.value === "string" ? row.value : null;
+}
+
+/**
+ * One consumer's notices, oldest first in the order they were written (`seq`), normalized (both
+ * payload shapes) and worded: `limit` of them after `after` (a `seq` from the request's cursor; 0 for
+ * the first page). The next cursor is the page's last `seq`, or `after` again when the page is empty.
+ * `epoch` is the one the route checked the cursor against; it's read here when not given.
+ */
 export async function listNotices(
   consumerId: string,
-  opts: { since?: Date; templateId?: string; limit: number },
-): Promise<ApiNotice[]> {
-  const where: SQL[] = [eq(consumerNotices.consumerId, consumerId)];
-  if (opts.since) where.push(gt(consumerNotices.createdAt, opts.since));
+  opts: { after?: number; templateId?: string; limit: number; epoch?: string | null },
+): Promise<NoticePage> {
+  const after = opts.after ?? 0;
+  const epoch = opts.epoch === undefined ? await noticeEpoch() : opts.epoch;
+  const where: SQL[] = [eq(consumerNotices.consumerId, consumerId), gt(consumerNotices.seq, after)];
   if (opts.templateId) where.push(eq(consumerNotices.templateId, opts.templateId));
   const rows = await db
     .select()
     .from(consumerNotices)
     .where(and(...where))
-    .orderBy(desc(consumerNotices.createdAt), desc(consumerNotices.id))
-    .limit(opts.limit);
-  return (await withActiveVersion(rows)).map(noticeView);
+    .orderBy(asc(consumerNotices.seq))
+    .limit(opts.limit + 1);
+  const { items, hasMore } = cutPage(rows, opts.limit);
+  return {
+    notices: (await withActiveVersion(items)).map(noticeView),
+    hasMore,
+    nextCursor: noticeCursor({ consumerId, templateId: opts.templateId ?? null, epoch }, items.at(-1)?.seq ?? after),
+  };
 }
 
 type NoticeDbRow = typeof consumerNotices.$inferSelect;

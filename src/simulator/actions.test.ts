@@ -2,8 +2,9 @@ import { rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ApiContract, ApiTemplateDetail, ApiVariable } from "@/contracts/api-v1";
+import type { ApiContract, ApiNotice, ApiNoticeList, ApiTemplateDetail, ApiVariable } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import type { UcompApi } from "./ucomp-api";
 
 // The simulator's actions and read models against a temporary sim database and a fake UCOMP behind
 // fetch. The fake answers like /api/v1: one template, v2 Active (v3 can go Active with a new required
@@ -96,10 +97,13 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
   };
 }
 
+/** Oldest first, as the API serves them. */
 const NOTICES = [
-  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
   { id: "ntc_1", kind: "new_version", createdAt: "2026-09-01T00:00:00.000Z", template: { id: "UC-OTHER1", name: "Other" }, versionNumber: 2, activeVersion: 2, sunsetAt: null, reason: null, changes: [], message: "Other v2 is available. No contract changes." },
+  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
 ];
+/** The fake serves one notice per page whatever the limit, so Coral has to follow nextCursor. */
+const noticeCalls: URLSearchParams[] = [];
 
 const apiError = (status: number, code: string, message: string) => Response.json({ error: { code, message } }, { status });
 
@@ -112,8 +116,13 @@ async function fakeUcomp(input: RequestInfo | URL, init: RequestInit = {}): Prom
     return Response.json({ query: url.searchParams.get("q") ?? "", asOf: "", results: [{ id: TPL, name: NAME, activeVersion: ucomp.active }] });
   }
   if (path === "/api/v1/consumers/coral/notices") {
+    noticeCalls.push(url.searchParams);
     const t = url.searchParams.get("templateId");
-    return Response.json({ consumerId: "coral", asOf: "", notices: NOTICES.filter((n) => !t || n.template.id === t) });
+    const mine = NOTICES.filter((n) => !t || n.template.id === t);
+    // The fake's cursor is the count already served, prefixed so it can't be mistaken for a number.
+    const from = Number(url.searchParams.get("after")?.replace(/^c/, "") ?? 0);
+    const notices = mine.slice(from, from + 1);
+    return Response.json({ consumerId: "coral", asOf: "", notices, hasMore: from + 1 < mine.length, nextCursor: `c${from + notices.length}` });
   }
   if (path === `/api/v1/templates/${TPL}`) {
     const version = url.searchParams.get("version");
@@ -338,7 +347,11 @@ describe("upgrade, sunset and relink", () => {
 
 describe("notices", () => {
   it("lists Coral's notices with read state and linked offers, and marks them read", async () => {
+    noticeCalls.length = 0;
     const before = await queries.getSimHome();
+    // Every page, followed by nextCursor until hasMore is false; shown newest first.
+    expect(noticeCalls.map((p) => p.get("after"))).toEqual([null, "c1"]);
+    expect(before.notices.map((n) => n.id)).toEqual(["ntc_2", "ntc_1"]);
     expect(before.unread).toBe(2);
     expect(before.notices[0]).toMatchObject({ id: "ntc_2", templateName: NAME, versionNumber: 3, read: false, offerIds: ["offer_spring_travel"], lines: ["v3 adds required `annual_fee` (Currency)."] });
 
@@ -351,5 +364,44 @@ describe("notices", () => {
     expect(after.unread).toBe(1);
     const page = await queries.getSimOfferPage("offer_spring_travel");
     expect(page?.notices.map((n) => [n.id, n.read])).toEqual([["ntc_2", true]]);
+  });
+});
+
+describe("allNotices: an answer that wouldn't end is an error, not a loop", () => {
+  /** A client whose notices pages come from `page(n)`, n counting from 1. */
+  const pagedApi = (page: (n: number) => Pick<ApiNoticeList, "notices" | "hasMore">) => {
+    let calls = 0;
+    const api = {
+      listNotices: async () => {
+        calls += 1;
+        return { ok: true as const, data: { consumerId: "coral", asOf: "", nextCursor: `c${calls}`, ...page(calls) } };
+      },
+    } as unknown as UcompApi;
+    return { api, calls: () => calls };
+  };
+  const notice = NOTICES[0] as ApiNotice;
+
+  it("an empty page that says more follow", async () => {
+    const { api, calls } = pagedApi((n) => (n === 1 ? { notices: [notice], hasMore: true } : { notices: [], hasMore: true }));
+    expect(await queries.allNotices(api)).toEqual({
+      ok: false,
+      error: { status: 200, code: "bad_response", message: "Stencil sent an empty page of notices that said more follow." },
+    });
+    expect(calls()).toBe(2);
+  });
+
+  it("more than 50 pages", async () => {
+    const { api, calls } = pagedApi(() => ({ notices: [notice], hasMore: true }));
+    expect(await queries.allNotices(api)).toEqual({
+      ok: false,
+      error: { status: 200, code: "bad_response", message: "Stencil sent more than 50 pages of notices." },
+    });
+    expect(calls()).toBe(queries.MAX_NOTICE_PAGES);
+  });
+
+  it("the last of 50 pages is still read", async () => {
+    const { api } = pagedApi((n) => ({ notices: [notice], hasMore: n < 50 }));
+    const result = await queries.allNotices(api);
+    expect(result.ok && result.notices).toHaveLength(50);
   });
 });

@@ -17,13 +17,22 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 
 | Endpoint | Shapes | Handler |
 | --- | --- | --- |
-| `GET /api/v1/templates?q=&limit=` | `ApiTemplateSearch`, `ApiTemplateSummary` | [templates/route.ts](../app/api/v1/templates/route.ts) |
+| `GET /api/v1/templates?q=&limit=&after=` | `ApiTemplateSearch`, `ApiTemplateSummary`, `ApiPage` | [templates/route.ts](../app/api/v1/templates/route.ts) |
 | `GET /api/v1/templates/{id}?version=&since=` | `ApiTemplateDetail`, `ApiVersionSummary`, `ApiContract`, `ApiVariable`, `ApiJsonSchema`, `ApiContractDiff`, `ApiContractChange` | [templates/[templateId]/route.ts](<../app/api/v1/templates/[templateId]/route.ts>) |
-| `GET /api/v1/consumers/{consumerId}/notices?since=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind` | [notices/route.ts](<../app/api/v1/consumers/[consumerId]/notices/route.ts>) |
+| `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind`, `ApiPage` | [notices/route.ts](<../app/api/v1/consumers/[consumerId]/notices/route.ts>) |
 | `POST /api/v1/templates/{id}/render` | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response` (a raw PDF or HTML answer has no type) | [render/route.ts](<../app/api/v1/templates/[templateId]/render/route.ts>) |
 
 Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
-previews. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
+previews.
+
+The two lists page the same way (`ApiPage`): a call returns `nextCursor` and `hasMore`, and the next call passes
+the cursor back as `after`. Notices come oldest first in the order Stencil wrote them, so a consumer that keeps the
+last `nextCursor` gets every notice once, however many arrive between polls. A cursor is opaque to consumers and
+belongs to its list; anything else, or a notices cursor from before a demo reset, is 400 `bad_request`. Search
+compares names and ids by code point, not by locale. The cursor format, and why notices page on
+`consumer_notices.seq` rather than on time, are in
+[decision 0006](../../docs/decisions/0006-page-notices-by-commit-order.md); the code is
+`src/domain/golive/cursor.ts`. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
 and the demo-clock `Date` header come from [server/api/http.ts](../server/api/http.ts). The GET handlers read through
 `src/server/queries/consumer-api.ts` and the pure builders in `src/domain/golive/`.
 

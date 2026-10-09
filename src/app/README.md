@@ -94,9 +94,9 @@ persona; the mocks read their deep-link search params.
 | `GET /api/imports/[uploadId]/file`, `…/view` | [file](./api/imports/[uploadId]/file/route.ts), [view](./api/imports/[uploadId]/view/route.ts) | Browser: the rail's Original tab ([original-view.tsx](../components/import/original-view.tsx)). |
 | `GET /api/palette/[space]` | [route.ts](./api/palette/[space]/route.ts) | Browser: the command palette, once per space. |
 | `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV). |
-| `GET /api/v1/templates?q=&limit=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
+| `GET /api/v1/templates?q=&limit=&after=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/templates/[templateId]?version=&since=` | [route.ts](./api/v1/templates/[templateId]/route.ts) | Simulator and outside consumers. |
-| `GET /api/v1/consumers/[consumerId]/notices` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
+| `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
 | `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Browser preview with `preview: true` ([render-preview.ts](../components/preview/render-preview.ts)); simulator and outside consumers with `X-Consumer-Id`. |
 | `GET /sim/deliveries/[deliveryId]/file` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts) | Simulator: the customer views' iframes and PDF. |
 
@@ -154,6 +154,10 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
   Render requires it unless `preview: true`, which uses the persona cookie instead, and checks it in
   [render-template.ts](../server/render/render-template.ts).
+- Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
+  `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
+  refuse a cursor from another list, or a notices cursor from before a demo reset (`noticeEpoch`), with
+  `bad_request`.
 - Render reads a JSON number in `values` as its exact source text (`parseJsonWithNumberText` in
   `src/domain/render/json-number-text.ts`), so `21.90` stays `"21.90"`.
 - Render adds `X-Stencil-Template-Id`, `X-Stencil-Version`, `X-Stencil-Newer-Version` and `X-Stencil-Preview`,

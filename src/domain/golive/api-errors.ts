@@ -11,7 +11,8 @@ export const QUERY_MESSAGES = {
   version: "version must be a version number.",
   since: "since must be a version number.",
   sinceOrder: "since must be lower than version.",
-  sinceDate: "since must be a date and time, like 2026-10-05T12:00:00Z.",
+  after: "after must be the nextCursor of an earlier page of this list.",
+  staleAfter: "after is from before the notices were reset. Start again without after.",
 } as const;
 
 export const SEARCH_LIMIT = { min: 1, max: 50, fallback: 20 } as const;
@@ -53,16 +54,4 @@ export function parseVersionNumber(raw: string | null, message: string): Parsed<
   const n = /^[1-9]\d*$/.test(text) ? Number(text) : NaN;
   if (!Number.isSafeInteger(n)) return { ok: false, error: apiBadRequest(message) };
   return { ok: true, value: n };
-}
-
-const INSTANT = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/;
-
-/** An ISO 8601 date or date-time: absent or blank → undefined. No zone reads as UTC (a date alone already does). */
-export function parseInstant(raw: string | null, message: string): Parsed<Date | undefined> {
-  const text = raw?.trim() ?? "";
-  if (text === "") return { ok: true, value: undefined };
-  const match = INSTANT.exec(text);
-  const date = match ? new Date(match[1] === undefined && text.includes("T") ? `${text}Z` : text) : null;
-  if (!date || Number.isNaN(date.getTime())) return { ok: false, error: apiBadRequest(message) };
-  return { ok: true, value: date };
 }

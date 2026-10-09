@@ -42,10 +42,14 @@ describe("createUcompApi", () => {
     await api.getTemplate("UC-4F7K2Q", { version: 2, since: 1 });
     await api.getTemplate("UC 1/2");
     await api.listNotices({ templateId: "UC-4F7K2Q", limit: 200 });
+    await api.listNotices({ limit: 200, after: "eyJ2IjoxfQ" });
+    await api.searchTemplates({ q: "rate", limit: 20, after: "eyJ2IjoxfQ" });
     expect(calls.map((c) => c.url)).toEqual([
       "http://x.test/api/v1/templates/UC-4F7K2Q?version=2&since=1",
       "http://x.test/api/v1/templates/UC%201%2F2",
       "http://x.test/api/v1/consumers/coral/notices?templateId=UC-4F7K2Q&limit=200",
+      "http://x.test/api/v1/consumers/coral/notices?limit=200&after=eyJ2IjoxfQ",
+      "http://x.test/api/v1/templates?q=rate&limit=20&after=eyJ2IjoxfQ",
     ]);
   });
 

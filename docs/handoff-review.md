@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 11 | 30 | 13 | 54 |
+| Open | 0 | 10 | 30 | 13 | 53 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 11 | 5 | 1 | 18 |
+| Fixed | 1 | 12 | 5 | 1 | 19 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -317,7 +317,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D11 · Low: JavaScript-only behavior that won't port cleanly
 
-- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant`, `localeCompare` ordering and `canonicalAction` remain.
+- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) and `canonicalAction` remain.
 - **Where:** `src/domain/audit.ts` line 93; `src/domain/golive/api-errors.ts` line 61
 - **What happens:** A plain-object lookup with untrusted keys (`canonicalAction("toString")` returns a function). `parseInstant("2026-02-30")` rolls over to March 2. `localeCompare` orders ids and names (ICU collation, unlike Java's `compareTo`). If a key is renamed and a new variable reuses the old key, the diff reports only the rename.
 - **Fix:** Use `Map` or `Object.hasOwn`; validate dates by round-trip; compare ids by code point; fix the contract matcher.
@@ -539,7 +539,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
-- **Status:** Open
+- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
 - **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.

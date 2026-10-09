@@ -1,7 +1,7 @@
 import "server-only";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { connection } from "next/server";
-import type { ApiChannel, ApiContract, ApiTemplateDetail } from "@/contracts/api-v1";
+import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
 import { simDb } from "./db";
 import { SIM_FIELDS, simField } from "./fields";
@@ -102,20 +102,50 @@ export async function loadLinkState(api: UcompApi, link: LinkRow): Promise<LinkS
   return { summary: linkSummaryOf(link, detail.data), contract: detail.data.contract, upgrade, error };
 }
 
-/** Coral's notices (newest first, as the API orders them) with Coral's read state and linked offers. */
+/** At most this many pages of notices per load (10,000 notices); more is treated as a bad answer. */
+export const MAX_NOTICE_PAGES = 50;
+
+/**
+ * Every Coral notice (one template's with `templateId`), oldest first as the API serves them: reads
+ * page after page until `hasMore` is false. Coral keeps no cursor and reads the whole outbox on each
+ * page load, which is fine at a simulator's size; a consumer that polls keeps the last `nextCursor`.
+ * An answer that wouldn't end (an empty page that says more follow, or more than MAX_NOTICE_PAGES
+ * pages) is an error, not a loop.
+ */
+export async function allNotices(
+  api: UcompApi,
+  templateId?: string,
+): Promise<{ ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }> {
+  const notices: ApiNotice[] = [];
+  let after: string | undefined;
+  for (let pages = 1; pages <= MAX_NOTICE_PAGES; pages++) {
+    const page = await api.listNotices({ templateId, limit: 200, after });
+    if (!page.ok) return page;
+    if (!page.data.hasMore) return { ok: true, notices: [...notices, ...page.data.notices] };
+    if (page.data.notices.length === 0) {
+      return { ok: false, error: { status: 200, code: "bad_response", message: "Stencil sent an empty page of notices that said more follow." } };
+    }
+    notices.push(...page.data.notices);
+    after = page.data.nextCursor;
+  }
+  return { ok: false, error: { status: 200, code: "bad_response", message: `Stencil sent more than ${MAX_NOTICE_PAGES} pages of notices.` } };
+}
+
+/** Coral's notices, newest first, with Coral's read state and linked offers. */
 async function loadNotices(
   api: UcompApi,
   links: readonly LinkRow[],
   templateId?: string,
 ): Promise<{ notices: SimNoticeView[]; error: SimApiError | null }> {
-  const list = await api.listNotices({ templateId, limit: 200 });
+  const list = await allNotices(api, templateId);
   if (!list.ok) return { notices: [], error: list.error };
-  const ids = list.data.notices.map((n) => n.id);
+  const newestFirst = [...list.notices].reverse();
+  const ids = newestFirst.map((n) => n.id);
   const reads = ids.length
     ? await simDb.select({ id: simNoticeReads.noticeId }).from(simNoticeReads).where(inArray(simNoticeReads.noticeId, ids))
     : [];
   const read = new Set(reads.map((r) => r.id));
-  const notices = list.data.notices.map(
+  const notices = newestFirst.map(
     (n): SimNoticeView => ({
       id: n.id,
       kind: n.kind,

@@ -5,7 +5,6 @@ import {
   consumerMismatch,
   consumerNotFound,
   NOTICE_LIMIT,
-  parseInstant,
   parseLimit,
   parseVersionNumber,
   QUERY_MESSAGES,
@@ -55,22 +54,5 @@ describe("parseVersionNumber", () => {
 
   it.each(["0", "01", "-1", "1.5", "v2", "draft"])("refuses %s", (raw) => {
     expect(parseVersionNumber(raw, QUERY_MESSAGES.since)).toEqual({ ok: false, error: { code: "bad_request", message: "since must be a version number." } });
-  });
-});
-
-describe("parseInstant", () => {
-  const parse = (raw: string | null) => parseInstant(raw, QUERY_MESSAGES.sinceDate);
-
-  it("takes ISO dates and date-times; no zone reads as UTC", () => {
-    expect(parse(null)).toEqual({ ok: true, value: undefined });
-    expect(parse("2026-10-05")).toEqual({ ok: true, value: new Date("2026-10-05T00:00:00.000Z") });
-    expect(parse("2026-10-05T12:00:00Z")).toEqual({ ok: true, value: new Date("2026-10-05T12:00:00.000Z") });
-    expect(parse("2026-10-05T12:00:00.123Z")).toEqual({ ok: true, value: new Date("2026-10-05T12:00:00.123Z") });
-    expect(parse("2026-10-05T14:00:00+02:00")).toEqual({ ok: true, value: new Date("2026-10-05T12:00:00.000Z") });
-    expect(parse("2026-10-05T12:00")).toEqual({ ok: true, value: new Date("2026-10-05T12:00:00.000Z") });
-  });
-
-  it.each(["yesterday", "1700000000000", "2026-13-01", "2026-10-05 12:00", "10/05/2026"])("refuses %s", (raw) => {
-    expect(parse(raw)).toEqual({ ok: false, error: { code: "bad_request", message: "since must be a date and time, like 2026-10-05T12:00:00Z." } });
   });
 });

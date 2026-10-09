@@ -7,9 +7,9 @@
 // render types still fit the shapes declared here, so the two can't drift.
 //
 // Phase 5 (going live). Endpoints:
-//   GET  /api/v1/templates                          search, Active templates only     → ApiTemplateSearch
+//   GET  /api/v1/templates                          search, Active templates only     → ApiTemplateSearch (paged)
 //   GET  /api/v1/templates/{id}                     metadata + contract (+ changes)    → ApiTemplateDetail
-//   GET  /api/v1/consumers/{consumerId}/notices     UCOMP's outbox for one consumer    → ApiNoticeList
+//   GET  /api/v1/consumers/{consumerId}/notices     UCOMP's outbox for one consumer    → ApiNoticeList (paged)
 //   POST /api/v1/templates/{id}/render              (Phase 3; contract in src/domain/render/types.ts)
 //
 // Every request carries `X-Consumer-Id` (a registered consumer: "coral", "deposits-online"); the render
@@ -68,18 +68,42 @@ export interface ApiErrorBody {
   error: ApiError;
 }
 
-// ── GET /api/v1/templates?q=&limit= ─────────────────────────────────────────────
+// ── Paging (search and notices) ─────────────────────────────────────────────────
+
+/**
+ * A list that pages. Ask for the next page by passing `nextCursor` back as `after`; read on until
+ * `hasMore` is false.
+ * - `nextCursor` is always present. On the last page (even an empty one) it marks the end of the list,
+ *   so a later call with it returns only what came after: for notices, exactly the ones written since.
+ * - `hasMore`: true when more items follow this page right now.
+ * A cursor is opaque: keep it as is, don't build or edit one. It belongs to the list it came from (the
+ * same consumer and `templateId`, or the same `q`); any other `after` is 400 bad_request
+ * ("after must be the nextCursor of an earlier page of this list."). A notices cursor from before the
+ * demo was reset is 400 bad_request too ("after is from before the notices were reset. Start again
+ * without after."): the notices were renumbered, so read them again from the start.
+ */
+export interface ApiPage {
+  /** Pass as `after` to continue where this page ended. */
+  nextCursor: string;
+  hasMore: boolean;
+}
+
+// ── GET /api/v1/templates?q=&limit=&after= ──────────────────────────────────────
 
 /**
  * Search. ONLY templates with an Active version are returned (a consumer can't link anything else).
  * - `q` (optional, trimmed): a template id, case-insensitive, with or without "UC-" ("uc-4f7k2q",
  *   "4F7K2Q"); or words matched case-insensitively against the name (every word must appear).
  *   Empty `q` lists every Active template.
- * - `limit` (optional): 1–50, default 20.
- * Order: an exact id match first, then names that start with the query, then the rest; ties by name.
- * Errors: 400 consumer_required, 403 unknown_consumer, 400 bad_request ("limit must be a number from 1 to 50.").
+ * - `limit` (optional): results per page, 1–50, default 20.
+ * - `after` (optional): the `nextCursor` of an earlier page for the same `q` (ApiPage).
+ * Order: an exact id match first, then names that start with the query, then the rest; ties by name,
+ * then id, both compared by Unicode code point (capitals before lower case; not a locale's collation).
+ * Pages follow that order and never overlap.
+ * Errors: 400 consumer_required, 403 unknown_consumer, 400 bad_request ("limit must be a number from 1 to 50.",
+ * or ApiPage's sentence for a bad `after`).
  */
-export interface ApiTemplateSearch {
+export interface ApiTemplateSearch extends ApiPage {
   query: string;
   /** Demo-clock time the answer was computed at. */
   asOf: string;
@@ -206,18 +230,24 @@ export interface ApiJsonSchemaProperty {
   examples: string[];
 }
 
-// ── GET /api/v1/consumers/{consumerId}/notices?since=&templateId=&limit= ────────
+// ── GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit= ────────
 
 /**
- * UCOMP's outbox for one consumer: new versions, sunsets scheduled, revokes. Newest first.
+ * UCOMP's outbox for one consumer: new versions, sunsets scheduled, revokes. Oldest first, in the order
+ * UCOMP wrote them, paged with a cursor (ApiPage).
  * Notices go to every consumer that rendered the template (not as a preview) in the 90 days before the
  * event. Read state is the consumer's business (the simulator keeps it in sim_notice_reads).
  * - `X-Consumer-Id` must equal `{consumerId}` → else 403 consumer_mismatch
  *   ("X-Consumer-Id doesn't match consumer coral."). An unregistered `{consumerId}` → 404 consumer_not_found.
- * - `since` (optional ISO): only notices created after it. `templateId` (optional): one template.
- * - `limit` (optional): 1–200, default 50.
+ * - `after` (optional): the `nextCursor` of an earlier page. Without it the list starts at the
+ *   consumer's oldest notice.
+ * - `templateId` (optional): one template's notices. A cursor keeps to the filter it was made with.
+ * - `limit` (optional): notices per page, 1–200, default 50.
+ * To poll, keep the last `nextCursor` and call with it: every notice arrives once and in order, however
+ * many were written in between. To start without the history, page to the end once and keep that
+ * `nextCursor`.
  */
-export interface ApiNoticeList {
+export interface ApiNoticeList extends ApiPage {
   consumerId: string;
   asOf: string;
   notices: ApiNotice[];

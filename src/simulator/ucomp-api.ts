@@ -38,9 +38,11 @@ export interface EmailOutput {
 
 export interface UcompApi {
   readonly origin: string;
-  searchTemplates(input?: { q?: string; limit?: number }): Promise<ApiResult<ApiTemplateSearch>>;
+  /** One page of search results; `after` is an earlier page's `nextCursor` for the same `q`. */
+  searchTemplates(input?: { q?: string; limit?: number; after?: string }): Promise<ApiResult<ApiTemplateSearch>>;
   getTemplate(templateId: string, input?: { version?: number; since?: number }): Promise<ApiResult<ApiTemplateDetail>>;
-  listNotices(input?: { since?: string; templateId?: string; limit?: number }): Promise<ApiResult<ApiNoticeList>>;
+  /** One page of Coral's notices, oldest first; `after` is an earlier page's `nextCursor`. */
+  listNotices(input?: { after?: string; templateId?: string; limit?: number }): Promise<ApiResult<ApiNoticeList>>;
   /**
    * POST …/render. PDF is always asked for as base64 (JSON); web comes back as the HTML document.
    * `at` is when UCOMP answered, by its HTTP `Date` header (`answeredAt`).
@@ -136,14 +138,14 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
   return {
     origin: base,
 
-    searchTemplates: ({ q, limit } = {}) =>
-      getJson<ApiTemplateSearch>(`/api/v1/templates${query({ q: q?.trim(), limit })}`),
+    searchTemplates: ({ q, limit, after } = {}) =>
+      getJson<ApiTemplateSearch>(`/api/v1/templates${query({ q: q?.trim(), limit, after })}`),
 
     getTemplate: (templateId, { version, since } = {}) =>
       getJson<ApiTemplateDetail>(`/api/v1/templates/${id(templateId)}${query({ version, since })}`),
 
-    listNotices: ({ since, templateId, limit } = {}) =>
-      getJson<ApiNoticeList>(`/api/v1/consumers/${CONSUMER_ID}/notices${query({ since, templateId, limit })}`),
+    listNotices: ({ after, templateId, limit } = {}) =>
+      getJson<ApiNoticeList>(`/api/v1/consumers/${CONSUMER_ID}/notices${query({ templateId, limit, after })}`),
 
     async render(templateId, body, correlationId) {
       const channel: ApiChannel = body.channel;

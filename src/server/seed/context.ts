@@ -28,7 +28,8 @@ export interface Sink {
   approvals: Row<typeof ucomp.approvals>[];
   commentThreads: Row<typeof ucomp.commentThreads>[];
   comments: Row<typeof ucomp.comments>[];
-  consumerNotices: Row<typeof ucomp.consumerNotices>[];
+  /** Numbered (`seq`) when inserted, oldest first: modules push them in build order, not time order. */
+  consumerNotices: Omit<Row<typeof ucomp.consumerNotices>, "seq">[];
   auditEvents: Row<typeof ucomp.auditEvents>[];
   notifications: Row<typeof ucomp.notifications>[];
   accessRequests: Row<typeof ucomp.accessRequests>[];
