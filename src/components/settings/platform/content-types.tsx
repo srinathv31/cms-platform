@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import type { ContentTypeView } from "@/domain/access-types";
-import { SECTION_TITLE_MAX, updateRequiredSections } from "@/domain/platform-config";
-import { CHANNEL_LABELS, joinWithAnd } from "@/domain/render/errors";
+import { SECTION_TITLE_MAX, describeSectionsChange, removeSectionRefusal } from "@/domain/platform-config";
+import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { RequiredSection } from "@/domain/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,8 @@ import { Blocked, FullRow, HeaderRow, Strip, plural, useFocusAfterCommit } from 
 
 // Settings > Platform > Content types. One dense row per type; "Edit sections" opens the required
 // sections under the row (rename, reorder, add, remove) with the consequence strip: required sections
-// shape templates created from then on, and no existing template changes.
+// shape templates created from then on, and no existing template changes. The domain words the strip
+// and checks the draft as it changes (`describeSectionsChange`), the same check `updateContentType` runs.
 
 const COLS = "minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1fr) 8.5rem";
 
@@ -90,24 +91,13 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
   }, [focusKey]);
 
   const next: RequiredSection[] = rows.map((r) => ({ key: r.key, title: r.title }));
-  // The same rule the server applies, so a refusal is said here and nothing known to fail is sent.
-  const outcome = updateRequiredSections({
-    contentType: { id: type.id, name: type.name, requiredSections: type.requiredSections },
+  // The server's own check and the strip's lines, as the admin edits: nothing known to fail is sent.
+  const { problem, changed, lines } = describeSectionsChange({
+    contentTypeName: type.name,
+    current: type.requiredSections,
     next,
-    actor: { id: "", name: "" },
-    now: new Date(0),
   });
-  const changed = outcome.ok ? outcome.effects.length > 0 : true;
-  const problem = outcome.ok ? null : outcome.reason;
-
-  const added = rows.filter((r) => !type.requiredSections.some((s) => s.key === r.key));
-  const removed = type.requiredSections.filter((s) => !rows.some((r) => r.key === s.key));
-  // The scope is said from the start, before anything is edited; what changes follows once it does.
-  const lines: string[] = [`Applies to new ${type.name} templates only. Existing templates keep their sections.`];
-  if (changed && !problem) {
-    if (added.length) lines.push(`New templates start with ${joinWithAnd(added.map((r) => r.title.trim() || "an untitled section"))} added.`);
-    if (removed.length) lines.push(`${joinWithAnd(removed.map((s) => s.title))} becomes an ordinary heading in new templates.`);
-  }
+  const removeBlocked = removeSectionRefusal(rows.length);
 
   const move = (index: number, by: -1 | 1) =>
     setRows((list) => {
@@ -148,15 +138,15 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
             <Button variant="ghost" size="icon" aria-label={`Move ${row.title || `section ${index + 1}`} down`} aria-disabled={index === rows.length - 1} onClick={() => move(index, 1)} className="aria-disabled:opacity-40">
               <ArrowDown aria-hidden strokeWidth={1.75} />
             </Button>
-            <Blocked reason={rows.length === 1 ? "Keep at least one required section." : null}>
+            <Blocked reason={removeBlocked}>
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label={`Remove ${row.title || `section ${index + 1}`}`}
-                aria-disabled={rows.length === 1}
+                aria-disabled={!!removeBlocked}
                 className="aria-disabled:opacity-40"
                 onClick={() => {
-                  if (rows.length === 1) return;
+                  if (removeBlocked) return;
                   setRows((list) => list.filter((r) => r.key !== row.key));
                   setFocusKey(rows[index + 1]?.key ?? rows[index - 1]?.key ?? null);
                 }}

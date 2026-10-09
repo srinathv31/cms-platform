@@ -18,13 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { TeamsSection } from "@/domain/access-types";
-import {
-  PLATFORM_REFUSALS,
-  RESERVED_SLUGS,
-  TEAM_DESCRIPTION_MAX,
-  TEAM_NAME_MAX,
-  slugify,
-} from "@/domain/platform-config";
+import { newTeamConsequences, validateNewTeam } from "@/domain/platform-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -34,7 +28,8 @@ import { HeaderRow, PersonLine, Pick, Strip, plural, useFocusAfterCommit } from 
 
 // Settings > Platform > Teams (Platform Admin). A dense table of the teams, and a "Create team" form
 // that opens above it: name, an optional description, an icon, and the first Team Admin. The strip says
-// what creating it does before it is committed.
+// what creating it does before it is committed. The form is checked as the admin types with the domain's
+// `validateNewTeam`, the same check `createTeam` refuses with.
 
 const ICONS: Record<string, { Icon: LucideIcon; label: string }> = {
   "credit-card": { Icon: CreditCard, label: "Credit card" },
@@ -113,21 +108,11 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
   const [icon, setIcon] = useState("building-2");
   const [adminId, setAdminId] = useState("");
 
-  const trimmed = name.trim().replace(/\s+/g, " ");
   const admin = section.people.find((p) => p.id === adminId);
-  const slug = slugify(trimmed);
-  const taken = section.teams.find((t) => t.slug === slug || t.name.toLowerCase() === trimmed.toLowerCase());
-  const problem: string | null = !trimmed
-    ? null
-    : trimmed.length > TEAM_NAME_MAX
-      ? PLATFORM_REFUSALS.teamNameTooLong
-      : !slug || RESERVED_SLUGS.has(slug)
-        ? PLATFORM_REFUSALS.reservedName(trimmed)
-        : taken
-          ? PLATFORM_REFUSALS.teamTaken(taken.name)
-          : description.trim().length > TEAM_DESCRIPTION_MAX
-            ? PLATFORM_REFUSALS.descriptionTooLong
-            : null;
+  const check = validateNewTeam({ name, description, icon, existing: section.teams });
+  const trimmed = check.name;
+  // Nothing is flagged before a name is typed; until then Create team just isn't offered.
+  const problem = trimmed ? check.problem : null;
   const ready = !!trimmed && !!admin && !problem;
   const id = useId();
 
@@ -214,14 +199,11 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
         <Strip
           key={`${trimmed}:${adminId}`}
           focusOnMount={false}
-          lines={[
-            `${admin.name} becomes Team Admin of ${trimmed} and approves its access requests.`,
-            `${trimmed} starts with no templates.`,
-          ]}
+          lines={newTeamConsequences(trimmed, admin.name)}
           confirmLabel="Create team"
           onCancel={onClose}
           onDone={onClose}
-          onConfirm={() => createTeam({ name: trimmed, description: description.trim(), icon, adminUserId: admin.id })}
+          onConfirm={() => createTeam({ name: trimmed, description: check.description, icon, adminUserId: admin.id })}
           className="bg-surface-sunken"
         />
       ) : (

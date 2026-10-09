@@ -1,13 +1,13 @@
 "use client";
 
-import { ROLE_LABEL } from "@/domain/access";
-import type { AccessRequestRow, AccessRequestsSection } from "@/domain/access-types";
+import { ROLE_LABEL, validateDecisionNote } from "@/domain/access";
+import { DECISION_NOTE_MAX, type AccessRequestRow, type AccessRequestsSection } from "@/domain/access-types";
 import { decideAccessRequest } from "@/server/actions/access";
 import { fmtDay, firstName } from "./format";
 import { GroupHeading, RowTable, type RowData } from "./rows";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 
-function pendingRow(r: AccessRequestRow, team: string, today: string): RowData {
+function pendingRow(r: AccessRequestRow, today: string): RowData {
   const first = firstName(r.person.name);
   const blocked = r.can.decide.ok ? null : r.can.decide.reason;
   const role = ROLE_LABEL[r.role];
@@ -29,7 +29,7 @@ function pendingRow(r: AccessRequestRow, team: string, today: string): RowData {
         label: "Approve",
         blocked,
         strip: {
-          consequence: `${r.person.name} gets ${role} access to ${team} and sees its Library the next time they open Stencil.`,
+          consequence: r.consequences.approve,
           confirmLabel: `Approve as ${role}`,
           detail: reason,
           run: () => decideAccessRequest({ requestId: r.id, decision: "approve" }),
@@ -40,10 +40,10 @@ function pendingRow(r: AccessRequestRow, team: string, today: string): RowData {
         label: "Deny",
         blocked,
         strip: {
-          consequence: `${first} sees your note and can ask again.`,
+          consequence: r.consequences.deny,
           confirmLabel: "Deny request",
           detail: reason,
-          note: `Note for ${first}`,
+          note: { label: `Note for ${first}`, max: DECISION_NOTE_MAX, problem: (note) => validateDecisionNote("deny", note) },
           run: (note) => decideAccessRequest({ requestId: r.id, decision: "deny", note }),
         },
       },
@@ -81,7 +81,6 @@ function Decided({ rows, today }: { rows: AccessRequestRow[]; today: string }) {
 }
 
 export function AccessRequestsTable({ section, today }: { section: AccessRequestsSection; today: string }) {
-  const { team } = section;
   return (
     <>
       <RowTable
@@ -89,7 +88,7 @@ export function AccessRequestsTable({ section, today }: { section: AccessRequest
         columns={["Role", "Reason"]}
         cols="5.5rem minmax(0,1.3fr)"
         actionsW="9.5rem"
-        rows={section.pending.map((r) => pendingRow(r, team.name, today))}
+        rows={section.pending.map((r) => pendingRow(r, today))}
         empty="No requests waiting."
       />
       {section.decided.length ? (

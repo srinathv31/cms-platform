@@ -279,6 +279,8 @@ export interface MemberRow {
   addedAt: string;
   isYou: boolean;
   can: { editRoles: PermissionResult; remove: PermissionResult; reinstate: PermissionResult };
+  /** The strips' lines (`memberConsequences`). */
+  consequences: { remove: string; reinstate: string };
 }
 
 export interface MembersSection {
@@ -303,6 +305,8 @@ export interface AccessRequestRow {
   note?: string | null;
   /** Disabled with "You can't decide your own access request." on your own. */
   can: { decide: PermissionResult };
+  /** The Approve and Deny strips' lines (`requestConsequences`). */
+  consequences: { approve: string; deny: string };
 }
 
 export interface AccessRequestsSection {
@@ -322,7 +326,11 @@ export interface RecertItemRow {
   decidedAt?: string;
   /** The member's status now (a removed member has no membership: "removed"). */
   membership: MembershipStatus | "removed";
+  /** How the row reads once nothing is left to decide on it, in place of Keep and Remove (`recertItemOutcome`). */
+  outcome: string | null;
   can: { decide: PermissionResult };
+  /** The Remove strip's line (`recertRemoveConsequence`). */
+  consequences: { remove: string };
 }
 
 export interface RecertProgress {
@@ -348,6 +356,8 @@ export interface RecertView {
   items: RecertItemRow[];
   /** Closed reviews: the members whose access lapsed at the deadline. */
   lapsed: Person[];
+  /** The line under the numbers (`recertFootnote`). */
+  footnote: string;
 }
 
 export interface RecertificationSection {
@@ -356,6 +366,8 @@ export interface RecertificationSection {
   current: RecertView | null;
   /** "Start review": only when nothing is open or upcoming. */
   can: { start: PermissionResult };
+  /** The Start review strip's line, with the deadline a review started now gets (`startRecertConsequence`). */
+  consequences: { start: string };
   today: string;
 }
 
@@ -370,7 +382,11 @@ export interface InactivityRow {
   suspendsAt: string;
   status: MembershipStatus;
   statusReason: MembershipStatusReason | null;
+  /** Past day 120 and still active: the sweep kept them on as the team's last Team Admin (`heldAsLastAdmin`). */
+  heldAsLastAdmin: boolean;
   can: { suspend: PermissionResult; keep: PermissionResult; reinstate: PermissionResult };
+  /** The strips' lines (`memberConsequences`). */
+  consequences: { suspend: string; keep: string; reinstate: string };
 }
 
 export interface InactivitySection {
@@ -423,6 +439,8 @@ export interface ChannelRuleRow {
   allowed: Record<Channel, boolean>;
   /** Active versions per channel: the consequence line when turning one off. */
   activeUsing: Record<Channel, number>;
+  /** Per channel, whether its switch may flip (`channelRuleRefusal`): the last channel on can't go off. */
+  can: { toggle: Record<Channel, PermissionResult> };
 }
 
 export interface ChannelRulesSection {

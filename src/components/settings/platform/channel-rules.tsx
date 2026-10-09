@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ChannelRuleRow, ChannelRulesSection } from "@/domain/access-types";
-import { PLATFORM_REFUSALS, channelOffConsequences } from "@/domain/platform-config";
+import { channelOffConsequences } from "@/domain/platform-config";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";
@@ -11,7 +11,8 @@ import { Blocked, FullRow, Strip, useActionRun, useFocusAfterCommit } from "./ui
 
 // Settings > Platform > Channel rules: the content type by channel matrix. Turning a channel on takes
 // effect at once; turning one off says what it stops (from the Active versions that use it) in a strip
-// under the row, and only the strip's confirm commits it.
+// under the row, and only the strip's confirm commits it. A switch that can't flip (the last channel on)
+// comes decided from the read model, `row.can.toggle`, and shows disabled with its reason.
 
 const COLS = "minmax(0,1fr) repeat(3, 5.5rem)";
 
@@ -54,7 +55,6 @@ function TypeRow({
 }) {
   const { pending, error, run } = useActionRun();
   const switches = useRef(new Map<Channel, HTMLElement | null>());
-  const onCount = channels.filter((c) => row.allowed[c]).length;
 
   const focusAfter = useFocusAfterCommit();
   const closeAsk = () => {
@@ -76,17 +76,18 @@ function TypeRow({
         </div>
         {channels.map((channel) => {
           const on = row.allowed[channel];
-          const lastOne = on && onCount === 1;
+          const toggle = row.can.toggle[channel];
+          const blocked = toggle.ok ? null : toggle.reason;
           return (
             <div role="cell" key={channel} className="flex justify-center">
-              <Blocked reason={lastOne ? PLATFORM_REFUSALS.oneChannel : null}>
+              <Blocked reason={blocked}>
                 <Switch
                   ref={(el) => {
                     switches.current.set(channel, el);
                   }}
                   aria-label={`${row.name} on ${CHANNEL_LABELS[channel]}`}
                   checked={on}
-                  disabled={lastOne}
+                  disabled={!!blocked}
                   readOnly={pending}
                   onCheckedChange={(next) => {
                     if (pending) return;

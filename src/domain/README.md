@@ -47,8 +47,8 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [redline.ts](redline.ts) | The diff between two versions' documents, and their rename (`nameChange`), for the review screen and Compare. |
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
-| | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. |
-| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve). |
+| | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. Also what the Team settings sections say: each strip's line (`memberConsequences`, `requestConsequences`, `startRecertConsequence`), a review's footnote and settled rows (`recertFootnote`, `recertItemOutcome`), and the checks the forms run live (`describeRoleChange`, `validateDecisionNote`). |
+| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve). Each Platform screen's live check is the function its transition refuses with: `validateNewTeam`, `describeSectionsChange`, `channelRuleRefusal`, `removeStageRefusal`. |
 | | [audit.ts](audit.ts), [activity.ts](activity.ts) | One sentence per audit event, the Audit page's filters and CSV, notification fallbacks. |
 | Contract and consequences | [contract.ts](contract.ts) | One sentence per contract change: "v2 adds required `annual_fee` (Currency)." |
 | | [consequences.ts](consequences.ts) | Who an approve, sunset, or revoke affects, from render usage. |
@@ -159,6 +159,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | Add a lifecycle transition | `startRevoke` or `setSunset` in [lifecycle.ts](lifecycle.ts) | Returns `Outcome<…>`; sentences in `REFUSALS`; tests in [lifecycle.test.ts](lifecycle.test.ts). |
 | Add an access or settings rule | `requestAccess` in [access.ts](access.ts) | Limits live in [access-types.ts](access-types.ts), so the form ([request-access.tsx](../components/access/request-access.tsx)) and the server share them. |
 | Validate a settings form live with the server's own rule | `validateChain` in [platform-config.ts](platform-config.ts) | Takes the facts (people's access, the actor, the saved chain) and returns each problem with the stage and field it's about. The read model carries the facts; [approval-chains.tsx](../components/settings/platform/approval-chains.tsx) shows each problem at its field and disables Save with the first; `saveApprovalChain` refuses with the first. |
+| Say what a settings action does before it's confirmed | `memberConsequences` in [access.ts](access.ts) | The read model returns the lines as `consequences` beside `can`, dated with the demo clock by the function that sets the date (`inactivity`, `recertDueAt`); the screen only renders them ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)). A line that depends on what's being typed is a pure function the screen calls, like `describeSectionsChange` in [platform-config.ts](platform-config.ts). |
 | Apply deadlines from the clock | `sweepAccess` in [access.ts](access.ts) | Idempotent at the same `now`; effects carry the instant each deadline passed. |
 | Add a permission | `Action` in [types.ts](types.ts), `TEAM_GRANTS` and `GUARDS` in [permissions.ts](permissions.ts) | Add the case to [permissions.test.ts](permissions.test.ts). |
 | Word something for people | `describeChange` in [contract.ts](contract.ts) | Each case's sentence is shown in the doc comment. |
@@ -171,8 +172,8 @@ Read these before you assume a rule is missing. When you change one, move it her
   instead; throw only for bugs.
 - **A third `Ok` / `Refused`.** Identical pairs exist in [lifecycle.ts](lifecycle.ts) and
   [access-types.ts](access-types.ts). Import one of them.
-- **Dates through `render/errors`.** `lifecycle.ts`, `access.ts`, `activity.ts`, `audit.ts`, `consequences.ts`,
-  and `golive/notices.ts` import `formatLongDate` from the re-export in `render/errors.ts`. Import from
+- **Dates through `render/errors`.** `lifecycle.ts`, `activity.ts`, `audit.ts`, `consequences.ts`, and
+  `golive/notices.ts` import `formatLongDate` from the re-export in `render/errors.ts`. Import from
   [dates.ts](dates.ts).
 - **Local copies of small helpers.** "a, b and c" joins: `andList` in `copilot.ts` and `import.ts`, `listKeys` in
   `lifecycle.ts`; use `joinWithAnd` from [render/errors.ts](render/errors.ts). Count-and-noun `plural` in

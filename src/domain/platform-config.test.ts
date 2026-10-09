@@ -7,9 +7,14 @@ import {
   RESERVED_SLUGS,
   approverProblem,
   channelOffConsequences,
+  channelRuleRefusal,
   conformToSections,
   createTeam,
   describeChainChange,
+  describeSectionsChange,
+  newTeamConsequences,
+  removeSectionRefusal,
+  removeStageRefusal,
   ruleLabel,
   saveApprovalChain,
   sectionKey,
@@ -17,6 +22,8 @@ import {
   slugify,
   updateRequiredSections,
   validateChain,
+  validateNewTeam,
+  validateRequiredSections,
 } from "./platform-config";
 import type { ApprovalStage } from "./review-types";
 import type { ApproverRule, JSONContent, RequiredSection } from "./types";
@@ -120,6 +127,48 @@ describe("createTeam", () => {
   });
 });
 
+describe("validateNewTeam (the Create team form, as the admin types)", () => {
+  const check = (over: Partial<Parameters<typeof validateNewTeam>[0]> = {}) =>
+    validateNewTeam({ name: "Home Loans", description: "Mortgage disclosures.", icon: "home", existing: EXISTING, ...over });
+
+  it("tidies what was typed and finds nothing wrong with a new team", () => {
+    expect(check({ name: "  Home   Loans ", description: " Mortgages. " })).toEqual({
+      name: "Home Loans",
+      description: "Mortgages.",
+      slug: "home-loans",
+      problem: null,
+    });
+  });
+
+  it("gives the reason createTeam refuses with, in the same order", () => {
+    const cases: { name?: string; description?: string; icon?: string }[] = [
+      { name: " " },
+      { name: "x".repeat(61) },
+      { description: "x".repeat(201) },
+      { icon: "skull" },
+      { name: "All" },
+      { name: "coral offers" },
+      // A reserved name and a long description: the description is said first, as the server does.
+      { name: "Sim", description: "x".repeat(201) },
+    ];
+    for (const over of cases) {
+      const { problem } = check(over);
+      expect(problem).not.toBeNull();
+      const created = createTeam({ name: "Home Loans", description: "", icon: "home", admin: alex, actor: riley, now: NOW, existing: EXISTING, ...over });
+      expect(created).toEqual({ ok: false, reason: problem });
+    }
+    expect(check({ name: "coral offers" }).problem).toBe("A team called Coral Offers already exists.");
+    expect(check({ name: "Sim", description: "x".repeat(201) }).problem).toBe(PLATFORM_REFUSALS.descriptionTooLong);
+  });
+
+  it("newTeamConsequences: who becomes Team Admin, and that it starts empty", () => {
+    expect(newTeamConsequences("Home Loans", "Alex Kim")).toEqual([
+      "Alex Kim becomes Team Admin of Home Loans and approves its access requests.",
+      "Home Loans starts with no templates.",
+    ]);
+  });
+});
+
 // ── Required sections ────────────────────────────────────────────────────────
 
 const SECTIONS: RequiredSection[] = [
@@ -206,6 +255,49 @@ describe("updateRequiredSections", () => {
   });
 });
 
+describe("the sections editor: validateRequiredSections, removeSectionRefusal, describeSectionsChange", () => {
+  const describe_ = (next: RequiredSection[]) => describeSectionsChange({ contentTypeName: "Disclosure", current: SECTIONS, next });
+  const SCOPE = "Applies to new Disclosure templates only. Existing templates keep their sections.";
+
+  it("validateRequiredSections is the reason updateRequiredSections refuses with", () => {
+    const lists: RequiredSection[][] = [[], [{ key: "", title: " " }], [{ key: "", title: "x".repeat(61) }], [SECTIONS[0]!, { key: "n", title: "offer details" }]];
+    for (const next of lists) {
+      const problem = validateRequiredSections(next);
+      expect(problem).not.toBeNull();
+      expect(updateRequiredSections({ contentType: disclosure, next, actor: riley, now: NOW })).toEqual({ ok: false, reason: problem });
+    }
+    expect(validateRequiredSections(SECTIONS)).toBeNull();
+  });
+
+  it("removeSectionRefusal keeps the last section", () => {
+    expect(removeSectionRefusal(1)).toBe(PLATFORM_REFUSALS.oneSection);
+    expect(removeSectionRefusal(2)).toBeNull();
+  });
+
+  it("says the scope from the start; nothing to save until something changes", () => {
+    expect(describe_(SECTIONS)).toEqual({ problem: null, changed: false, lines: [SCOPE] });
+    expect(describe_(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` })))).toEqual({ problem: null, changed: false, lines: [SCOPE] });
+  });
+
+  it("names what new templates gain and what becomes an ordinary heading", () => {
+    expect(describe_([SECTIONS[0]!, SECTIONS[2]!, { key: "new-1", title: " Privacy " }, { key: "new-2", title: "Contact" }])).toEqual({
+      problem: null,
+      changed: true,
+      lines: [SCOPE, "New templates start with Privacy and Contact added.", "Rates and fees becomes an ordinary heading in new templates."],
+    });
+    // A rename or a move changes something but adds no line.
+    expect(describe_([SECTIONS[1]!, SECTIONS[0]!, SECTIONS[2]!])).toEqual({ problem: null, changed: true, lines: [SCOPE] });
+  });
+
+  it("a draft that can't be saved says why, and only the scope", () => {
+    expect(describe_([...SECTIONS, { key: "new-1", title: "" }])).toEqual({
+      problem: PLATFORM_REFUSALS.sectionTitle,
+      changed: true,
+      lines: [SCOPE],
+    });
+  });
+});
+
 describe("conformToSections", () => {
   const h = (id: string, key: string | null, text: string): JSONContent => ({
     type: "heading",
@@ -236,6 +328,20 @@ describe("conformToSections", () => {
 });
 
 // ── Channel rules ────────────────────────────────────────────────────────────
+
+describe("channelRuleRefusal (whether a switch may flip)", () => {
+  it("refuses turning off the last channel on, and nothing else", () => {
+    expect(channelRuleRefusal(["email"], "email", false)).toBe(PLATFORM_REFUSALS.oneChannel);
+    expect(channelRuleRefusal(["web", "email"], "email", false)).toBeNull();
+    expect(channelRuleRefusal(["email"], "pdf", true)).toBeNull();
+    expect(channelRuleRefusal(["email"], "fax" as never, true)).toBe(PLATFORM_REFUSALS.oneChannel);
+    const ct = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["email" as const] };
+    expect(setChannelRule({ contentType: ct, channel: "email", allowed: false, activeUsing: 0, actor: riley, now: NOW })).toEqual({
+      ok: false,
+      reason: channelRuleRefusal(["email"], "email", false),
+    });
+  });
+});
 
 describe("setChannelRule", () => {
   const ct = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["pdf", "web", "email"] as const };
@@ -406,6 +512,32 @@ describe("validateChain", () => {
   it("offers in the picker only the people approverProblem allows", () => {
     expect(approvers.filter((p) => !approverProblem(p, "riley")).map((p) => p.id)).toEqual(["alex", "dana", "jordan", "casey"]);
     expect(approvers.filter((p) => !approverProblem(p, "casey")).map((p) => p.id)).toEqual(["alex", "dana", "jordan"]);
+  });
+});
+
+describe("removeStageRefusal (the chain editor's Remove)", () => {
+  it("keeps the last stage, and a stage a version in review still needs", () => {
+    expect(removeStageRefusal({ name: "Team approver", waiting: 0 }, 0)).toBe(PLATFORM_REFUSALS.oneStage);
+    expect(removeStageRefusal({ name: "Legal reviewer", waiting: 2 }, 1)).toBe("2 versions in review still need Legal reviewer.");
+    expect(removeStageRefusal({ name: "Legal reviewer", waiting: 0 }, 1)).toBeNull();
+  });
+
+  it("is the reason saveApprovalChain refuses a removal with", () => {
+    const legal: ApprovalStage = { id: "stage_legal", position: 1, name: "Legal reviewer", rule: LEGAL.rule };
+    const both = [
+      { id: "stage_team", name: "Team approver" },
+      { id: "stage_legal", name: "Legal reviewer" },
+    ];
+    const saved = saveApprovalChain({
+      contentType: { id: "ct_disclosure", name: "Disclosure" },
+      current: [TEAM, legal],
+      next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }],
+      inReview: [{ versionId: "v3", stages: both, currentStage: 1 }],
+      people: approvers,
+      actor: riley,
+      now: NOW,
+    });
+    expect(saved).toEqual({ ok: false, reason: removeStageRefusal({ name: "Legal reviewer", waiting: 1 }, 1) });
   });
 });
 

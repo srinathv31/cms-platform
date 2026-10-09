@@ -15,8 +15,9 @@
 //     suspended automatically at 120 days.
 //   - Boundaries are inclusive: the instant a deadline or a day count is reached, it applies.
 
+import { formatLongDate, formatShortDate } from "./dates";
 import { REASONS } from "./permissions";
-import { formatLongDate } from "./render/errors";
+import { joinWithAnd } from "./render/errors";
 import {
   ACCESS_REASON_MAX,
   DECISION_NOTE_MAX,
@@ -89,6 +90,35 @@ export function rolesLabel(roles: readonly TeamRole[]): string {
   return sortRoles(roles)
     .map((r) => ROLE_LABEL[r])
     .join(" & ");
+}
+
+/** "Sam" from "Sam Ortiz": how the strips address a person they've already named. */
+export function firstName(name: string): string {
+  return name.split(" ")[0] ?? name;
+}
+
+/** Why a member can't be given this set of roles, or null: they keep at least one. */
+export function validateRoles(roles: readonly TeamRole[]): string | null {
+  return roles.some((r) => (TEAM_ROLES as readonly string[]).includes(r)) ? null : ACCESS_REFUSALS.pickRoles;
+}
+
+/**
+ * The roles editor's line as the Team Admin ticks roles: who the member will be, or, with no role
+ * ticked, that they need one (`validateRoles`, which `changeRoles` refuses with). Blocked while there's
+ * nothing to save: no role, or the roles they have.
+ */
+export function describeRoleChange(input: {
+  member: Named;
+  team: Named;
+  from: readonly TeamRole[];
+  to: readonly TeamRole[];
+}): { line: string; blocked: boolean } {
+  const to = sortRoles(input.to);
+  if (validateRoles(to)) return { line: `${firstName(input.member.name)} needs at least one role on ${input.team.name}.`, blocked: true };
+  return {
+    line: `${input.member.name} will be ${rolesLabel(to)} on ${input.team.name}.`,
+    blocked: to.join() === sortRoles(input.from).join(),
+  };
 }
 
 export function isRequestableRole(role: unknown): role is (typeof REQUESTABLE_ROLES)[number] {
@@ -245,6 +275,27 @@ export interface RequestDecisionFields {
 }
 
 /**
+ * Why `actor` can't decide the request at all, or null: nobody decides their own, and a request is
+ * decided once. The access requests read model asks it for every row's Approve and Deny.
+ */
+export function requestDecisionRefusal(request: Pick<AccessRequestFacts, "userId" | "status">, actor: Named): string | null {
+  if (actor.id === request.userId) return REASONS.ownRequest;
+  if (request.status !== "pending") return ACCESS_REFUSALS.decided;
+  return null;
+}
+
+/**
+ * The first reason a decision's note can't be sent, or null: a denial needs one (the requester reads
+ * it), and a note stays under DECISION_NOTE_MAX. The Deny strip runs it as the admin types.
+ */
+export function validateDecisionNote(decision: "approve" | "deny", note: string | null | undefined): string | null {
+  const trimmed = (note ?? "").trim();
+  if (trimmed.length > DECISION_NOTE_MAX) return ACCESS_REFUSALS.noteTooLong;
+  if (decision === "deny" && !trimmed) return ACCESS_REFUSALS.denyNote;
+  return null;
+}
+
+/**
  * Approve: a new membership with the role; an active member gains the role; a suspended or lapsed
  * member is reinstated with exactly the requested role (and a fresh inactivity clock).
  * Deny: needs a note, which the requester sees.
@@ -261,11 +312,9 @@ export function decideAccessRequest(input: {
   membership: MembershipFacts | null;
 }): Ok<{ request: RequestDecisionFields; membership: MembershipChange | null; effects: AccessEffect[] }> | Refused {
   const { request, requester, team, actor, decision, now, membership } = input;
-  if (actor.id === request.userId) return refuse(REASONS.ownRequest);
-  if (request.status !== "pending") return refuse(ACCESS_REFUSALS.decided);
+  const refusal = requestDecisionRefusal(request, actor) ?? validateDecisionNote(decision, input.note);
+  if (refusal) return refuse(refusal);
   const note = (input.note ?? "").trim();
-  if (note.length > DECISION_NOTE_MAX) return refuse(ACCESS_REFUSALS.noteTooLong);
-  if (decision === "deny" && !note) return refuse(ACCESS_REFUSALS.denyNote);
 
   const fields: RequestDecisionFields = {
     status: decision === "approve" ? "approved" : "denied",
@@ -377,8 +426,9 @@ export function changeRoles(
   const { membership, member, team, actor } = input;
   if (actor.id === membership.userId) return refuse(REASONS.ownAccess);
   if (membership.status !== "active") return refuse(ACCESS_REFUSALS.notActive);
+  const rolesProblem = validateRoles(input.roles);
+  if (rolesProblem) return refuse(rolesProblem);
   const roles = sortRoles(input.roles.filter((r) => (TEAM_ROLES as readonly string[]).includes(r)));
-  if (roles.length === 0) return refuse(ACCESS_REFUSALS.pickRoles);
   const from = sortRoles(membership.roles);
   if (from.join() === roles.join()) return { ok: true, membership: null, effects: [] };
   if (losesLastAdmin(input.teamMemberships, membership, roles)) return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
@@ -549,6 +599,11 @@ export interface NewRecert {
   items: RecertItemFacts[];
 }
 
+/** When a review started at `now` is due: RECERT_WINDOW_DAYS later. */
+export function recertDueAt(now: Date): Date {
+  return new Date(now.getTime() + RECERT_WINDOW_DAYS * DAY_MS);
+}
+
 /** A Team Admin starts a review now, due in 30 days, covering the team's members (Team Admins aside). */
 export function startRecert(input: {
   team: Named;
@@ -562,7 +617,7 @@ export function startRecert(input: {
   if (input.unfinished.some((r) => recertPhase(r, now) !== "closed")) return refuse(ACCESS_REFUSALS.reviewOpen);
   const subjects = recertSubjects(input.memberships, team.id);
   if (subjects.length === 0) return refuse(ACCESS_REFUSALS.nobodyToReview);
-  const dueAt = new Date(now.getTime() + RECERT_WINDOW_DAYS * DAY_MS);
+  const dueAt = recertDueAt(now);
   const label = quarterLabel(dueAt);
   return {
     ok: true,
@@ -664,6 +719,108 @@ export function decideRecertItem(input: {
     });
   }
   return { ok: true, item: decided, membership: change, completedAt, effects };
+}
+
+// ── What the Team settings sections say ──────────────────────────────────────
+// The line in a row's strip before the Team Admin confirms, and how a settled row reads. The read
+// models fill these in with the demo clock's `now`, so a screen never words a rule or works out a
+// date itself.
+
+export interface MemberConsequences {
+  remove: string;
+  /** Restore a suspended or lapsed member, with the roles they had. */
+  reinstate: string;
+  suspend: string;
+  /** Keep a flagged member: the day they're flagged again, from the fresh clock `keepInactive` starts. */
+  keep: string;
+}
+
+/** What each member action does: Remove, Restore, Suspend and Keep. */
+export function memberConsequences(input: { membership: MembershipFacts; member: Named; team: Named; now: Date }): MemberConsequences {
+  const { membership, member, team, now } = input;
+  const first = firstName(member.name);
+  const flaggedAgain = inactivity({ ...membership, inactivityKeptAt: now }, now).flagAt;
+  return {
+    remove: `${member.name} loses access to ${team.name} and drops off this list. They can ask for access again.`,
+    reinstate: `${first} signs in to ${team.name} again as ${rolesLabel(membership.roles)}. The inactivity count restarts today.`,
+    suspend: `${first} can't sign in to ${team.name} until you restore them.`,
+    keep: `${first} stays on ${team.name}. The count restarts today, so they're flagged again on ${formatShortDate(flaggedAgain, now)} if they still haven't signed in.`,
+  };
+}
+
+/** What approving and denying a pending access request do. */
+export function requestConsequences(input: { requester: Named; role: TeamRole; team: Named }): { approve: string; deny: string } {
+  const { requester, role, team } = input;
+  return {
+    approve: `${requester.name} gets ${ROLE_LABEL[role]} access to ${team.name} and sees its Library the next time they open Stencil.`,
+    deny: `${firstName(requester.name)} sees your note and can ask again.`,
+  };
+}
+
+/** What starting a review now asks of the team, and by when: the deadline `startRecert` sets. */
+export function startRecertConsequence(team: Named, now: Date): string {
+  const due = formatShortDate(recertDueAt(now), now);
+  return `Every member except Team Admins is asked to be kept or removed by ${due}, ${RECERT_WINDOW_DAYS} days from today. Anyone not confirmed by then loses access to ${team.name}.`;
+}
+
+/** What removing a member in a review does: their access ends now, not at the deadline. */
+export function recertRemoveConsequence(member: Named, team: Named): string {
+  return `${member.name} loses access to ${team.name} now, not at the deadline.`;
+}
+
+/**
+ * The line under a review's numbers. While it runs: who loses access at the deadline. Once it's
+ * closed: who lapsed at the deadline (`lapsed`), else that it closed early with every member decided,
+ * else that nobody lapsed.
+ */
+export function recertFootnote(input: {
+  recert: Pick<RecertFacts, "startsAt" | "dueAt" | "completedAt">;
+  lapsed: readonly Named[];
+  team: Named;
+  now: Date;
+}): string {
+  const { recert, now } = input;
+  const day = (d: Date) => formatShortDate(d, now);
+  if (recertPhase(recert, now) !== "closed") return `Anyone not confirmed by ${day(recert.dueAt)} loses access to ${input.team.name}.`;
+  if (input.lapsed.length) return `Access lapsed on ${day(recert.dueAt)} for ${joinWithAnd(input.lapsed.map((p) => p.name))}.`;
+  if (recert.completedAt && recert.completedAt.getTime() < recert.dueAt.getTime()) {
+    return `Closed on ${day(recert.completedAt)}: every member was decided.`;
+  }
+  return "Nobody lapsed.";
+}
+
+/**
+ * How a member's row in a review reads once nothing is left to decide on it, or null while it can
+ * still be kept or removed: kept (by whom, when), removed, suspended for inactivity, lapsed at the
+ * deadline, or not confirmed before the review closed.
+ */
+export function recertItemOutcome(input: {
+  item: Pick<RecertItemFacts, "decision" | "decidedAt">;
+  decidedBy: Named | null;
+  /** The member's status now; "removed" when they have no membership on the team. */
+  membership: MembershipStatus | "removed";
+  recert: Pick<RecertFacts, "startsAt" | "dueAt" | "completedAt">;
+  now: Date;
+}): string | null {
+  const { item, recert, now } = input;
+  const day = (d: Date) => formatShortDate(d, now);
+  if (item.decision === "keep") {
+    return `Kept${input.decidedBy ? ` · ${input.decidedBy.name}` : ""}${item.decidedAt ? `, ${day(item.decidedAt)}` : ""}`;
+  }
+  if (item.decision === "remove" || input.membership === "removed") return `Removed${item.decidedAt ? ` · ${day(item.decidedAt)}` : ""}`;
+  if (input.membership === "suspended") return "Suspended for inactivity";
+  if (input.membership === "lapsed") return `Access lapsed ${day(recert.dueAt)}`;
+  if (recertPhase(recert, now) === "closed") return "Not confirmed";
+  return null;
+}
+
+/**
+ * An active member past the automatic suspension whom the sweep kept on as their team's last Team
+ * Admin (`sweepAccess` records it). The Inactivity section says so in place of a suspension date.
+ */
+export function heldAsLastAdmin(m: MembershipFacts, now: Date): boolean {
+  const idle = inactivity(m, now);
+  return m.status === "active" && idle.state === "suspend_due" && suspensionHeld(m, idle);
 }
 
 // ── The sweep: what the clock did since last time ───────────────────────────
