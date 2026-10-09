@@ -1,9 +1,11 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { ApproverFacts } from "./access-types";
 import {
   PLATFORM_REFUSALS,
   RESERVED_SLUGS,
+  approverProblem,
   channelOffConsequences,
   conformToSections,
   createTeam,
@@ -14,9 +16,10 @@ import {
   setChannelRule,
   slugify,
   updateRequiredSections,
+  validateChain,
 } from "./platform-config";
 import type { ApprovalStage } from "./review-types";
-import type { JSONContent, RequiredSection } from "./types";
+import type { ApproverRule, JSONContent, RequiredSection } from "./types";
 
 const NOW = new Date("2026-10-05T12:00:00.000Z");
 const riley = { id: "riley", name: "Riley Brooks" };
@@ -287,6 +290,87 @@ const TEAM: ApprovalStage & { id: string } = {
 };
 const LEGAL = { name: "Legal reviewer", rule: { kind: "user" as const, userId: "dana" } };
 
+/**
+ * Everyone a chain test may name. Riley is the Platform Admin saving; Alex, Dana and Jordan hold active
+ * team roles; Taylor is the Auditor; Morgan has no active access; Pat is a Platform Admin with no team role.
+ */
+const approvers: ApproverFacts[] = [
+  { ...riley, platformRole: "platform_admin", activeTeamRole: false },
+  { ...alex, platformRole: null, activeTeamRole: true },
+  { ...dana, platformRole: null, activeTeamRole: true },
+  { id: "jordan", name: "Jordan Ellis", platformRole: null, activeTeamRole: true },
+  { id: "taylor", name: "Taylor Nguyen", platformRole: "auditor", activeTeamRole: false },
+  { id: "morgan", name: "Morgan Lee", platformRole: null, activeTeamRole: false },
+  { id: "pat", name: "Pat Admin", platformRole: "platform_admin", activeTeamRole: false },
+];
+const naming = (userId: string, name = "Sign-off") => ({ name, rule: { kind: "user" as const, userId } });
+
+describe("validateChain", () => {
+  const check = (stages: { name: string; rule: ApproverRule }[], actorId = "riley") =>
+    validateChain({ stages, actorId, people: approvers });
+  const team = { name: "Team approver", rule: TEAM.rule };
+
+  it("passes a chain somebody can approve: the Approver role, then different people", () => {
+    expect(check([team, LEGAL, naming("alex", "Final sign-off")])).toEqual([]);
+    expect(check([team, { name: "Second approver", rule: TEAM.rule }])).toEqual([]); // two people with the role
+  });
+
+  it("refuses one person on two stages, at the later stage", () => {
+    expect(check([team, LEGAL, naming("dana", "Final sign-off")])).toEqual([
+      { stage: 2, field: "reviewer", reason: "Dana Park already reviews stage 2." },
+    ]);
+  });
+
+  it("refuses every team role but Approver: none of them can decide", () => {
+    for (const [role, label] of [
+      ["viewer", "Viewer"],
+      ["author", "Author"],
+      ["team_admin", "Team Admin"],
+    ] as const) {
+      expect(check([team, { name: "Second look", rule: { kind: "team_role", role } }])).toEqual([
+        { stage: 1, field: "reviewer", reason: `The ${label} role can't approve.` },
+      ]);
+    }
+    expect(check([{ name: "Boss", rule: { kind: "team_role", role: "boss" as never } }])).toEqual([
+      { stage: 0, field: "reviewer", reason: PLATFORM_REFUSALS.pickRole },
+    ]);
+  });
+
+  it("refuses the admin naming themselves", () => {
+    expect(check([team, naming("riley")])).toEqual([{ stage: 1, field: "reviewer", reason: "You can't name yourself as an approver." }]);
+    expect(check([team, naming("riley")], "pat")).toEqual([
+      { stage: 1, field: "reviewer", reason: "Riley Brooks is a Platform Admin with no team role and can't approve." },
+    ]);
+  });
+
+  it("refuses an Auditor", () => {
+    expect(check([team, naming("taylor")])).toEqual([{ stage: 1, field: "reviewer", reason: "Taylor Nguyen is an Auditor and can't approve." }]);
+  });
+
+  it("refuses someone who can't approve: no active team role, whatever their platform role", () => {
+    expect(check([team, naming("morgan")])).toEqual([{ stage: 1, field: "reviewer", reason: "Morgan Lee has no active access." }]);
+    expect(check([team, naming("pat")])).toEqual([
+      { stage: 1, field: "reviewer", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
+    ]);
+    expect(check([team, naming("nobody")])).toEqual([{ stage: 1, field: "reviewer", reason: PLATFORM_REFUSALS.pickPerson }]);
+  });
+
+  it("checks every stage, names too, in stage order with the name first", () => {
+    expect(check([{ name: " ", rule: { kind: "team_role", role: "author" } }, naming("taylor", "team APPROVER"), naming("morgan", "Team approver")])).toEqual([
+      { stage: 0, field: "name", reason: PLATFORM_REFUSALS.stageName },
+      { stage: 0, field: "reviewer", reason: "The Author role can't approve." },
+      { stage: 1, field: "reviewer", reason: "Taylor Nguyen is an Auditor and can't approve." },
+      { stage: 2, field: "name", reason: "There are two stages called Team approver." },
+      { stage: 2, field: "reviewer", reason: "Morgan Lee has no active access." },
+    ]);
+    expect(check([{ ...team, name: "x".repeat(41) }])).toEqual([{ stage: 0, field: "name", reason: PLATFORM_REFUSALS.stageNameTooLong }]);
+  });
+
+  it("offers in the picker only the people approverProblem allows", () => {
+    expect(approvers.filter((p) => !approverProblem(p, "riley")).map((p) => p.id)).toEqual(["alex", "dana", "jordan"]);
+  });
+});
+
 describe("saveApprovalChain", () => {
   const run = (over: Partial<Parameters<typeof saveApprovalChain>[0]> = {}) =>
     saveApprovalChain({
@@ -294,7 +378,7 @@ describe("saveApprovalChain", () => {
       current: [TEAM],
       next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }, LEGAL],
       inReview: [],
-      people,
+      people: approvers,
       actor: riley,
       now: NOW,
       ...over,
@@ -391,18 +475,26 @@ describe("saveApprovalChain", () => {
     const same = run({ next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }] });
     expect(same.ok && same.effects).toEqual([]);
   });
+
+  it("refuses a chain nobody can approve with validateChain's first problem, and writes nothing", () => {
+    const team = { id: "stage_team", name: "Team approver", rule: TEAM.rule };
+    expect(run({ next: [team, LEGAL, naming("dana", "Final sign-off")] })).toEqual({ ok: false, reason: "Dana Park already reviews stage 2." });
+    expect(run({ next: [{ ...team, rule: { kind: "team_role", role: "viewer" } }] })).toEqual({ ok: false, reason: "The Viewer role can't approve." });
+    expect(run({ next: [team, naming("riley")] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.nameYourself });
+    expect(run({ next: [team, naming("taylor")] })).toEqual({ ok: false, reason: "Taylor Nguyen is an Auditor and can't approve." });
+    expect(run({ next: [team, naming("morgan")] })).toEqual({ ok: false, reason: "Morgan Lee has no active access." });
+  });
+
+  it("refuses re-saving a stage whose person has lost access since they were named", () => {
+    const legal = { id: "stage_legal", position: 1, ...LEGAL };
+    const lapsed = approvers.map((p) => (p.id === "dana" ? { ...p, activeTeamRole: false } : p));
+    const renamed = [{ id: "stage_team", name: "Team sign-off", rule: TEAM.rule }, { id: "stage_legal", ...LEGAL }];
+    expect(run({ current: [TEAM, legal], next: renamed, people: lapsed })).toEqual({ ok: false, reason: "Dana Park has no active access." });
+    expect(run({ current: [TEAM, legal], next: renamed }).ok).toBe(true);
+  });
 });
 
 describe("describeChainChange (the Now / After cards)", () => {
-  it("says each stage needs a different person only when one person is named on two stages", () => {
-    const twice = describeChainChange({
-      contentTypeName: "Disclosure",
-      current: [TEAM],
-      next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }, LEGAL, { name: "Final", rule: LEGAL.rule }],
-      people,
-    });
-    expect(twice.lines).toContain("Each stage needs a different person.");
-  });
 
   it("shows the Legal stage added, and says Dana reviews every team's submissions", () => {
     expect(

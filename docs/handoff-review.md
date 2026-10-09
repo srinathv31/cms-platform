@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 9 | 30 | 13 | 52 |
+| Open | 0 | 8 | 30 | 13 | 51 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 13 | 5 | 1 | 20 |
+| Fixed | 1 | 14 | 5 | 1 | 21 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -261,7 +261,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D4 · High: The chain editor saves chains nobody can approve
 
-- **Status:** Open
+- **Status:** Fixed. One domain `validateChain` refuses a person on two stages, any role but Approver, naming yourself, an Auditor and anyone without an active team role, for every named person on every save; `saveApprovalChain` and the chain editor both run it, and the editor shows each reason at its stage with Save disabled ([decision 0008](decisions/0008-a-chain-must-be-approvable.md)).
 - **Where:** `src/domain/platform-config.ts` line 437; `src/server/actions/platform.ts` line 262
 - **What happens:** Naming the same person on two stages only adds a warning line; the save succeeds and every submission stalls. A `team_role` stage may name viewer, author or team_admin, none of which can decide. The rules against naming yourself, an Auditor or someone without access exist only in the server action.
 - **Fix:** A domain `validateChain` that refuses all of these; allow only `team_role: "approver"`.

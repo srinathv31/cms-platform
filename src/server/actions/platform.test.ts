@@ -383,6 +383,50 @@ describe("saveApprovalChain", () => {
     }
   });
 
+  it("refuses one person on two stages, and writes nothing", async () => {
+    const before = await chain();
+    const kept = before.map((s) => ({ id: s.id, name: s.name, rule: s.approverRule }));
+    const jordan: ApproverRule = { kind: "user", userId: "jordan" };
+    const at = as("riley");
+    expect(
+      await saveApprovalChain({
+        contentTypeId: CT,
+        stages: [...kept, { name: "Compliance", rule: jordan }, { name: "Final sign-off", rule: jordan }],
+      }),
+    ).toEqual({ ok: false, reason: `Jordan Ellis already reviews stage ${before.length + 1}.` });
+    expect(await chain()).toEqual(before);
+    expect(await auditAt(at)).toEqual([]);
+    expect(await notificationsAt(at)).toEqual([]);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("refuses a team role other than Approver as bad input: only that role decides", async () => {
+    const before = await chain();
+    as("riley");
+    const viewers = { id: TEAM_STAGE, name: "Team approver", rule: { kind: "team_role", role: "viewer" } as ApproverRule };
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: [viewers] })).toEqual({ ok: false, reason: "Check the form and try again." });
+    expect(await chain()).toEqual(before);
+  });
+
+  it("checks people named before too: a chain naming someone who has since lost access can't be saved", async () => {
+    const before = await chain();
+    expect(before.some((s) => s.approverRule.kind === "user" && s.approverRule.userId === "dana")).toBe(true);
+    const renamed = before.map((s) => ({ id: s.id, name: s.id === TEAM_STAGE ? "Team sign-off" : s.name, rule: s.approverRule }));
+    await db.update(memberships).set({ status: "suspended" }).where(eq(memberships.userId, "dana"));
+    try {
+      const at = as("riley");
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: renamed })).toEqual({ ok: false, reason: "Dana Park has no active access." });
+      expect(await chain()).toEqual(before);
+      expect(await auditAt(at)).toEqual([]);
+      // The editor gets the same facts, so it shows the reason at Dana's stage before anyone saves.
+      const section = await getApprovalChainsSection();
+      expect(section.people.some((p) => p.id === "dana")).toBe(false);
+      expect(section.approvers.find((p) => p.id === "dana")).toEqual({ id: "dana", name: "Dana Park", platformRole: null, activeTeamRole: false });
+    } finally {
+      await db.update(memberships).set({ status: "active" }).where(eq(memberships.userId, "dana"));
+    }
+  });
+
   it("when a waiting stage names someone else, they're told about the versions already waiting", async () => {
     const templateId = await submitted("coral-offers", "maya"); // waits on the Team approver stage
     const legalId = (await chain())[1]!.id;

@@ -158,7 +158,7 @@ export function Strip({
 
 // ── Controls ─────────────────────────────────────────────────
 
-/** A 32px native select in the house control style. */
+/** A 32px native select in the house control style. `invalid` marks it like an invalid Input; `describedBy` names the reason. */
 export function Pick({
   value,
   onChange,
@@ -166,6 +166,8 @@ export function Pick({
   className,
   children,
   autoFocus,
+  invalid,
+  describedBy,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -173,15 +175,19 @@ export function Pick({
   className?: string;
   children: ReactNode;
   autoFocus?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   return (
     <span className={cn("relative inline-flex", className)}>
       <select
         aria-label={label}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         data-autofocus={autoFocus ? "" : undefined}
-        className="h-8 w-full appearance-none rounded-lg border border-hairline bg-surface pr-7 pl-2.5 text-[14px] text-text outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="h-8 w-full appearance-none rounded-lg border border-hairline bg-surface pr-7 pl-2.5 text-[14px] text-text outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
       >
         {children}
       </select>

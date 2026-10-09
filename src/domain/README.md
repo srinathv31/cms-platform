@@ -47,7 +47,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [redline.ts](redline.ts) | The diff between two versions' documents, for the review screen. |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
 | | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. |
-| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains. |
+| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve). |
 | | [audit.ts](audit.ts), [activity.ts](activity.ts) | One sentence per audit event, the Audit page's filters and CSV, notification fallbacks. |
 | Contract and consequences | [contract.ts](contract.ts) | One sentence per contract change: "v2 adds required `annual_fee` (Currency)." |
 | | [consequences.ts](consequences.ts) | Who an approve, sunset, or revoke affects, from render usage. |
@@ -135,7 +135,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | --- | --- |
 | Comment policy: length (`COMMENT_MAX`), the block must exist on a frozen version, who is notified; effects built inline | [actions/comments.ts](../server/actions/comments.ts) |
 | Which states take comments (`draft`, `in_review`); `addComment` doesn't check the version's state | `versionTakesComments` in [thread-state.ts](../components/comments/thread-state.ts) |
-| Who may be named on a stage (not yourself, not an Auditor, needs an active team role); re-notifying when a stage's rule changes | `unableToApprove`, `saveApprovalChain` in [actions/platform.ts](../server/actions/platform.ts) |
+| Re-notifying the people a stage names when its rule changes | `saveApprovalChain` in [actions/platform.ts](../server/actions/platform.ts) |
 | The default chain (`DEFAULT_CHAIN`), the combined decide check (`decideCheck`), and `waitingStage`, which reads an out-of-range stage as the last one where `stageAt` returns null | [queries/review-shared.ts](../server/queries/review-shared.ts) |
 | A new template's channels (wanted and allowed, else the first allowed) | `conformToContentType` in [templates/create.ts](../server/templates/create.ts) |
 | A version publishes a channel only if the content type still allows it | [queries/consumer-api.ts](../server/queries/consumer-api.ts), [queries/integration.ts](../server/queries/integration.ts), [render-template.ts](../server/render/render-template.ts) |
@@ -152,6 +152,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | --- | --- | --- |
 | Add a lifecycle transition | `startRevoke` or `setSunset` in [lifecycle.ts](lifecycle.ts) | Returns `Outcome<…>`; sentences in `REFUSALS`; tests in [lifecycle.test.ts](lifecycle.test.ts). |
 | Add an access or settings rule | `requestAccess` in [access.ts](access.ts) | Limits live in [access-types.ts](access-types.ts), so the form ([request-access.tsx](../components/access/request-access.tsx)) and the server share them. |
+| Validate a settings form live with the server's own rule | `validateChain` in [platform-config.ts](platform-config.ts) | Takes the facts (people's access, the actor) and returns each problem with the stage and field it's about. The read model carries the facts; [approval-chains.tsx](../components/settings/platform/approval-chains.tsx) shows each problem at its field and disables Save with the first; `saveApprovalChain` refuses with the first. |
 | Apply deadlines from the clock | `sweepAccess` in [access.ts](access.ts) | Idempotent at the same `now`; effects carry the instant each deadline passed. |
 | Add a permission | `Action` in [types.ts](types.ts), `TEAM_GRANTS` and `GUARDS` in [permissions.ts](permissions.ts) | Add the case to [permissions.test.ts](permissions.test.ts). |
 | Word something for people | `describeChange` in [contract.ts](contract.ts) | Each case's sentence is shown in the doc comment. |

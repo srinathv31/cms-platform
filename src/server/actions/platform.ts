@@ -3,7 +3,7 @@
 import { refresh, revalidatePath } from "next/cache";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { ActionResult } from "@/domain/access-types";
+import type { ActionResult, ApproverFacts } from "@/domain/access-types";
 import { stageRecipients } from "@/domain/approval-chain";
 import { PermissionError, assertCan } from "@/domain/permissions";
 import {
@@ -12,7 +12,7 @@ import {
   setChannelRule as setChannelRuleRule,
   updateRequiredSections,
 } from "@/domain/platform-config";
-import { CHANNELS, TEAM_ROLES, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
+import { CHANNELS, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
@@ -243,8 +243,9 @@ export async function setChannelRule(input: {
 
 // ── Approval chains ───────────────────────────────────────────
 
+// Only the Approver role decides, so it is the only role a stage may name (domain validateChain).
 const RuleInput: z.ZodType<ApproverRule> = z.union([
-  z.object({ kind: z.literal("team_role"), role: z.enum(TEAM_ROLES) }),
+  z.object({ kind: z.literal("team_role"), role: z.literal("approver") }),
   z.object({ kind: z.literal("user"), userId: z.string().min(1).max(64) }),
 ]);
 
@@ -258,48 +259,23 @@ const ChainInput = z.object({
 const sameRule = (a: ApproverRule, b: ApproverRule) =>
   a.kind === "user" ? b.kind === "user" && a.userId === b.userId : b.kind === "team_role" && a.role === b.role;
 
-/**
- * A person a stage newly names who could never act on it, or who mustn't: the acting admin themselves
- * (Platform Admin has no approve power; naming yourself would grant it, so another admin must name
- * you), an Auditor (read-only), or someone with no active team role anywhere. A platform role alone
- * is not access to approve with (permissions.ts, namedApprover). A stage that already named them is
- * left alone, so re-saving a chain never fails over someone else's access. Returns the refusal, or null.
- */
-async function unableToApprove(
-  tx: Tx,
-  actorId: string,
-  current: { id: string; rule: ApproverRule }[],
-  next: { id?: string; rule: ApproverRule }[],
-): Promise<string | null> {
-  const named = next.flatMap((s) => {
-    if (s.rule.kind !== "user") return [];
-    const before = current.find((c) => c.id === s.id)?.rule;
-    return before?.kind === "user" && before.userId === s.rule.userId ? [] : [s.rule.userId];
-  });
-  if (named.length === 0) return null;
-  if (named.includes(actorId)) return "You can't name yourself as an approver.";
-  const rows = await tx
-    .select({ id: users.id, name: users.name, platformRole: users.platformRole })
-    .from(users)
-    .where(inArray(users.id, named));
+/** Everyone, with what the domain's validateChain checks: their platform role and whether they hold an active team role. */
+async function approverFacts(tx: Tx): Promise<ApproverFacts[]> {
+  const people = await tx.select({ id: users.id, name: users.name, platformRole: users.platformRole }).from(users);
   const active = await tx
-    .select({ userId: memberships.userId })
+    .selectDistinct({ userId: memberships.userId })
     .from(memberships)
     .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
-    .where(and(inArray(memberships.userId, named), eq(memberships.status, "active")));
-  for (const u of rows) {
-    if (u.platformRole === "auditor") return `${u.name} is an Auditor and can't approve.`;
-    if (!active.some((a) => a.userId === u.id)) {
-      return u.platformRole === "platform_admin"
-        ? `${u.name} is a Platform Admin with no team role and can't approve.`
-        : `${u.name} has no active access.`;
-    }
-  }
-  return null; // an unknown id: the domain refuses it ("Pick a person.")
+    .where(eq(memberships.status, "active"));
+  const withRole = new Set(active.map((a) => a.userId));
+  return people.map((p) => ({ ...p, activeTeamRole: withRole.has(p.id) }));
 }
 
 /**
- * Saves the whole chain, in order. Existing stages keep their id; versions in review keep waiting on
+ * Saves the whole chain, in order. Every stage must pass the domain's `validateChain`, which the chain
+ * editor also runs as the admin edits: the Approver role or a person who can approve, never the admin
+ * saving it, never one person on two stages. Every named person is checked, including people named
+ * before who have since lost access. Existing stages keep their id; versions in review keep waiting on
  * the same stage wherever it moves (their currentStage is remapped, compare-and-set). Removing a stage
  * a version waits on is refused.
  */
@@ -340,9 +316,7 @@ export async function saveApprovalChain(input: {
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(and(eq(templates.contentTypeId, type.id), eq(versions.state, "in_review")));
-    const people = await tx.select({ id: users.id, name: users.name }).from(users);
-    const cannotApprove = await unableToApprove(tx, viewer.userId, current, parsed.data.stages);
-    if (cannotApprove) refuse(cannotApprove);
+    const people = await approverFacts(tx);
 
     const outcome = saveApprovalChainRule({
       contentType: { id: type.id, name: type.name },
