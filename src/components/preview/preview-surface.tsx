@@ -7,6 +7,7 @@ import { OriginalView } from "@/components/import/original-view";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Channel } from "@/domain/types";
 import {
+  useFocusTarget,
   usePreviewState,
   useSaveTick,
   useWorkspaceSession,
@@ -69,6 +70,8 @@ export function PreviewSurface({
   const saveTick = useSaveTick();
   const { variables } = useContractState();
   const switcher = useRef<SampleSetSwitcherHandle>(null);
+  // Focus follows here from the plain rail's Original tab when it widens the rail (content/rail.tsx).
+  const originalTab = useFocusTarget("originalTab");
 
   // The sets as saved, then edited here. `listSets` fills in any default set the version lacks.
   const [stored, setStored] = useState(sampleSets);
@@ -110,6 +113,7 @@ export function PreviewSurface({
             : preview.view
         }
         views={railHeaderViews({ preview: true, comments: commentsCount, original: original !== null })}
+        originalTabRef={originalTab}
         onChange={(view) => session.selectRailView(view)}
         onClose={() => closePreview(session, { restoreFocus: true })}
       >

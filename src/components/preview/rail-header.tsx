@@ -3,7 +3,7 @@
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { X } from "lucide-react";
 import { m } from "motion/react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { spring } from "@/components/motion/presets";
 import { Button } from "@/components/ui/button";
 import type { PreviewView } from "@/components/workspace/session/session-store";
@@ -67,6 +67,7 @@ export function RailHeader({
   onChange,
   onClose,
   views = VIEWS,
+  originalTabRef,
   children,
 }: {
   value: PreviewView;
@@ -75,6 +76,8 @@ export function RailHeader({
   views?: readonly RailHeaderView[];
   /** Shown only below the rail's breakpoint, where the rail is an overlay. */
   onClose: () => void;
+  /** The Original tab's ref, when there is one: the rail registers it as a focus target (`useFocusTarget`). */
+  originalTabRef?: Ref<HTMLElement>;
   /** The control at the right of the row. It gives way (truncates) before the tabs do. */
   children?: ReactNode;
 }) {
@@ -92,7 +95,12 @@ export function RailHeader({
           {views.map((view) => {
             const active = view.value === value;
             return (
-              <TabsPrimitive.Tab key={view.value} value={view.value} className={TAB}>
+              <TabsPrimitive.Tab
+                key={view.value}
+                ref={view.value === "original" ? originalTabRef : undefined}
+                value={view.value}
+                className={TAB}
+              >
                 <span className={LABEL}>
                   {/* The medium weight is wider: an unseen copy of the label holds the room for it, so the tabs don't shift when they swap. */}
                   <span className={cn("col-start-1 row-start-1 flex items-baseline gap-1.5", active && "font-medium")}>

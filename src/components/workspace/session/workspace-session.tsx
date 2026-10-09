@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, use, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import { createContext, use, useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { useDraftAutosave } from "../autosave/use-draft-autosave";
+import type { FocusTargetElements, FocusTargetName } from "./focus-targets";
 import {
   createWorkspaceSession,
   INITIAL_PREVIEW,
@@ -144,4 +145,18 @@ export function useOwnsFields(fields: readonly string[]): boolean {
   const owned = useSyncExternalStore(session.subscribe, session.getOwnedFields, () => "");
   const set = new Set(owned.split(","));
   return fields.every((field) => set.has(field));
+}
+
+/**
+ * The ref for a control that code sends focus to (`FocusTargetElements`). It registers the element with the
+ * session while it is mounted, so callers find it by name, never by its label or its place in the page. `state`
+ * is what it shows, for a caller waiting for a particular one (the status row's version state): a new state
+ * registers it again.
+ */
+export function useFocusTarget<N extends FocusTargetName>(name: N, state?: string) {
+  const session = useWorkspaceSession();
+  return useCallback(
+    (element: FocusTargetElements[N] | null) => (element ? session.focusTargets.register(name, element, state) : undefined),
+    [session, name, state],
+  );
 }

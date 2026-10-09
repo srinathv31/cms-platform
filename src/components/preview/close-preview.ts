@@ -2,14 +2,15 @@
 // whatever way it is closed (Esc, the toggle again, the overlay's Close button), focus goes back to
 // that toggle when it would otherwise be lost, so the keyboard picks up where it left off.
 
+import type { FocusTargets } from "@/components/workspace/session/focus-targets";
 import type { WorkspaceSession } from "@/components/workspace/session/session-store";
 
-/** The tab bar's Preview toggle (`PreviewToggle` in workspace-actions.tsx carries the attribute). */
-const PREVIEW_TOGGLE = "[data-preview-toggle]";
-
-/** Puts focus on the tab bar's Preview toggle (it is mounted on the Content tab, which the preview lives on). */
-export function focusPreviewToggle(): void {
-  document.querySelector<HTMLElement>(PREVIEW_TOGGLE)?.focus({ preventScroll: true });
+/**
+ * Puts focus on the tab bar's Preview toggle, which registers itself as a focus target while it is
+ * mounted (`PreviewToggle` in workspace-actions.tsx, on the Content tab, which the preview lives on).
+ */
+export function focusPreviewToggle(targets: Pick<FocusTargets, "get">): void {
+  targets.get("previewToggle")?.focus({ preventScroll: true });
 }
 
 /**
@@ -19,10 +20,10 @@ export function focusPreviewToggle(): void {
  * document keeps their caret).
  */
 export function closePreview(
-  session: Pick<WorkspaceSession, "closePreview" | "setRailOpen">,
+  session: Pick<WorkspaceSession, "closePreview" | "setRailOpen" | "focusTargets">,
   { restoreFocus }: { restoreFocus: boolean },
 ): void {
-  if (restoreFocus) focusPreviewToggle();
+  if (restoreFocus) focusPreviewToggle(session.focusTargets);
   session.closePreview();
   session.setRailOpen(false);
 }

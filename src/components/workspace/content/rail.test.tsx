@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
-import { act, useSyncExternalStore } from "react";
+import { act, useCallback, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RailHeader, railHeaderViews } from "@/components/preview/rail-header";
+import type { FocusTargetElements, FocusTargetName } from "../session/focus-targets";
 import { createWorkspaceSession, INITIAL_PREVIEW } from "../session/session-store";
 import { Rail } from "./rail";
 
@@ -13,21 +15,40 @@ vi.mock("../session/workspace-session", () => ({
   useRailTab: () => useSyncExternalStore(session.current!.subscribe, session.current!.getRailTab, () => null),
   usePreviewState: () =>
     useSyncExternalStore(session.current!.subscribe, session.current!.getPreview, () => INITIAL_PREVIEW),
+  useFocusTarget: (name: FocusTargetName, state?: string) => useFocusTarget(name, state),
 }));
+
+/** What `useFocusTarget` does, on the test's session. */
+function useFocusTarget<N extends FocusTargetName>(name: N, state?: string) {
+  return useCallback(
+    (element: FocusTargetElements[N] | null) => (element ? session.current!.focusTargets.register(name, element, state) : undefined),
+    [name, state],
+  );
+}
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
 
-/** The page around the rail: the tab bar's Preview toggle, the template name, the document, and the rail with a button in it. */
-function Page() {
+/** The tab bar's Preview toggle, which registers itself with the session as the real one does. */
+function PreviewToggle() {
+  return (
+    <button ref={useFocusTarget("previewToggle")} id="toggle">
+      Preview
+    </button>
+  );
+}
+
+/**
+ * The page around the rail: the tab bar's Preview toggle, the template name (registered with the session as
+ * name-field.tsx does, under whatever label it has), the document, and the rail with a button in it.
+ */
+function Page({ nameLabel = "Template name" }: { nameLabel?: string }) {
   return (
     <>
-      <button data-preview-toggle="" id="toggle">
-        Preview
-      </button>
-      <textarea aria-label="Template name" id="name" defaultValue="Card offer terms" />
+      <PreviewToggle />
+      <textarea ref={useFocusTarget("name")} aria-label={nameLabel} id="name" defaultValue="Card offer terms" />
       <div className="ProseMirror" id="doc" tabIndex={0} />
       <Rail channels={<div />} preview={<button id="in-rail">Download PDF</button>}>
         <div />
@@ -114,6 +135,26 @@ describe("Escape in the template name", () => {
     expect(session.current!.getPreview().open).toBe(false);
     expect(document.activeElement).toBe($("toggle"));
   });
+
+  it("knows the field by what it is, not by its label: renamed, its Escape works the same", () => {
+    act(() => root.render(<Page nameLabel="Title" />));
+    const field = $<HTMLTextAreaElement>("name");
+    expect(field.getAttribute("aria-label")).toBe("Title");
+    nameFieldHandlesEscape(field);
+
+    // Mid-edit: the field takes the Escape, and the preview stays.
+    field.focus();
+    field.value = "Card offer terms, edited";
+    pressEscape(field);
+    expect(field.value).toBe("Card offer terms");
+    expect(session.current!.getPreview().open).toBe(true);
+
+    // Nothing to put back: the Escape closes the preview, and focus goes to the Preview toggle.
+    field.focus();
+    pressEscape(field);
+    expect(session.current!.getPreview().open).toBe(false);
+    expect(document.activeElement).toBe($("toggle"));
+  });
 });
 
 describe("The rail with review comments", () => {
@@ -188,18 +229,37 @@ describe("The rail with review comments", () => {
 });
 
 describe("The rail of an imported template", () => {
+  /** The widened rail's header row, as the preview surface draws it while the preview is open, with its own Original tab. */
+  function WidenedHeader() {
+    const preview = useSyncExternalStore(session.current!.subscribe, session.current!.getPreview);
+    const originalTab = useFocusTarget("originalTab");
+    if (!preview.open) return null;
+    return (
+      <RailHeader
+        value={preview.view}
+        views={railHeaderViews({ preview: true, comments: null, original: true })}
+        originalTabRef={originalTab}
+        onChange={(view) => session.current!.selectRailView(view)}
+        onClose={() => {}}
+      />
+    );
+  }
+
   function ImportedPage({ arrival = false }: { arrival?: boolean }) {
     return (
       <>
-        <button data-preview-toggle="" id="toggle">
-          Preview
-        </button>
+        <PreviewToggle />
         <Rail
           channels={<div id="channels" />}
           original
           takeArrival={() => arrival}
           footer={<button id="copilot">Copilot prompt</button>}
-          preview={<button id="in-rail">Original file</button>}
+          preview={
+            <>
+              <WidenedHeader />
+              <button id="in-rail">Original file</button>
+            </>
+          }
         >
           <div id="variables-panel" />
         </Rail>
@@ -234,12 +294,33 @@ describe("The rail of an imported template", () => {
     expect(shown("variables-panel")).toBe(false);
   });
 
+  it("moves focus to the widened rail's Original tab when Original is picked, once that has mounted", async () => {
+    const plain = tab("Original")!;
+    act(() => plain.click());
+    await act(async () => {});
+    expect(plain.isConnected, "the plain rail's header went as the rail widened").toBe(false);
+    expect(tab("Original")!.closest('[data-slot="rail-header"]')).not.toBeNull();
+    expect(document.activeElement).toBe(tab("Original"));
+  });
+
   it("is put away by Escape, and focus goes back to the Original tab", async () => {
     act(() => tab("Original")!.click());
     $("in-rail").focus();
     pressEscape($("in-rail"));
     expect(session.current!.getPreview().open).toBe(false);
     await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(document.activeElement).toBe(tab("Original"));
+  });
+
+  it("is put away by Escape from the widened rail's Original tab, and focus goes to the plain rail's", async () => {
+    act(() => tab("Original")!.click());
+    await act(async () => {});
+    const widened = tab("Original")!;
+    expect(document.activeElement).toBe(widened);
+    pressEscape(widened);
+    await act(async () => {});
+    expect(session.current!.getPreview().open).toBe(false);
+    expect(widened.isConnected).toBe(false);
     expect(document.activeElement).toBe(tab("Original"));
   });
 

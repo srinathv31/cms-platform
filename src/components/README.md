@@ -194,6 +194,11 @@ The same store holds the workspace still (`makeInert`, read with `useInert`): Su
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
 A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the
 header's `SaveStopped` says why and offers Reload. Anything else that has to stop edits takes a hold the same way.
+The session also holds the controls that code sends focus to (`session.focusTargets`): the name field, the header's
+status row, the Preview toggle and the rail's Original tab register themselves while mounted (`useFocusTarget`), and
+an Esc, a submit or a revert asks for them by name, or waits for one to mount, rather than querying the page by label
+([decision 0027](../../docs/decisions/0027-focus-targets-register-with-the-session.md)). A new control that code
+focuses registers the same way.
 
 ## Copy these
 

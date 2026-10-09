@@ -32,6 +32,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0024](0024-the-palette-searches-on-the-server.md) | The ⌘K palette searches on the server, and keeps answers per viewer | Accepted |
 | [0025](0025-refusals-carry-stable-codes.md) | Every refusal carries a stable code, and code branches on the code | Accepted |
 | [0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md) | A passed sunset is recorded by a sweep, in the audit log only: no notice, no notification | Accepted |
+| [0027](0027-focus-targets-register-with-the-session.md) | Focus targets register with the workspace session; nothing finds them by label | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

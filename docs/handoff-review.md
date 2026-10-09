@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 16 | 9 | 28 |
+| Open | 0 | 3 | 16 | 8 | 27 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 19 | 4 | 43 |
+| Fixed | 1 | 19 | 19 | 5 | 44 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -439,7 +439,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I15 · Low: Focus and Esc handling is wired through DOM queries
 
-- **Status:** Open
+- **Status:** Fixed. The name field, the status row, the Preview toggle and the rail's Original tabs register with the workspace session (`session.focusTargets`), and callers ask it or wait for a registration instead of querying labels or polling frames ([decision 0027](decisions/0027-focus-targets-register-with-the-session.md)).
 - **Where:** `src/components/workspace/workspace-actions.tsx` line 59
 - **What happens:** rAF polling for up to 3 seconds, `textarea[aria-label="Template name"]`, a tab found by its text "Original". Renaming a label breaks Esc handling.
 - **Fix:** Register focus targets as refs on the workspace session.
