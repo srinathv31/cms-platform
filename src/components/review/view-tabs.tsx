@@ -2,6 +2,9 @@
 
 import { Tab, TabList, Tabs } from "@/components/primitives/tabs";
 import { Switch } from "@/components/ui/switch";
+import { statusLabel } from "@/domain/status";
+import type { VersionState } from "@/domain/types";
+import { cn } from "@/lib/utils";
 
 // The view tabs over the main pane: the app's tabs (`Tabs`), with the underline sliding to the next
 // tab. The panels aren't beside the bar (the document and the output are cells of the review grid, and
@@ -94,16 +97,25 @@ function Toggle({
 }
 
 /**
+ * What the redline is against: "vs v2" for the Active version. With none Active (after a revoke) it is
+ * an older text, and the label says which: "vs v3 (revoked)".
+ */
+export function baselineLabel({ number, state }: { number: number; state: VersionState }): string {
+  return state === "active" ? `vs v${number}` : `vs v${number} (${statusLabel(state).toLowerCase()})`;
+}
+
+/**
  * Show changes, flush right, and (once the changes show) Changes only to its left, so Show changes
- * never moves. Offered only when there is an Active version to compare with.
+ * never moves. Offered only when there is a version to compare with (`ReviewScreenData.baseline`): the
+ * Active one, or after a revoke the version the correction started from.
  *
  * The group gives way to the bar's width in steps, so it never spills past the bar's edge (800px, with
  * both on, needs the last two): "vs v2" and the count go first (32rem, 29rem), then "Show changes" reads
- * "Changes" (27.5rem) and "Changes only" reads "Only" (25.25rem). The names stay whole for screen
- * readers and in the tooltip.
+ * "Changes" (27.5rem) and "Changes only" reads "Only" (25.25rem). The longer "vs v3 (revoked)" goes
+ * sooner, at 40rem. The names stay whole for screen readers and in the tooltip.
  */
 export function ChangeToggles({
-  baselineNumber,
+  baseline,
   showChanges,
   onShowChanges,
   changesOnly,
@@ -111,7 +123,8 @@ export function ChangeToggles({
   count,
   summary,
 }: {
-  baselineNumber: number;
+  /** The version the redline is against, and its state. */
+  baseline: { number: number; state: VersionState };
   showChanges: boolean;
   onShowChanges: (next: boolean) => void;
   changesOnly: boolean;
@@ -124,7 +137,15 @@ export function ChangeToggles({
     <div data-change-toggles="" className="flex items-center gap-x-5 @max-[32rem]/bar:gap-x-4">
       {showChanges ? (
         <>
-          <span className="text-[13px] whitespace-nowrap text-text-muted @max-[32rem]/bar:hidden">vs v{baselineNumber}</span>
+          <span
+            data-slot="baseline-label"
+            className={cn(
+              "text-[13px] whitespace-nowrap text-text-muted",
+              baseline.state === "active" ? "@max-[32rem]/bar:hidden" : "@max-[40rem]/bar:hidden",
+            )}
+          >
+            {baselineLabel(baseline)}
+          </span>
           <Toggle
             label="Changes only"
             shortLabel="Only"

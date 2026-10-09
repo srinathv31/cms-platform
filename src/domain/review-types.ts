@@ -326,10 +326,18 @@ export interface ReviewScreenData {
     contractLines: string[];
   };
   /**
-   * The Active version, for the redline and the sunset the Approve dialog offers. Null when nothing is
-   * Active (a first version, or after a revoke). The contract changes come from submit (`contractBaseline`).
+   * What the redline, its "vs vN" label and the change count compare with (`reviewBaseline`): the Active
+   * version; with none Active (after a revoke), the released version the draft was based on, then the
+   * newest version that still renders. Null for a first version, or when that would be this version.
+   * `state` is for the label ("vs v3 (revoked)"). The contract changes come from submit (`contractBaseline`).
    */
-  baseline: { id: string; number: number; body: JSONContent; variables: Variable[] } | null;
+  baseline: { id: string; number: number; state: VersionState; body: JSONContent; variables: Variable[] } | null;
+  /**
+   * The Active version this one would replace, for the Approve dialog's consequences and its sunset
+   * offer. Null when nothing is Active, or this is the Active version. Not `baseline`: after a revoke the
+   * redline compares with the revoked version, which approving replaces nothing of.
+   */
+  previousNumber: number | null;
   /**
    * The name customers get today, which the rail shows a rename against: the Active version's or, with
    * none Active, the newest version that still renders (`contractBaseline`). Null when nothing else

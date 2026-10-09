@@ -12,9 +12,9 @@ import { RedlineView } from "./redline-view";
 import { RV } from "./review-grid";
 
 /**
- * The version as a read-only document, or, with Show changes on, as the redline against the Active
- * version. They are two renderers in the same cell with the same typography; the editor's own
- * document styles do both.
+ * The version as a read-only document, or, with Show changes on, as the redline against the baseline
+ * (the Active version, or after a revoke the version the correction started from). They are two
+ * renderers in the same cell with the same typography; the editor's own document styles do both.
  *
  * The clean document is the live editor, read-only: it is where comments live (a highlight per open
  * thread, a Comment button on selected text, markers in the right gutter). The redline is static, so it
@@ -23,7 +23,7 @@ import { RV } from "./review-grid";
  * (redline-view.tsx). Opening a thread never turns the changes off.
  */
 
-/** The version's variables, plus any the Active version had that this one dropped (a deleted chip needs its label). */
+/** The version's variables, plus any the baseline had that this one dropped (a deleted chip needs its label). */
 function labelsFor(variables: readonly Variable[], baseline: readonly Variable[] | null): Variable[] {
   if (!baseline) return [...variables];
   const have = new Set(variables.map((v) => v.key));

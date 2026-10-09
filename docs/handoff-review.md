@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 14 | 27 | 44 |
+| Open | 0 | 3 | 13 | 27 | 43 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 23 | 5 | 48 |
+| Fixed | 1 | 19 | 24 | 5 | 49 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), and PRs #9–#40 (the Fix first list, October 2026).
@@ -103,7 +103,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N1 · Medium: After a revoke, the review screen shows no redline
 
-- **Status:** Open
+- **Status:** Fixed. With nothing Active, the redline, its label and the change count compare with the revoked version the correction started from ("vs v3 (revoked)"), falling back to the version that still renders, while the Approve dialog keeps the Active version as its previous one ([decision 0031](decisions/0031-a-correction-is-redlined-against-the-revoked-version.md)).
 - **Where:** `src/server/queries/review.ts` (`getReviewScreen`, its `baseline`); `src/components/review/review-workspace.tsx`
 - **What happens:** The review screen compares the version only with the Active one: `baseline` is null when nothing is Active. After the Active version is revoked ([D1](#d1--high-revoking-the-live-version-freezes-the-template-for-good)), the approver reviewing the correction gets no redline and no "vs vN" label, so the whole document reads as new and they can't see what the correction changed. The rename line on the same screen already compares with `contractBaseline`. Noticed while fixing D1 (PR #16).
 - **Fix:** When nothing is Active, compare with the draft's base version (`versions.basedOnVersionId`, the revoked version the correction started from) or with `contractBaseline`, and name it in the label. Keep the approve dialog's previous version apart ([N3](#n3--low-after-a-revoke-approves-consequences-read-as-a-first-version)): today it takes `baseline`'s number.
@@ -120,7 +120,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 #### N3 · Low: After a revoke, Approve's consequences read as a first version
 
 - **Status:** Open
-- **Where:** `src/domain/consequences.ts` (`approveLines`); `src/components/review/review-workspace.tsx` (`previousNumber`)
+- **Where:** `src/domain/consequences.ts` (`approveLines`); `src/server/queries/review.ts` (`getReviewScreen`'s `previousNumber`, which `src/components/review/review-workspace.tsx` passes to the dialog)
 - **What happens:** The approve dialog takes its previous version from the Active one. With nothing Active, after a revoke, it says "v3 becomes Active." and "Consumers can start using it right away.", as for a first version. Consumers still pinned to a Superseded version that renders aren't named, nor are the keys they have to map before they move ("Coral has to map `annual_fee` before it moves to v3."), though the version's contract changes were worked out against that version. Noticed while fixing D1 (PR #16).
 - **Fix:** When nothing is Active, pass the newest version that still renders (`contractBaseline`) as the version consumers move from, with an approve case for it in `consequences`: no "becomes Superseded" line, and the mapping lines for its consumers.
 - **Evidence:** traced

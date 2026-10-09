@@ -298,6 +298,53 @@ export function contractBaseline<V extends { state: VersionState; number: number
     .reduce<V | null>((best, v) => (best === null || (v.number ?? 0) > (best.number ?? 0) ? v : best), null);
 }
 
+// ── The review baseline ───────────────────────────────────────
+
+/** What `reviewBaseline` reads of each of the template's versions. */
+export interface BaselineFacts {
+  id: string;
+  state: VersionState;
+  number: number | null;
+  sunsetAt: Date | null;
+  /** The version its draft was copied from (`DraftFields.basedOnVersionId`). */
+  basedOnVersionId: string | null;
+}
+
+/** States a version reaches only once approved: one of them is text that was released. */
+const RELEASED_STATES: ReadonlySet<VersionState> = new Set(["active", "superseded", "revoked"]);
+
+/**
+ * The version the review screen compares `versionId` with: its redline, the "vs vN" label and the
+ * change count. The Active version when there is one (null when that is the version itself).
+ *
+ * With none Active (it was revoked), the released version the draft was based on: the revoked text
+ * the correction started from, since checking the fix to it is the approver's job here. A draft a
+ * change request opened is based on the version sent back, so the walk goes on through those to the
+ * released one. When the walk finds none (a first version, or a based-on version that is missing),
+ * the newest version that still renders (`contractBaseline`); null when nothing does, as for a first
+ * version (decision 0031).
+ *
+ * Not the Approve dialog's previous version: that is the Active one only.
+ */
+export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], versionId: string, now: Date): V | null {
+  const active = versions.find((v) => v.state === "active");
+  if (active) return active.id === versionId ? null : active;
+
+  const byId = new Map(versions.map((v) => [v.id, v]));
+  const seen = new Set([versionId]);
+  for (let id = byId.get(versionId)?.basedOnVersionId ?? null; id !== null && !seen.has(id); ) {
+    seen.add(id);
+    const base = byId.get(id);
+    if (!base) break;
+    if (RELEASED_STATES.has(base.state) && base.number !== null) return base;
+    if (base.state !== "changes_requested") break;
+    id = base.basedOnVersionId;
+  }
+
+  const live = contractBaseline(versions, now);
+  return live && live.id !== versionId ? live : null;
+}
+
 // ── Submit for review ─────────────────────────────────────────
 
 /** What `submit` reads from the draft. The caller loads it from the version row. */
