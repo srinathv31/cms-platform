@@ -39,6 +39,7 @@ export type AuditAction =
   | "version.activated" // the last stage approved: the version is Active
   | "version.superseded"
   | "version.sunset_set"
+  | "version.sunset_passed" // the clock-driven sweep: the sunset came and renders stopped
   | "version.revoke_started"
   | "version.revoke_cancelled"
   | "version.revoked"
@@ -46,13 +47,36 @@ export type AuditAction =
   | "thread.resolved"
   | "thread.reopened";
 
-export interface AuditEffect {
-  kind: "audit";
-  action: AuditAction;
-  /** The version the event is about; defaults to the transition's version. */
-  versionId?: string;
-  details: Record<string, unknown>;
+/**
+ * A `version.sunset_passed` row's details (`sweepSunsets` in lifecycle.ts): the version, the instant its
+ * renders stopped, and that instant's day in the business time zone, with the zone it was read in.
+ */
+export type SunsetPassedDetails = {
+  number: number;
+  /** ISO: the instant renders stopped (`versions.sunset_at`). The row is dated then too. */
+  sunsetAt: string;
+  /** YYYY-MM-DD: the day the sunset fell on in `zone`, the day people read. */
+  sunsetDay: string;
+  zone: string;
+};
+
+/**
+ * The audit actions whose details have a declared shape. Every other action's details are still an open
+ * record (handoff review D10); a new action gets its shape here.
+ */
+export interface AuditDetailsByAction {
+  "version.sunset_passed": SunsetPassedDetails;
 }
+
+export type AuditEffect = {
+  [A in AuditAction]: {
+    kind: "audit";
+    action: A;
+    /** The version the event is about; defaults to the transition's version. */
+    versionId?: string;
+    details: A extends keyof AuditDetailsByAction ? AuditDetailsByAction[A] : Record<string, unknown>;
+  };
+}[AuditAction];
 
 /** Where a notification links to. The server turns it into an href with the team slug. */
 export type NotificationLink =

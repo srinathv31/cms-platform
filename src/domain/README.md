@@ -43,7 +43,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Vocabulary | [types.ts](types.ts) | `VersionState`, `Channel`, roles, `Viewer`, the permission `Action` list, `DraftPatch`. Re-exports the editor model's `Variable` and `ContractChange`. |
 | | [status.ts](status.ts) | Label, tone, and icon for each version state. |
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
-| Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with. |
+| Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with; `sunsetPassed`, the one test of a passed sunset; and `sweepSunsets`, its audit record. |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, and their rename (`nameChange`), for the review screen and Compare. |
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
@@ -68,7 +68,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Template | A document consumers render, with a stable id like `UC-4F7K2Q`. Belongs to one team and one content type. | `templates` in [ucomp.ts](../server/db/schema/ucomp.ts) |
 | Version | One snapshot of a template: body (TipTap JSON), variables, channels, email fields, sample sets. `number` is null while it is a draft; `submit` sets it to the highest number + 1, and it never changes. | `VersionSnapshot`, `DraftFields` |
 | Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The database allows one open draft and one Active version per template. | [types.ts](types.ts), [status.ts](status.ts) |
-| Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it. Not a state. | `setSunset`, `sunsetPassed`, `checkVersion` |
+| Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it, and the clock-driven sweep records it (`version.sunset_passed`). Not a state. | `setSunset`, `sunsetPassed`, `sweepSunsets`, `checkVersion` |
 | Revoke pending | An Active or Superseded version whose `revoke` record has no `confirmedAt`. Not a state: it renders until a different approver confirms. | `revokePending` |
 | Content type | Platform configuration a template follows: required sections, allowed channels, approval chain. | [platform-config.ts](platform-config.ts) |
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
@@ -95,6 +95,7 @@ in_review    approve, earlier of its stages               → in_review, current
 in_review    approve, last of its stages                  → active; the previous active, if any → superseded
 in_review    requestChanges                               → changes_requested, plus a new draft
 superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
+superseded   the clock passes sunsetAt                    → superseded; renders stop (sweepSunsets records it)
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
 ```
 
@@ -154,7 +155,12 @@ Every other date stays UTC. In [business-zone.ts](business-zone.ts):
 - "After today" (`isAfterToday` in [lifecycle.ts](lifecycle.ts)) compares the day with `todayIn(now, zone)`, so at
   23:30 Eastern the next day is still a valid date. The picker's today is the same day (`SunsetCalendar` in
   [review-types.ts](review-types.ts)).
-- Passed is an instant comparison (`sunsetPassed`), unchanged.
+- Passed is an instant comparison, `sunsetPassed` in [lifecycle.ts](lifecycle.ts), and the only one: the render
+  rule, the consumer API, the Versions and Usage screens, the count of pending sunsets and the sweep all ask it.
+- `sweepSunsets` records each passed sunset once, as the system: a `version.sunset_passed` audit row dated at the
+  sunset, naming its day in the zone at the sweep (`SunsetPassedDetails`). A version revoked before its sunset isn't
+  recorded: its renders had already stopped. No consumer notice and no notification: both went out when the sunset
+  was set ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
 - Changing the zone moves no sunset already set. Audit rows and notices record the day picked and the zone
   (`sunsetDay`, `zone`); `recordedSunsetDay` reads them, and reads a record from before the rule as the UTC date
   of its `sunsetAt`, which is what it meant then.
@@ -187,7 +193,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | Add an access or settings rule | `requestAccess` in [access.ts](access.ts) | Limits live in [access-types.ts](access-types.ts), so the form ([request-access.tsx](../components/access/request-access.tsx)) and the server share them. |
 | Validate a settings form live with the server's own rule | `validateChain` in [platform-config.ts](platform-config.ts) | Takes the facts (people's access, the actor, the saved chain) and returns each problem with the stage and field it's about. The read model carries the facts; [approval-chains.tsx](../components/settings/platform/approval-chains.tsx) shows each problem at its field and disables Save with the first; `saveApprovalChain` refuses with the first. |
 | Say what a settings action does before it's confirmed | `memberConsequences` in [access.ts](access.ts) | The read model returns the lines as `consequences` beside `can`, dated with the demo clock by the function that sets the date (`inactivity`, `recertDueAt`); the screen only renders them ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)). A line that depends on what's being typed is a pure function the screen calls, like `describeSectionsChange` in [platform-config.ts](platform-config.ts). |
-| Apply deadlines from the clock | `sweepAccess` in [access.ts](access.ts) | Idempotent at the same `now`; effects carry the instant each deadline passed. |
+| Apply deadlines from the clock | `sweepAccess` in [access.ts](access.ts), `sweepSunsets` in [lifecycle.ts](lifecycle.ts) | Idempotent: each reads what's already done (a membership's status, `passedRecorded`), so running it again writes nothing. Effects carry the instant each deadline passed. |
 | Add a permission | `Action` in [types.ts](types.ts), `TEAM_GRANTS` and `GUARDS` in [permissions.ts](permissions.ts) | Add the case to [permissions.test.ts](permissions.test.ts). |
 | Word something for people | `describeChange` in [contract.ts](contract.ts) | Each case's sentence is shown in the doc comment. |
 | Return a consumer API error | [render/errors.ts](render/errors.ts) | One builder per message; never echo a value. |

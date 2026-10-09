@@ -5,7 +5,7 @@ import { contractDiff } from "@/domain/golive/contract-diff";
 import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
 import { apiVariables, contractJsonSchema } from "@/domain/golive/json-schema";
 import { noticeView } from "@/domain/golive/notices";
-import { contractBaseline } from "@/domain/lifecycle";
+import { contractBaseline, sunsetPassed } from "@/domain/lifecycle";
 import type {
   ApiContract,
   ApiError,
@@ -170,7 +170,7 @@ function versionSummary(
     activatedAt: (v.activatedAt ?? v.createdAt).toISOString(),
     supersededAt: v.supersededAt?.toISOString() ?? null,
     sunsetAt: v.sunsetAt?.toISOString() ?? null,
-    sunsetPassed: v.sunsetAt !== null && v.sunsetAt.getTime() <= now.getTime(),
+    sunsetPassed: sunsetPassed(v, now),
     revokedAt,
     renders: checkVersion({
       version: { number: v.number!, state: v.state, sunsetAt: v.sunsetAt, revokedAt: revokedAt ? new Date(revokedAt) : null },

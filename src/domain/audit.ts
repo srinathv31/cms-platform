@@ -55,6 +55,7 @@ const ACTIONS = {
   "version.activated": { label: "Became Active", category: "templates" },
   "version.superseded": { label: "Superseded", category: "templates" },
   "version.sunset_set": { label: "Sunset set", category: "templates" },
+  "version.sunset_passed": { label: "Sunset passed", category: "templates" },
   "version.revoke_started": { label: "Revoke started", category: "templates" },
   "version.revoke_cancelled": { label: "Revoke canceled", category: "templates" },
   "version.revoked": { label: "Revoked", category: "templates" },

@@ -1,7 +1,8 @@
 import "server-only";
 import { cache } from "react";
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { DEFAULT_BUSINESS_ZONE, isBusinessZone, type BusinessZone } from "@/domain/business-zone";
+import { sunsetPassed } from "@/domain/lifecycle";
 import { db, type Db } from "./db/client";
 import { settings, versions } from "./db/schema/ucomp";
 import type { Tx } from "./effects";
@@ -30,11 +31,11 @@ export async function readBusinessZone(reader: Reader): Promise<BusinessZone> {
  */
 export const getBusinessZone = cache(async (): Promise<BusinessZone> => readBusinessZone(db));
 
-/** Superseded versions whose sunset is set and still ahead of `now`: what a change of zone leaves in place. */
+/** Superseded versions whose sunset is set and hasn't passed (`sunsetPassed`): what a change of zone leaves in place. */
 export async function countPendingSunsets(reader: Reader, now: Date): Promise<number> {
-  const [row] = await reader
-    .select({ n: count() })
+  const rows = await reader
+    .select({ sunsetAt: versions.sunsetAt })
     .from(versions)
-    .where(and(eq(versions.state, "superseded"), gt(versions.sunsetAt, now)));
-  return row?.n ?? 0;
+    .where(and(eq(versions.state, "superseded"), isNotNull(versions.sunsetAt)));
+  return rows.filter((v) => !sunsetPassed(v, now)).length;
 }
