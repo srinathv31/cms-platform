@@ -13,7 +13,7 @@ Lint-enforced ([eslint.config.mjs](../../eslint.config.mjs)):
 - No `"use server"` here, at the top of a file or inside a function: server actions live in `src/server/actions/`.
 
 Convention only (nothing checks these):
-- Don't edit `ui/`. It is generated.
+- Don't edit `ui/`. It is generated. The one deliberate edit is listed under [`ui/`](#ui-shadcn-on-base-ui).
 - Nothing here imports from `src/app`.
 - A client component imports server code only as `import type`, as a server action, or as a pure module.
   Query modules start with `import "server-only"`, so a value import from one into a client file breaks the build.
@@ -71,6 +71,12 @@ the `render` prop, not `asChild`. A link styled as a button also needs `nativeBu
 ```
 
 Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` is in `Providers`.
+
+One generated file is edited on purpose. `ui/sidebar.tsx` has no window-level ⌘B / Ctrl+B listener: shadcn's
+toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` cookie, though the app's sidebar is
+`collapsible="none"`. `npx shadcn add sidebar` overwrites the file and brings the listener back;
+[ui/sidebar.test.tsx](ui/sidebar.test.tsx) then fails. Remove the listener again
+([decision 0021](../../docs/decisions/0021-the-sidebar-has-no-keyboard-shortcut.md)).
 
 ### Primitives
 
