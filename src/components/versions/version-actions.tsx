@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { REASONS } from "@/domain/permissions";
 import type { ConsumerUsage, VersionTimelineItem } from "@/domain/review-types";
@@ -17,7 +18,8 @@ import { SunsetDialog } from "./sunset-dialog";
 // The interactive parts of one version's entry. The entry itself is a server component; these are the
 // islands in it: the actions at the head (Set sunset, Revoke) and the ones in a pending revoke's
 // block (Confirm revoke, Withdraw revoke). An action is shown when the viewer may take it. A blocked
-// one is shown only when the reason is the point (the two-person rule), disabled, with the reason.
+// one is shown only when the reason is the point, disabled, with the reason: the two-person rule, and a
+// sunset that has passed (final, so the read model refuses it to everyone who can see the version).
 //
 // Focus: a dialog that is dismissed (Esc, Cancel) returns focus to the control that opened it. After
 // an action goes through, that control is usually gone (the Revoke button turns into a pending
@@ -34,7 +36,7 @@ export interface VersionContext {
   nowIso: string;
 }
 
-type Item = Pick<VersionTimelineItem, "id" | "number" | "state" | "sunsetAt" | "revoke" | "can">;
+type Item = Pick<VersionTimelineItem, "id" | "number" | "state" | "sunsetAt" | "sunsetPassed" | "revoke" | "can">;
 
 function pendingRevoke(item: Item): boolean {
   return !!item.revoke && !item.revoke.confirmedAt;
@@ -71,15 +73,23 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
   const headingId = entryHeadingId(item.id);
   const revoking = pendingRevoke(item);
   // A sunset is for a version that stays; while its revoke waits for a second approver, its fate is that.
-  const canSunset = item.state === "superseded" && item.can.setSunset.ok && !revoking;
+  // Once the sunset has passed it stays where it is, disabled, saying why.
+  const sunset = item.can.setSunset;
+  const showSunset = item.state === "superseded" && !revoking && (sunset.ok || item.sunsetPassed);
   const canRevoke = (item.state === "active" || item.state === "superseded") && !revoking && item.can.startRevoke.ok;
-  if (!canSunset && !canRevoke) return null;
+  if (!showSunset && !canRevoke) return null;
 
   const sunsetLabel = item.sunsetAt ? "Change sunset" : "Set sunset";
 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
-      {canSunset ? (
+      {showSunset && !sunset.ok ? (
+        <BlockedButton label={`${sunsetLabel} for v${number}`} reason={sunset.reason}>
+          <CalendarClock aria-hidden strokeWidth={1.75} />
+          {sunsetLabel}
+        </BlockedButton>
+      ) : null}
+      {showSunset && sunset.ok ? (
         <>
           <Button
             ref={sunsetButton}
@@ -137,6 +147,40 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
         </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * An outline action that can't be taken: in place and greyed, still focusable, with the reason in a
+ * tooltip and as its description.
+ */
+function BlockedButton({ label, reason, children }: { label: string; reason: string; children: ReactNode }) {
+  const reasonId = useId();
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="outline"
+              aria-label={label}
+              aria-describedby={reasonId}
+              // Focusable, so the reason can be reached from the keyboard. It is marked `data-disabled`
+              // (not the native `disabled`), so that is what greys it out.
+              disabled
+              focusableWhenDisabled
+              className="gap-1.5 bg-surface data-disabled:cursor-default data-disabled:opacity-50 data-disabled:hover:bg-surface"
+            />
+          }
+        >
+          {children}
+        </TooltipTrigger>
+        <TooltipContent>{reason}</TooltipContent>
+      </Tooltip>
+      <span id={reasonId} className="sr-only">
+        {reason}
+      </span>
+    </>
   );
 }
 

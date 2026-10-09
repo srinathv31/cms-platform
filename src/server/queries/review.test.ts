@@ -235,6 +235,31 @@ describe("getVersions", () => {
     expect(author.items[1]!.can.setSunset).toEqual({ ok: false, reason: REASONS.generic });
   });
 
+  it("once Balance Transfer v1's sunset passes, its sunset is refused to everyone, with the reason", async () => {
+    const templateId = ids["balance-transfer"]!;
+    as("jordan");
+    const sunsetAt = new Date((await getVersions("coral-offers", templateId)).items[1]!.sunsetAt!);
+    try {
+      env.now = new Date(sunsetAt.getTime() - 1);
+      expect((await getVersions("coral-offers", templateId)).items[1]).toMatchObject({
+        sunsetPassed: false,
+        can: { setSunset: { ok: true } },
+      });
+
+      env.now = sunsetAt;
+      const passed = { ok: false, reason: REFUSALS.sunsetPassed };
+      const [v2, v1] = (await getVersions("coral-offers", templateId)).items;
+      expect(v1).toMatchObject({ state: "superseded", sunsetPassed: true, can: { setSunset: passed, startRevoke: { ok: true } } });
+      expect(v2!.can.setSunset).toEqual({ ok: false, reason: REFUSALS.sunsetNotSuperseded });
+
+      // A fact about the version, not the viewer: an author reads the same reason.
+      as("maya");
+      expect((await getVersions("coral-offers", templateId)).items[1]!.can.setSunset).toEqual(passed);
+    } finally {
+      env.now = BASE;
+    }
+  });
+
   it("flags each contract line breaking or not, next to the same lines `contractLines` keeps", async () => {
     as("jordan");
     const cashBack = await getVersions("coral-offers", ids["cash-back"]!);

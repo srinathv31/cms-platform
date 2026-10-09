@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { describeChanges } from "@/domain/contract";
-import { REFUSALS, revokePending } from "@/domain/lifecycle";
+import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { VersionTimelineItem, VersionsData } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, RevokeRecord, VersionState, Viewer } from "@/domain/types";
@@ -26,12 +26,15 @@ const DAY_MS = 86_400_000;
  * What the viewer may do on one version right now: the permission (with its reason) first, then the
  * version's state, in the domain's words (`REFUSALS`, the same sentences the transitions refuse with).
  * A pending revoke is checked before the confirm permission, so the starter reads "You started this
- * revoke. Another approver must confirm it." only while there is one to confirm.
+ * revoke. Another approver must confirm it." only while there is one to confirm. A Superseded
+ * version's passed sunset comes before the permission: it is a fact about the version, final for
+ * everyone, and the Versions tab shows it at the disabled control to anyone who can see the version.
  */
 export function versionActions(
   viewer: Viewer,
   teamId: string,
-  version: { state: VersionState; revoke: RevokeRecord | null },
+  version: { state: VersionState; sunsetAt: Date | null; revoke: RevokeRecord | null },
+  now: Date,
 ): VersionTimelineItem["can"] {
   const pending = revokePending(version);
   const then = (permission: PermissionResult, blocked: string | null): PermissionResult =>
@@ -42,10 +45,13 @@ export function versionActions(
   };
 
   return {
-    setSunset: then(
-      can(viewer, "version.setSunset", { teamId }),
-      version.state === "superseded" ? null : REFUSALS.sunsetNotSuperseded,
-    ),
+    setSunset:
+      version.state === "superseded" && sunsetPassed(version, now)
+        ? { ok: false, reason: REFUSALS.sunsetPassed }
+        : then(
+            can(viewer, "version.setSunset", { teamId }),
+            version.state === "superseded" ? null : REFUSALS.sunsetNotSuperseded,
+          ),
     startRevoke: then(
       can(viewer, "version.revoke.start", { teamId }),
       version.state === "revoked"
@@ -149,7 +155,7 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
           })),
         lastRenderAt: usage ? new Date(Number(usage.lastRenderAt)).toISOString() : null,
         renders30d: usage ? Number(usage.renders30d ?? 0) : 0,
-        can: versionActions(space.viewer, template.teamId, v),
+        can: versionActions(space.viewer, template.teamId, v, nowDate),
       };
       if (v.submittedAt) {
         item.submittedAt = iso(v.submittedAt);

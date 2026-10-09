@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 15 | 31 | 13 | 59 |
+| Open | 0 | 14 | 31 | 13 | 58 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 7 | 4 | 1 | 13 |
+| Fixed | 1 | 8 | 4 | 1 | 14 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -245,7 +245,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D2 · High: Setting a new sunset brings a sunset version back to life
 
-- **Status:** Open
+- **Status:** Fixed. `setSunset` refuses once the current sunset has passed (the new domain predicate `sunsetPassed`), and the Versions screen shows Change sunset disabled with the reason ([decision 0002](decisions/0002-a-passed-sunset-is-final.md)); the `sunset_passed` audit transition and the other copies of the test stay with D7.
 - **Where:** `src/domain/lifecycle.ts` line 723
 - **What happens:** `setSunset` checks only that the version is Superseded and the new date is after today. It never checks that the old sunset already passed. v1 sunset October 1 stops rendering; setting December 1 makes it render again. The Versions screen offers this.
 - **Fix:** Refuse when the current `sunsetAt` is in the past, and add the `sunsetPassed` transition the plan lists (see D7).
