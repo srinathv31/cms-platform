@@ -7,6 +7,10 @@
 //
 // One line: Enter never adds a line, and a multi-line paste joins its lines with spaces
 // (extensions/single-line.ts). `{{key}}` in pasted text becomes chips, as in the document.
+//
+// `hidden` keeps the field mounted and registered while it isn't shown, so its chips still count
+// and a key renamed meanwhile still reaches them (and `onChange` reports it). Unmounting it instead
+// would leave its chips on the old key.
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -30,7 +34,7 @@ const BOX =
 
 const EMPTY_FIELD: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
-export function InlineVariableField({ label, value, onChange, id, className }: InlineVariableFieldProps) {
+export function InlineVariableField({ label, value, onChange, hidden = false, id, className }: InlineVariableFieldProps) {
   const root = useEditorRoot("InlineVariableField");
   const readOnly = useStore(root.config, (s) => s.readOnly);
   const variables = useStore(root.variables, (s) => s.variables);
@@ -46,9 +50,13 @@ export function InlineVariableField({ label, value, onChange, id, className }: I
     root.registerField({ id: fieldId, label, kind: "inline" }, latestRef.current ?? initial);
     return () => root.unregisterField(fieldId);
   }, [root, fieldId, label, initial]);
+  // After every (re-)registration above, and whenever it changes: a hidden field is no target for insert, undo or redo.
+  useLayoutEffect(() => {
+    root.setFieldHidden(fieldId, hidden);
+  }, [root, fieldId, label, initial, hidden]);
 
   return (
-    <div id={id} className={cx(BOX, FOCUS_WITHIN_RING, className)} data-read-only={readOnly ? "" : undefined}>
+    <div id={id} hidden={hidden} className={cx(BOX, FOCUS_WITHIN_RING, className)} data-read-only={readOnly ? "" : undefined}>
       {hydrated ? (
         <LiveField label={label} fieldId={fieldId} initial={initial} latestRef={latestRef} readOnly={readOnly} onChange={onChange} />
       ) : (

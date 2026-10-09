@@ -453,3 +453,67 @@ describe("undo and redo for a host's buttons", () => {
     expect(line(editor, 0)).toBe("Intro and more");
   });
 });
+
+describe("a field the host hides (the email subject while Email is off)", () => {
+  const SUBJECT: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [text("Hi "), chip("first_name")] }] };
+
+  /** The subject as a live inline field of the root, the way <InlineVariableField> registers it. */
+  function subject(root: EditorRootRuntime): Editor {
+    root.registerField({ id: "subject", label: "Email subject", kind: "inline" }, SUBJECT);
+    const editor = new Editor({
+      element: document.createElement("div"),
+      extensions: inlineFieldExtensions({ store: root.variables, binding: { fieldId: "subject", kind: "inline", root, chip: createChipPopoverStore() } }),
+      content: SUBJECT,
+    });
+    editors.push(editor);
+    return editor;
+  }
+
+  /** Where `key` is used, field by field. */
+  const usedIn = (root: EditorRootRuntime, key: string) => {
+    root.flushUsage();
+    return root.usage.getState().byKey.get(key)?.places.map((p) => `${p.field}: ${p.count}`) ?? [];
+  };
+
+  it("still counts, and a rename or delete while hidden reaches its chips", () => {
+    const promo: Variable = { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "" };
+    const { root, editor } = setup(DOC, [...VARIABLES, promo]);
+    const field = subject(root);
+    root.setFieldHidden("subject", true);
+    expect(usedIn(root, "first_name")).toEqual(["Document: 1", "Document: 1", "Email subject: 1"]);
+
+    root.updateVariable("first_name", { key: "given_name" });
+    expect(chipKeys(field)).toEqual(["given_name"]);
+    expect(chipKeys(editor)).toEqual(["given_name", "purchase_apr", "given_name"]);
+    expect(usedIn(root, "given_name")).toEqual(["Document: 1", "Document: 1", "Email subject: 1"]);
+
+    // A variable used only in the hidden subject is in use: the panel asks before deleting it.
+    field.commands.setContent({ type: "doc", content: [{ type: "paragraph", content: [chip("promo_code")] }] });
+    expect(usedIn(root, "promo_code")).toEqual(["Email subject: 1"]);
+    root.deleteVariable("promo_code", { removeChips: true });
+    expect(chipKeys(field)).toEqual([]);
+  });
+
+  it("isn't where click-to-insert, undo or redo go until it shows again", () => {
+    const { root, editor } = setup();
+    const field = subject(root);
+    root.noteFocus("subject");
+    field.view.dispatch(closeHistory(field.state.tr.insertText("!", field.state.doc.content.size - 1)));
+    expect(root.history.getState()).toEqual({ canUndo: true, canRedo: false });
+
+    root.setFieldHidden("subject", true);
+    // The document's history now (nothing to undo there), and a panel click inserts into the document.
+    expect(root.history.getState()).toEqual({ canUndo: false, canRedo: false });
+    expect(root.undo()).toBe(false);
+    expect(field.state.doc.textContent).toBe("Hi !");
+    expect(root.insertVariable("purchase_apr")).toBe(true);
+    expect(line(editor, 2)).toBe("{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(chipKeys(field)).toEqual(["first_name"]);
+
+    // Shown again, it is a target once it has focus.
+    root.setFieldHidden("subject", false);
+    root.noteFocus("subject");
+    expect(root.undo()).toBe(true);
+    expect(field.state.doc.textContent).toBe("Hi ");
+  });
+});

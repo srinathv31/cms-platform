@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 13 | 31 | 13 | 57 |
+| Open | 0 | 12 | 31 | 13 | 56 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 9 | 4 | 1 | 15 |
+| Fixed | 1 | 10 | 4 | 1 | 16 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -343,7 +343,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I3 · High: Renaming a variable with Email off orphans its chips in the subject
 
-- **Status:** Open
+- **Status:** Fixed. With Email off the Email details fields stay mounted, hidden (`InlineVariableField` takes `hidden`; the root still counts them and sends renames and deletes to them, but insert, undo and redo pass them by), so the subject follows a rename and saves it ([decision 0004](decisions/0004-email-fields-hidden-not-unmounted.md)).
 - **Where:** `src/editor/state/editor-root.ts` line 317; `src/components/workspace/content/email-details.tsx` line 48
 - **What happens:** With Email off, the subject and preheader fields unmount, so a rename doesn't reach them. Turn Email back on: the subject shows an unknown chip, the saved subject keeps the old key, and Submit fails with "Define or remove {{first_name}}". The hidden chips aren't counted either, so the variable can be deleted as unused without the confirm dialog.
 - **Fix:** Keep the fields mounted but hidden, or apply the root's rename forwards and tombstones when a field mounts.

@@ -6,6 +6,10 @@
 // per frame, from each field's latest document, and published per key (a panel row re-renders
 // only when its own numbers change).
 //
+// A field the host hides for a while (the email subject while Email is off) stays registered: its
+// chips still count and still follow renames and deletes. It just isn't a target: click-to-insert,
+// undo and redo pass it by until it shows again.
+//
 // Undo and redo from outside the fields (a host's buttons) act on the last-focused field, the
 // body until one has had focus: the same field ⌘Z would undo in. `history` says whether there is
 // anything to undo or redo there. Unlike ⌘Z they leave the scroll position alone: a button pressed
@@ -81,6 +85,8 @@ export interface EditorRootRuntime {
   /** Adds a field. `content` seeds its usage before its editor exists (server paint, first frame). */
   registerField: (info: FieldInfo, content?: JSONContent | null) => void;
   unregisterField: (id: string) => void;
+  /** The host hid or showed a field. Hidden, it still counts and follows list changes, but nothing targets it. */
+  setFieldHidden: (id: string, hidden: boolean) => void;
   attachEditor: (id: string, editor: Editor) => void;
   detachEditor: (id: string, editor: Editor) => void;
   /** A field's document changed. Usage catches up on the next frame (`sync` computes it now). */
@@ -122,6 +128,7 @@ export interface EditorRootRuntime {
 
 interface FieldRecord extends FieldInfo {
   seq: number;
+  hidden: boolean;
   editor: Editor | null;
   usage: FieldUsage;
   pendingDoc: PMNode | null;
@@ -209,8 +216,9 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   const pickField = (fieldId?: string): FieldRecord | undefined => {
     if (fieldId) return fields.get(fieldId);
     const last = lastFocused ? fields.get(lastFocused) : undefined;
-    if (last?.editor && !last.editor.isDestroyed) return last;
-    return ordered().find((f) => f.kind === "body" && f.editor) ?? ordered().find((f) => f.editor);
+    if (last?.editor && !last.editor.isDestroyed && !last.hidden) return last;
+    const shown = ordered().filter((f) => f.editor && !f.hidden);
+    return shown.find((f) => f.kind === "body") ?? shown[0];
   };
 
   /** The live, editable editor undo and redo act on. */
@@ -260,6 +268,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
       fields.set(info.id, {
         ...info,
         seq: seq++,
+        hidden: false,
         editor: null,
         usage: content ? usageFromJSON(content, { sections: info.kind === "body" }) : EMPTY_USAGE,
         pendingDoc: null,
@@ -271,6 +280,15 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
       if (!fields.delete(id)) return;
       if (lastFocused === id) lastFocused = null;
       publish();
+      publishHistory();
+    },
+
+    setFieldHidden(id, hidden) {
+      const field = fields.get(id);
+      if (!field || field.hidden === hidden) return;
+      field.hidden = hidden;
+      // As if it had gone: the next click-to-insert starts over, and undo and redo move to the document.
+      if (hidden && lastFocused === id) lastFocused = null;
       publishHistory();
     },
 

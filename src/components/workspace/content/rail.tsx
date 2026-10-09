@@ -86,8 +86,8 @@ function escapeIsSpokenFor(event: KeyboardEvent, nameAtFocus: string | null): bo
  * plus Comments when it has them). Picking Original widens the rail on the Original view, the file it
  * was imported from (Compare with original); Esc and the overlay's Close put it away, like Preview.
  *
- * `emailDetails` sits directly under Channels (it renders nothing while Email is off, and brings its
- * own top margin); `children` are the sections after it (Variables); `preview` is the preview's
+ * `emailDetails` sits directly under Channels (hidden while Email is off, and it brings its own top
+ * margin); `children` are the sections after it (Variables); `preview` is the preview's
  * surface, which draws the header row and the Preview view while the preview is open (it comes first
  * in the rail, ahead of the normal rail).
  */

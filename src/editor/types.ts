@@ -190,6 +190,12 @@ export interface InlineVariableFieldProps {
    */
   value: JSONContent | null;
   onChange?: (value: JSONContent) => void;
+  /**
+   * Not shown for now (the email subject while Email is off), but still part of the root: its chips
+   * count in the panel and follow renames and deletes (reported through `onChange`). Click-to-insert,
+   * undo and redo pass it by. Default false.
+   */
+  hidden?: boolean;
   id?: string;
   className?: string;
 }
