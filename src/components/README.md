@@ -157,6 +157,9 @@ the list is the server's again, and a refusal shows its reason on the card.
 **Other paths.** Some client code `fetch`es route handlers: autosave (`workspace/autosave/save-transport.ts`),
 the preview render (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and the ⌘K palette.
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
+The same store holds the workspace still (`makeInert`, read with `useInert`): Submit holds it from its click until its
+dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
+Anything else that has to stop edits for a while takes a hold the same way.
 
 ## Copy these
 
@@ -188,7 +191,8 @@ State shared across subtrees is a small store read with `useSyncExternalStore` (
   handler when it must load on demand (as `app-shell/command-palette.tsx` reads `/api/palette/[space]`).
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`;
   `review/decision-model.ts` hides a control when the reason is `REASONS.generic`; `versions/version-actions.tsx`
-  branches on `REASONS.ownRevoke`. Have the query return the result.
+  branches on `REASONS.ownRevoke`, and `submit/submit-dialog.tsx` offers Refresh summary on `REFUSALS.summaryStale`.
+  Have the query return the result.
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
   and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
   `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.

@@ -126,6 +126,6 @@ export type SubmitDraftResult = { ok: true; number: number } | { ok: false; reas
  * "Submit for review" from Phase 3. The submit now lives with the review actions (`submitVersion`,
  * which adds the note to reviewers and the notifications); this name stays for existing callers.
  */
-export async function submitDraft(input: { templateId: string; note?: string | null }): Promise<SubmitDraftResult> {
+export async function submitDraft(input: { templateId: string; note?: string | null; rev: number }): Promise<SubmitDraftResult> {
   return submitVersion(input);
 }

@@ -104,6 +104,15 @@ export function useCanRevert(): boolean {
   return useSyncExternalStore(session.subscribe, session.getCanRevert, () => false);
 }
 
+/**
+ * The page is held still (`session.makeInert`): Submit is reading or freezing the saved draft. Every
+ * part that edits the draft shows it read-only meanwhile, and is editable again once it is let go.
+ */
+export function useInert(): boolean {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getInert, () => false);
+}
+
 /** Some part of the page on screen can show other values of every one of `fields` (the Content tab, editable, for the content fields). */
 export function useOwnsFields(fields: readonly string[]): boolean {
   const session = useWorkspaceSession();

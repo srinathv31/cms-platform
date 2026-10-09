@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { createDraft } from "@/domain/lifecycle";
 import type { TeamRole, Viewer } from "@/domain/types";
@@ -82,4 +82,16 @@ export async function createTemplateWithDraft(
   });
   await db.insert(schema.versions).values({ id: draftId, templateId, ...changes.draft });
   return { templateId, draftId };
+}
+
+/**
+ * The template's open draft's `rev`, the one its submit summary carries (0 when there is no draft):
+ * what a test passes to `submitVersion` to submit the draft as it stands.
+ */
+export async function draftRev(db: Db, templateId: string): Promise<number> {
+  const draft = await db.query.versions.findFirst({
+    columns: { rev: true },
+    where: and(eq(schema.versions.templateId, templateId), eq(schema.versions.state, "draft")),
+  });
+  return draft?.rev ?? 0;
 }

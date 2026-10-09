@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, type ReactNode } from "react";
+import { act, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SaveFields } from "./autosave/autosave-scheduler";
@@ -15,7 +15,10 @@ let session: WorkspaceSession;
 vi.mock("next/navigation", () => ({
   useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }),
 }));
-vi.mock("./session/workspace-session", () => ({ useWorkspaceSession: () => session }));
+vi.mock("./session/workspace-session", () => ({
+  useWorkspaceSession: () => session,
+  useInert: () => useSyncExternalStore(session.subscribe, session.getInert),
+}));
 
 const { NameField } = await import("./name-field");
 
@@ -187,5 +190,28 @@ describe("NameField", () => {
     await render(<NameField name="Card offer terms" editable={false} />);
     expect(container.querySelector("textarea")).toBeNull();
     expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it("is the same field, read-only, while the page is inert (Submit), and its keys change nothing", async () => {
+    await render(<NameField name="Card offer terms" editable />);
+    await act(async () => field().focus());
+    await typeInto(field(), "Spring Travel");
+    save.mockClear();
+
+    let letGo = () => {};
+    await act(async () => {
+      letGo = session.makeInert();
+    });
+    expect(field().readOnly).toBe(true);
+    expect(field().value, "what was typed stays on screen").toBe("Spring Travel");
+    await press(field(), "Escape");
+    await press(field(), "Enter");
+    expect(field().value).toBe("Spring Travel");
+    expect(save).not.toHaveBeenCalled();
+
+    await act(async () => letGo());
+    expect(field().readOnly).toBe(false);
+    await typeInto(field(), "Spring Travel Rewards");
+    expect(save).toHaveBeenLastCalledWith({ name: "Spring Travel Rewards" });
   });
 });

@@ -7,6 +7,11 @@ import type { Channel, Variable } from "@/domain/types";
  */
 export interface SubmitSummary {
   templateId: string;
+  /**
+   * The draft's `rev` as it was read. Submit sends it back and is refused (`REFUSALS.summaryStale`)
+   * when the draft has changed since, so nothing this summary didn't show gets frozen.
+   */
+  rev: number;
   /** The number the version gets at submit: one above the template's highest. */
   number: number;
   /** The channels the version renders to, in the content type's order. */

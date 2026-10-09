@@ -14,7 +14,7 @@ import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";
-import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
+import { useInert, usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
 import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
@@ -81,6 +81,11 @@ export interface ContentWorkspaceProps {
  * you opened it" (the header's save status menu) puts this page's fields back to how they were when
  * it mounted: the session hands the values over (`restore`), and everything inside the editor root
  * remounts with them (`shown.gen` is its key), since the root and the fields read their values once.
+ *
+ * While the session is inert (Submit is reading or freezing the saved draft), an editable page shows
+ * read-only without remounting: the editor root (the document, the email fields, the variables panel,
+ * undo and redo), the channels and the sample sets. It stays bound, so autosave keeps sending what was
+ * typed before, and it is editable again, history and all, when the hold is let go.
  */
 export function ContentWorkspace({
   templateId,
@@ -108,6 +113,9 @@ export function ContentWorkspace({
 }: ContentWorkspaceProps) {
   const session = useWorkspaceSession();
   const { open: previewOpen } = usePreviewState();
+  const inert = useInert();
+  // Editable right now: an editable draft, and nothing holding the page still.
+  const editing = editable && !inert;
 
   // Arriving from an import, the rail opens widened on the Original view, with the import report at
   // its top (the name field selects the name, from its own cookie). The rail does it, before the first paint.
@@ -261,7 +269,7 @@ export function ContentWorkspace({
       variables={shown.variables}
       baseline={baseline}
       requiredSections={requiredSections}
-      readOnly={!editable}
+      readOnly={!editing}
       onVariablesChange={onVariablesChange}
     >
       {editable ? <HistoryBridge onChange={session.setHistory} /> : null}
@@ -316,7 +324,13 @@ export function ContentWorkspace({
             : null
         }
         channels={
-          <ChannelSelector channels={channels} allowed={allowedChannels} editable={editable} onChange={onChannels} />
+          <ChannelSelector
+            channels={channels}
+            allowed={allowedChannels}
+            editable={editable}
+            disabled={!editing}
+            onChange={onChannels}
+          />
         }
         emailDetails={
           <EmailDetails
@@ -336,7 +350,7 @@ export function ContentWorkspace({
             versionNumber={versionNumber}
             teamName={teamName}
             channels={channels}
-            editable={editable}
+            editable={editing}
             sampleSets={shown.sampleSets}
             today={today}
             commentsCount={hasComments ? open : null}

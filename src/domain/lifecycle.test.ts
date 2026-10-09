@@ -376,6 +376,7 @@ describe("submit", () => {
     emailPreheader: null,
     channels: ["pdf", "web"],
     writers: ["maya"],
+    rev: 7,
   };
   const SUBMITTER = "maya";
   const run = (
@@ -385,10 +386,12 @@ describe("submit", () => {
       baseline?: Variable[] | null;
       note?: string | null;
       chain?: ApprovalStage[];
+      seenRev?: number;
     } = {},
   ) =>
     submit({
       draft: { ...draft, ...over },
+      seenRev: extra.seenRev ?? draft.rev,
       highestNumber: extra.highestNumber ?? 0,
       baseline: extra.baseline ?? null,
       now: NOW,
@@ -505,6 +508,18 @@ describe("submit", () => {
 
     const unchanged = run({}, { baseline: VARIABLES });
     expect(unchanged.ok && unchanged.changes.contractChanges).toEqual([]);
+  });
+
+  it("refuses a draft that changed after the summary was read, before anything else", () => {
+    expect(run({}, { seenRev: 6 })).toEqual({ ok: false, reason: REFUSALS.summaryStale });
+    // Even when its content would be refused too: the author sees what changed first.
+    const body: JSONContent = { type: "doc", content: [{ type: "paragraph", attrs: { id: "b_one" }, content: [chip("gift_name")] }] };
+    expect(run({ body })).toEqual({ ok: false, reason: "Define or remove {{gift_name}} before submitting." });
+    expect(run({ body }, { seenRev: 6 })).toEqual({ ok: false, reason: REFUSALS.summaryStale });
+  });
+
+  it("submits the draft the summary showed", () => {
+    expect(run({ rev: 12 }, { seenRev: 12 })).toMatchObject({ ok: true, changes: { number: 1 } });
   });
 
   it.each(["in_review", "changes_requested", "active", "superseded", "revoked"] as const)(
@@ -1484,10 +1499,11 @@ describe("scenario 3: the review loop", () => {
       emailPreheader: null,
       channels: ["pdf", "web"],
       writers: ["maya"],
+      rev: 3,
     };
     const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name };
 
-    const first = submit({ ...base, draft, highestNumber: 0, baseline: null });
+    const first = submit({ ...base, draft, seenRev: 3, highestNumber: 0, baseline: null });
     if (!first.ok) throw new Error(first.reason);
     const v1 = reviewVersion({ ...first.changes, id: "v_1" });
 
@@ -1497,7 +1513,7 @@ describe("scenario 3: the review loop", () => {
     if (!returned.ok) throw new Error(returned.reason);
     expect(returned.newDraft.basedOnVersionId).toBe("v_1");
 
-    const second = submit({ ...base, draft: { ...returned.newDraft }, highestNumber: 1, baseline: null });
+    const second = submit({ ...base, draft: { ...returned.newDraft }, seenRev: returned.newDraft.rev, highestNumber: 1, baseline: null });
     if (!second.ok) throw new Error(second.reason);
     expect(second.changes.number).toBe(2);
 
@@ -1526,6 +1542,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
   const submitAs = (draft: SubmitDraft, submittedBy: string, highestNumber: number) => {
     const result = submit({
       draft,
+      seenRev: draft.rev,
       highestNumber,
       baseline: null,
       now: NOW,

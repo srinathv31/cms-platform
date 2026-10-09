@@ -17,6 +17,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0009](0009-correct-a-revoked-version-from-its-content.md) | Correct a revoked version from its content | Accepted |
 | [0010](0010-comments-are-answered-where-they-show.md) | Comments are answered where they show | Accepted |
 | [0011](0011-cap-each-render-value.md) | Each render value is at most 1,000 characters | Accepted |
+| [0012](0012-submit-freezes-only-what-it-showed.md) | Submit freezes only what it showed: a compare-and-set on `rev`, the workspace inert meanwhile | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

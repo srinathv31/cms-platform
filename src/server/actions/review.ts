@@ -239,7 +239,7 @@ function effectContext(viewer: Viewer, found: { teamId: string; templateId: stri
 
 // ── Submit for review ─────────────────────────────────────────
 
-const SubmitInput = TemplateRef.extend({ note: z.string().nullish() });
+const SubmitInput = TemplateRef.extend({ note: z.string().nullish(), rev: z.number().int().nonnegative() });
 
 /**
  * "Submit v2": the template's open draft becomes its next version, In review, with the optional note
@@ -250,13 +250,18 @@ const SubmitInput = TemplateRef.extend({ note: z.string().nullish() });
  * compare-and-set, and the rev bump makes an autosave still in flight fail rather than land on a
  * frozen version.
  *
+ * `rev` is the draft's rev from the submit summary the author saw (`getSubmitSummary`). A draft that
+ * has changed since, by a save from this page or any other, is refused (`REFUSALS.summaryStale`), so
+ * submit freezes only what the dialog showed.
+ *
  * Stays on the page (the workspace re-renders in place). A refusal (an undefined chip, no email subject,
- * already in review) writes nothing and comes back as the sentence to show. The client flushes the
- * pending autosave first.
+ * already in review, a stale summary) writes nothing and comes back as the sentence to show. The client
+ * flushes the pending autosave first.
  */
 export async function submitVersion(input: {
   templateId: string;
   note?: string | null;
+  rev: number;
 }): Promise<ActionResult<{ number: number }>> {
   const viewer = await getViewer();
   const parsed = SubmitInput.safeParse(input);
@@ -289,6 +294,7 @@ export async function submitVersion(input: {
 
     const outcome = submit({
       draft,
+      seenRev: parsed.data.rev,
       highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
       baseline,
       now: at,

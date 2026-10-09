@@ -288,6 +288,8 @@ export interface SubmitDraft {
   channels: readonly Channel[];
   /** Who has written the draft (`DraftFields.writers`). */
   writers: readonly string[];
+  /** Moves with every write to the version row: each autosave that lands, and every transition. */
+  rev: number;
 }
 
 export interface SubmitChanges {
@@ -311,6 +313,11 @@ export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | { o
 
 export interface SubmitInput {
   draft: SubmitDraft;
+  /**
+   * The draft's `rev` when the submitter's summary was read (`SubmitSummary.rev`): what they were
+   * shown is what gets frozen, so a draft that has moved on since is refused.
+   */
+  seenRev: number;
   /** The template's highest version number (0 when it has none). */
   highestNumber: number;
   /** The variable list of the newest version that still renders (`contractBaseline`), or null when none does. */
@@ -337,6 +344,8 @@ export interface SubmitInput {
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
+ *   - the draft changed after the submitter's summary was read (`seenRev`): a save that landed
+ *     meanwhile, from this page or another, would otherwise be frozen without being shown;
  *   - a chip names a key the variable list doesn't have: in the document, and in the email subject
  *     and preheader while Email is on (they are not part of the output otherwise);
  *   - Email is on and the subject is empty.
@@ -348,6 +357,7 @@ export function submit(input: SubmitInput): SubmitResult {
 
   if (draft.state === "in_review") return { ok: false, reason: "This version is already in review." };
   if (draft.state !== "draft") return { ok: false, reason: "Only a draft can be submitted." };
+  if (draft.rev !== input.seenRev) return { ok: false, reason: REFUSALS.summaryStale };
 
   const emailOn = draft.channels.includes("email");
 
@@ -433,6 +443,8 @@ export type Outcome<T> = Ok<T> | Refused;
 
 /** The sentences a refused review transition returns (maker-checker reasons come from `REASONS`). */
 export const REFUSALS = {
+  /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */
+  summaryStale: "This draft changed after this summary was made.",
   notInReview: "This version isn't in review.",
   stageMissing: "This version's approval stage no longer exists.",
   giveReason: "Give a reason.",

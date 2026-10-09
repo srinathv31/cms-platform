@@ -275,4 +275,33 @@ describe("Revert to v1", () => {
     expect(content.mock.calls[0]![0]).toMatchObject({ body: doc("Opening") });
     expect(toast.dismiss).not.toHaveBeenCalled();
   });
+
+  it("greys the item out while the page is inert (Submit), and offers it again after", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    let letGo = () => {};
+    await act(async () => {
+      letGo = session!.makeInert();
+    });
+    await openMenu();
+    expect(item().hasAttribute("data-disabled")).toBe(true);
+    await click(item());
+    expect(getBaseVersion).not.toHaveBeenCalled();
+
+    await act(async () => letGo());
+    expect(item().hasAttribute("data-disabled")).toBe(false);
+  });
+
+  it("takes the Undo away when Submit holds the page", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+    const { undo } = undoToast();
+
+    await act(async () => void session!.makeInert());
+    expect(toast.dismiss).toHaveBeenCalledWith("revert-toast");
+    content.mockClear();
+    await undo();
+    expect(content).not.toHaveBeenCalled();
+  });
 });

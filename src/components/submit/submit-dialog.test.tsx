@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
-// The submit dialog: what it lists, the breaking flags, the note, and how a refusal and a success end.
+// The submit dialog: what it lists, the breaking flags, the note, how a refusal and a success end, and
+// the refresh it offers when the draft changed after its summary was read.
 
 import { act, createRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { REFUSALS } from "@/domain/lifecycle";
 import type { ActionResult } from "@/domain/review-types";
 import type { Variable } from "@/domain/types";
 import type { SubmitSummary } from "./types";
@@ -27,6 +29,7 @@ const BASE = [v("first_name"), v("purchase_apr", { type: "percent" })];
 
 const summary = (over: Partial<SubmitSummary> = {}): SubmitSummary => ({
   templateId: "UC-4F7K2Q",
+  rev: 4,
   number: 3,
   channels: ["pdf", "email"],
   sampleSetNames: ["Typical customer", "Long name and maximum values", "Minimum values"],
@@ -36,17 +39,21 @@ const summary = (over: Partial<SubmitSummary> = {}): SubmitSummary => ({
 });
 
 type Submit = (note: string | undefined) => Promise<ActionResult<{ number: number }>>;
+type Refresh = () => Promise<ActionResult<{ summary: SubmitSummary }>>;
 
 let root: Root;
 let container: HTMLElement;
 let onSubmit: ReturnType<typeof vi.fn<Submit>>;
+let onRefresh: ReturnType<typeof vi.fn<Refresh>>;
 let closed: ReturnType<typeof vi.fn<(open: boolean) => void>>;
 
+/** Holds the summary, as the Submit button does: a refresh hands it the new one. */
 function Host({ data }: { data: SubmitSummary }) {
   const [open, setOpen] = useState(true);
+  const [shown, setShown] = useState(data);
   return (
     <SubmitDialog
-      summary={data}
+      summary={shown}
       open={open}
       onOpenChange={(next) => {
         closed(next);
@@ -54,6 +61,11 @@ function Host({ data }: { data: SubmitSummary }) {
       }}
       finalFocus={createRef<HTMLElement>()}
       onSubmit={onSubmit}
+      onRefresh={async () => {
+        const result = await onRefresh();
+        if (result.ok) setShown(result.summary);
+        return result;
+      }}
     />
   );
 }
@@ -82,6 +94,7 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   onSubmit = vi.fn<Submit>(async () => ({ ok: true, number: 3 }));
+  onRefresh = vi.fn<Refresh>(async () => ({ ok: true, summary: summary() }));
   closed = vi.fn();
 });
 
@@ -278,5 +291,71 @@ describe("submitting", () => {
     await act(async () => button(/^Cancel$/).click());
     expect(onSubmit).not.toHaveBeenCalled();
     expect(closed).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe("a summary the draft has moved past (handoff review I8)", () => {
+  const STALE = { ok: false as const, reason: REFUSALS.summaryStale };
+  const alert = () => dialog()!.querySelector("[role='alert']")?.textContent;
+  const buttonNamed = (name: RegExp) =>
+    [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((b) => name.test(b.textContent ?? "")) ?? null;
+
+  it("says so at the button, which becomes Refresh summary; refreshed, it lists the new draft and submits it", async () => {
+    onSubmit.mockResolvedValueOnce(STALE);
+    await render(summary());
+    await typeNote("Keep me.");
+    await act(async () => button(/^Submit v3$/).click());
+    expect(alert()).toBe(REFUSALS.summaryStale);
+    expect(closed).not.toHaveBeenCalledWith(false);
+    expect(buttonNamed(/^Submit v3$/), "it no longer offers to submit what it shows").toBeNull();
+    expect(buttonNamed(/^Refresh summary$/)).not.toBeNull();
+
+    const moved = summary({ rev: 6, variables: [...BASE, v("gift_card", { required: false })] });
+    onRefresh.mockResolvedValueOnce({ ok: true, summary: moved });
+    await act(async () => button(/^Refresh summary$/).click());
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(alert()).toBe("");
+    expect(dialog()!.textContent).toContain("v3 adds optional gift_card (Text).");
+    expect(note().value, "the note is kept").toBe("Keep me.");
+
+    await act(async () => button(/^Submit v3$/).click());
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).toHaveBeenLastCalledWith("Keep me.");
+    expect(closed).toHaveBeenLastCalledWith(false);
+  });
+
+  it("⌘Enter refreshes, rather than submits, while the summary is stale", async () => {
+    onSubmit.mockResolvedValueOnce(STALE);
+    await render(summary());
+    await press(note(), { key: "Enter", metaKey: true });
+    expect(alert()).toBe(REFUSALS.summaryStale);
+    await press(note(), { key: "Enter", metaKey: true });
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(buttonNamed(/^Submit v3$/)).not.toBeNull();
+  });
+
+  it("keeps offering the refresh when it fails, with its reason", async () => {
+    onSubmit.mockResolvedValueOnce(STALE);
+    onRefresh.mockResolvedValueOnce({ ok: false, reason: "Your latest changes aren't saved yet." });
+    await render(summary());
+    await act(async () => button(/^Submit v3$/).click());
+    await act(async () => button(/^Refresh summary$/).click());
+    expect(alert()).toBe("Your latest changes aren't saved yet.");
+    expect(buttonNamed(/^Refresh summary$/)).not.toBeNull();
+
+    onRefresh.mockRejectedValueOnce(new Error("boom"));
+    await act(async () => button(/^Refresh summary$/).click());
+    expect(alert()).toBe("Couldn't refresh the summary. Try again.");
+    expect(buttonNamed(/^Refresh summary$/)).not.toBeNull();
+  });
+
+  it("offers no refresh for any other refusal", async () => {
+    onSubmit.mockResolvedValueOnce({ ok: false, reason: "Add an email subject before submitting." });
+    await render(summary());
+    await act(async () => button(/^Submit v3$/).click());
+    expect(buttonNamed(/^Refresh summary$/)).toBeNull();
+    expect(buttonNamed(/^Submit v3$/)).not.toBeNull();
   });
 });

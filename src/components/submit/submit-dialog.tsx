@@ -11,11 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
+import { REFUSALS } from "@/domain/lifecycle";
 import type { ActionResult } from "@/domain/review-types";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
 import type { SubmitSummary } from "./types";
 
 const SUBMIT_FAILED = "Couldn't submit. Try again.";
+const REFRESH_FAILED = "Couldn't refresh the summary. Try again.";
 const noop = () => undefined;
 /** What `disabled:` does for a native disabled button, for the `aria-disabled` one that keeps focus. */
 const PENDING = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
@@ -73,6 +75,8 @@ export interface SubmitDialogProps {
   finalFocus: RefObject<HTMLElement | null>;
   /** Submits the version with the note (undefined when it is blank). */
   onSubmit: (note: string | undefined) => Promise<ActionResult<{ number: number }>>;
+  /** Reads the summary again (the host passes the new one in as `summary`): after the draft changed under this one. */
+  onRefresh: () => Promise<ActionResult>;
 }
 
 /**
@@ -86,13 +90,19 @@ export interface SubmitDialogProps {
  * description, the body, and a footer with an outline Cancel and the primary. No Close X (Esc and Cancel
  * close it).
  *
+ * When the draft changed after this summary was read, the server refuses the submit
+ * (`REFUSALS.summaryStale`): the sentence shows at the button, and the button becomes "Refresh
+ * summary", which reads it again. The note is kept, and the button goes back to "Submit v{N}".
+ *
  * While the server works, nothing that holds focus is `disabled`: a disabled control drops focus to the
  * page, and the next Tab would leave the dialog for the sidebar. The note is read-only and the buttons
  * are `aria-disabled` (`focusableWhenDisabled`), so after a refusal focus is still where it was.
  */
-export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit }: SubmitDialogProps) {
+export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit, onRefresh }: SubmitDialogProps) {
   const [note, setNote] = useState("");
   const [reason, setReason] = useState<string | null>(null);
+  // The draft has changed since `summary` was read: the one black button refreshes it instead of submitting.
+  const [stale, setStale] = useState(false);
   const [pending, startTransition] = useTransition();
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const noteId = useId();
@@ -109,6 +119,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
     // Closing mid-submit would hide the outcome.
     if (pending) return;
     setReason(null);
+    setStale(false);
     onOpenChange(false);
   }
 
@@ -121,6 +132,8 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
         const result = await onSubmit(trimmed === "" ? undefined : trimmed);
         if (!result.ok) {
           setReason(result.reason);
+          // The sentence is the only signal a refusal carries today (I11 gives them stable codes).
+          setStale(result.reason === REFUSALS.summaryStale);
           return;
         }
         setNote("");
@@ -132,6 +145,26 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
     });
   }
 
+  function refresh() {
+    if (pending) return;
+    startTransition(async () => {
+      try {
+        const result = await onRefresh();
+        if (!result.ok) {
+          setReason(result.reason);
+          return;
+        }
+        setReason(null);
+        setStale(false);
+      } catch (error) {
+        unstable_rethrow(error);
+        setReason(REFRESH_FAILED);
+      }
+    });
+  }
+
+  const primary = stale ? refresh : submit;
+
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <ScrimDialogContent
@@ -140,7 +173,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            submit();
+            primary();
           }
         }}
         className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg"
@@ -223,9 +256,9 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
               <Button variant="outline" className={cn("px-4", PENDING)} onClick={close} disabled={pending} focusableWhenDisabled>
                 Cancel
               </Button>
-              <Button className={cn("relative px-4", PENDING)} onClick={submit} disabled={pending} focusableWhenDisabled>
-                <span className={cn(pending && "invisible")}>Submit v{summary.number}</span>
-                {pending ? <Spinner aria-label="Submitting" className="absolute" /> : null}
+              <Button className={cn("relative px-4", PENDING)} onClick={primary} disabled={pending} focusableWhenDisabled>
+                <span className={cn(pending && "invisible")}>{stale ? "Refresh summary" : `Submit v${summary.number}`}</span>
+                {pending ? <Spinner aria-label={stale ? "Refreshing" : "Submitting"} className="absolute" /> : null}
               </Button>
             </div>
           </>

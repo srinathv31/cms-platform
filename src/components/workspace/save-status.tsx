@@ -21,7 +21,7 @@ import { getBaseVersion } from "@/server/queries/base-version";
 import type { SaveFields } from "./autosave/autosave-scheduler";
 import { SaveIndicator } from "./autosave/save-indicator";
 import type { WorkspaceSession } from "./session/session-store";
-import { useCanRevert, useHistoryControls, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
+import { useCanRevert, useHistoryControls, useInert, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
 
 /** What "Revert to v3" replaces: the draft's versioned content (the name lives on the template, so it stays). */
 const VERSION_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
@@ -188,7 +188,8 @@ function offerUndo(session: WorkspaceSession, message: string, previous: SaveFie
  * The status, as the trigger of a small menu: Revert to when you opened it, Revert to v3.
  * "Revert to v3" reads the version from the server. While it does, the menu stays open with both
  * items greyed out and "Reverting…" under the one pressed, so a second press can't start another; a
- * failure shows in a toast.
+ * failure shows in a toast. Both are greyed out too while the session is inert (Submit is reading
+ * the saved draft), when a revert would be refused.
  */
 function RevertMenu({
   templateId,
@@ -202,6 +203,7 @@ function RevertMenu({
   children: ReactNode;
 }) {
   const session = useWorkspaceSession();
+  const inert = useInert();
   const [open, setOpen] = useState(false);
   const [opened, setOpened] = useState("");
   const [pending, start] = useTransition();
@@ -256,7 +258,7 @@ function RevertMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-auto min-w-64">
         {sinceOpened ? (
-          <DropdownMenuItem onClick={revert} disabled={pending} className="items-start gap-2.5 px-2 py-1.5">
+          <DropdownMenuItem onClick={revert} disabled={pending || inert} className="items-start gap-2.5 px-2 py-1.5">
             <RotateCcw aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
               <span className="text-[14px] leading-5">Revert to when you opened it</span>
@@ -270,7 +272,7 @@ function RevertMenu({
             onClick={revertToBase}
             // It closes once the version has arrived (or failed), so its greyed "Reverting…" shows meanwhile.
             closeOnClick={false}
-            disabled={pending}
+            disabled={pending || inert}
             aria-busy={pending || undefined}
             className="items-start gap-2.5 px-2 py-1.5"
           >

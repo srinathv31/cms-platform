@@ -585,3 +585,77 @@ describe("revert to when the page opened", () => {
     expect(session.getCanRevert()).toBe(false);
   });
 });
+
+// Submit holds the page still from its click until its dialog closes (handoff review I8).
+describe("an inert page", () => {
+  const body = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+
+  function setup() {
+    const session = createWorkspaceSession();
+    const save = vi.fn();
+    const flush = vi.fn(async () => {});
+    session.bind({ versionId: "v_1", rev: 0 });
+    session.attach(save, flush);
+    const content = vi.fn();
+    session.addRestoreTarget({ opening: { body: body("Opening"), channels: ["pdf"] }, restore: content });
+    return { session, save, flush, content };
+  }
+
+  it("is held until let go, and tells subscribers when it starts and ends", () => {
+    const { session } = setup();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    expect(session.getInert()).toBe(false);
+
+    const letGo = session.makeInert();
+    expect(session.getInert()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    letGo();
+    expect(session.getInert()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("stays inert until every hold is let go, and letting go twice changes nothing", () => {
+    const { session } = setup();
+    const first = session.makeInert();
+    const second = session.makeInert();
+    first();
+    first();
+    expect(session.getInert(), "the second hold still holds").toBe(true);
+    second();
+    expect(session.getInert()).toBe(false);
+  });
+
+  it("still sends what was typed before, and flushes it", async () => {
+    const { session, save, flush } = setup();
+    session.save({ body: body("Typed before Submit") });
+    session.makeInert();
+    await session.flush();
+    expect(save).toHaveBeenCalledWith({ body: body("Typed before Submit") });
+    expect(flush).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses revert, replace and a revert's Undo, changing nothing", () => {
+    const { session, save, content } = setup();
+    session.save({ body: body("Edited") });
+    const previous = session.revert()!;
+    const since = session.getEditGeneration();
+    save.mockClear();
+    content.mockClear();
+    expect(session.canRestore(previous, since)).toBe(true);
+
+    const letGo = session.makeInert();
+    // The Undo of the revert just made is refused while inert (its toast goes), though nothing was edited since.
+    expect(session.canRestore(previous, since)).toBe(false);
+    expect(session.restore(previous, since)).toBe(false);
+    expect(session.revert()).toBeNull();
+    expect(session.replace({ body: body("v3") })).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+    expect(content).not.toHaveBeenCalled();
+    expect(session.getEditGeneration()).toBe(since);
+
+    letGo();
+    expect(session.replace({ body: body("v3") })).toEqual({ body: body("Opening") });
+  });
+});

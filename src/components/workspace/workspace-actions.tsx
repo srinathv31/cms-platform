@@ -14,6 +14,8 @@ import { submitVersion } from "@/server/actions/review";
 import { SubmitDialog } from "@/components/submit/submit-dialog";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import type { SubmitSummary } from "@/components/submit/types";
+import type { ActionResult } from "@/domain/review-types";
+import type { WorkspaceSession } from "./session/session-store";
 import { usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
 
 /**
@@ -50,6 +52,18 @@ const NOT_SAVED = "Your latest changes aren't saved yet.";
 const SUBMIT_FAILED = "Couldn't open the submit dialog. Try again.";
 
 /**
+ * Sends the pending autosave, and says whether everything typed is saved: what the server reads next
+ * (the summary, the submit) is then what the page shows.
+ */
+async function saveFirst(session: WorkspaceSession): Promise<ActionResult> {
+  await session.flush();
+  // The host publishes the outcome of that flush on the next render: wait one task for it.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  const saved = session.getStatus();
+  return saved.status === "error" ? { ok: false, reason: saved.error ?? NOT_SAVED } : { ok: true };
+}
+
+/**
  * Puts focus on the header's status row once the page behind a submit has re-rendered as In review.
  * The Submit button unmounts with the draft, and focus would fall to the page; the row is where the
  * outcome is ("In review v2"), and its `tabIndex={-1}` lets a script land there without adding a Tab
@@ -74,15 +88,24 @@ function focusStatusRow() {
 }
 
 /**
- * "Submit for review" on a draft the viewer can submit: the one black button. It sends the pending
- * autosave first (the version that gets frozen must be what is on screen), then opens the submit
- * dialog (components/submit), which lists what is about to be frozen and asks for the optional note.
- * The dialog's own "Submit v{N}" does the submitting; a refusal ("Define or remove {{promo_code}}
- * before submitting.") shows inside the dialog, at that button, and the draft stays as it is. When
- * the save itself failed, there is nothing safe to show, so the reason appears in a small popover
- * right under this button instead. On success the dialog closes and the action refreshes the page in
- * place: the header reads In review, the document turns read-only, and this button goes away with
- * the draft; focus moves to the header's status row (`focusStatusRow`), so it doesn't fall to the page.
+ * "Submit for review" on a draft the viewer can submit: the one black button. From the click on, the
+ * page is inert (`session.makeInert`): the document, the variables, the email fields, the channels,
+ * the sample sets and the name are read-only, so nothing can change the draft between what the
+ * dialog lists and what gets frozen. It sends the pending autosave first (what was typed before the
+ * click), then opens the submit dialog (components/submit), which lists what is about to be frozen
+ * and asks for the optional note. Cancelling the dialog makes the page editable again, with nothing
+ * lost.
+ *
+ * The dialog's own "Submit v{N}" does the submitting. It sends anything still pending first and
+ * passes the summary's `rev`: if the draft changed after the summary was read (a save from another
+ * tab), the server refuses (`REFUSALS.summaryStale`) and the dialog offers to refresh the summary.
+ * Any other refusal ("Define or remove {{promo_code}} before submitting.") shows inside the dialog,
+ * at that button, and the draft stays as it is. When the save itself failed, or the summary can't be
+ * read, there is nothing safe to show: the page is editable again and the reason appears in a small
+ * popover right under this button instead. On success the dialog closes and the action refreshes the
+ * page in place: the header reads In review, the document turns read-only for good, and this button
+ * goes away with the draft (letting go of the page as it does); focus moves to the header's status
+ * row (`focusStatusRow`), so it doesn't fall to the page.
  */
 export function SubmitButton({ templateId }: { templateId: string }) {
   const session = useWorkspaceSession();
@@ -95,34 +118,46 @@ export function SubmitButton({ templateId }: { templateId: string }) {
   const trigger = useRef<HTMLButtonElement>(null);
   // When the submit went through (performance.now()). This button unmounts once the draft is In review.
   const submittedAt = useRef<number | null>(null);
+  // Lets go of the page (`session.makeInert`); null while this button isn't holding it.
+  const letGoRef = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
+      letGoRef.current?.();
+      letGoRef.current = null;
       if (submittedAt.current !== null && performance.now() - submittedAt.current < 10_000) focusStatusRow();
     },
     [],
   );
 
+  function hold() {
+    letGoRef.current ??= session.makeInert();
+  }
+  function letGo() {
+    letGoRef.current?.();
+    letGoRef.current = null;
+  }
+
   function refuse(text: string) {
+    letGo();
     setReason(text);
     setOpen(true);
+  }
+
+  /** What the dialog lists, read from the saved draft once everything typed has gone out. */
+  async function readSummary(): Promise<ActionResult<{ summary: SubmitSummary }>> {
+    const saved = await saveFirst(session);
+    if (!saved.ok) return saved;
+    return getSubmitSummary({ templateId });
   }
 
   function openDialog() {
     if (pending) return;
     setOpen(false);
+    // Before anything else: an edit made while the summary is read would be frozen without being listed.
+    hold();
     startTransition(async () => {
       try {
-        await session.flush();
-        // The host publishes the outcome of that flush on the next render: wait one task for it.
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        const saved = session.getStatus();
-        if (saved.status === "error") {
-          refuse(saved.error ?? NOT_SAVED);
-          return;
-        }
-
-        // What the dialog lists is read from the saved draft, which is the live one now.
-        const result = await getSubmitSummary({ templateId });
+        const result = await readSummary();
         if (!result.ok) {
           refuse(result.reason);
           return;
@@ -130,6 +165,8 @@ export function SubmitButton({ templateId }: { templateId: string }) {
         setSummary(result.summary);
         setDialogOpen(true);
       } catch (error) {
+        // Before the rethrow: a redirect leaves this page, and the hold must not outlive it.
+        letGo();
         unstable_rethrow(error);
         refuse(SUBMIT_FAILED);
       }
@@ -178,10 +215,25 @@ export function SubmitButton({ templateId }: { templateId: string }) {
       <SubmitDialog
         summary={summary}
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(next) => {
+          setDialogOpen(next);
+          // Closed without submitting: the page is editable again. After a submit it stays held until
+          // this button goes away with the draft, so nothing can be typed into a version being frozen.
+          if (!next && submittedAt.current === null) letGo();
+        }}
         finalFocus={trigger}
+        onRefresh={async () => {
+          const result = await readSummary();
+          if (result.ok) setSummary(result.summary);
+          return result;
+        }}
         onSubmit={async (note) => {
-          const result = await submitVersion({ templateId, note });
+          if (!summary) return { ok: false, reason: SUBMIT_FAILED };
+          // Anything still waiting to save goes out first. If something does, the draft has moved past
+          // the summary, and the server says so rather than freezing what the dialog didn't list.
+          const saved = await saveFirst(session);
+          if (!saved.ok) return saved;
+          const result = await submitVersion({ templateId, note, rev: summary.rev });
           if (result.ok) submittedAt.current = performance.now();
           return result;
         }}
