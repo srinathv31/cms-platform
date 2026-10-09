@@ -1,44 +1,17 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ActionResult } from "@/domain/access-types";
 import type { Person } from "@/domain/review-types";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
-import { runAction } from "@/components/versions/action-dialog";
 
 // The machinery the four Platform sections share (settings variant A): a dense table whose rows carry
-// their actions inline, and a consequence strip before anything is committed. The strip's confirm is
-// the only black button on screen; everything that opens a strip is outline.
+// their actions inline, and a consequence strip (`Strip`, settings/strip.tsx) before anything is
+// committed. The strip's confirm is the only black button on screen; everything that opens a strip is
+// outline.
 
-// ── Running an action ────────────────────────────────────────
-
-/** One server action at a time: the pending flag, the refusal sentence and a guarded `run`. */
-export function useActionRun() {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const sending = useRef(false);
-
-  function run(action: () => Promise<ActionResult>, onOk?: () => void) {
-    if (sending.current) return;
-    sending.current = true;
-    setError(null);
-    start(async () => {
-      try {
-        const result = await runAction(action);
-        if (result.ok) onOk?.();
-        else setError(result.reason);
-      } finally {
-        sending.current = false;
-      }
-    });
-  }
-
-  return { pending, error, setError, run };
-}
 
 // ── Returning focus ──────────────────────────────────────────
 
@@ -58,100 +31,6 @@ export function useFocusAfterCommit() {
   return (get: () => HTMLElement | null | undefined) => {
     pending.current = get;
   };
-}
-
-// ── The consequence strip ────────────────────────────────────
-
-/**
- * What will happen, optional content (the Now / After cards, inputs), then Cancel and the confirm.
- * By default focus goes to the first `data-autofocus` control or, with none, to Cancel (the safe
- * action), and Esc closes the strip and nothing else. A strip that appears while someone is typing
- * (`focusOnMount={false}`) leaves focus alone. The confirm is `aria-disabled` while blocked or sending,
- * never natively disabled, so focus stays where it is.
- */
-export function Strip({
-  lines = [],
-  children,
-  confirmLabel,
-  blocked = false,
-  message,
-  onConfirm,
-  onCancel,
-  onDone,
-  focusOnMount = true,
-  cancelLabel = "Cancel",
-  className,
-}: {
-  lines?: ReactNode[];
-  children?: ReactNode;
-  confirmLabel: string;
-  /** The confirm can't run yet. */
-  blocked?: boolean;
-  /** Said beside the buttons while it applies (the reason the confirm is blocked). */
-  message?: string | null;
-  onConfirm: () => Promise<ActionResult>;
-  onCancel: () => void;
-  /** Called once the server accepted the action. */
-  onDone: () => void;
-  focusOnMount?: boolean;
-  cancelLabel?: string;
-  className?: string;
-}) {
-  const root = useRef<HTMLDivElement>(null);
-  const { pending, error, run } = useActionRun();
-
-  useEffect(() => {
-    if (!focusOnMount) return;
-    const el = root.current;
-    if (!el) return;
-    const target = el.querySelector<HTMLElement>("[data-autofocus]") ?? el.querySelector<HTMLElement>("[data-cancel]");
-    target?.focus({ preventScroll: true });
-    el.scrollIntoView({ block: "nearest" });
-  }, [focusOnMount]);
-
-  const shown = error ?? (blocked ? message : null);
-
-  return (
-    <div
-      ref={root}
-      data-slot="consequence-strip"
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || !focusOnMount) return;
-        e.stopPropagation();
-        if (!pending) onCancel();
-      }}
-      className={cn("flex flex-col gap-3 rounded-lg bg-surface-sunken p-4", className)}
-    >
-      {children}
-      {lines.length ? (
-        <ul className="flex flex-col gap-1.5 text-[14px] leading-relaxed text-text">
-          {lines.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="flex items-center justify-end gap-2">
-        {shown ? (
-          <p role={error ? "alert" : undefined} className={cn("mr-auto text-[13px]", error ? "text-danger-text" : "text-text-muted")}>
-            {shown}
-          </p>
-        ) : null}
-        <Button data-cancel variant="ghost" aria-disabled={pending} onClick={() => (pending ? undefined : onCancel())}>
-          {cancelLabel}
-        </Button>
-        <Button
-          aria-disabled={blocked || pending}
-          className="aria-disabled:opacity-50"
-          onClick={() => {
-            if (blocked || pending) return;
-            run(onConfirm, onDone);
-          }}
-        >
-          {confirmLabel}
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 // ── Controls ─────────────────────────────────────────────────

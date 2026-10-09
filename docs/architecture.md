@@ -81,12 +81,15 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
 ### A mutation: setting a sunset date
 
 1. [sunset-dialog.tsx](../src/components/versions/sunset-dialog.tsx) calls the `setSunset` server action inside
-   `useActionDialog` ([action-dialog.tsx](../src/components/versions/action-dialog.tsx)): one request at a time,
+   `useActionDialog` ([action-dialog.tsx](../src/components/versions/action-dialog.tsx)), which runs it with
+   `useActionRun` ([use-action-run.ts](../src/components/primitives/use-action-run.ts)): one request at a time,
    closes on `ok`, shows `reason` otherwise.
-2. `setSunset` in [actions/review.ts](../src/server/actions/review.ts): `getViewer()`, zod parse, permission check,
-   `now()` once, then one transaction. Inside it: re-read the version, call the domain transition, write the changes
-   with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row, notifications,
-   consumer notices) with `writeEffects`. On success, `revalidatePath()` and `refresh()`.
+2. `setSunset` in [actions/review.ts](../src/server/actions/review.ts) runs on the server action kit, `serverAction`
+   in [actions/kit.ts](../src/server/actions/kit.ts): `getViewer()`, zod parse, permission check, `now()` once,
+   then one transaction. Inside it: re-read the version, call the domain transition, write the changes with a
+   compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row, notifications, consumer
+   notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the answer. On success,
+   `revalidatePath()` and `refresh()`.
 3. The transition (`setSunset` in [lifecycle.ts](../src/domain/lifecycle.ts)) decides; the action only writes. A
    refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
    ([refusals.ts](../src/domain/refusals.ts)).

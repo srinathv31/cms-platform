@@ -7,7 +7,9 @@ import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";
 import { setChannelRule } from "@/server/actions/platform";
-import { Blocked, FullRow, Strip, useActionRun, useFocusAfterCommit } from "./ui";
+import { useActionRun } from "@/components/primitives/use-action-run";
+import { Strip } from "../strip";
+import { Blocked, FullRow, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Channel rules: the content type by channel matrix. Turning a channel on takes
 // effect at once; turning one off says what it stops (from the Active versions that use it) in a strip

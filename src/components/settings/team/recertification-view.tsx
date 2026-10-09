@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { decideRecertItem, startRecertification } from "@/server/actions/access";
 import { daysBetween, formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
+import { Strip } from "../strip";
 import { firstName, lastActive } from "./format";
-import { Bar, RowTable, Strip, type RowData } from "./rows";
+import { Bar, RowTable, type RowData } from "./rows";
 
 /** The borrowed stat card: how many are confirmed, and how long is left. The footnote comes worded. */
 function StatCard({ view, today }: { view: RecertView; today: string }) {

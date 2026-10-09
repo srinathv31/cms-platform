@@ -112,26 +112,26 @@ actor, ids, and `now`. It returns either a refusal, `{ ok: false, code, reason }
 `reason` is the sentence the person reads, or what to write plus `effects`. Lifecycle transitions return `changes`, plus `approval`,
 `newDraft`, `reasonComment`, or `previous` when there is more than one row to write. Access and platform functions
 name their rows instead (`request`, `membership`, `recert`, `requiredSections`). Nothing is written here. The
-server writes it all in one transaction with `inTransaction` from [server/effects.ts](../server/effects.ts), which
-retries `SQLITE_BUSY`.
+server writes it all in one transaction: every action runs on `serverAction`
+([server/actions/kit.ts](../server/actions/kit.ts)), whose transaction is `inTransaction` from
+[server/effects.ts](../server/effects.ts), which retries `SQLITE_BUSY`.
 `writeEffects` (same file) writes `LifecycleEffect`s and decides who receives them; `writeAccessEffects` and
 `applyMembershipChange` in [server/access-effects.ts](../server/access-effects.ts) do the same for access. The
 caller in `approveVersion` ([actions/review.ts](../server/actions/review.ts)), shortened:
 
 ```ts
-const at = await now();                                 // the demo clock, read once
-const result = await transact(async (tx) => {           // inTransaction; a refusal becomes { ok: false, code, reason }
-  const version = await loadVersion(tx, found, number); // re-read inside the transaction
+transaction: async (tx, { viewer, input, found, now: at }) => { // the demo clock, read once before it
+  const version = await loadVersion(tx, found, input.versionNumber); // re-read inside the transaction
   const outcome = approve({ version, chain, actorId: viewer.userId, now: at, /* … */ });
-  if (!outcome.ok) refuse(outcome);                     // the domain's refusal; nothing is written
+  if (!outcome.ok) refuse(outcome);                     // the domain's refusal: rolled back, returned as { ok: false, code, reason }
   await updateVersion(tx, version, { state: outcome.changes.state, /* … */ }, at, REFUSALS.notInReview);
   await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
   return { ok: true, wentLive: outcome.wentLive, number: version.number! };
-});
+},
 ```
 
-**Permissions are a separate check.** Server actions call `assertCan` before the transition and turn a
-`PermissionError` into a returned refusal. Transitions repeat only the guards they can see in their facts
+**Permissions are a separate check.** Server actions ask `can` before the transition (the kit's `check`) and return
+its refusal. Transitions repeat only the guards they can see in their facts
 (`approve` and `requestChanges` ask `makerCheckerRefusal`, as the `version.decide` guard does, and refuse the
 submitter with `REASONS.ownVersion` and any other writer with `REASONS.wroteVersion`). Whether a stage is yours is `canActOnStage`, not
 `can`. Read models carry `PermissionResult`s for the UI, such as `ReviewScreenData.can`.
@@ -217,8 +217,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 ## Don't copy
 
 - **Throwing for an expected outcome.** `editLatest` throws `LifecycleError` for a version that isn't Active or
-  Revoked, and the `startDraft` and `createTemplate` actions throw `Error`. Return `Outcome<T>` with a sentence
-  instead; throw only for bugs.
+  Revoked. Return `Outcome<T>` with a sentence instead; throw only for bugs.
 - **A third `Ok` / `Refused`.** `Refused` is [refusals.ts](refusals.ts)'s, which [lifecycle.ts](lifecycle.ts) and
   [access-types.ts](access-types.ts) re-export; `Ok` is declared in both. Import them.
 - **Local copies of small helpers.** "a, b and c" joins: `andList` in `copilot.ts` and `import.ts`, `listKeys` in

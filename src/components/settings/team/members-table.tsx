@@ -7,8 +7,9 @@ import type { PermissionResult, TeamRole } from "@/domain/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { changeMemberRoles, reinstateMember, removeMember } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";
+import { Strip } from "../strip";
 import { firstName, lastActive } from "./format";
-import { RowTable, Strip, type RowAct, type RowData } from "./rows";
+import { RowTable, type RowAct, type RowData } from "./rows";
 
 /** Why a member is not active, in the dimmed row's sub line. */
 function stateNote(m: MemberRow, today: string): string {

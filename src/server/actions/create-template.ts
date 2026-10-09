@@ -7,9 +7,6 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams } from "@/server/db/schema/ucomp";
-import { now } from "@/server/clock";
-import { inTransaction } from "@/server/effects";
-import { getViewer } from "@/server/viewer";
 import { newId } from "@/server/ids";
 import {
   conformToContentType,
@@ -17,18 +14,21 @@ import {
   freshTemplateId,
   insertNewTemplate,
 } from "@/server/templates/create";
-import { buildStarter, isStarterKey, type StarterKey } from "@/server/starters";
-import { assertCan } from "@/domain/permissions";
+import { STARTER_KEYS, buildStarter, type StarterKey } from "@/server/starters";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { ActionResult } from "@/domain/review-types";
 import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
 import { createDraft } from "@/domain/lifecycle";
+import { check, refuse, serverAction } from "./kit";
 
-// New template, from a starter. It sits apart from the other template actions (templates.ts)
-// because it is the only one that builds starters: the starter bodies, and the editor schema they
-// are normalized with, load only where New template is offered, not with every Edit button.
+// New template, from a starter, on the server action kit (kit.ts). It sits apart from the other
+// template actions (templates.ts) because it is the only one that builds starters: the starter bodies,
+// and the editor schema they are normalized with, load only where New template is offered, not with
+// every Edit button.
 
 const CreateTemplateInput = z.object({
   teamSlug: z.string().min(1).max(64),
-  starterKey: z.string(),
+  starterKey: z.enum(STARTER_KEYS),
 });
 
 /**
@@ -36,50 +36,44 @@ const CreateTemplateInput = z.object({
  * field selects the name on arrival so the author can rename it at once: it learns the template is
  * new from a one-shot cookie (`just-created.ts`), so the redirect goes to the template's own address
  * and the address bar never needs tidying (one history entry; Back returns to the Library).
- * Blank starts as "Untitled template"; an example keeps its own name.
+ * Blank starts as "Untitled template"; an example keeps its own name. A refusal (a viewer who can't
+ * create on the team) is the answer instead, and nothing is written.
  */
-export async function createTemplate(input: { teamSlug: string; starterKey: StarterKey }): Promise<void> {
-  const viewer = await getViewer();
-
-  // The team is looked up only to know which team the permission is checked on. An unknown team
-  // has no id, so the check fails the same way as a team the viewer can't write to.
-  const parsed = CreateTemplateInput.safeParse(input);
-  const team = parsed.success
-    ? await db.query.teams.findFirst({ where: eq(teams.slug, parsed.data.teamSlug) })
-    : undefined;
-  assertCan(viewer, "template.create", { teamId: team?.id ?? null });
-
-  if (!parsed.success || !team) throw new Error("Unknown team");
-  if (!isStarterKey(parsed.data.starterKey)) throw new Error("Unknown starter");
-  const starterKey = parsed.data.starterKey;
-
-  const at = await now();
-  const contentType = await disclosureContentType();
-  const templateId = await freshTemplateId();
-
-  const starter = conformToContentType(buildStarter(starterKey, { scope: templateId, now: at }), contentType);
-  const created = createDraft({ starter, createdBy: viewer.userId, now: at });
-  const versionId = newId("v");
-
-  // Retried while the file is busy, like every lifecycle write (`inTransaction`).
-  await inTransaction(db, async (tx) => {
-    await insertNewTemplate(tx, {
-      templateId,
-      teamId: team.id,
-      contentTypeId: contentType.id,
-      versionId,
-      created,
-      at,
-      actorId: viewer.userId,
-    });
+export async function createTemplate(input: { teamSlug: string; starterKey: StarterKey }): Promise<ActionResult> {
+  return serverAction(input, {
+    input: CreateTemplateInput,
+    // The team is looked up only to know which team the permission is checked on. An unknown team
+    // has no id, so the check refuses it the same way as a team the viewer can't write to.
+    authorize: async ({ viewer, input }) => {
+      const team = await db.query.teams.findFirst({ where: eq(teams.slug, input.teamSlug) });
+      check(viewer, "template.create", { teamId: team?.id ?? null });
+      if (!team) refuse(REQUEST_REFUSALS.teamGone);
+      return team;
+    },
+    transaction: async (tx, { viewer, input, found: team, now: at }) => {
+      const contentType = await disclosureContentType(tx);
+      const templateId = await freshTemplateId(tx);
+      const starter = conformToContentType(buildStarter(input.starterKey, { scope: templateId, now: at }), contentType);
+      await insertNewTemplate(tx, {
+        templateId,
+        teamId: team.id,
+        contentTypeId: contentType.id,
+        versionId: newId("v"),
+        created: createDraft({ starter, createdBy: viewer.userId, now: at }),
+        at,
+        actorId: viewer.userId,
+      });
+      return { ok: true, templateId };
+    },
+    after: async ({ templateId }, { found: team }) => {
+      (await cookies()).set(JUST_CREATED_COOKIE, templateId, {
+        path: "/",
+        sameSite: "lax",
+        maxAge: JUST_CREATED_MAX_AGE,
+      });
+      // The library lists now include it.
+      revalidatePath("/[team]/library", "page");
+      redirect(`/${team.slug}/templates/${templateId}`);
+    },
   });
-
-  (await cookies()).set(JUST_CREATED_COOKIE, templateId, {
-    path: "/",
-    sameSite: "lax",
-    maxAge: JUST_CREATED_MAX_AGE,
-  });
-  // The library lists now include it.
-  revalidatePath("/[team]/library", "page");
-  redirect(`/${team.slug}/templates/${templateId}`);
 }

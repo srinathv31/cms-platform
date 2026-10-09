@@ -6,7 +6,8 @@ import { zoneLabel } from "@/domain/business-zone";
 import { describeZoneChange } from "@/domain/platform-config";
 import { Button } from "@/components/ui/button";
 import { setBusinessZone } from "@/server/actions/platform";
-import { Blocked, FullRow, HeaderRow, Pick, Strip, useFocusAfterCommit } from "./ui";
+import { Strip } from "../strip";
+import { Blocked, FullRow, HeaderRow, Pick, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Time zone: the business time zone a sunset date is read in (decision 0017). One
 // row; "Change time zone" opens a picker of the zones on offer under it with the consequence strip. What

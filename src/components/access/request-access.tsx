@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TeamIcon } from "@/components/app-shell/team-icon";
-import { runAction } from "@/components/versions/action-dialog";
+import { useActionRun } from "@/components/primitives/use-action-run";
 import { ACCESS_REFUSALS, ROLE_LABEL, rolesLabel } from "@/domain/access";
 import {
   ACCESS_REASON_MAX,
@@ -103,12 +103,10 @@ function RequestForm({
   const reasonId = useId();
   const root = useRef<HTMLFormElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
-  const sending = useRef(false);
   const [role, setRole] = useState<RequestableRole>(roles[0]!);
   const [reason, setReason] = useState("");
   const [attempted, setAttempted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const { pending, error, run } = useActionRun();
 
   // Focus goes to the chosen role: the first thing to decide.
   useEffect(() => {
@@ -124,27 +122,18 @@ function RequestForm({
   const shown = error ?? (attempted ? invalid : null);
 
   function submit() {
-    if (sending.current || pending) return;
+    if (pending) return;
     setAttempted(true);
     if (invalid) {
       reasonRef.current?.focus();
       return;
     }
     if (noAdmin) return;
-    sending.current = true;
-    setError(null);
-    start(async () => {
-      try {
-        const result = await runAction(() => requestAccess({ teamId: team.id, role, reason: trimmed }));
-        if (result.ok) {
-          onSent();
-          onClose();
-        } else {
-          setError(result.reason);
-        }
-      } finally {
-        sending.current = false;
-      }
+    run(() => requestAccess({ teamId: team.id, role, reason: trimmed }), {
+      onOk: () => {
+        onSent();
+        onClose();
+      },
     });
   }
 

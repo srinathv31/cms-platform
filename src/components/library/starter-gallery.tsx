@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardEvent, type Ref } from "react";
-import { unstable_rethrow } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { useActionRun } from "@/components/primitives/use-action-run";
 import { Spinner } from "@/components/ui/spinner";
 import { createTemplate } from "@/server/actions/create-template";
 import { STARTERS, type StarterKey } from "@/server/starters/catalog";
@@ -14,7 +14,7 @@ import { StarterPreview } from "./starter-preview";
  * so choosing a card is the second click from the Library. Under the cards, the dashed "Import a file"
  * row makes a template from a .docx, .pdf or .txt instead. Used in the New template dialog and,
  * inline, as the empty state of a team's Library. One thing happens at a time: while a card is
- * creating or a file is importing, the rest are locked.
+ * creating or a file is importing, the rest are locked. A refusal shows its sentence under the cards.
  *
  * `onImported` is called when the new template has opened, from a card as from a file.
  *
@@ -41,9 +41,8 @@ export function StarterGallery({
   /** A template was made (from a card or a file) and has opened: the dialog closes along with that navigation. */
   onImported?: () => void;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRun("Couldn't create the template. Try again.");
   const [picked, setPicked] = useState<StarterKey | null>(null);
-  const [failed, setFailed] = useState(false);
   const [importing, setImporting] = useState(false);
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
   const busy = pending || importing;
@@ -67,18 +66,8 @@ export function StarterGallery({
 
   function pick(starterKey: StarterKey) {
     if (busy) return;
-    setPicked(starterKey);
-    setFailed(false);
-    startTransition(async () => {
-      try {
-        // On success the action redirects, which reaches here as an error Next handles itself.
-        await createTemplate({ teamSlug, starterKey });
-      } catch (error) {
-        unstable_rethrow(error);
-        setPicked(null);
-        setFailed(true);
-      }
-    });
+    // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
+    if (run(() => createTemplate({ teamSlug, starterKey }), { onRefused: () => setPicked(null) })) setPicked(starterKey);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -162,9 +151,9 @@ export function StarterGallery({
           rowRef={importRowRef}
         />
       </div>
-      {failed ? (
+      {error ? (
         <p role="alert" className="mt-4 text-[13px] text-danger-text">
-          Couldn&apos;t create the template. Try again.
+          {error}
         </p>
       ) : null}
     </div>

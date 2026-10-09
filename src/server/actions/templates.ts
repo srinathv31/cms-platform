@@ -7,18 +7,17 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams, templates, versions } from "@/server/db/schema/ucomp";
-import { now } from "@/server/clock";
-import { inTransaction, writeEffects } from "@/server/effects";
+import { writeEffects } from "@/server/effects";
 import { submitVersion } from "@/server/actions/review";
-import { getViewer } from "@/server/viewer";
 import { newId } from "@/server/ids";
 import { draftRow } from "@/server/templates/create";
-import { assertCan } from "@/domain/permissions";
 import { editLatest, planDraftStart, type VersionSnapshot } from "@/domain/lifecycle";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
+import { check, refuse, serverAction } from "./kit";
 
-// Template editing. Every action checks permissions first, writes in one transaction, refreshes
-// what it changed, and redirects last. New template (`createTemplate`) is in `create-template.ts`,
+// Template editing, on the server action kit (kit.ts): the permission first, one transaction, a refresh
+// of what changed, and the redirect last. New template (`createTemplate`) is in `create-template.ts`,
 // so the routes that only edit don't load the starters. Submitting moved to `actions/review.ts`
 // (`submitDraft` here is its Phase 3 name).
 //
@@ -39,84 +38,82 @@ const StartDraftInput = z.object({ templateId: z.string().min(1).max(32) });
 /**
  * "Edit" on a template whose latest version is Active, or Revoked (the corrected draft after a revoke).
  * Opens the template's draft: the one already open if there is one (a template has at most one),
- * otherwise a new draft copied from that latest version (`planDraftStart`, `editLatest`).
+ * otherwise a new draft copied from that latest version (`planDraftStart`, `editLatest`), and then
+ * redirects to the workspace. A refusal (a newer version in review, a viewer who can't edit) is the
+ * answer instead, and nothing is written.
  */
-export async function startDraft(input: { templateId: string }): Promise<void> {
-  const viewer = await getViewer();
-
-  // As in createTemplate (create-template.ts), the template is read only to learn its team for the
-  // permission check.
-  const parsed = StartDraftInput.safeParse(input);
-  const found = parsed.success
-    ? await db
+export async function startDraft(input: { templateId: string }): Promise<ActionResult> {
+  return serverAction(input, {
+    input: StartDraftInput,
+    // As in createTemplate (create-template.ts), the template is read only to learn its team for the
+    // permission check.
+    authorize: async ({ viewer, input }) => {
+      const found = await db
         .select({ id: templates.id, teamId: templates.teamId, teamSlug: teams.slug })
         .from(templates)
         .innerJoin(teams, eq(teams.id, templates.teamId))
-        .where(eq(templates.id, parsed.data.templateId))
+        .where(eq(templates.id, input.templateId))
         .limit(1)
-        .then((rows) => rows[0])
-    : undefined;
-  assertCan(viewer, "draft.edit", { teamId: found?.teamId ?? null });
-  if (!found) throw new Error("Template not found");
+        .then((rows) => rows[0]);
+      check(viewer, "draft.edit", { teamId: found?.teamId ?? null });
+      if (!found) refuse(REQUEST_REFUSALS.templateGone);
+      return found;
+    },
+    // A write that meets another one takes its turn (src/lib/serialized-writes.ts), and `inTransaction`
+    // retries a lock held by another process past the busy timeout. The retry re-reads, so it sees a
+    // draft another press made meanwhile.
+    transaction: async (tx, { viewer, found, now: at }) => {
+      const list = await tx
+        .select({ id: versions.id, state: versions.state, number: versions.number })
+        .from(versions)
+        .where(eq(versions.templateId, found.id));
+      const plan = planDraftStart(list);
+      if (plan.kind === "open") return { ok: true, opened: true };
+      if (plan.kind === "blocked") refuse(plan);
 
-  const workspace = `/${found.teamSlug}/templates/${found.id}` as Route;
-  const at = await now();
+      const latest = await tx.query.versions.findFirst({
+        where: and(eq(versions.id, plan.from), inArray(versions.state, ["active", "revoked"])),
+      });
+      if (!latest) refuse(REQUEST_REFUSALS.latestChanged);
 
-  // A write that met another one used to fail with SQLITE_BUSY (and poison its connection), so the
-  // action answered 500 and Edit seemed to do nothing. Writes now take turns (src/lib/serialized-writes.ts);
-  // `inTransaction` still retries a lock held by another process past the busy timeout. The retry
-  // re-reads, so it sees a draft another press made meanwhile.
-  const outcome = await inTransaction(db, async (tx) => {
-    const list = await tx
-      .select({ id: versions.id, state: versions.state, number: versions.number })
-      .from(versions)
-      .where(eq(versions.templateId, found.id));
-    const plan = planDraftStart(list);
-    if (plan.kind === "open") return { opened: true as const };
-    if (plan.kind === "blocked") throw new Error(plan.reason);
+      const snapshot: VersionSnapshot = {
+        id: latest.id,
+        number: latest.number,
+        state: latest.state,
+        name: latest.name,
+        body: latest.body,
+        emailSubject: latest.emailSubject,
+        emailPreheader: latest.emailPreheader,
+        channels: latest.channels,
+        variables: latest.variables,
+        sampleSets: latest.sampleSets,
+      };
+      const { changes, effects } = editLatest({ from: snapshot, createdBy: viewer.userId, now: at });
+      const draftId = newId("v");
 
-    const latest = await tx.query.versions.findFirst({
-      where: and(eq(versions.id, plan.from), inArray(versions.state, ["active", "revoked"])),
-    });
-    if (!latest) throw new Error("The latest version changed. Try again.");
-
-    const snapshot: VersionSnapshot = {
-      id: latest.id,
-      number: latest.number,
-      state: latest.state,
-      name: latest.name,
-      body: latest.body,
-      emailSubject: latest.emailSubject,
-      emailPreheader: latest.emailPreheader,
-      channels: latest.channels,
-      variables: latest.variables,
-      sampleSets: latest.sampleSets,
-    };
-    const { changes, effects } = editLatest({ from: snapshot, createdBy: viewer.userId, now: at });
-    const draftId = newId("v");
-
-    await tx.insert(versions).values(draftRow(changes.draft, { id: draftId, templateId: found.id }));
-    await writeEffects(tx, effects, {
-      at,
-      actorId: viewer.userId,
-      teamId: found.teamId,
-      templateId: found.id,
-      versionId: draftId,
-    });
-    return { opened: false as const };
-  }).catch(async (error: unknown) => {
-    // Two people pressing Edit at once: the partial unique index lets one draft in. The other
-    // simply opens it.
-    const open = await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, found.id), eq(versions.state, "draft")),
-    });
-    if (open) return { opened: true as const };
-    throw error;
+      // Two people pressing Edit at once: the partial unique index (one open draft per template) lets
+      // one draft in. The other inserts nothing and simply opens it.
+      const [inserted] = await tx
+        .insert(versions)
+        .values(draftRow(changes.draft, { id: draftId, templateId: found.id }))
+        .onConflictDoNothing()
+        .returning({ id: versions.id });
+      if (!inserted) return { ok: true, opened: true };
+      await writeEffects(tx, effects, {
+        at,
+        actorId: viewer.userId,
+        teamId: found.teamId,
+        templateId: found.id,
+        versionId: draftId,
+      });
+      return { ok: true, opened: false };
+    },
+    after: ({ opened }, { found }) => {
+      if (!opened) refreshLists(found.id);
+      // Usually called from the workspace itself: replace, so Back doesn't land on the same page twice.
+      redirect(`/${found.teamSlug}/templates/${found.id}` as Route, RedirectType.replace);
+    },
   });
-
-  if (!outcome.opened) refreshLists(found.id);
-  // Usually called from the workspace itself: replace, so Back doesn't land on the same page twice.
-  redirect(workspace, RedirectType.replace);
 }
 
 // ── Submit for review ─────────────────────────────────────────

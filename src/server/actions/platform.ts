@@ -5,8 +5,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult, ApproverFacts } from "@/domain/access-types";
 import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
-import { PermissionError, assertCan } from "@/domain/permissions";
-import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import {
   PLATFORM_REFUSALS,
   createTeam as createTeamRule,
@@ -18,8 +17,6 @@ import {
 import { CHANNELS, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "@/server/business-zone";
-import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
 import {
   approvalStages,
   contentTypes,
@@ -31,49 +28,23 @@ import {
   users,
   versions,
 } from "@/server/db/schema/ucomp";
-import { inTransaction, writeEffects, type Tx } from "@/server/effects";
+import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { loadDecisions } from "@/server/queries/review-shared";
-import { getViewer } from "@/server/viewer";
+import { check, refuse, serverAction, type ActionContext } from "./kit";
 
 // Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules, approval
-// chains and the business time zone (contract: `PlatformActions` in domain/access-types.ts). Every action checks the
-// permission first, reads the facts and writes the domain's answer (domain/platform-config.ts) in ONE
-// transaction with its audit rows and notifications, then refreshes every page (the switcher, the
-// sidebar and the settings modal all read this configuration).
+// chains and the business time zone (contract: `PlatformActions` in domain/access-types.ts). Every action
+// runs the server action kit (kit.ts): it checks the permission (`manage`), reads the facts and writes
+// the domain's answer (domain/platform-config.ts) in ONE transaction with its audit rows and
+// notifications, then refreshes every page (the switcher, the sidebar and the settings modal all read
+// this configuration).
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
-/** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class RefusalError extends Error {
-  constructor(readonly refusal: Refusal) {
-    super(refusal.reason);
-    this.name = "RefusalError";
-  }
-}
-
-function refuse(refusal: Refusal): never {
-  throw new RefusalError(refusal);
-}
-
 /** Platform Admin only (a cross-team permission: no team). */
-function checkManage(viewer: Viewer): Refused | null {
-  try {
-    assertCan(viewer, "platform.manage", { teamId: null });
-    return null;
-  } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
-    throw error;
-  }
-}
-
-async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-  try {
-    return await inTransaction(db, run);
-  } catch (error) {
-    if (error instanceof RefusalError) return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
-    throw error;
-  }
+function manage({ viewer }: ActionContext<unknown>) {
+  check(viewer, "platform.manage", { teamId: null });
 }
 
 function refreshAll() {
@@ -105,38 +76,33 @@ export async function createTeam(input: {
   icon: string;
   adminUserId: string;
 }): Promise<ActionResult<{ slug: string }>> {
-  const viewer = await getViewer();
-  const refused = checkManage(viewer);
-  if (refused) return refused;
-  const parsed = CreateTeamInput.safeParse(input);
-  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
+  return serverAction(input, {
+    input: CreateTeamInput,
+    authorize: manage,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const admin = await tx.query.users.findFirst({ where: eq(users.id, input.adminUserId) });
+      if (!admin) refuse(PLATFORM_REFUSALS.pickPerson);
+      // The Auditor is read-only everywhere: they can't be a team's first Team Admin.
+      if (admin.platformRole === "auditor") refuse(PLATFORM_REFUSALS.auditorCantBeAdmin(admin.name));
+      const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
+      const outcome = createTeamRule({
+        name: input.name,
+        description: input.description,
+        icon: input.icon,
+        admin: { id: admin.id, name: admin.name },
+        actor: actorOf(viewer),
+        now: at,
+        existing,
+      });
+      if (!outcome.ok) refuse(outcome);
 
-  const at = await now();
-  const result = await transact<{ slug: string }>(async (tx) => {
-    const admin = await tx.query.users.findFirst({ where: eq(users.id, parsed.data.adminUserId) });
-    if (!admin) refuse(PLATFORM_REFUSALS.pickPerson);
-    // The Auditor is read-only everywhere: they can't be a team's first Team Admin.
-    if (admin.platformRole === "auditor") refuse(PLATFORM_REFUSALS.auditorCantBeAdmin(admin.name));
-    const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
-    const outcome = createTeamRule({
-      name: parsed.data.name,
-      description: parsed.data.description,
-      icon: parsed.data.icon,
-      admin: { id: admin.id, name: admin.name },
-      actor: actorOf(viewer),
-      now: at,
-      existing,
-    });
-    if (!outcome.ok) refuse(outcome);
-
-    await tx.insert(teams).values(outcome.team);
-    await applyMembershipChange(tx, outcome.membership);
-    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
-    return { ok: true, slug: outcome.team.slug };
+      await tx.insert(teams).values(outcome.team);
+      await applyMembershipChange(tx, outcome.membership);
+      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      return { ok: true, slug: outcome.team.slug };
+    },
+    after: refreshAll,
   });
-
-  if (result.ok) refreshAll();
-  return result;
 }
 
 // ── Content types ─────────────────────────────────────────────
@@ -154,33 +120,30 @@ export async function updateContentType(input: {
   contentTypeId: string;
   requiredSections: RequiredSection[];
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const refused = checkManage(viewer);
-  if (refused) return refused;
-  const parsed = SectionsInput.safeParse(input);
-  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
-
-  const at = await now();
   let wrote = false;
-  const result = await transact(async (tx) => {
-    const type = await contentTypeRow(tx, parsed.data.contentTypeId);
-    const outcome = updateRequiredSections({
-      contentType: type,
-      next: parsed.data.requiredSections,
-      actor: actorOf(viewer),
-      now: at,
-    });
-    if (!outcome.ok) refuse(outcome);
-    if (outcome.effects.length === 0) return { ok: true };
+  return serverAction(input, {
+    input: SectionsInput,
+    authorize: manage,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const type = await contentTypeRow(tx, input.contentTypeId);
+      const outcome = updateRequiredSections({
+        contentType: type,
+        next: input.requiredSections,
+        actor: actorOf(viewer),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
+      if (outcome.effects.length === 0) return { ok: true };
 
-    await tx.update(contentTypes).set({ requiredSections: outcome.requiredSections }).where(eq(contentTypes.id, type.id));
-    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
-    wrote = true;
-    return { ok: true };
+      await tx.update(contentTypes).set({ requiredSections: outcome.requiredSections }).where(eq(contentTypes.id, type.id));
+      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshAll();
+    },
   });
-
-  if (result.ok && wrote) refreshAll();
-  return result;
 }
 
 // ── Channel rules ─────────────────────────────────────────────
@@ -210,35 +173,32 @@ export async function setChannelRule(input: {
   channel: Channel;
   allowed: boolean;
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const refused = checkManage(viewer);
-  if (refused) return refused;
-  const parsed = ChannelInput.safeParse(input);
-  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
-
-  const at = await now();
   let wrote = false;
-  const result = await transact(async (tx) => {
-    const type = await contentTypeRow(tx, parsed.data.contentTypeId);
-    const outcome = setChannelRuleRule({
-      contentType: type,
-      channel: parsed.data.channel,
-      allowed: parsed.data.allowed,
-      activeUsing: await activeUsing(tx, type.id, parsed.data.channel),
-      actor: actorOf(viewer),
-      now: at,
-    });
-    if (!outcome.ok) refuse(outcome);
-    if (outcome.effects.length === 0) return { ok: true };
+  return serverAction(input, {
+    input: ChannelInput,
+    authorize: manage,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const type = await contentTypeRow(tx, input.contentTypeId);
+      const outcome = setChannelRuleRule({
+        contentType: type,
+        channel: input.channel,
+        allowed: input.allowed,
+        activeUsing: await activeUsing(tx, type.id, input.channel),
+        actor: actorOf(viewer),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
+      if (outcome.effects.length === 0) return { ok: true };
 
-    await tx.update(contentTypes).set({ allowedChannels: outcome.allowedChannels }).where(eq(contentTypes.id, type.id));
-    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
-    wrote = true;
-    return { ok: true };
+      await tx.update(contentTypes).set({ allowedChannels: outcome.allowedChannels }).where(eq(contentTypes.id, type.id));
+      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshAll();
+    },
   });
-
-  if (result.ok && wrote) refreshAll();
-  return result;
 }
 
 // ── Approval chains ───────────────────────────────────────────
@@ -284,94 +244,91 @@ export async function saveApprovalChain(input: {
   contentTypeId: string;
   stages: { id?: string; name: string; rule: ApproverRule }[];
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const refused = checkManage(viewer);
-  if (refused) return refused;
-  const parsed = ChainInput.safeParse(input);
-  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
-
-  const at = await now();
   let wrote = false;
-  const result = await transact(async (tx) => {
-    const type = await contentTypeRow(tx, parsed.data.contentTypeId);
-    const current = await tx
-      .select({
-        id: approvalStages.id,
-        position: approvalStages.position,
-        name: approvalStages.name,
-        rule: approvalStages.approverRule,
-      })
-      .from(approvalStages)
-      .where(eq(approvalStages.contentTypeId, type.id))
-      .orderBy(asc(approvalStages.position));
-    const inReview = await tx
-      .select({
-        versionId: versions.id,
-        stages: versions.stages,
-        currentStage: versions.currentStage,
-        number: versions.number,
-        writers: versions.writers,
-        templateId: templates.id,
-        templateName: versions.name,
-        teamId: templates.teamId,
-      })
-      .from(versions)
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(and(eq(templates.contentTypeId, type.id), eq(versions.state, "in_review")));
-    const people = await approverFacts(tx);
+  return serverAction(input, {
+    input: ChainInput,
+    authorize: manage,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const type = await contentTypeRow(tx, input.contentTypeId);
+      const current = await tx
+        .select({
+          id: approvalStages.id,
+          position: approvalStages.position,
+          name: approvalStages.name,
+          rule: approvalStages.approverRule,
+        })
+        .from(approvalStages)
+        .where(eq(approvalStages.contentTypeId, type.id))
+        .orderBy(asc(approvalStages.position));
+      const inReview = await tx
+        .select({
+          versionId: versions.id,
+          stages: versions.stages,
+          currentStage: versions.currentStage,
+          number: versions.number,
+          writers: versions.writers,
+          templateId: templates.id,
+          templateName: versions.name,
+          teamId: templates.teamId,
+        })
+        .from(versions)
+        .innerJoin(templates, eq(templates.id, versions.templateId))
+        .where(and(eq(templates.contentTypeId, type.id), eq(versions.state, "in_review")));
+      const people = await approverFacts(tx);
 
-    const outcome = saveApprovalChainRule({
-      contentType: { id: type.id, name: type.name },
-      current,
-      next: parsed.data.stages,
-      inReview: inReview.map(({ versionId, stages, currentStage }) => ({ versionId, stages, currentStage })),
-      people,
-      actor: actorOf(viewer),
-      now: at,
-    });
-    if (!outcome.ok) refuse(outcome);
-    if (outcome.effects.length === 0) return { ok: true };
+      const outcome = saveApprovalChainRule({
+        contentType: { id: type.id, name: type.name },
+        current,
+        next: input.stages,
+        inReview: inReview.map(({ versionId, stages, currentStage }) => ({ versionId, stages, currentStage })),
+        people,
+        actor: actorOf(viewer),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
+      if (outcome.effects.length === 0) return { ok: true };
 
-    const keep = new Set(outcome.stages.flatMap((s) => (s.id ? [s.id] : [])));
-    const removed = current.filter((s) => !keep.has(s.id)).map((s) => s.id);
-    if (removed.length) await tx.delete(approvalStages).where(inArray(approvalStages.id, removed));
-    for (const stage of outcome.stages) {
-      const row = { position: stage.position, name: stage.name, approverRule: stage.rule };
-      if (stage.id) await tx.update(approvalStages).set(row).where(eq(approvalStages.id, stage.id));
-      else await tx.insert(approvalStages).values({ id: newId("stage"), contentTypeId: type.id, ...row });
-    }
-    // A stage that now names someone else (same stage, new rule): whoever it names now is told
-    // about the versions already waiting on it, as if those had just arrived, unless they approved a
-    // stage of that version already and so can't take this one. The version's own name for the
-    // stage, as its stepper shows it.
-    const decisions = await loadDecisions(tx, inReview.map((v) => v.versionId));
-    for (const v of inReview) {
-      const before = currentStageOf(v, current);
-      const after = before && outcome.stages.find((s) => s.id === before.id);
-      if (!before || !after || sameRule(before.rule, after.rule) || v.number === null) continue;
-      const asked = stageRecipients({ ...before, rule: after.rule }, v.writers, approvedThisRound(decisions.get(v.versionId) ?? []));
-      if (!asked) continue;
-      await writeEffects(
-        tx,
-        [
-          {
-            kind: "notification",
-            notification: "review_requested",
-            to: asked,
-            title: `${v.templateName} v${v.number} is waiting on ${before.name}.`,
-            link: { to: "review", templateId: v.templateId, versionNumber: v.number },
-          },
-        ],
-        { at, actorId: viewer.userId, teamId: v.teamId, templateId: v.templateId, versionId: v.versionId },
-      );
-    }
-    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
-    wrote = true;
-    return { ok: true };
+      const keep = new Set(outcome.stages.flatMap((s) => (s.id ? [s.id] : [])));
+      const removed = current.filter((s) => !keep.has(s.id)).map((s) => s.id);
+      if (removed.length) await tx.delete(approvalStages).where(inArray(approvalStages.id, removed));
+      for (const stage of outcome.stages) {
+        const row = { position: stage.position, name: stage.name, approverRule: stage.rule };
+        if (stage.id) await tx.update(approvalStages).set(row).where(eq(approvalStages.id, stage.id));
+        else await tx.insert(approvalStages).values({ id: newId("stage"), contentTypeId: type.id, ...row });
+      }
+      // A stage that now names someone else (same stage, new rule): whoever it names now is told
+      // about the versions already waiting on it, as if those had just arrived, unless they approved a
+      // stage of that version already and so can't take this one. The version's own name for the
+      // stage, as its stepper shows it.
+      const decisions = await loadDecisions(tx, inReview.map((v) => v.versionId));
+      for (const v of inReview) {
+        const before = currentStageOf(v, current);
+        const after = before && outcome.stages.find((s) => s.id === before.id);
+        if (!before || !after || sameRule(before.rule, after.rule) || v.number === null) continue;
+        const asked = stageRecipients({ ...before, rule: after.rule }, v.writers, approvedThisRound(decisions.get(v.versionId) ?? []));
+        if (!asked) continue;
+        await writeEffects(
+          tx,
+          [
+            {
+              kind: "notification",
+              notification: "review_requested",
+              to: asked,
+              title: `${v.templateName} v${v.number} is waiting on ${before.name}.`,
+              link: { to: "review", templateId: v.templateId, versionNumber: v.number },
+            },
+          ],
+          { at, actorId: viewer.userId, teamId: v.teamId, templateId: v.templateId, versionId: v.versionId },
+        );
+      }
+      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshAll();
+    },
   });
-
-  if (result.ok && wrote) refreshAll();
-  return result;
 }
 
 // ── Business time zone ────────────────────────────────────────
@@ -384,34 +341,31 @@ const ZoneInput = z.object({ zone: z.string().min(1).max(64) });
  * have been told when it ends. The same zone again writes nothing.
  */
 export async function setBusinessZone(input: { zone: string }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const refused = checkManage(viewer);
-  if (refused) return refused;
-  const parsed = ZoneInput.safeParse(input);
-  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
-
-  const at = await now();
   let wrote = false;
-  const result = await transact(async (tx) => {
-    const outcome = setBusinessZoneRule({
-      current: await readBusinessZone(tx),
-      next: parsed.data.zone,
-      pendingSunsets: await countPendingSunsets(tx, at),
-      actor: actorOf(viewer),
-      now: at,
-    });
-    if (!outcome.ok) refuse(outcome);
-    if (outcome.effects.length === 0) return { ok: true };
+  return serverAction(input, {
+    input: ZoneInput,
+    authorize: manage,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const outcome = setBusinessZoneRule({
+        current: await readBusinessZone(tx),
+        next: input.zone,
+        pendingSunsets: await countPendingSunsets(tx, at),
+        actor: actorOf(viewer),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
+      if (outcome.effects.length === 0) return { ok: true };
 
-    await tx
-      .insert(settings)
-      .values({ key: BUSINESS_ZONE_KEY, value: outcome.zone })
-      .onConflictDoUpdate({ target: settings.key, set: { value: outcome.zone } });
-    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
-    wrote = true;
-    return { ok: true };
+      await tx
+        .insert(settings)
+        .values({ key: BUSINESS_ZONE_KEY, value: outcome.zone })
+        .onConflictDoUpdate({ target: settings.key, set: { value: outcome.zone } });
+      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshAll();
+    },
   });
-
-  if (result.ok && wrote) refreshAll();
-  return result;
 }

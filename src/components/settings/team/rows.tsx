@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/domain/access-types";
 import type { Person } from "@/domain/review-types";
@@ -8,118 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
-import { runAction } from "@/components/versions/action-dialog";
+import { useActionRun } from "@/components/primitives/use-action-run";
+import { Strip } from "../strip";
 
 // The shared row machinery of the four Team sections (settings variant A): a dense table whose rows
-// carry their actions inline, and a consequence strip under the row before anything is committed.
-// The strip's black button is the only black button on screen.
-
-// ── Running an action ────────────────────────────────────────
-
-/** One server action at a time: the pending flag, the refusal sentence and a guarded `run`. */
-export function useActionRun() {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const sending = useRef(false);
-
-  function run(action: () => Promise<ActionResult>, onOk?: () => void) {
-    if (sending.current) return;
-    sending.current = true;
-    setError(null);
-    start(async () => {
-      try {
-        const result = await runAction(action);
-        if (result.ok) onOk?.();
-        else setError(result.reason);
-      } finally {
-        sending.current = false;
-      }
-    });
-  }
-
-  return { pending, error, setError, run };
-}
+// carry their actions inline, and a consequence strip (`Strip`, settings/strip.tsx) under the row
+// before anything is committed. The strip's black button is the only black button on screen.
 
 // ── The consequence strip ────────────────────────────────────
-
-/**
- * The strip under a row: what will happen, optional inputs, then Cancel and the confirm. Focus goes to
- * the first input (`data-autofocus`) or, with none, to Cancel (the safe action). Esc closes the strip and
- * nothing else.
- */
-export function Strip({
-  consequence,
-  children,
-  confirmLabel,
-  blocked = false,
-  message,
-  onConfirm,
-  onCancel,
-  onDone,
-  className,
-}: {
-  consequence: ReactNode;
-  children?: ReactNode;
-  confirmLabel: string;
-  /** The confirm can't run yet (a required note is empty, nothing to save). */
-  blocked?: boolean;
-  /** Said beside the buttons while it applies. */
-  message?: string | null;
-  onConfirm: () => Promise<ActionResult>;
-  onCancel: () => void;
-  /** Called once the server accepted the action. */
-  onDone: () => void;
-  className?: string;
-}) {
-  const root = useRef<HTMLDivElement>(null);
-  const { pending, error, run } = useActionRun();
-
-  useEffect(() => {
-    const el = root.current;
-    if (!el) return;
-    const target = el.querySelector<HTMLElement>("[data-autofocus]") ?? el.querySelector<HTMLElement>("[data-cancel]");
-    target?.focus({ preventScroll: true });
-    el.scrollIntoView({ block: "nearest" });
-  }, []);
-
-  const shown = error ?? message;
-
-  return (
-    <div
-      ref={root}
-      data-slot="consequence-strip"
-      onKeyDown={(e) => {
-        if (e.key !== "Escape") return;
-        e.stopPropagation();
-        if (!pending) onCancel();
-      }}
-      className={cn("flex flex-col gap-3 rounded-lg bg-surface-sunken p-4", className)}
-    >
-      <p className="text-[14px] leading-relaxed text-text">{consequence}</p>
-      {children}
-      <div className="flex items-center justify-end gap-2">
-        {shown ? (
-          <p role={error ? "alert" : undefined} className={cn("mr-auto text-[13px]", error ? "text-danger-text" : "text-text-muted")}>
-            {shown}
-          </p>
-        ) : null}
-        <Button data-cancel variant="ghost" aria-disabled={pending} onClick={() => (pending ? undefined : onCancel())}>
-          Cancel
-        </Button>
-        <Button
-          aria-disabled={blocked || pending}
-          className="aria-disabled:opacity-50"
-          onClick={() => {
-            if (blocked || pending) return;
-            run(onConfirm, onDone);
-          }}
-        >
-          {confirmLabel}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 /** The strip most actions use: a consequence, an optional required note, and the confirm. */
 export function ConfirmStrip({
@@ -268,10 +164,11 @@ export function RowTable({
   empty?: string;
 }) {
   const [open, setOpen] = useState<{ id: string; key: string } | null>(null);
-  const [failure, setFailure] = useState<{ id: string; reason: string } | null>(null);
+  // An action run straight from its button (no strip): one at a time, its refusal under the row it was on.
+  const direct = useActionRun();
+  const [ranOn, setRanOn] = useState<string | null>(null);
   const table = useRef<HTMLDivElement>(null);
   const [returnTo, setReturnTo] = useState<string | null>(null);
-  const [, start] = useTransition();
 
   // After a strip closes without a change, focus returns to the button that opened it.
   useEffect(() => {
@@ -287,18 +184,13 @@ export function RowTable({
     setOpen(null);
   };
   const pick = (row: RowData, act: RowAct) => {
-    setFailure(null);
+    direct.setError(null);
     setReturnTo(null);
     if (act.strip || act.custom) {
       setOpen({ id: row.id, key: act.key });
       return;
     }
-    const run = act.run;
-    if (!run) return;
-    start(async () => {
-      const result = await runAction(run);
-      if (!result.ok) setFailure({ id: row.id, reason: result.reason });
-    });
+    if (act.run && direct.run(act.run)) setRanOn(row.id);
   };
 
   if (rows.length === 0) return empty ? <p className="py-6 text-[15px] text-text-muted">{empty}</p> : null;
@@ -349,9 +241,9 @@ export function RowTable({
                   {act ? null : <Actions row={row} onPick={(a) => pick(row, a)} />}
                 </div>
               </div>
-              {failure?.id === row.id ? (
+              {direct.error && ranOn === row.id ? (
                 <FullRow span={span}>
-                  <p role="alert" className="pb-3 text-right text-[13px] text-danger-text">{failure.reason}</p>
+                  <p role="alert" className="pb-3 text-right text-[13px] text-danger-text">{direct.error}</p>
                 </FullRow>
               ) : null}
               {act ? (

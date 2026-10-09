@@ -19,7 +19,8 @@ import { StatusBadge } from "@/components/primitives/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveApprovalChain } from "@/server/actions/platform";
-import { Blocked, Pick, Strip, useFocusAfterCommit } from "./ui";
+import { Strip } from "../strip";
+import { Blocked, Pick, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Approval chains. Per content type, the ordered stages as dense rows with their
 // actions inline (edit, move, remove) and an "Add stage" below. Every edit is a draft: nothing is saved

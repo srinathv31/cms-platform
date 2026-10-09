@@ -6,6 +6,8 @@ import { refresh, revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { eq } from "drizzle-orm";
 import { canSeeSpace, defaultSpace } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { ActionResult } from "@/domain/review-types";
 import { runAccessSweep } from "@/server/access-sweep";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
@@ -26,11 +28,15 @@ function firstSegment(path: string): string | null {
  * sign-in. The access sweep runs FIRST (a member past a deadline lost access before signing in), then
  * the sign-in restarts their inactivity clock (`users.last_active_at`). The sunset sweep runs too, so
  * the audit log records any sunset the clock has passed.
- * Stay on the same URL if the new persona can see it, otherwise go to their default space.
+ * Stay on the same URL if the new persona can see it, otherwise go to their default space. A demo
+ * tool, so it checks no permission and doesn't run on the server action kit; a persona that isn't one
+ * is refused.
  */
-export async function switchPersona(personaId: string, currentPath: string): Promise<void> {
+export async function switchPersona(personaId: string, currentPath: string): Promise<ActionResult> {
   const personas = await getPersonas();
-  if (!personas.some((p) => p.id === personaId)) throw new Error("Unknown persona");
+  if (typeof currentPath !== "string" || !personas.some((p) => p.id === personaId)) {
+    return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
+  }
 
   (await cookies()).set(PERSONA_COOKIE, personaId, {
     path: "/",
@@ -50,17 +56,17 @@ export async function switchPersona(personaId: string, currentPath: string): Pro
 
   if (segment === null) {
     refresh();
-    return;
+    return { ok: true };
   }
   if (segment === "request-access") {
     // Anyone may request access, but someone who already has a team lands in it.
     if (fallback) redirect(home);
     refresh();
-    return;
+    return { ok: true };
   }
   if (canSeeSpace(viewer, segment)) {
     refresh();
-    return;
+    return { ok: true };
   }
   redirect(home);
 }

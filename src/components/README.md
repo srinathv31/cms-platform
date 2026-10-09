@@ -50,7 +50,7 @@ Feature folders:
 | `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
 | `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows. | `/[team]/review` |
-| `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`. | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
+| `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
@@ -88,6 +88,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
 | `TemplateId` | [template-id.tsx](primitives/template-id.tsx) | A template ID with a copy button (client). |
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
+| `useActionRun`, `runAction` | [use-action-run.ts](primitives/use-action-run.ts) | Running a server action: one at a time, in a transition, with the refusal's sentence (`error`) and `onOk` / `onRefused`. A call that throws becomes the code `failed` with the screen's sentence; Next's redirect is handed back to Next (client). |
 | `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, the Versions tab's passed sunset (client). |
 | `StatCard` | [stat-card.tsx](primitives/stat-card.tsx) | Caps label over a big numeral. Only `/design` uses it today (see [Don't copy](#dont-copy)). |
 
@@ -157,11 +158,15 @@ the decision buttons for `generic`, `versions/version-actions.tsx` keeps Confirm
 and `submit/submit-dialog.tsx` offers Refresh summary on `summary_stale`. The sentence is shown as written and can be
 reworded freely ([decision 0025](../../docs/decisions/0025-refusals-carry-stable-codes.md)).
 
-**Mutations.** Client components import server actions from `@/server/actions/*` and call them in a transition.
-Most return `ActionResult` (`src/domain/review-types.ts`): `{ ok: true, … } | { ok: false, code, reason }`. Show
-the `reason` as written. A refusal made in the browser (the call threw, or the server couldn't be reached) has the
-code `failed` and the screen's own sentence (`runAction` in `versions/action-dialog.tsx`). On success the action calls `refresh()` or `revalidatePath`, so the server components
-re-render with fresh props; the client doesn't refetch. The dialog pattern ([versions/action-dialog.tsx](versions/action-dialog.tsx)):
+**Mutations.** Client components import server actions from `@/server/actions/*` and run them with `useActionRun`
+([primitives/use-action-run.ts](primitives/use-action-run.ts)): in a transition, one at a time. Actions return
+`ActionResult` (`src/domain/review-types.ts`): `{ ok: true, … } | { ok: false, code, reason }`. Show the `reason` as
+written. A refusal made in the browser (the call threw, or the server couldn't be reached) has the code `failed` and
+the screen's own sentence (`useActionRun("Couldn't open a draft. Try again.")`). On success the action calls
+`refresh()` or `revalidatePath`, so the server components re-render with fresh props; the client doesn't refetch.
+`startDraft` and `createTemplate` redirect on success: `runAction` hands Next's redirect back to Next, and returns
+their refusal like any other (`EditButton` in `workspace/workspace-actions.tsx`, `library/starter-gallery.tsx`). The
+dialog pattern, `useActionDialog` on `useActionRun` ([versions/action-dialog.tsx](versions/action-dialog.tsx)):
 
 ```tsx
 const { pending, error, setError, submit } = useActionDialog(() => onOpenChange(false));
@@ -170,9 +175,8 @@ submit(invalid /* a known refusal, shown without sending */, () => requestChange
 // error: result.reason in a role="alert" line beside the buttons; the dialog closes only on ok
 ```
 
-`runAction` there turns any throw into `GENERIC_FAILURE`. Actions that redirect on success (`startDraft`,
-`createTemplate`) throw the redirect instead of returning. Catch it and call `unstable_rethrow(error)` first, as
-`workspace/workspace-actions.tsx` and `library/starter-gallery.tsx` do. Never pass such an action to `runAction`.
+The settings sections confirm through one `Strip` ([settings/strip.tsx](settings/strip.tsx)), which runs its action the
+same way.
 
 **Optimistic updates.** `comments/use-review-threads.ts` holds `useOptimistic(initial, reduceThreads)`;
 `comments/thread-list.tsx` applies the mutation and calls the action in one `startTransition`. When it ends,
@@ -204,6 +208,7 @@ focuses registers the same way.
 
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
+| Run an action from a button | `EditButton` in [workspace/workspace-actions.tsx](workspace/workspace-actions.tsx) on [primitives/use-action-run.ts](primitives/use-action-run.ts) | `run(action, { onOk, onRefused })`; `pending` while it runs, `error` the refusal's sentence. |
 | Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain constant, as `access/request-access.tsx` does with `ACCESS_REASON_MAX`. |
 | Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*` and `m.consequences.*`; `rows.tsx` renders refusals and strips. |
 | Show an action the viewer can't take, with why | `BlockedButton` in [review/decision-rail.tsx](review/decision-rail.tsx) | Greyed and focusable; `describedBy` points at a visible reason when there is one. |
@@ -220,8 +225,6 @@ focuses registers the same way.
 - **Segmented controls.** `preview/controls.tsx` keeps `Segmented` private, so its class strings are pasted into
   `usage/consumers-table.tsx` and `integration/contract-changes.tsx`, and restyled as a radio group in
   `access/role-picker.tsx`. Export the one in `preview/controls.tsx` (or move it to `primitives/`) instead of a fifth copy.
-- **Two action runners.** `useActionRun` and `Strip` exist in both `settings/team/rows.tsx` and
-  `settings/platform/ui.tsx`. Reuse one; don't write a third.
 - **Copied helpers.** `andList` in `access/format.ts` repeats `joinWithAnd`; a clipboard fallback is in both
   `primitives/template-id.tsx` and `integration/copy-button.tsx`. Dates, "3 days ago", counts and plurals have one
   home each: `formatShortDate`, `formatAgo` and the rest in `src/domain/dates.ts`, `formatCount` in
@@ -251,7 +254,7 @@ focuses registers the same way.
 ## Testing
 
 - Unit tests sit next to their code as `*.test.ts(x)`. `npx vitest run src/components src/lib` runs this
-  layer's 66 files in a few seconds; `npm test` runs everything.
+  layer's 69 files in a few seconds; `npm test` runs everything.
 - The default environment is `node` ([vitest.config.mts](../../vitest.config.mts)). A test that needs a DOM
   opts in with `// @vitest-environment happy-dom` on its first line.
 - No Testing Library. Markup tests use `renderToStaticMarkup` (`primitives/status-badge.test.tsx`); interaction

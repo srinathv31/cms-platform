@@ -17,32 +17,28 @@ import {
   type ThreadStatusResult,
 } from "@/domain/comments";
 import { REASONS } from "@/domain/permissions";
-import { REQUEST_REFUSALS, refuse, type Refused } from "@/domain/refusals";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult, VersionStage } from "@/domain/review-types";
-import type { PermissionResult, Viewer } from "@/domain/types";
-import { now } from "@/server/clock";
+import type { Viewer } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
-import { inTransaction, writeEffects } from "@/server/effects";
+import { writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { blockIdsOf, loadChain, stageApproverIds } from "@/server/queries/review-shared";
-import { getViewer } from "@/server/viewer";
+import { permit, refuse, serverAction } from "./kit";
 
 // Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen. The rules
 // are domain/comments.ts: which versions take comments (a draft, a version in review), who may act on
-// which thread, the text's limits, and who is notified. Every action has the same shape:
-//   1. read the facts outside a transaction and ask the rule, so a refused caller gets its reason at once
-//      (an unknown id is refused like a forbidden one);
+// which thread, the text's limits, and who is notified. Every action runs the server action kit (kit.ts):
+//   1. `authorize`: read the facts outside a transaction and ask the rule (`permit`), so a refused caller
+//      gets its reason at once (an unknown id is refused like a forbidden one);
 //   2. ONE transaction that reads the facts again, asks the domain transition, and writes the rows and
-//      its effects (audit, notifications). Every refusal comes before the first write, so a refused
-//      transaction writes nothing. Writes in this process take turns (src/lib/serialized-writes.ts), so
-//      what the transaction read still holds when it writes; resolve and reopen also compare-and-set
-//      the status;
+//      its effects (audit, notifications). A refusal rolls it back, so a refused transaction writes
+//      nothing. Writes in this process take turns (src/lib/serialized-writes.ts), so what the
+//      transaction read still holds when it writes; resolve and reopen also compare-and-set the status;
 //   3. `refresh()`, so the page the person is on re-renders in place.
 //
 // A "use server" file may export only async functions: the helpers below stay private.
-
-const REFUSED = refuse(REASONS.generic);
 
 // ── Facts ─────────────────────────────────────────────────────
 
@@ -171,10 +167,6 @@ function effectContext(viewer: Viewer, template: { id: string; teamId: string },
   return { at, actorId: viewer.userId, teamId: template.teamId, templateId: template.id, versionId };
 }
 
-function refusal(result: PermissionResult): Refused | null {
-  return result.ok ? null : result;
-}
-
 /** The pages that show threads: the template workspace (margin) and the review screens. */
 function refreshThreads() {
   revalidatePath("/[team]/templates/[templateId]", "layout");
@@ -204,37 +196,35 @@ export async function addComment(input: {
   quote?: string | null;
   body: string;
 }): Promise<ActionResult<{ threadId: string }>> {
-  const viewer = await getViewer();
-  const parsed = AddCommentInput.safeParse(input);
-  const found = parsed.success ? await loadVersion(db, parsed.data.templateId, parsed.data.versionId) : undefined;
-  if (!parsed.success || !found) return REFUSED;
-  const refused = refusal(canComment(viewer, { teamId: found.template.teamId, version: found.version }));
-  if (refused) return refused;
+  return serverAction(input, {
+    input: AddCommentInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await loadVersion(db, input.templateId, input.versionId);
+      if (!found) refuse(REASONS.generic);
+      permit(canComment(viewer, { teamId: found.template.teamId, version: found.version }));
+    },
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const facts = await loadVersion(tx, input.templateId, input.versionId);
+      if (!facts) refuse(REQUEST_REFUSALS.versionGone);
+      const outcome = addCommentTransition({
+        viewer,
+        ...facts,
+        blockId: input.blockId,
+        quote: input.quote,
+        body: input.body,
+        threadId: newId("th"),
+        commentId: newId("cm"),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
 
-  const at = await now();
-  const result = await inTransaction(db, async (tx): Promise<ActionResult<{ threadId: string }>> => {
-    const facts = await loadVersion(tx, parsed.data.templateId, parsed.data.versionId);
-    if (!facts) return refuse(REQUEST_REFUSALS.versionGone);
-    const outcome = addCommentTransition({
-      viewer,
-      ...facts,
-      blockId: parsed.data.blockId,
-      quote: parsed.data.quote,
-      body: parsed.data.body,
-      threadId: newId("th"),
-      commentId: newId("cm"),
-      now: at,
-    });
-    if (!outcome.ok) return outcome;
-
-    await tx.insert(commentThreads).values(outcome.thread);
-    await tx.insert(comments).values(outcome.comment);
-    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.version.id, at));
-    return { ok: true, threadId: outcome.thread.id };
+      await tx.insert(commentThreads).values(outcome.thread);
+      await tx.insert(comments).values(outcome.comment);
+      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.version.id, at));
+      return { ok: true, threadId: outcome.thread.id };
+    },
+    after: refreshThreads,
   });
-
-  if (result.ok) refreshThreads();
-  return result;
 }
 
 // ── Threads: reply, resolve, reopen ───────────────────────────
@@ -242,43 +232,44 @@ export async function addComment(input: {
 const ThreadInput = z.object({ threadId: z.string().min(1).max(64) });
 const ReplyInput = ThreadInput.extend({ body: z.string() });
 
+/** The thread the input names, and the rule asked of it; an unknown thread is refused like a forbidden one. */
+async function authorizeThread({ viewer, input }: { viewer: Viewer; input: { threadId: string } }) {
+  const found = await loadThread(db, input.threadId);
+  if (!found) refuse(REASONS.generic);
+  permit(canActOnThread(viewer, found));
+}
+
 /**
  * Adds a reply to a thread (open or resolved; a reply doesn't reopen it). Everyone who has written in the
  * thread, and the author of the version it started on, is notified (never the one replying).
  */
 export async function reply(input: { threadId: string; body: string }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = ReplyInput.safeParse(input);
-  const found = parsed.success ? await loadThread(db, parsed.data.threadId) : undefined;
-  if (!parsed.success || !found) return REFUSED;
-  const refused = refusal(canActOnThread(viewer, found));
-  if (refused) return refused;
+  return serverAction(input, {
+    input: ReplyInput,
+    authorize: authorizeThread,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const facts = await loadThread(tx, input.threadId);
+      if (!facts) refuse(REQUEST_REFUSALS.threadGone);
+      const participants = await tx
+        .selectDistinct({ authorId: comments.authorId })
+        .from(comments)
+        .where(eq(comments.threadId, facts.thread.id));
+      const outcome = replyTransition({
+        viewer,
+        ...facts,
+        participants: participants.map((p) => p.authorId),
+        body: input.body,
+        commentId: newId("cm"),
+        now: at,
+      });
+      if (!outcome.ok) refuse(outcome);
 
-  const at = await now();
-  const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
-    const facts = await loadThread(tx, parsed.data.threadId);
-    if (!facts) return refuse(REQUEST_REFUSALS.threadGone);
-    const participants = await tx
-      .selectDistinct({ authorId: comments.authorId })
-      .from(comments)
-      .where(eq(comments.threadId, facts.thread.id));
-    const outcome = replyTransition({
-      viewer,
-      ...facts,
-      participants: participants.map((p) => p.authorId),
-      body: parsed.data.body,
-      commentId: newId("cm"),
-      now: at,
-    });
-    if (!outcome.ok) return outcome;
-
-    await tx.insert(comments).values(outcome.comment);
-    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
-    return { ok: true };
+      await tx.insert(comments).values(outcome.comment);
+      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+      return { ok: true };
+    },
+    after: refreshThreads,
   });
-
-  if (result.ok) refreshThreads();
-  return result;
 }
 
 /**
@@ -298,33 +289,29 @@ async function setStatus(
   input: { threadId: string },
   transition: typeof resolveTransition | typeof reopenTransition,
 ): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = ThreadInput.safeParse(input);
-  const found = parsed.success ? await loadThread(db, parsed.data.threadId) : undefined;
-  if (!parsed.success || !found) return REFUSED;
-  const refused = refusal(canActOnThread(viewer, found));
-  if (refused) return refused;
-
-  const at = await now();
   let wrote = false;
-  const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
-    const facts = await loadThread(tx, parsed.data.threadId);
-    if (!facts) return refuse(REQUEST_REFUSALS.threadGone);
-    const outcome: ThreadStatusResult = transition({ viewer, ...facts, now: at });
-    if (!outcome.ok) return outcome;
-    if (!outcome.changes) return { ok: true };
+  return serverAction(input, {
+    input: ThreadInput,
+    authorize: authorizeThread,
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const facts = await loadThread(tx, input.threadId);
+      if (!facts) refuse(REQUEST_REFUSALS.threadGone);
+      const outcome: ThreadStatusResult = transition({ viewer, ...facts, now: at });
+      if (!outcome.ok) refuse(outcome);
+      if (!outcome.changes) return { ok: true };
 
-    const [row] = await tx
-      .update(commentThreads)
-      .set(outcome.changes)
-      .where(and(eq(commentThreads.id, facts.thread.id), eq(commentThreads.status, facts.thread.status)))
-      .returning({ id: commentThreads.id });
-    if (!row) return { ok: true };
-    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
-    wrote = true;
-    return { ok: true };
+      const [row] = await tx
+        .update(commentThreads)
+        .set(outcome.changes)
+        .where(and(eq(commentThreads.id, facts.thread.id), eq(commentThreads.status, facts.thread.status)))
+        .returning({ id: commentThreads.id });
+      if (!row) return { ok: true };
+      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshThreads();
+    },
   });
-
-  if (wrote) refreshThreads();
-  return result;
 }

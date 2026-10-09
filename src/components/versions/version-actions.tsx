@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState } from "react";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -8,7 +8,8 @@ import { BlockedButton } from "@/components/primitives/blocked-button";
 import { cn } from "@/lib/utils";
 import type { ConsumerUsage, SunsetCalendar, VersionTimelineItem } from "@/domain/review-types";
 import { cancelRevoke } from "@/server/actions/review";
-import { DESTRUCTIVE_PRIMARY, GENERIC_FAILURE, runAction } from "./action-dialog";
+import { useActionRun } from "@/components/primitives/use-action-run";
+import { DESTRUCTIVE_PRIMARY } from "./action-dialog";
 import { entryHeadingId, entryRevokeId } from "./entry-ids";
 import { ConfirmRevokeDialog, StartRevokeDialog } from "./revoke-dialogs";
 import { SunsetDialog } from "./sunset-dialog";
@@ -151,8 +152,7 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
 /** Confirm revoke and Withdraw revoke, inside a pending revoke's block. */
 export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: Item }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = useActionRun();
   const confirmButton = useRef<HTMLButtonElement>(null);
   /** The revoke was confirmed: its button is gone, so focus goes to the heading, not back to it. */
   const confirmed = useRef(false);
@@ -170,13 +170,9 @@ export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: I
   const blocked = !confirm.ok ? confirm.reason : null;
 
   function withdraw() {
-    if (pending) return;
-    setError(null);
-    start(async () => {
-      const result = await runAction(() => cancelRevoke({ templateId: ctx.templateId, versionNumber: number as number }));
+    run(() => cancelRevoke({ templateId: ctx.templateId, versionNumber: number as number }), {
       // The block is gone and the entry's Revoke button is back (once the refresh lands): focus goes to it.
-      if (result.ok) focusWhenPresent(entryRevokeId(item.id), headingId);
-      else setError(result.reason || GENERIC_FAILURE);
+      onOk: () => focusWhenPresent(entryRevokeId(item.id), headingId),
     });
   }
 
