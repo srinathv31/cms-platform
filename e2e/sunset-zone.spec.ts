@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Client } from "@libsql/client";
-import { daysBetween, sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { daysBetween } from "@/domain/dates";
 import { openDb } from "./api/helpers";
 import { TEAM, click, createSpringTravel, removeTemplate, rows, run, type SpringFixture } from "./helpers/golive";
 import { asPersona, expect, hydrated, test } from "./helpers/scenario";

@@ -22,10 +22,10 @@ import {
   ROLES,
   dayLabel,
   daysAgo,
-  plural,
   type Role,
   type Stage,
 } from "./data";
+import { plural } from "@/domain/plural";
 import { ConfirmStrip, Items, type Act, type Item, type Variant } from "./items";
 import { Bar, ChainFlow, IdleTrack, Pick, Reviewers } from "./parts";
 import { useStore } from "./store";

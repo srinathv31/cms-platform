@@ -21,8 +21,8 @@ import type {
 } from "./access-types";
 import { INACTIVITY_FLAG_DAYS } from "./access-types";
 import { SYSTEM_ACTOR, describeActivity } from "./activity";
-import { formatShortDate } from "./dates";
-import { formatLongDate } from "./render/errors";
+import { addDays, formatRecordedDate, formatShortDate, isCalendarDay, utcDay } from "./dates";
+import { plural } from "./plural";
 import type { Person } from "./review-types";
 import { TEAM_ROLES, type TeamRole } from "./types";
 
@@ -176,7 +176,7 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
       return roles ? `${who} removed ${possessive(subject)} ${roles} access.` : `${who} removed ${subject}.`;
 
     case "access.flagged_inactive": {
-      const until = date(d.suspendsAt);
+      const until = formatRecordedDate(d.suspendsAt);
       const stem = `${subject} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days`;
       return until ? `${stem}: suspends automatically on ${until}.` : `${stem}.`;
     }
@@ -196,7 +196,7 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
     }
 
     case "access.lapsed": {
-      const by = date(d.dueAt);
+      const by = formatRecordedDate(d.dueAt);
       return by
         ? `${possessive(subject)} access lapsed: not recertified by ${by}.`
         : `${possessive(subject)} access lapsed: not recertified.`;
@@ -206,7 +206,7 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
       const team = text(d.teamName);
       const as = team ? `the last Team Admin of ${team}` : "the last Team Admin";
       if (d.reason === "recert_unconfirmed") {
-        const by = date(d.dueAt);
+        const by = formatRecordedDate(d.dueAt);
         return `${possessive(subject)} access didn't lapse${by ? ` on ${by}` : ""}: ${as}.`;
       }
       const days = count(d.daysInactive);
@@ -218,7 +218,7 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 
     case "recert.started": {
       const members = count(d.members);
-      const due = date(d.dueAt);
+      const due = formatRecordedDate(d.dueAt);
       const parts = [members === null ? "" : `${plural(members, "member")} to confirm`, due ? `due ${due}` : ""].filter(Boolean);
       const stem = actor ? `${who} started ${review}` : `${capitalize(review)} started`;
       return parts.length ? `${stem}: ${parts.join(", ")}.` : `${stem}.`;
@@ -267,16 +267,13 @@ export const AUDIT_LIST_KEYS = ["team", "person", "action", "template"] as const
 /** A facet the menus count: one of the list filters. Dates aren't counted. */
 export type AuditFacet = AuditListKey;
 
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const PERSON_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 const TEMPLATE_RE = /^UC-[0-9A-Z]{6}$/;
 
 /** "2026-02-30" and friends are not days. */
 export function isDay(value: unknown): value is string {
-  if (typeof value !== "string" || !DAY_RE.test(value)) return false;
-  const at = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === value;
+  return typeof value === "string" && isCalendarDay(value);
 }
 
 /** The values of one list filter (empty when unset). */
@@ -364,11 +361,6 @@ export function activeFilterCount(filters: AuditFilters): number {
   );
 }
 
-/** YYYY-MM-DD of an ISO instant on the demo clock (UTC, as the workspace's `today`). */
-export function dayOfIso(iso: string): string {
-  return iso.slice(0, 10);
-}
-
 /** Does the row pass every filter (but `skip`, for that facet's own counts)? */
 export function matchesAuditFilters(row: AuditRow, filters: AuditFilters, skip?: AuditFacet): boolean {
   if (skip !== "team") {
@@ -387,7 +379,7 @@ export function matchesAuditFilters(row: AuditRow, filters: AuditFilters, skip?:
     const templates = filterValues(filters, "template");
     if (templates.length && !(row.template && templates.includes(row.template.id))) return false;
   }
-  const day = dayOfIso(row.at);
+  const day = utcDay(row.at);
   if (filters.from && day < filters.from) return false;
   if (filters.to && day > filters.to) return false;
   return true;
@@ -435,16 +427,14 @@ export function auditFacetCounts(rows: readonly AuditRow[], filters: AuditFilter
 
 // ── Dates ───────────────────────────────────────────────────────────────────
 
-const DAY_MS = 86_400_000;
 export const AUDIT_DATE_PRESETS = [7, 30, 90] as const;
 
 /** "Last 7 days" etc., ending today (inclusive) on the demo clock. */
 export function datePresets(today: string): { days: number; label: string; from: string; to: string }[] {
-  const end = new Date(`${today}T00:00:00.000Z`).getTime();
   return AUDIT_DATE_PRESETS.map((days) => ({
     days,
     label: `Last ${days} days`,
-    from: new Date(end - (days - 1) * DAY_MS).toISOString().slice(0, 10),
+    from: addDays(today, -(days - 1)),
     to: today,
   }));
 }
@@ -620,10 +610,6 @@ function count(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 function isRole(value: unknown): value is TeamRole {
   return typeof value === "string" && (TEAM_ROLES as readonly string[]).includes(value);
 }
@@ -683,13 +669,6 @@ function withText(stem: string, value: unknown): string {
   const t = text(value);
   if (!t) return `${stem}.`;
   return `${stem}: ${t}${/[.!?]$/.test(t) ? "" : "."}`;
-}
-
-/** An ISO date in the long form ("March 1, 2027"), or "" when it isn't one. */
-function date(value: unknown): string {
-  if (typeof value !== "string") return "";
-  const at = new Date(value);
-  return Number.isNaN(at.getTime()) ? "" : formatLongDate(at);
 }
 
 // ── The contract ────────────────────────────────────────────────────────────

@@ -24,7 +24,8 @@ import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createTeam } from "@/server/actions/platform";
 import { cn } from "@/lib/utils";
-import { HeaderRow, PersonLine, Pick, Strip, plural, useFocusAfterCommit } from "./ui";
+import { plural } from "@/domain/plural";
+import { HeaderRow, PersonLine, Pick, Strip, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Teams (Platform Admin). A dense table of the teams, and a "Create team" form
 // that opens above it: name, an optional description, an icon, and the first Team Admin. The strip says

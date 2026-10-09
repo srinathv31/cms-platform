@@ -15,7 +15,8 @@ import {
   type RequestableRole,
 } from "@/domain/access-types";
 import { requestAccess } from "@/server/actions/access";
-import { fmtDay, orList } from "./format";
+import { formatShortDate } from "@/domain/dates";
+import { orList } from "./format";
 import { RolePicker } from "./role-picker";
 
 // Request access: one card per team, with its Team Admin and what you can do about it. A pending
@@ -28,7 +29,7 @@ const LABEL = "text-[13px] leading-5 font-medium text-text";
 type Ended = RequestAccessData["ended"][number];
 
 function endedSentence(e: Ended): string {
-  const when = fmtDay(e.at);
+  const when = formatShortDate(e.at);
   if (e.status === "lapsed") return `Your access to ${e.teamName} lapsed on ${when}: it wasn't confirmed in the access review.`;
   if (e.reason === "inactivity_auto")
     return `Your access to ${e.teamName} was suspended on ${when} after a long time without a sign-in.`;
@@ -67,7 +68,7 @@ function RequestStatus({
         <p className="text-[14px] leading-5 font-medium">
           {admins ? `Your request for ${role} access is waiting on ${admins}.` : `Your request for ${role} access is waiting.`}
         </p>
-        <p className="mt-1 text-[13px] leading-5 text-text-muted">Asked {fmtDay(request.createdAt)}</p>
+        <p className="mt-1 text-[13px] leading-5 text-text-muted">Asked {formatShortDate(request.createdAt)}</p>
         <p className="mt-2 text-[14px] leading-5 break-words text-text-muted">{request.reason}</p>
       </div>
     );
@@ -77,7 +78,7 @@ function RequestStatus({
     return (
       <div tabIndex={-1} className="mt-5 rounded-lg bg-surface-sunken p-4 outline-none" data-slot="request-status">
         <p className="text-[14px] leading-5 font-medium">
-          {by} declined your request for {role} access{request.decidedAt ? ` on ${fmtDay(request.decidedAt)}` : ""}.
+          {by} declined your request for {role} access{request.decidedAt ? ` on ${formatShortDate(request.decidedAt)}` : ""}.
         </p>
         {request.note ? <p className="mt-2 text-[14px] leading-5 break-words text-text">&ldquo;{request.note}&rdquo;</p> : null}
       </div>

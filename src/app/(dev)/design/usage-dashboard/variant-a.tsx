@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, StackedBars } from "./charts";
 import { InfoDot, Panel, PanelHead, TabRow, TrendPill } from "./bits";
 import { ConsumersTable } from "./consumers-table";
-import { BY_CONSUMER, DAYS, ON_ACTIVE_PCT, ON_SUPERSEDED, STATS, TOP_TEMPLATES, WEEKS, fmt } from "./data";
+import { BY_CONSUMER, DAYS, ON_ACTIVE_PCT, ON_SUPERSEDED, STATS, TOP_TEMPLATES, WEEKS } from "./data";
+import { formatCount } from "@/domain/numbers";
 
 /*
  * A: Insights. The layout of Unknown.png carried over: three stat cards (numeral over a caps label,
@@ -58,7 +59,7 @@ export function VariantA() {
       <TabRow<Tab> tabs={[{ id: "overview", label: "Overview" }, { id: "consumers", label: "Consumers" }]} value={tab} onChange={setTab} />
       {tab === "overview" ? (
         <div className="mt-9 grid gap-6 lg:grid-cols-6">
-          <Stat value={fmt.format(STATS.month)} label="Renders this month" trend={<TrendPill>{STATS.trendPct}% vs December</TrendPill>}>
+          <Stat value={formatCount(STATS.month)} label="Renders this month" trend={<TrendPill>{STATS.trendPct}% vs December</TrendPill>}>
             <div className="mt-6 border-t border-hairline-strong pt-5">
               <ChannelMix
                 parts={[
@@ -77,7 +78,7 @@ export function VariantA() {
             </div>
             <Gauge pct={ON_ACTIVE_PCT} className="mt-4 max-w-[13rem]">
               <span className="text-[14px] text-text-muted">On v1</span>
-              <span className="text-[22px] text-text tabular-nums">{fmt.format(ON_SUPERSEDED)}</span>
+              <span className="text-[22px] text-text tabular-nums">{formatCount(ON_SUPERSEDED)}</span>
             </Gauge>
           </Panel>
 
@@ -92,7 +93,7 @@ export function VariantA() {
           </Panel>
 
           <Panel className="lg:col-span-3">
-            <PanelHead title="Daily renders" aside={`Busiest day | ${fmt.format(STATS.busiest)}`} />
+            <PanelHead title="Daily renders" aside={`Busiest day | ${formatCount(STATS.busiest)}`} />
             <div className="mt-6">
               <Heatmap days={DAYS} />
             </div>

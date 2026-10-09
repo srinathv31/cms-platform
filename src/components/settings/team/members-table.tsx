@@ -6,12 +6,13 @@ import type { MemberRow, MembersSection } from "@/domain/access-types";
 import type { PermissionResult, TeamRole } from "@/domain/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { changeMemberRoles, reinstateMember, removeMember } from "@/server/actions/access";
-import { fmtDay, daysAgo, firstName } from "./format";
+import { formatShortDate } from "@/domain/dates";
+import { firstName, lastActive } from "./format";
 import { RowTable, Strip, type RowAct, type RowData } from "./rows";
 
 /** Why a member is not active, in the dimmed row's sub line. */
 function stateNote(m: MemberRow, today: string): string {
-  const at = m.statusChangedAt ? ` ${fmtDay(m.statusChangedAt, today)}` : "";
+  const at = m.statusChangedAt ? ` ${formatShortDate(m.statusChangedAt, today)}` : "";
   if (m.status === "lapsed") return `Access lapsed${at}`;
   return `${m.statusReason === "inactivity_auto" ? "Auto-suspended" : "Suspended"}${at}`;
 }
@@ -98,7 +99,7 @@ export function MembersTable({ section }: { section: MembersSection }) {
       aside: m.isYou ? "You" : undefined,
       sub: active ? m.title : stateNote(m, today),
       dim: !active,
-      cells: [rolesLabel(m.roles), daysAgo(m.lastActiveAt, today)],
+      cells: [rolesLabel(m.roles), lastActive(m.lastActiveAt, today)],
       actions,
     };
   });

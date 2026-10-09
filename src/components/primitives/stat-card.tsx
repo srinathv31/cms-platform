@@ -1,7 +1,6 @@
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { formatCount } from "@/domain/numbers";
 import { cn } from "@/lib/utils";
-
-const integer = new Intl.NumberFormat("en-US");
 
 /**
  * Tracked-caps label over a big, regular-weight tabular numeral. Optional trend pill and footnote.
@@ -50,7 +49,7 @@ export function StatCard({
         ) : null}
       </div>
       <dd className="numeral m-0 mt-4 text-text">
-        {typeof value === "number" ? integer.format(value) : value}
+        {typeof value === "number" ? formatCount(value) : value}
       </dd>
       {footnote ? (
         <dd className="m-0 mt-4 border-t border-hairline pt-3 text-[13px] leading-5 text-text-muted">

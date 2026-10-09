@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,6 +98,34 @@ describe("getNotificationsData", () => {
       expect(n.href, n.kind).toMatch(/^\//);
     }
     expect(data.items.find((n) => n.kind === "recert_due")!.href).toBe("/coral-offers/settings/recertification");
+  });
+
+  it("words each time by calendar day: 23:00 the night before is Yesterday at 01:00 (D9)", async () => {
+    const before = env.now;
+    const ids = ["nt_d9_late", "nt_d9_early"];
+    env.now = new Date("2026-10-05T01:00:00.000Z");
+    try {
+      await db.insert(notifications).values(
+        [new Date("2026-10-04T23:00:00.000Z"), new Date("2026-10-05T00:30:00.000Z")].map((createdAt, i) => ({
+          id: ids[i]!,
+          userId: "morgan",
+          teamId: "coral-offers",
+          kind: "recert_due",
+          title: "Recertification is due.",
+          body: null,
+          href: null,
+          createdAt,
+          readAt: null,
+        })),
+      );
+      as("morgan");
+      const ago = new Map((await getNotificationsData()).items.map((n) => [n.id, n.ago]));
+      expect(ago.get("nt_d9_late")).toBe("Yesterday");
+      expect(ago.get("nt_d9_early")).toBe("30 minutes ago");
+    } finally {
+      env.now = before;
+      await db.delete(notifications).where(inArray(notifications.id, ids));
+    }
   });
 });
 

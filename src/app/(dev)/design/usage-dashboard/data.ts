@@ -1,6 +1,8 @@
 // Static, deterministic fake render history for the Usage mocks. No DB, no actions.
 // 90 days ending Jan 31, 2027 (the demo clock starts Feb 1, 2027).
 
+import { DAY_MS } from "@/domain/dates";
+
 export type VariantId = "a" | "b" | "c";
 export type ScopeId = "team" | "template";
 export type Channel = "pdf" | "web" | "email";
@@ -22,7 +24,6 @@ function rng(seed: number) {
   };
 }
 
-const DAY_MS = 86_400_000;
 const START = Date.UTC(2026, 10, 3); // Nov 3, 2026
 export const DAY_COUNT = 90;
 
@@ -215,8 +216,6 @@ export function sunsetTag(row: Row): string | null {
   if (row.state === "superseded") return `On superseded v${row.version} · sunset in ${row.sunsetInDays} days`;
   return null;
 }
-
-export const fmt = new Intl.NumberFormat("en-US");
 
 // ── Per-template (Balance Transfer Intro — Terms) ────────────────────────────
 

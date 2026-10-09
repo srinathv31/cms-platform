@@ -5,6 +5,8 @@
 
 import { sunsetDay } from "../business-zone";
 import { formatLongDate } from "../dates";
+import { formatCount } from "../numbers";
+import { pluralName } from "../plural";
 import { CHANNELS, type Channel, type VariableType, type VersionState } from "../types";
 import {
   MAX_BODY_BYTES,
@@ -23,8 +25,7 @@ export function renderError(code: RenderErrorCode, message: string, details?: Re
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
-// Dates read the one shared way (`@/domain/dates`); re-exported for the callers that import them from here.
-export { formatLongDate, formatShortDate } from "../dates";
+// Dates, counts and plurals read the one shared way (`../dates.ts`, `../numbers.ts`, `../plural.ts`).
 
 /** How a channel is named in messages. */
 export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = { pdf: "PDF", web: "Web", email: "Email" };
@@ -37,13 +38,6 @@ export function joinWithAnd(items: readonly string[]): string {
 
 function channelLabel(channel: string): string {
   return (CHANNEL_LABELS as Record<string, string>)[channel] ?? channel;
-}
-
-/** "Disclosure" → "Disclosures", "Policy" → "Policies", "Notices" stays. */
-function plural(name: string): string {
-  if (/s$/i.test(name)) return name;
-  if (/[^aeiou]y$/i.test(name)) return `${name.slice(0, -1)}ies`;
-  return `${name}s`;
 }
 
 // ── 400 / 403 / 413 ──────────────────────────────────────────────────────────
@@ -65,7 +59,7 @@ export function consumerRequired(): RenderError {
 
 /** 413: "The body must be at most 1,000,000 bytes." Declared by Content-Length, or counted as it's read. */
 export function bodyTooLarge(): RenderError {
-  return renderError("body_too_large", `The body must be at most ${MAX_BODY_BYTES.toLocaleString("en-US")} bytes.`);
+  return renderError("body_too_large", `The body must be at most ${formatCount(MAX_BODY_BYTES)} bytes.`);
 }
 
 /** `Consumer "acme" isn't registered.` */
@@ -145,7 +139,7 @@ export function versionRevoked(version: number, revokedAt: Date | null, activeVe
 
 /** The content type doesn't allow the channel: "Disclosures don't render to sms." */
 export function channelNotAllowed(contentTypeName: string, channel: string): RenderError {
-  return renderError("channel_not_allowed", `${plural(contentTypeName)} don't render to ${channelLabel(channel)}.`, {
+  return renderError("channel_not_allowed", `${pluralName(contentTypeName)} don't render to ${channelLabel(channel)}.`, {
     channel,
   });
 }
@@ -195,7 +189,7 @@ function missingSentence(missing: readonly string[]): string {
  * "{name} must be at most 1,000 characters." The route names the key; the CMS preview, the label.
  */
 export function invalidSentence(name: string, { expected, maxLength }: Pick<InvalidValue, "expected" | "maxLength">): string {
-  if (maxLength !== undefined) return `${name} must be at most ${maxLength.toLocaleString("en-US")} characters.`;
+  if (maxLength !== undefined) return `${name} must be at most ${formatCount(maxLength)} characters.`;
   return `${name} must be ${VALUE_NOUNS[expected]}.`;
 }
 

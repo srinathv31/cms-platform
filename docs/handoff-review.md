@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 16 | 8 | 27 |
-| Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 19 | 5 | 44 |
+| Open | 0 | 3 | 15 | 8 | 26 |
+| Partly fixed | 0 | 4 | 2 | 2 | 8 |
+| Fixed | 1 | 19 | 21 | 5 | 46 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -301,7 +301,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D9 · Medium: "Today" and "yesterday" disagree between screens
 
-- **Status:** Open
+- **Status:** Fixed. Every screen counts days with `daysBetween` and words them with `formatAgo` in `src/domain/dates.ts`: calendar days in UTC, the days the dates on screen show (a sunset's in the business time zone), so 23:00 yesterday is "yesterday" at 01:00 everywhere, and a cross-screen test holds the dialogs, Usage, Versions, Activity, the review queue and Team settings to it ([decision 0028](decisions/0028-today-and-yesterday-are-utc-calendar-days.md)).
 - **Where:** `src/domain/consequences.ts` line 129
 - **What happens:** `ago()` counts 24-hour periods, so a render at 23:00 yesterday reads "today" at 01:00. The Usage table and `server/queries/format.ts` count calendar days. `DAY_MS` is redefined in more than ten files.
 - **Fix:** One day-counting helper in `domain/dates.ts`.
@@ -803,7 +803,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H4 · Medium: Formatting helpers are duplicated and clash
 
-- **Status:** Partly fixed. Variable values now have one formatting module (PR #6). The UI's date, plural and number helpers are still duplicated.
+- **Status:** Fixed. Variable values have one formatting module (PR #6), and the UI's dates, day counts and "how long ago" (`src/domain/dates.ts`, with the one `DAY_MS`), counts (`src/domain/numbers.ts`) and plurals (`src/domain/plural.ts`) now have one each: the copies, the server's `queries/format.ts` and the clashing `fmtDay`, `relativeTime` and `dayLabel` are gone. Coral keeps its own (`src/simulator` may not import `src/domain`), and the `/design` mocks keep their fixture-clock day labels.
 - **Where:** `src/domain/activity.ts` line 114; `src/domain/audit.ts` line 686
 - **What happens:** An identical `date()` in two domain files; seven `plural` definitions; six or more "days ago" helpers; 13 `NumberFormat` instances; same-named functions with different signatures (`fmtDay`, `relativeTime`, `dayLabel`). `domain/dates.ts` calls itself the one way to write a date.
 - **Fix:** Make `domain/dates.ts` plus one number and plural module the only homes.

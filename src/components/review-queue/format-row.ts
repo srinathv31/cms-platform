@@ -2,7 +2,7 @@
 // Made on the server, where the demo clock is (relative times are against it, never the system clock).
 
 import type { Person, ReviewQueueRow } from "@/domain/review-types";
-import { relativeTime } from "@/server/queries/format";
+import { formatAgo } from "@/domain/dates";
 
 export interface QueueRowView {
   key: string;
@@ -29,13 +29,13 @@ export interface QueueRowView {
 const DECISION_LABEL = { approved: "Approved", changes_requested: "Changes requested" } as const;
 
 export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: Date): QueueRowView {
-  const submitted = relativeTime(new Date(row.submittedAt), nowDate);
+  const submitted = formatAgo(row.submittedAt, nowDate);
   const decision = row.decision
     ? {
         kind: row.decision.kind,
         label: DECISION_LABEL[row.decision.kind],
         by: row.decision.by.name,
-        when: relativeTime(new Date(row.decision.at), nowDate),
+        when: formatAgo(row.decision.at, nowDate),
       }
     : undefined;
   return {

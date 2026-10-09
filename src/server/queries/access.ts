@@ -2,8 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { DAY_MS, utcDay } from "@/domain/dates";
 import {
-  DAY_MS,
   changeRoles,
   decideRecertItem,
   firstName,
@@ -109,7 +109,6 @@ const named = (p: { id: string; name: string }): Named => ({ id: p.id, name: p.n
 const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 const isoOrUndefined = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
-const today = (d: Date) => d.toISOString().slice(0, 10);
 const okOr = (r: { ok: true } | Refused): PermissionResult => (r.ok ? { ok: true } : refuse(r));
 const okUnless = (refusal: Refusal | null): PermissionResult => (refusal ? refuse(refusal) : { ok: true });
 
@@ -234,7 +233,7 @@ export const getMembersSection = cache(async (teamSlug: string): Promise<Members
   rows.sort(
     (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.person.name.localeCompare(b.person.name),
   );
-  return { team: header, rows, roles: TEAM_ROLES, today: today(nowDate) };
+  return { team: header, rows, roles: TEAM_ROLES, today: utcDay(nowDate) };
 });
 
 // ── Access requests ──────────────────────────────────────────
@@ -380,7 +379,7 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
     current,
     can: { start },
     consequences: { start: startRecertConsequence(named(team), nowDate) },
-    today: today(nowDate),
+    today: utcDay(nowDate),
   };
 });
 

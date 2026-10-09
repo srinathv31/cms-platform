@@ -42,7 +42,7 @@ import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zon
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { refusal, refuse, type Refused } from "./refusals";
-import { formatLongDate } from "./render/errors";
+import { formatLongDate } from "./dates";
 import {
   DOCUMENT_THREAD,
   type ApprovalStage,

@@ -173,7 +173,9 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 - **The business time zone.** A sunset date ends at 00:00 on that day in one platform time zone, a Platform
   setting that is `America/New_York` by default
   ([decision 0017](decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)). Every other date
-  the UI shows is UTC.
+  the UI shows is UTC, and "today", "yesterday" and "3 days ago" count UTC calendar days, the same on every screen
+  ([decision 0028](decisions/0028-today-and-yesterday-are-utc-calendar-days.md)). Dates, counts and plurals have
+  one module each in `src/domain`: `dates.ts`, `numbers.ts`, `plural.ts`.
 - **Identity.** There is no login. `getViewer()` reads the `ucomp_persona` cookie. A missing or unknown cookie acts
   as Maya.
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:

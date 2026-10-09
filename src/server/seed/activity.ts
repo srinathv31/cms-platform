@@ -1,5 +1,5 @@
 import type { AnyNotificationKind } from "@/domain/access-types";
-import { formatLongDate } from "@/domain/render/errors";
+import { formatLongDate } from "@/domain/dates";
 import type { SeedCtx } from "./context";
 import { flaggedMembers, recertSubjectIds } from "./teams";
 import { userName } from "./people";

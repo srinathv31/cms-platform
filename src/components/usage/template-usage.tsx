@@ -2,16 +2,18 @@ import Link from "next/link";
 import type { Route } from "next";
 import { WS } from "@/components/workspace/workspace-grid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { addDays, errorText } from "@/domain/golive/usage";
+import { addDays, formatShortDate } from "@/domain/dates";
+import { errorText } from "@/domain/golive/usage";
+import { formatCount } from "@/domain/numbers";
+import { plural } from "@/domain/plural";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { TemplateUsageData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
-import { renderCount } from "@/components/versions/format";
 import { Legend, SERIES, StackedBars, type StackSeries } from "./charts";
 import { ConsumersTable } from "./consumers-table";
-import { formatDayShort, formatLastRender } from "./format";
+import { formatLastRender } from "./format";
 import { Panel, PanelHead, TrendPill } from "./panel";
 import { Numeral, StatLabel } from "./stat";
 
@@ -27,7 +29,6 @@ import { Numeral, StatLabel } from "./stat";
 // width where the grid pads its own right side, it is the grid area, as every tab is.
 
 export const TEMPLATE_BARS_HEIGHT = 210;
-const NF = new Intl.NumberFormat("en-US");
 /** Classes of the tab's cell, shared with the skeleton. */
 export const USAGE_CELL = cn(
   WS.doc,
@@ -112,8 +113,8 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
               height={TEMPLATE_BARS_HEIGHT}
               series={series}
               data={d.weekly.map((w, i) => ({
-                label: formatDayShort(w.weekStart),
-                title: `Week of ${formatDayShort(w.weekStart)}`,
+                label: formatShortDate(w.weekStart),
+                title: `Week of ${formatShortDate(w.weekStart)}`,
                 parts: d.weeklyVersions.map((v) => w.byVersion[v] ?? 0),
                 partial: i === d.weekly.length - 1 && d.today < addDays(w.weekStart, 6),
               }))}
@@ -123,7 +124,7 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
         <div className="grid grid-rows-[auto_1fr] gap-6">
           <Panel>
             <Numeral
-              value={NF.format(d.stats.renders.value)}
+              value={formatCount(d.stats.renders.value)}
               trend={d.stats.renders.trendPct === null ? null : <TrendPill pct={d.stats.renders.trendPct} />}
             />
             <StatLabel tip="Live renders only. Previews aren't counted.">Renders · 30 days</StatLabel>
@@ -134,7 +135,7 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
             <div className="mt-4 flex flex-col gap-1 border-t border-hairline pt-3 text-[13px] text-text-muted">
               {d.success.errors > 0 ? (
                 <span>
-                  {NF.format(d.success.errors)} of {renderCount(d.stats.renders.value)} failed
+                  {formatCount(d.success.errors)} of {plural(d.stats.renders.value, "render")} failed
                 </span>
               ) : null}
               {still.length === 0 ? (

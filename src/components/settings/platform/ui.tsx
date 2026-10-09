@@ -14,8 +14,6 @@ import { runAction } from "@/components/versions/action-dialog";
 // their actions inline, and a consequence strip before anything is committed. The strip's confirm is
 // the only black button on screen; everything that opens a strip is outline.
 
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
 // ── Running an action ────────────────────────────────────────
 
 /** One server action at a time: the pending flag, the refusal sentence and a guarded `run`. */

@@ -20,7 +20,7 @@
 // `sunsetDay` is `instant.atZone(zone).toLocalDate()`. The US zones change at 02:00, so their midnight
 // always exists once.
 
-const DAY_MS = 86_400_000;
+import { DAY_MS, daysBetween, isCalendarDay } from "./dates";
 
 /** Until a Platform Admin chooses another. */
 export const DEFAULT_BUSINESS_ZONE = "America/New_York";
@@ -51,21 +51,6 @@ export function zoneLabel(zone: string): string {
   const known = BUSINESS_ZONES.find((z) => z.id === zone);
   if (!known) return zone;
   return known.name === known.id ? known.id : `${known.name} (${known.id})`;
-}
-
-// ── Calendar days ────────────────────────────────────────────────────────────
-
-/** Whether `value` is a real calendar day written YYYY-MM-DD ("2027-02-30" isn't). */
-export function isCalendarDay(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const ms = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return new Date(ms).toISOString().slice(0, 10) === value;
-}
-
-/** Whole days from one calendar day to another: 1 from "2026-10-09" to "2026-10-10". */
-export function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / DAY_MS);
 }
 
 // ── Wall clocks ──────────────────────────────────────────────────────────────

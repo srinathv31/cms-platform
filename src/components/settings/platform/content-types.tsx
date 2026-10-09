@@ -9,7 +9,8 @@ import type { RequiredSection } from "@/domain/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { updateContentType } from "@/server/actions/platform";
-import { Blocked, FullRow, HeaderRow, Strip, plural, useFocusAfterCommit } from "./ui";
+import { plural } from "@/domain/plural";
+import { Blocked, FullRow, HeaderRow, Strip, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Content types. One dense row per type; "Edit sections" opens the required
 // sections under the row (rename, reorder, add, remove) with the consequence strip: required sections

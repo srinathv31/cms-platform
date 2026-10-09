@@ -4,7 +4,8 @@ import { refresh, revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { canActOnStage, currentStageOf } from "@/domain/approval-chain";
-import { isCalendarDay, sunsetInstant } from "@/domain/business-zone";
+import { sunsetInstant } from "@/domain/business-zone";
+import { isCalendarDay } from "@/domain/dates";
 import {
   approve,
   cancelRevoke as cancelRevokeTransition,

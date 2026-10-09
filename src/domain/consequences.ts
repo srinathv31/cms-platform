@@ -14,11 +14,10 @@
 // A consumer "renders" a version when the usage rows (non-preview renders, aggregated by the server)
 // list it for that version. Several consumers are listed most-used first.
 
-import { formatLongDate } from "./render/errors";
+import { formatAgo, formatLongDate } from "./dates";
+import { plural } from "./plural";
 import type { ConsequenceAction, ConsumerUsage } from "./review-types";
 import type { ContractChange } from "./types";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** What going live means when nothing was Active before. */
 export const FIRST_LIVE = "Consumers can start using it right away.";
@@ -125,19 +124,14 @@ function failsNow(u: Usage, v: string, now: Date, pending: boolean): string {
   return `${u.consumerName} ${what}. ${pending ? "Once confirmed, its" : "Its"} renders will fail immediately.`;
 }
 
-/** "today", "yesterday", "3 days ago": whole days elapsed on the demo clock. */
-export function ago(iso: string, now: Date): string {
-  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / DAY_MS);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  return `${days} days ago`;
+/** "today", "yesterday", "45 days ago": calendar days on the demo clock, as every screen counts them. */
+function ago(iso: string, now: Date): string {
+  return formatAgo(iso, now, { precision: "day" });
 }
-
-const countFormat = new Intl.NumberFormat("en-US");
 
 /** "once", "412 times", "1,204 times". */
 function times(n: number): string {
-  return n === 1 ? "once" : `${countFormat.format(n)} times`;
+  return n === 1 ? "once" : plural(n, "time");
 }
 
 // ── Usage ────────────────────────────────────────────────────────────────────

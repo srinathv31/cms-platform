@@ -8,7 +8,8 @@ import { Share } from "lucide-react";
 import { Legend, StackedBars } from "./charts";
 import { InfoDot, Panel, PanelHead, TabRow, TrendPill } from "./bits";
 import { ConsumersTable } from "./consumers-table";
-import { TEMPLATE, fmt } from "./data";
+import { TEMPLATE } from "./data";
+import { formatCount } from "@/domain/numbers";
 
 /*
  * The per-template Usage tab: which consumers render which version. Compact on purpose: one chart,
@@ -58,7 +59,7 @@ export function TemplateTab() {
         </Panel>
         <div className="flex flex-col gap-6">
           <Panel>
-            <div className="flex items-start justify-between"><div className="numeral text-text">{fmt.format(total)}</div><TrendPill>4%</TrendPill></div>
+            <div className="flex items-start justify-between"><div className="numeral text-text">{formatCount(total)}</div><TrendPill>4%</TrendPill></div>
             <div className="caps-label mt-3">Renders, 30 days <InfoDot tip="Live renders only. Previews aren't counted." /></div>
           </Panel>
           <Panel>

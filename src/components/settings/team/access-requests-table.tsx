@@ -3,7 +3,8 @@
 import { ROLE_LABEL, validateDecisionNote } from "@/domain/access";
 import { DECISION_NOTE_MAX, type AccessRequestRow, type AccessRequestsSection } from "@/domain/access-types";
 import { decideAccessRequest } from "@/server/actions/access";
-import { fmtDay, firstName } from "./format";
+import { formatShortDate } from "@/domain/dates";
+import { firstName } from "./format";
 import { GroupHeading, RowTable, type RowData } from "./rows";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 
@@ -21,7 +22,7 @@ function pendingRow(r: AccessRequestRow, today: string): RowData {
   return {
     id: r.id,
     person: r.person,
-    sub: `Asked ${fmtDay(r.createdAt, today)}`,
+    sub: `Asked ${formatShortDate(r.createdAt, today)}`,
     cells: [role, <span key="reason" title={r.reason} className="line-clamp-2 text-[13px] leading-snug text-text-muted">{r.reason}</span>],
     actions: [
       {
@@ -69,7 +70,7 @@ function Decided({ rows, today }: { rows: AccessRequestRow[]; today: string }) {
               <div>
                 {verb}
                 {r.decidedBy ? ` by ${r.decidedBy.name}` : ""}
-                {r.decidedAt ? ` · ${fmtDay(r.decidedAt, today)}` : ""}
+                {r.decidedAt ? ` · ${formatShortDate(r.decidedAt, today)}` : ""}
               </div>
               {r.status === "denied" && r.note ? <div className="line-clamp-2">{r.note}</div> : null}
             </div>

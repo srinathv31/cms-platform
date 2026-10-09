@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, breakingKeysOf, consequences } from "./consequences";
+import { breakingKeysOf, consequences } from "./consequences";
 import type { ConsumerUsage } from "./review-types";
 import type { ContractChange } from "./types";
 
@@ -172,10 +172,12 @@ describe("consequences: sunset", () => {
     ]);
   });
 
-  it("phrases the last render from the demo clock", () => {
+  it("phrases the last render from the demo clock, by calendar day", () => {
     const line = (lastRenderAt: string) =>
       consequences({ kind: "sunset", number: 1, sunsetAt: MARCH_1, activeNumber: 2 }, [row("Coral", 1, lastRenderAt, 5)], NOW)[0];
-    expect(line(hoursAgo(23))).toBe("Coral still renders v1 (last render today). It will keep working until March 1, 2027.");
+    expect(line(hoursAgo(11))).toBe("Coral still renders v1 (last render today). It will keep working until March 1, 2027.");
+    // 23:00 on October 3 is yesterday at noon on October 4, though less than a day has passed.
+    expect(line(hoursAgo(13))).toBe("Coral still renders v1 (last render yesterday). It will keep working until March 1, 2027.");
     expect(line(hoursAgo(30))).toBe("Coral still renders v1 (last render yesterday). It will keep working until March 1, 2027.");
     expect(line(daysAgo(3))).toBe("Coral still renders v1 (last render 3 days ago). It will keep working until March 1, 2027.");
   });
@@ -281,16 +283,24 @@ describe("consequences: revoke", () => {
   });
 });
 
-describe("ago", () => {
-  it("counts whole days on the demo clock", () => {
-    expect(ago(hoursAgo(0), NOW)).toBe("today");
-    expect(ago(hoursAgo(23.9), NOW)).toBe("today");
-    expect(ago(hoursAgo(24), NOW)).toBe("yesterday");
-    expect(ago(daysAgo(2), NOW)).toBe("2 days ago");
-    expect(ago(daysAgo(15), NOW)).toBe("15 days ago");
+describe("the last render's day", () => {
+  const revoked = (lastRenderAt: string, now = NOW) =>
+    consequences({ kind: "revoke", number: 1, activeNumber: 2 }, [row("Coral", 1, lastRenderAt, 0)], now)[0];
+
+  it("counts calendar days on the demo clock, not 24-hour periods (D9)", () => {
+    const oneAm = new Date("2026-10-04T01:00:00.000Z");
+    expect(revoked("2026-10-03T23:00:00.000Z", oneAm)).toBe("Coral last rendered v1 yesterday. Its renders will fail immediately.");
+    expect(revoked("2026-10-04T00:30:00.000Z", oneAm)).toBe("Coral last rendered v1 today. Its renders will fail immediately.");
+    expect(revoked("2026-10-02T23:59:00.000Z", oneAm)).toBe("Coral last rendered v1 2 days ago. Its renders will fail immediately.");
+  });
+
+  it("keeps counting days, with no date in place of them", () => {
+    expect(revoked(hoursAgo(0))).toBe("Coral last rendered v1 today. Its renders will fail immediately.");
+    expect(revoked(daysAgo(2))).toBe("Coral last rendered v1 2 days ago. Its renders will fail immediately.");
+    expect(revoked(daysAgo(15))).toBe("Coral last rendered v1 15 days ago. Its renders will fail immediately.");
   });
 
   it("reads a render after `now` (a clock rewound by a reset) as today", () => {
-    expect(ago(hoursAgo(-5), NOW)).toBe("today");
+    expect(revoked(hoursAgo(-5))).toBe("Coral last rendered v1 today. Its renders will fail immediately.");
   });
 });

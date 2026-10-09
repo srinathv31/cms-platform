@@ -35,9 +35,8 @@ import type { Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
-import { formatDateTime } from "@/domain/dates";
-import { dayAgo } from "./format";
-import { dayOf, getPeople, iso, personOf, type People } from "./review-shared";
+import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
+import { getPeople, iso, personOf, type People } from "./review-shared";
 import { requireSpace } from "./spaces";
 import { currentName } from "./template-name";
 
@@ -102,7 +101,7 @@ export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters:
   const { matching } = await readAudit(scope.scope, filters, nowDate);
   return {
     ok: true,
-    filename: `stencil-audit-${scope.scope.slug}-${dayOf(nowDate)}.csv`,
+    filename: `stencil-audit-${scope.scope.slug}-${utcDay(nowDate)}.csv`,
     csv: toCsv(matching),
     count: matching.length,
   };
@@ -144,7 +143,7 @@ async function readAudit(
   const filters = sanitize(requested, space, universe, teamRows);
   const matching = filterAuditRows(universe, filters);
   const counts = auditFacetCounts(universe, filters);
-  const today = dayOf(nowDate);
+  const today = utcDay(nowDate);
 
   const knownPeople = new Map<string, Person>();
   const knownTemplates = new Map<string, { id: string; name: string; teamSlug: string }>();
@@ -256,7 +255,7 @@ function toRow(
     summary: describeAuditEvent({ action: e.action, details: e.details, versionNumber }, actor),
     subject: subjectId ? personOf(people, subjectId) : null,
     when: formatDateTime(e.at, nowDate),
-    ago: dayAgo(e.at, nowDate),
+    ago: formatAgo(e.at, nowDate, { capitalize: true }),
   };
 }
 

@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BUSINESS_ZONES,
   DEFAULT_BUSINESS_ZONE,
-  daysBetween,
   daysUntilSunset,
   isBusinessZone,
-  isCalendarDay,
   sunsetDay,
   sunsetInstant,
   todayIn,
@@ -91,22 +89,6 @@ describe("today and the days until a sunset, in the zone", () => {
     expect(sunsetDay(new Date("2027-03-01T05:00:00.000Z"), NY)).toBe("2027-03-01");
     // A sunset at midnight UTC (the rule before the business zone) is the evening before in New York.
     expect(sunsetDay(new Date("2027-03-01T00:00:00.000Z"), NY)).toBe("2027-02-28");
-  });
-});
-
-describe("calendar days", () => {
-  it("knows a real day", () => {
-    expect(isCalendarDay("2027-03-01")).toBe(true);
-    expect(isCalendarDay("2028-02-29")).toBe(true);
-    expect(isCalendarDay("2027-02-29")).toBe(false);
-    expect(isCalendarDay("2027-3-1")).toBe(false);
-    expect(isCalendarDay("")).toBe(false);
-  });
-
-  it("counts whole days between two days, across a DST change", () => {
-    expect(daysBetween("2026-03-07", "2026-03-09")).toBe(2);
-    expect(daysBetween("2026-10-09", "2026-10-09")).toBe(0);
-    expect(daysBetween("2026-10-10", "2026-10-09")).toBe(-1);
   });
 });
 

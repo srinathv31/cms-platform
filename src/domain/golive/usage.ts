@@ -7,7 +7,9 @@
 // ones are counted apart as errors.
 
 import { daysUntilSunset } from "../business-zone";
+import { DAY_MS, addDays, dayStartMs, utcDay } from "../dates";
 import { sunsetPassed } from "../lifecycle";
+import { plural } from "../plural";
 import type { RenderErrorCode } from "../render/types";
 import type { VersionState } from "../types";
 import {
@@ -23,24 +25,9 @@ import {
   type UsageTone,
 } from "../golive-types";
 
-const DAY_MS = 86_400_000;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
-// ── Days (UTC, YYYY-MM-DD) ───────────────────────────────────────────────────
-
-/** The UTC day of an instant. */
-export function utcDay(date: Date | number): string {
-  return new Date(date).toISOString().slice(0, 10);
-}
-
-/** Midnight UTC of a day, in ms. */
-export function dayStartMs(day: string): number {
-  return Date.parse(`${day}T00:00:00.000Z`);
-}
-
-export function addDays(day: string, n: number): string {
-  return utcDay(dayStartMs(day) + n * DAY_MS);
-}
+// ── Weeks (UTC days, YYYY-MM-DD; the day arithmetic is ../dates.ts) ──────────
 
 /** The Sunday that starts the day's week. */
 export function weekStartOf(day: string): string {
@@ -52,11 +39,6 @@ export function dayList(from: string, to: string): string[] {
   const days: string[] = [];
   for (let ms = dayStartMs(from), end = dayStartMs(to); ms <= end; ms += DAY_MS) days.push(utcDay(ms));
   return days;
-}
-
-/** Whole calendar days (UTC) from `now`'s day to `date`'s day: 0 today, 1 tomorrow, -1 yesterday. */
-export function calendarDaysUntil(date: Date, now: Date): number {
-  return Math.round((dayStartMs(utcDay(date)) - dayStartMs(utcDay(now))) / DAY_MS);
 }
 
 // ── Windows ──────────────────────────────────────────────────────────────────
@@ -140,14 +122,6 @@ export function percent(part: number, whole: number, decimals = 1): number | nul
   if (whole === 0) return null;
   const f = 10 ** decimals;
   return Math.round((part / whole) * 100 * f) / f;
-}
-
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const plain = new Intl.NumberFormat("en-US");
-
-/** A stat card's number: "812", "1.2k", "27.4k", "1.3m". */
-export function compactCount(n: number): string {
-  return n < 1000 ? plain.format(n) : compact.format(n).toLowerCase();
 }
 
 // ── Heatmap ──────────────────────────────────────────────────────────────────
@@ -245,7 +219,7 @@ export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag
   }
 
   if (row.errors30d > 0 && !failing) {
-    tags.push({ tone: "danger", text: `${row.errors30d} failed ${row.errors30d === 1 ? "render" : "renders"}` });
+    tags.push({ tone: "danger", text: plural(row.errors30d, "failed render") });
   }
   return tags;
 }

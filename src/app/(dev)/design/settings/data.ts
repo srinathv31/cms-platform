@@ -21,8 +21,6 @@ export function daysAgo(n: number): string {
   return `${n} days ago`;
 }
 
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
 export interface Person {
   id: string;
   name: string;

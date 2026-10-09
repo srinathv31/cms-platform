@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/primitives/status-badge";
 import { Button } from "@/components/ui/button";
 import type { CommentView, Person, ThreadView } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
-import { relativeTime } from "./format";
+import { formatAgo } from "@/domain/dates";
 import { isOptimistic } from "./thread-state";
 
 // The thread UI. A card is the quote it is about, the comments (avatar, name, time, text), then a
@@ -68,7 +68,7 @@ function CommentRow({ comment, nowMs }: { comment: CommentView; nowMs: number | 
         <div className="flex min-h-6 items-center gap-2">
           <span className="truncate text-[13.5px] leading-6 font-medium text-text">{comment.author.name}</span>
           <time dateTime={comment.createdAt} className="shrink-0 text-[12.5px] leading-6 text-text-subtle">
-            {nowMs === null ? "" : relativeTime(comment.createdAt, nowMs)}
+            {nowMs === null ? "" : formatAgo(comment.createdAt, nowMs, { dateFrom: 14 })}
           </time>
         </div>
         <p className="mt-0.5 text-[14px] leading-[1.45] break-words whitespace-pre-wrap text-text">{comment.body}</p>
@@ -280,7 +280,7 @@ export function ThreadCard({
                   Resolved by {thread.resolvedBy?.name ?? "someone"}
                 </div>
                 {thread.resolvedAt && nowMs !== null ? (
-                  <div className="text-[12.5px] leading-5 text-text-subtle">{relativeTime(thread.resolvedAt, nowMs)}</div>
+                  <div className="text-[12.5px] leading-5 text-text-subtle">{formatAgo(thread.resolvedAt, nowMs, { dateFrom: 14 })}</div>
                 ) : null}
               </div>
               {canComment ? (

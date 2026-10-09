@@ -3,7 +3,7 @@ import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { cn } from "@/lib/utils";
 import { WS } from "@/components/workspace/workspace-grid";
 import type { ActivityItem } from "@/domain/review-types";
-import { formatRelative, formatStamp } from "@/components/versions/format";
+import { formatAgo, formatStamp } from "@/domain/dates";
 import { now } from "@/server/clock";
 import { getActivity } from "@/server/queries/activity";
 import { Stamp } from "./stamp";
@@ -71,7 +71,7 @@ export async function ActivityContent({
                     </span>
                   ) : null}
                   <span className="flex h-6 w-24 shrink-0 items-center justify-end">
-                    <Stamp iso={item.at} relative={formatRelative(item.at, nowDate)} absolute={formatStamp(item.at)} />
+                    <Stamp iso={item.at} relative={formatAgo(item.at, nowDate)} absolute={formatStamp(item.at)} />
                   </span>
                 </li>
               ))}
