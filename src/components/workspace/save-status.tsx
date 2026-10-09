@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { ChevronDown, History, Redo2, RotateCcw, Undo2, type LucideProps } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,14 +31,16 @@ export interface SaveStatusProps {
 }
 
 /**
- * "Saved", "Saving…" or why it didn't save: the autosave status of the draft on screen. On the
- * Content tab it also carries the draft's quiet history controls, which only appear once they have
- * something to do, so an untouched draft reads exactly as before:
- *   - Undo and redo, beside it, once there is something to undo or redo; the one with nothing to do
- *     is greyed out. They act where ⌘Z would: the field last typed in (the document until another has had focus).
+ * "Saved", "Saving…" or why it didn't save: the autosave status of the draft on screen, with the
+ * draft's history controls:
+ *   - Undo and redo, always both, from the first paint (the server renders them). Each is greyed out,
+ *     with a "Nothing to undo" tooltip, while it has nothing to do and until the editor's history is
+ *     ready. They act where ⌘Z would: the field last typed in (the document until another has had focus).
  *   - The status itself opens a small menu when there is something to go back to: "Revert to when you
  *     opened it" once something has changed, and "Revert to v3" on a draft started from v3. Each
  *     toast has an Undo that puts the changes back.
+ * Undo and redo come first, so nothing the status does moves them: it changes width as it saves, and
+ * gains its menu's chevron once the Content tab is on screen. Before them, either would be a layout shift.
  */
 export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProps) {
   const { status, error } = useSaveStatus();
@@ -49,6 +51,7 @@ export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProp
   const indicator = <SaveIndicator status={status} error={error} />;
   return (
     <span className="inline-flex items-center gap-1.5">
+      <UndoRedo />
       {canRevert || base ? (
         <RevertMenu templateId={templateId} sinceOpened={canRevert} base={base}>
           {indicator}
@@ -56,33 +59,33 @@ export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProp
       ) : (
         indicator
       )}
-      <UndoRedo />
     </span>
   );
 }
 
+const noSubscribe = () => () => {};
+
 function UndoRedo() {
   const history = useHistoryControls();
-  if (!history || (!history.canUndo && !history.canRedo)) return null;
-  // Rendered on the client only (history is null on the server), so the platform check is safe here.
-  const apple = isApple();
+  // The server and hydration render the Ctrl shortcuts; an Apple platform's ⌘ ones follow straight after.
+  const apple = useSyncExternalStore(noSubscribe, isApple, () => false);
   return (
-    <span role="group" aria-label="History" className="inline-flex items-center gap-0.5 duration-200 animate-in fade-in-0">
+    <span role="group" aria-label="History" className="inline-flex items-center gap-0.5">
       <HistoryButton
         label="Undo"
         idle="Nothing to undo"
         shortcut={apple ? "⌘Z" : "Ctrl+Z"}
         icon={Undo2}
-        enabled={history.canUndo}
-        onPress={history.undo}
+        enabled={history?.canUndo ?? false}
+        onPress={() => history?.undo()}
       />
       <HistoryButton
         label="Redo"
         idle="Nothing to redo"
         shortcut={apple ? "⇧⌘Z" : "Ctrl+Shift+Z"}
         icon={Redo2}
-        enabled={history.canRedo}
-        onPress={history.redo}
+        enabled={history?.canRedo ?? false}
+        onPress={() => history?.redo()}
       />
     </span>
   );
