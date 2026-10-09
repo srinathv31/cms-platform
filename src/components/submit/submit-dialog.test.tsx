@@ -31,10 +31,11 @@ const summary = (over: Partial<SubmitSummary> = {}): SubmitSummary => ({
   templateId: "UC-4F7K2Q",
   rev: 4,
   number: 3,
+  name: "Spring Travel Rewards — Terms",
   channels: ["pdf", "email"],
   sampleSetNames: ["Typical customer", "Long name and maximum values", "Minimum values"],
   variables: BASE,
-  baseline: { number: 2, variables: BASE },
+  baseline: { number: 2, name: "Spring Travel Rewards — Terms", variables: BASE },
   ...over,
 });
 
@@ -141,6 +142,21 @@ describe("what the dialog lists", () => {
   it("has no contract section when there is no Active version to compare with", async () => {
     await render(summary({ baseline: null }));
     expect(dialog()!.textContent).not.toContain("Contract changes");
+  });
+
+  it("lists a rename against the Active version, old name struck and new name inserted", async () => {
+    await render(summary({ name: "Spring Travel Rewards — Card Terms" }));
+    const line = dialog()!.querySelector("[data-slot='name-change']")!;
+    expect(line.querySelector("del")?.textContent).toBe("Spring Travel Rewards — Terms");
+    expect(line.querySelector("ins")?.textContent).toBe("Spring Travel Rewards — Card Terms");
+    expect(line.textContent).toContain("Renamed from Spring Travel Rewards — Terms");
+  });
+
+  it("has no name section when the name is the Active version's, or nothing is Active", async () => {
+    await render(summary());
+    expect(dialog()!.querySelector("[data-slot='name-change']")).toBeNull();
+    await render(summary({ name: "Spring Travel Rewards — Card Terms", baseline: null }));
+    expect(dialog()!.querySelector("[data-slot='name-change']")).toBeNull();
   });
 
   it("starts with focus in the note, which is labelled for reviewers", async () => {

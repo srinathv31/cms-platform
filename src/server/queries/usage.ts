@@ -34,6 +34,7 @@ import { db } from "@/server/db/client";
 import { consumers, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { requireTemplate } from "./review-shared";
 import { requireSpace } from "./spaces";
+import { currentName } from "./template-name";
 
 // The Usage read models (slice S2). render_log is ~27k rows: every number is grouped in SQL by
 // day / consumer / template / version / channel, with the windows from `usageWindows(now)` (demo
@@ -260,7 +261,7 @@ export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageD
   const w = usageWindows(nowDate);
 
   const templateRows = await db
-    .select({ id: templates.id, name: templates.name, teamId: teams.id, teamSlug: teams.slug })
+    .select({ id: templates.id, name: currentName(templates.id), teamId: teams.id, teamSlug: teams.slug })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
     .where(space.isAll ? undefined : eq(teams.slug, spaceSlug));

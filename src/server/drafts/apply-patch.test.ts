@@ -75,7 +75,6 @@ async function seed() {
     id: "UC-AAAAAA",
     teamId: "coral",
     contentTypeId: "ct_disclosure",
-    name: "Annual fee",
     createdBy: "maya",
     createdAt: T0,
   });
@@ -84,6 +83,7 @@ async function seed() {
     templateId: "UC-AAAAAA",
     number: null,
     state: "draft",
+    name: "Annual fee",
     body: doc(para("Original", "p1")),
     channels: ["pdf"],
     variables: [variable("first_name")],
@@ -124,7 +124,6 @@ const save = (patch: Partial<DraftPatch>, opts: { by?: Viewer; id?: string; at?:
   });
 
 const draft = () => db.query.versions.findFirst({ where: eq(versions.id, "v_draft") }).then((v) => v!);
-const template = () => db.query.templates.findFirst({ where: eq(templates.id, "UC-AAAAAA") }).then((t) => t!);
 const audit = () => db.select().from(auditEvents);
 const failure = (res: DraftSaveResponse) => {
   if (res.ok) throw new Error("expected a failure");
@@ -166,7 +165,7 @@ describe("applyDraftPatch: a good save", () => {
     expect(after.emailSubject).toEqual(subject);
     expect(after.emailPreheader).toEqual(doc(para("Pre", "h1")));
     expect(after.sampleSets).toEqual([{ id: "s1", name: "Maya", values: { a: "1", b: 2 } }]);
-    expect((await template()).name).toBe("New name");
+    expect((await draft()).name).toBe("New name");
   });
 
   it("clears the email subject with null", async () => {
@@ -175,11 +174,32 @@ describe("applyDraftPatch: a good save", () => {
     expect((await draft()).emailSubject).toBeNull();
   });
 
-  it("renames the template, trimmed, and still bumps the version's rev", async () => {
+  it("renames the draft, trimmed, and still bumps the version's rev", async () => {
     const res = await save({ name: "  Annual fee waiver  " });
     expect(res).toMatchObject({ ok: true, rev: 6 });
-    expect((await template()).name).toBe("Annual fee waiver");
+    expect((await draft()).name).toBe("Annual fee waiver");
     expect((await draft()).body).toEqual(doc(para("Original", "p1")));
+  });
+
+  it("renames only the draft: the Active version keeps the name it went live with", async () => {
+    await db.insert(versions).values({
+      id: "v_active",
+      templateId: "UC-AAAAAA",
+      number: 1,
+      state: "active",
+      name: "Annual fee",
+      body: doc(para("Live", "p1")),
+      channels: ["pdf"],
+      variables: [],
+      sampleSets: [],
+      createdBy: "maya",
+      createdAt: T0,
+      updatedAt: T0,
+    });
+    expect(await save({ name: "Annual fee waiver" })).toMatchObject({ ok: true });
+    const active = await db.query.versions.findFirst({ where: eq(versions.id, "v_active") });
+    expect(active).toMatchObject({ name: "Annual fee", rev: 0, updatedAt: T0 });
+    expect((await draft()).name).toBe("Annual fee waiver");
   });
 
   it("gives blocks without an id one, and keeps the ids they have", async () => {
@@ -286,11 +306,11 @@ describe("applyDraftPatch: a document the check refuses is not saved, and says w
 describe("applyDraftPatch: refusals change nothing", () => {
   async function expectUntouched(run: () => Promise<DraftSaveResponse>) {
     const before = await draft();
-    const name = (await template()).name;
+    const name = (await draft()).name;
     const res = await run();
     expect(res.ok).toBe(false);
     expect(await draft()).toEqual(before);
-    expect((await template()).name).toBe(name);
+    expect((await draft()).name).toBe(name);
     expect(await audit()).toHaveLength(0);
     return failure(res);
   }
@@ -430,7 +450,6 @@ describe("applyDraftPatch: the audit row", () => {
       id: "UC-BBBBBB",
       teamId: "coral",
       contentTypeId: "ct_disclosure",
-      name: "Other",
       createdBy: "maya",
       createdAt: T0,
     });
@@ -438,6 +457,7 @@ describe("applyDraftPatch: the audit row", () => {
       id: "v_other",
       templateId: "UC-BBBBBB",
       state: "draft",
+      name: "Other",
       body: doc(para("o", "o1")),
       channels: ["pdf"],
       variables: [],
@@ -546,7 +566,7 @@ describe("applyDraftPatch: a save whose response was lost", () => {
     const after = await draft();
     expect(after.rev).toBe(7);
     expect(after.body).toEqual(doc(para("second try", "p1")));
-    expect((await template()).name).toBe("Landed"); // the first save's other fields stay
+    expect((await draft()).name).toBe("Landed"); // the first save's other fields stay
 
     const rows = await audit();
     expect(rows).toHaveLength(1);

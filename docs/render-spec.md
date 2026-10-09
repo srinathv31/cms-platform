@@ -60,7 +60,7 @@ Before stage 1 the route checks the request itself: the body's size (at most 1,0
 
 Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that for email stage 7 also checks the subject and preheader and stage 8 resolves them, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
-Inputs to the engine (and nothing else): the version's `body`, `emailSubject` and `emailPreheader` (TipTap JSON), the version's variable list, the request's `values`, the template id and name, the version number (or none for a draft), the channel, and the render time `at` (used only as the PDF's creation and modification date).
+Inputs to the engine (and nothing else): the version's `body`, `emailSubject` and `emailPreheader` (TipTap JSON), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel, and the render time `at` (used only as the PDF's creation and modification date).
 
 ---
 
@@ -515,7 +515,7 @@ The RenderDoc is the channel-neutral result of resolution, and the input of ever
 ```jsonc
 {
   "templateId": "UC-4F7K2Q",
-  "templateName": "Cash Back Welcome Bonus",   // metadata: PDF title, web <title>; never printed in the body
+  "templateName": "Cash Back Welcome Bonus",   // the version's name; metadata: PDF title, web <title>; never printed in the body
   "versionNumber": 2,                          // null for an unsubmitted draft
   "blocks": [ Block, … ]
 }
@@ -563,11 +563,11 @@ Adapters only choose how the RenderDoc looks. They never drop, add, reorder, ren
 
 ## 10. Channels
 
-Shared by every channel: every block of the RenderDoc renders, in order; every list item shows its `marker` before its first line; blank paragraphs render as blank lines; spaces and hard breaks render per section 4; links per section 6; the template name never appears in the body.
+Shared by every channel: every block of the RenderDoc renders, in order; every list item shows its `marker` before its first line; blank paragraphs render as blank lines; spaces and hard breaks render per section 4; links per section 6; the version's name never appears in the body.
 
 ### Web (`text/html; charset=utf-8`)
 
-- A complete, responsive HTML document: doctype, `<html lang="en">`, UTF-8, viewport, `<title>` = the template name (escaped), one `<style>` block. No scripts, no external resources.
+- A complete, responsive HTML document: doctype, `<html lang="en">`, UTF-8, viewport, `<title>` = the version's name (escaped), one `<style>` block. No scripts, no external resources.
 - Escaping: `&` `<` `>` `"` `'` as `&amp;` `&lt;` `&gt;` `&quot;` `&#39;` in text and attribute values. U+00A0 is written `&nbsp;`. Every other character is written as itself (UTF-8).
 - `white-space: pre-wrap` is on `p`, `h1`, `h2` and `h3` only, not on `li`, `td`, `th` or the callout. List items, table cells and callouts always hold their content as blocks, so a paragraph there is always a `<p>`.
 - Each text run is written on its own: its escaped text inside `<u>`, then `<em>`, then `<strong>` (all three: `<strong><em><u>…</u></em></strong>`). Adjacent runs never share a tag. A link's `<a>` wraps its runs (section 6).
@@ -606,7 +606,7 @@ The adapter returns `{ subject, preheader, html, text }`.
 ### PDF (`application/pdf`)
 
 - US Letter pages, 1 inch side margins, real selectable text, embedded fonts. Pagination rules are unchanged (keep-with-next headings, widows and orphans, table rows that never split, repeated table header rows, list items and callouts that move whole up to a size).
-- Document information: /Title = the template name, /Subject = the footer label (`UC-4F7K2Q · v2`, or `UC-4F7K2Q · Draft`), /Creator (Stencil), /Producer (Stencil), no /Author or /Keywords. /CreationDate = /ModDate = the render time `at` truncated (not rounded) to whole seconds, UTC, written `D:20270304120000Z`. The catalog's /Lang is (en-US). (react-pdf writes /ModificationDate; the Node adapter renames that key in place to /ModDate, padded with spaces so no byte offset moves.)
+- Document information: /Title = the version's name, /Subject = the footer label (`UC-4F7K2Q · v2`, or `UC-4F7K2Q · Draft`), /Creator (Stencil), /Producer (Stencil), no /Author or /Keywords. /CreationDate = /ModDate = the render time `at` truncated (not rounded) to whole seconds, UTC, written `D:20270304120000Z`. The catalog's /Lang is (en-US). (react-pdf writes /ModificationDate; the Node adapter renames that key in place to /ModDate, padded with spaces so no byte offset moves.)
 - A footer on every page: the label on the left, `Page N of M` on the right. The footer is not document content.
 - Prints exactly the RenderDoc: every item's `marker` (right-aligned in a hanging marker column), blank lines (an empty or blank paragraph takes one line of its type's line height per line; an empty paragraph exactly one), spaces and breaks per section 4 (the empty last line after a final hard break included).
 - Spaces: U+0020 and U+00A0 print with the face's own glyphs. Every other Unicode space (U+1680, U+2000–U+200A, U+202F, U+205F, U+3000), which neither face has, is drawn as the face's no-break space with letter spacing that gives it its own width: en quad and en space ½ em; em quad, em space and ideographic space 1 em; three-per-em ⅓ em; four-per-em ¼ em; six-per-em ⅙ em; figure space the width of the face's `0`; punctuation space the width of `.`; thin space and narrow no-break space ⅕ em; hair space 1/10 em; medium mathematical space 4/18 em; Ogham space mark the width of U+0020. So a space is never a character the PDF can't draw, and leading spaces of every kind keep their indent. In the text layer a U+0020 reads U+0020; a space drawn with Liberation Sans's space glyph (U+00A0 and the drawn substitutes) reads U+0020 too.

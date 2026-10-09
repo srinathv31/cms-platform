@@ -4,7 +4,7 @@ import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/domain/approval-chain";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
@@ -38,6 +38,7 @@ export const DECIDED_WINDOW_DAYS = 30;
 
 // ── Queue ─────────────────────────────────────────────────────
 
+// A row is a version, so it carries that version's name: an approver reviews the name it was submitted with.
 const queueColumns = {
   versionId: versions.id,
   versionNumber: versions.number,
@@ -51,7 +52,7 @@ const queueColumns = {
   currentStage: versions.currentStage,
   contractChanges: versions.contractChanges,
   templateId: templates.id,
-  templateName: templates.name,
+  templateName: versions.name,
   contentTypeId: templates.contentTypeId,
   teamId: teams.id,
   teamSlug: teams.slug,
@@ -225,11 +226,15 @@ export const getReviewScreen = cache(
     const number = version.number!;
 
     const nowDate = await demoNow();
-    const [active, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
+    const [active, others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
       db.query.versions.findFirst({
         columns: { id: true, number: true, body: true, variables: true },
         where: and(eq(versions.templateId, template.id), eq(versions.state, "active")),
       }),
+      db
+        .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt, name: versions.name })
+        .from(versions)
+        .where(eq(versions.templateId, template.id)),
       loadChain(db, template.contentTypeId),
       getPeople(),
       db
@@ -253,11 +258,13 @@ export const getReviewScreen = cache(
     const approvedBy = inReview ? approvedThisRound(decisionRows) : [];
     const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
     const contractChanges = version.contractChanges ?? [];
+    // What a rename is shown against: the name customers get today, the Active version's or, with none
+    // Active, the newest that still renders (as submit's contract changes compare). Not this version's own.
+    const live = contractBaseline(others, nowDate);
 
     return {
       template: {
         id: template.id,
-        name: template.name,
         teamId: template.teamId,
         teamSlug: template.teamSlug,
         teamName: template.teamName,
@@ -266,6 +273,7 @@ export const getReviewScreen = cache(
         id: version.id,
         number,
         state: version.state,
+        name: version.name,
         body: version.body,
         variables: version.variables,
         channels: version.channels,
@@ -283,6 +291,7 @@ export const getReviewScreen = cache(
         active && active.id !== version.id && active.number !== null
           ? { id: active.id, number: active.number, body: active.body, variables: active.variables }
           : null,
+      liveName: live && live.id !== version.id ? live.name : null,
       steps: stepperState(
         own,
         decisionRows.map((d) => ({

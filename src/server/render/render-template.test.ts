@@ -269,6 +269,56 @@ describe("runRender: previews", () => {
   });
 });
 
+// The name is a version field: the web <title> and the PDF's Title are the rendered version's name, so a
+// rename in a draft, or in a later version, never reaches the output of the version a consumer pins.
+describe("runRender: the title is the rendered version's name", () => {
+  const titleOf = (html: string) => /<title>([^<]*)<\/title>/.exec(html)?.[1];
+  async function pdfTitle(bytes: Uint8Array) {
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdf = await getDocument({ data: bytes.slice(), useSystemFonts: false }).promise;
+    const { info } = await pdf.getMetadata();
+    return (info as { Title?: string }).Title;
+  }
+  async function renameVersion(template: string, where: { number: number } | { state: "draft" }, name: string) {
+    const which = "number" in where ? eq(versions.number, where.number) : eq(versions.state, where.state);
+    const [row] = await db
+      .update(versions)
+      .set({ name })
+      .where(and(eq(versions.templateId, ids[template]!), which))
+      .returning({ id: versions.id });
+    expect(row).toBeDefined();
+  }
+
+  it("a consumer render of each version carries that version's own name, on the web and in the PDF", async () => {
+    await renameVersion("balance-transfer", { number: 1 }, "Balance Transfer Intro — Terms (2025)");
+    try {
+      const v1 = ok((await render({ template: "balance-transfer", version: 1 })).result);
+      const v2 = ok((await render({ template: "balance-transfer", version: 2 })).result);
+      expect(titleOf(v1.body as string)).toBe("Balance Transfer Intro — Terms (2025)");
+      expect(titleOf(v2.body as string)).toBe("Balance Transfer Intro — Terms");
+
+      const pdf1 = ok((await render({ template: "balance-transfer", version: 1, channel: "pdf" })).result);
+      const pdf2 = ok((await render({ template: "balance-transfer", version: 2, channel: "pdf" })).result);
+      expect(await pdfTitle(pdf1.body as Uint8Array)).toBe("Balance Transfer Intro — Terms (2025)");
+      expect(await pdfTitle(pdf2.body as Uint8Array)).toBe("Balance Transfer Intro — Terms");
+    } finally {
+      await renameVersion("balance-transfer", { number: 1 }, "Balance Transfer Intro — Terms");
+    }
+  }, 30_000);
+
+  it("a preview of the open draft shows the draft's name; its earlier version keeps its own", async () => {
+    await renameVersion("annual-fee-waiver", { state: "draft" }, "Annual Fee Waiver — Card Terms");
+    try {
+      const draft = ok((await render({ template: "annual-fee-waiver", version: "draft", preview: true, viewer: maya })).result);
+      const v1 = ok((await render({ template: "annual-fee-waiver", version: 1, preview: true, viewer: maya })).result);
+      expect(titleOf(draft.body as string)).toBe("Annual Fee Waiver — Card Terms");
+      expect(titleOf(v1.body as string)).toBe("Annual Fee Waiver — Terms");
+    } finally {
+      await renameVersion("annual-fee-waiver", { state: "draft" }, "Annual Fee Waiver — Terms");
+    }
+  });
+});
+
 describe("runRender: refusals before the version is known are not logged", () => {
   it("unknown template (404)", async () => {
     const { result, rows } = await render({ template: "UC-ZZZZZZ" });

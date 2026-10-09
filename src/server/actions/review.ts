@@ -156,11 +156,6 @@ async function loadVersion(tx: Tx, found: FoundVersion, number: number) {
   return row satisfies ReviewVersion;
 }
 
-async function templateName(tx: Tx, templateId: string): Promise<string> {
-  const row = await tx.select({ name: templates.name }).from(templates).where(eq(templates.id, templateId)).limit(1);
-  return row[0]?.name ?? templateId;
-}
-
 async function activeVersion(tx: Tx, templateId: string) {
   return tx.query.versions.findFirst({
     columns: { id: true, number: true, contractChanges: true },
@@ -210,6 +205,7 @@ function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
     templateId: ids.templateId,
     number: draft.number,
     state: draft.state,
+    name: draft.name,
     basedOnVersionId: draft.basedOnVersionId,
     body: draft.body,
     emailSubject: draft.emailSubject,
@@ -302,7 +298,7 @@ export async function submitVersion(input: {
       submittedBy: viewer.userId,
       submitterName: viewer.name,
       templateId: found.id,
-      templateName: await templateName(tx, found.id),
+      templateName: draft.name,
       note: parsed.data.note ?? null,
       chain: await loadChain(tx, found.contentTypeId),
     });
@@ -400,7 +396,7 @@ export async function requestChanges(input: {
       actorName: viewer.name,
       reason: parsed.data.reason,
       now: at,
-      templateName: await templateName(tx, found.templateId),
+      templateName: version.name,
     });
     if (!outcome.ok) refuse(outcome.reason);
 
@@ -499,7 +495,7 @@ export async function approveVersion(input: {
       active: active && active.id !== version.id && active.number !== null ? { id: active.id, number: active.number } : null,
       sunsetPrevious,
       sampleSetsSeen: parsed.data.sampleSetsSeen,
-      templateName: await templateName(tx, found.templateId),
+      templateName: version.name,
       decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
     });
     if (!outcome.ok) refuse(outcome.reason);
@@ -574,7 +570,7 @@ export async function setSunset(input: {
       now: at,
       sunsetAt,
       activeNumber: active?.number ?? null,
-      templateName: await templateName(tx, found.templateId),
+      templateName: version.name,
       contractChanges: active?.contractChanges ?? null,
     });
     if (!outcome.ok) refuse(outcome.reason);
@@ -607,14 +603,14 @@ export async function startRevoke(input: {
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
   if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, reason: REASONS.reasonTooLong };
 
-  return revokeStep(viewer, found, parsed.data.versionNumber, (version, at, name) =>
+  return revokeStep(viewer, found, parsed.data.versionNumber, (version, at) =>
     startRevokeTransition({
       version,
       actorId: viewer.userId,
       actorName: viewer.name,
       reason: parsed.data.reason,
       now: at,
-      templateName: name,
+      templateName: version.name,
     }),
   );
 }
@@ -631,7 +627,7 @@ export async function confirmRevoke(input: { templateId: string; versionNumber: 
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
 
-  return revokeStep(viewer, found, parsed.data.versionNumber, async (version, at, name, tx) => {
+  return revokeStep(viewer, found, parsed.data.versionNumber, async (version, at, tx) => {
     const active = await activeVersion(tx, found.templateId);
     return confirmRevokeTransition({
       version,
@@ -639,7 +635,7 @@ export async function confirmRevoke(input: { templateId: string; versionNumber: 
       actorName: viewer.name,
       now: at,
       activeNumber: active?.number ?? null,
-      templateName: name,
+      templateName: version.name,
     });
   });
 }
@@ -671,12 +667,12 @@ async function revokeStep(
   viewer: Viewer,
   found: FoundVersion,
   number: number,
-  transition: (version: ReviewVersion, at: Date, templateName: string, tx: Tx) => RevokeOutcome | Promise<RevokeOutcome>,
+  transition: (version: ReviewVersion, at: Date, tx: Tx) => RevokeOutcome | Promise<RevokeOutcome>,
 ): Promise<ActionResult> {
   const at = await now();
   const result = await transact(async (tx) => {
     const version = await loadVersion(tx, found, number);
-    const outcome = await transition(version, at, await templateName(tx, found.templateId), tx);
+    const outcome = await transition(version, at, tx);
     if (!outcome.ok) refuse(outcome.reason);
     await updateVersion(tx, version, outcome.changes, at, REFUSALS.noRevokePending);
     await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));

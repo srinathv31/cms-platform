@@ -18,9 +18,10 @@ import type { Channel, JSONContent, SampleSet, Variable } from "@/domain/types";
 // never the base of another draft the template has by now (the one on screen was submitted, and
 // someone started a new one).
 
-/** The draft's fields as they are in the version it was started from. */
+/** The draft's fields as they are in the version it was started from: its name too. */
 export interface BaseVersionContent {
   number: number;
+  name: string;
   body: JSONContent;
   variables: Variable[];
   channels: Channel[];
@@ -56,6 +57,7 @@ export async function getBaseVersion(input: {
       number: versions.number,
       state: versions.state,
       basedOnVersionId: versions.basedOnVersionId,
+      name: versions.name,
       body: versions.body,
       variables: versions.variables,
       channels: versions.channels,
@@ -75,6 +77,7 @@ export async function getBaseVersion(input: {
     ok: true,
     base: {
       number: base.number,
+      name: base.name,
       body: base.body,
       variables: base.variables,
       channels: base.channels,

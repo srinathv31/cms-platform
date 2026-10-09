@@ -46,7 +46,8 @@ test.beforeAll(async () => {
   db = openDb();
   const [row] = await rowsOf(
     db,
-    "SELECT t.id FROM templates t JOIN teams tm ON tm.id = t.team_id WHERE tm.slug = ? AND t.name = ?",
+    `SELECT DISTINCT t.id FROM templates t JOIN teams tm ON tm.id = t.team_id JOIN versions v ON v.template_id = t.id
+     WHERE tm.slug = ? AND v.name = ?`,
     [TEAM, NAME],
   );
   if (!row) throw new Error(`The seed has no ${NAME}. Run npm run db:reset.`);

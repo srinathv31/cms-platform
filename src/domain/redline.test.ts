@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changesOnly, diffDocuments, groupUnchanged } from "./redline";
+import { changesOnly, diffDocuments, groupUnchanged, nameChange } from "./redline";
 import type { RedlineDoc } from "./review-types";
 import type { JSONContent } from "./types";
 
@@ -524,5 +524,22 @@ describe("speed", () => {
     const next = edited(base);
     expect(diffDocuments(base, next).counts.added).toBe(1);
     expect(medianMs(base, next)).toBeLessThan(25);
+  });
+});
+
+describe("nameChange", () => {
+  it("is the rename from the base version's name to the new one", () => {
+    expect(nameChange("Rate Change Notice", "Rate Change Notice — 2027")).toEqual({ from: "Rate Change Notice", to: "Rate Change Notice — 2027" });
+  });
+
+  it("is null when the name is the same, or there is no base to compare with", () => {
+    expect(nameChange("Rate Change Notice", "Rate Change Notice")).toBeNull();
+    expect(nameChange(null, "Rate Change Notice")).toBeNull();
+    expect(nameChange(undefined, "Rate Change Notice")).toBeNull();
+  });
+
+  it("compares as typed: a change of case or spacing is a rename customers see", () => {
+    expect(nameChange("Rate change notice", "Rate Change Notice")).not.toBeNull();
+    expect(nameChange("Rate Change Notice", "Rate Change  Notice")).not.toBeNull();
   });
 });

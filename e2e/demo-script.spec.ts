@@ -1309,7 +1309,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await expect(after).toBeHidden();
 
     expect(await clockDay(db)).toBe(new Date().toISOString().slice(0, 10));
-    const [bt] = await rows(db, "SELECT v.state, v.revoke FROM versions v JOIN templates t ON t.id = v.template_id WHERE t.name = ? AND v.number = 1", [BT_NAME]);
+    const [bt] = await rows(db, "SELECT v.state, v.revoke FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.number = 1", [BT_NAME]);
     expect(bt, "Balance Transfer v1's revoke is undone").toMatchObject({ state: "superseded", revoke: null });
     const [sam] = await rows(db, "SELECT status FROM memberships WHERE user_id = 'sam' AND team_id = ?", [TEAM]);
     expect(sam.status, "Sam's access is back").toBe("active");

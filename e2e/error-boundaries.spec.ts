@@ -61,7 +61,7 @@ async function breakValue(table: "versions" | "settings", keyColumn: "id" | "key
 async function versionOf(name: string, state: string) {
   const [row] = await rowsOf(
     db,
-    "SELECT v.id, v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE t.name = ? AND v.state = ?",
+    "SELECT v.id, v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = ?",
     [name, state],
   );
   if (!row) throw new Error(`This spec needs the fresh seed (npm run db:reset): no ${state} version of ${name}.`);

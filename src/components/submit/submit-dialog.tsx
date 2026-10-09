@@ -9,9 +9,11 @@ import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { NameChangeLine } from "@/components/redline/name-change";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { REFUSALS } from "@/domain/lifecycle";
+import { nameChange } from "@/domain/redline";
 import type { ActionResult } from "@/domain/review-types";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
 import type { SubmitSummary } from "./types";
@@ -80,11 +82,11 @@ export interface SubmitDialogProps {
 }
 
 /**
- * "Submit v{N} for review": what is about to be frozen (channels, sample data sets, and the contract
- * changes against the newest version that still renders), an optional note to the reviewers, and the
- * screen's one black button. A refusal shows its reason at the button and the dialog stays; success
- * closes it, and the page behind re-renders in place as In review. Focus starts in the note; Enter there
- * is a new line and ⌘Enter (Ctrl+Enter) submits.
+ * "Submit v{N} for review": what is about to be frozen (channels, sample data sets, and the rename and
+ * contract changes against the newest version that still renders), an optional note to the reviewers,
+ * and the screen's one black button. A refusal shows its reason at the button and the dialog stays;
+ * success closes it, and the page behind re-renders in place as In review. Focus starts in the note;
+ * Enter there is a new line and ⌘Enter (Ctrl+Enter) submits.
  *
  * The shell is the one every action dialog has: 512px wide, 32px padding, the title, a one-line
  * description, the body, and a footer with an outline Cancel and the primary. No Close X (Esc and Cancel
@@ -114,6 +116,8 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
         : null,
     [summary],
   );
+  // A rename goes live with the version, so it is listed with what is about to be frozen.
+  const rename = summary ? nameChange(summary.baseline?.name, summary.name) : null;
 
   function close() {
     // Closing mid-submit would hide the outcome.
@@ -206,6 +210,12 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
                   ))}
                 </ul>
               </Section>
+
+              {rename ? (
+                <Section title="Name">
+                  <NameChangeLine change={rename} />
+                </Section>
+              ) : null}
 
               {contract ? (
                 <Section title="Contract changes" aside={contract.breaking ? <BreakingBadge /> : null}>

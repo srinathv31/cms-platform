@@ -68,7 +68,7 @@ async function main() {
 
     const input: RenderFixture = {
       templateId: id,
-      templateName: template.name,
+      templateName: row.name,
       versionNumber: row.number,
       at: GOLDEN_AT,
       variables: row.variables,

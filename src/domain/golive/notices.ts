@@ -73,6 +73,7 @@ function sentence(text: string): string {
 
 export function noticeView(row: NoticeRow): ApiNotice {
   const p = row.payload ?? {};
+  // The name the notice's own version had when it was written (server/effects.ts), not today's.
   const name = str(p.templateName) ?? row.templateId;
   const versionNumber = int(p.versionNumber) ?? 0;
   const title = `${name} v${versionNumber}`;

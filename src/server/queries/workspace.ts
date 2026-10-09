@@ -18,7 +18,10 @@ import { getImportOriginalRef } from "./import";
 
 export interface WorkspaceHeaderData {
   id: string;
+  /** The shown version's name: the open draft's (the field the author renames), otherwise the newest version's. */
   name: string;
+  /** The Active version's name, if any: what consumers see, so the SHARE ring's details carry it. */
+  activeName: string | null;
   teamSlug: string;
   teamName: string;
   status: VersionState;
@@ -56,7 +59,6 @@ export const getWorkspaceHeader = cache(
     const tpl = await db
       .select({
         id: templates.id,
-        name: templates.name,
         teamId: templates.teamId,
         teamSlug: teams.slug,
         teamName: teams.name,
@@ -76,6 +78,7 @@ export const getWorkspaceHeader = cache(
         id: versions.id,
         number: versions.number,
         state: versions.state,
+        name: versions.name,
         sunsetAt: versions.sunsetAt,
         basedOnVersionId: versions.basedOnVersionId,
       })
@@ -95,7 +98,8 @@ export const getWorkspaceHeader = cache(
 
     return {
       id: tpl.id,
-      name: tpl.name,
+      name: latest?.name ?? tpl.id,
+      activeName: active?.name ?? null,
       teamSlug: tpl.teamSlug,
       teamName: tpl.teamName,
       status: latest?.state ?? "draft",

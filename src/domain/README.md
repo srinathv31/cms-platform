@@ -44,7 +44,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
 | Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with. |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
-| | [redline.ts](redline.ts) | The diff between two versions' documents, for the review screen. |
+| | [redline.ts](redline.ts) | The diff between two versions' documents, and their rename (`nameChange`), for the review screen and Compare. |
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
 | | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. |
@@ -93,6 +93,11 @@ in_review    requestChanges                               → changes_requested,
 superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
 ```
+
+The template's name is a version field like the body (`name` on `VersionSnapshot` and `DraftFields`): a new draft
+copies it, the author renames the draft, and it freezes at submit, so a rename reaches customers only when its
+version goes live ([decision 0016](../../docs/decisions/0016-the-name-is-versioned.md)). `nameChange` in
+[redline.ts](redline.ts) is the rename the review, the submit dialog and Compare show.
 
 ## How it works
 

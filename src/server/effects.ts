@@ -14,6 +14,7 @@ import {
   teams,
   templates,
   users,
+  versions,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 
@@ -53,9 +54,9 @@ export interface EffectsWritten {
  *   holding the role on the template's team, minus `exceptUserIds`. Nobody is notified of their own
  *   action. The link becomes an href under the team's slug.
  * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, in the
- *   last 90 days (from the render log). The payload carries version numbers, dates and contract
- *   changes, never variable values. Each row takes the next `seq` (`takeNoticeSeqs`), the order the
- *   notices API pages in.
+ *   last 90 days (from the render log). The payload carries the name of the version the notice is
+ *   about (`templateName`), version numbers, dates and contract changes, never variable values. Each
+ *   row takes the next `seq` (`takeNoticeSeqs`), the order the notices API pages in.
  */
 export async function writeEffects(
   tx: Tx,
@@ -64,8 +65,14 @@ export async function writeEffects(
 ): Promise<EffectsWritten> {
   const written: EffectsWritten = { audit: 0, notifications: 0, consumerNotices: 0 };
   // Read once, and only when a notification or a notice needs it.
-  let template: Promise<{ name: string; teamSlug: string }> | undefined;
-  const templateInfo = () => (template ??= templateOf(tx, ctx));
+  let team: Promise<string> | undefined;
+  const teamSlugOf = () => (team ??= teamSlug(tx, ctx));
+  const names = new Map<string, Promise<string>>();
+  const nameOf = (versionId: string) => {
+    let name = names.get(versionId);
+    if (!name) names.set(versionId, (name = versionName(tx, versionId, ctx)));
+    return name;
+  };
   let audience: Promise<string[]> | undefined;
   const consumerAudience = () => (audience ??= recentConsumers(tx, ctx));
 
@@ -91,7 +98,7 @@ export async function writeEffects(
       case "notification": {
         const userIds = (await resolveRecipients(tx, effect.to, ctx.teamId)).filter((id) => id !== ctx.actorId);
         if (userIds.length === 0) break;
-        const { teamSlug } = await templateInfo();
+        const teamSlug = await teamSlugOf();
         // A stage reviewer outside the template's team opens the version from their own space: a review
         // link moves there, and a template link that names a version becomes that version's review.
         const link = effect.link;
@@ -124,7 +131,7 @@ export async function writeEffects(
       case "consumer_notice": {
         const consumerIds = await consumerAudience();
         if (consumerIds.length === 0) break;
-        const { name } = await templateInfo();
+        const name = await nameOf(effect.versionId);
         const first = await takeNoticeSeqs(tx, consumerIds.length);
         await tx.insert(consumerNotices).values(
           consumerIds.map((consumerId, i) => ({
@@ -146,15 +153,24 @@ export async function writeEffects(
   return written;
 }
 
-/** The template's name and its team's slug (notifications link under the slug; notices carry the name). */
-async function templateOf(tx: Tx, ctx: EffectContext): Promise<{ name: string; teamSlug: string }> {
+/** The template's team's slug: notifications link under it. */
+async function teamSlug(tx: Tx, ctx: EffectContext): Promise<string> {
   const rows = await tx
-    .select({ name: templates.name, teamSlug: teams.slug })
+    .select({ teamSlug: teams.slug })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
     .where(eq(templates.id, ctx.templateId))
     .limit(1);
-  return rows[0] ?? { name: ctx.templateId, teamSlug: ctx.teamId };
+  return rows[0]?.teamSlug ?? ctx.teamId;
+}
+
+/**
+ * The name a notice carries: the one the version it is about has, as written now. A new version's
+ * notice names it as approved; a sunset or a revoke names the old version as its consumers know it.
+ */
+async function versionName(tx: Tx, versionId: string, ctx: EffectContext): Promise<string> {
+  const rows = await tx.select({ name: versions.name }).from(versions).where(eq(versions.id, versionId)).limit(1);
+  return rows[0]?.name ?? ctx.templateId;
 }
 
 /**

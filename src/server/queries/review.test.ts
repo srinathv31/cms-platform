@@ -133,7 +133,6 @@ describe("getReviewScreen", () => {
     const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
     expect(screen.template).toEqual({
       id: ids["cash-back"],
-      name: "Cash Back Welcome Bonus — Terms",
       teamId: "coral-offers",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
@@ -141,11 +140,13 @@ describe("getReviewScreen", () => {
     expect(screen.version).toMatchObject({
       number: 3,
       state: "in_review",
+      name: "Cash Back Welcome Bonus — Terms",
       submittedBy: expect.objectContaining({ id: "maya" }),
       submittedAt: expect.stringMatching(ISO),
       contractLines: ["v3 adds required `annual_fee` (Currency)."],
     });
     expect(screen.baseline).toMatchObject({ number: 2 });
+    expect(screen.liveName).toBe("Cash Back Welcome Bonus — Terms");
     expect(screen.steps).toEqual([{ position: 0, name: "Team approver", status: "current" }]);
     expect(screen.can).toEqual({ approve: { ok: true }, requestChanges: { ok: true }, comment: { ok: true } });
     expect(screen.today).toBe("2026-10-04");
@@ -223,6 +224,24 @@ describe("getReviewScreen", () => {
     await expect(getReviewScreen("coral-offers", "UC-ZZZZZZ", 1)).rejects.toThrow(NOT_FOUND);
     as("riley");
     await expect(getReviewScreen("all", ids["cash-back"]!, 3)).resolves.toMatchObject({ version: { number: 3 } });
+  });
+
+  it("shows a rename against what still renders when the Active version was revoked, and none on the live version itself", async () => {
+    as("jordan");
+    const versionOf = (number: number) => and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, number));
+    const [v1, v2] = await Promise.all([1, 2].map((n) => db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!)));
+    const revoke = { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() };
+    await db.update(versions).set({ name: "Cash Back Welcome Bonus — 2025 Terms" }).where(versionOf(1));
+    await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
+    try {
+      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+      expect(screen.baseline, "nothing is Active: no redline").toBeNull();
+      expect(screen.liveName, "v1 still renders").toBe("Cash Back Welcome Bonus — 2025 Terms");
+    } finally {
+      await db.update(versions).set({ state: v2.state, revoke: v2.revoke }).where(versionOf(2));
+      await db.update(versions).set({ name: v1.name }).where(versionOf(1));
+    }
+    expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 2)).liveName, "v2 is the live one").toBeNull();
   });
 });
 

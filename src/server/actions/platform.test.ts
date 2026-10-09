@@ -850,8 +850,11 @@ describe("editing the chain while versions are in review: each version keeps the
   });
 });
 
+/** The name of the template's v1: what its notifications call it (the name is versioned). */
 async function versionTemplateName(templateId: string) {
-  const row = await db.query.templates.findFirst({ where: eq(schema.templates.id, templateId) });
+  const row = await db.query.versions.findFirst({
+    where: and(eq(schema.versions.templateId, templateId), eq(schema.versions.number, 1)),
+  });
   return row!.name;
 }
 

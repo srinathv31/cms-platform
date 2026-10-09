@@ -11,6 +11,7 @@ import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, renderLog, teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { requireSpace, type SpaceContext } from "./spaces";
+import { currentName } from "./template-name";
 
 // Helpers the Phase 4 read models (review, versions, activity, threads) and the review actions
 // share: people, template access, the approval chain, the decide check and the render-log usage.
@@ -53,6 +54,7 @@ export function dayOf(date: Date): string {
 
 export interface TemplateAccess {
   space: SpaceContext;
+  /** `name` is the CMS's name for the template (`currentName`): its open draft's, otherwise its newest version's. */
   template: { id: string; name: string; teamId: string; teamSlug: string; teamName: string; contentTypeId: string };
 }
 
@@ -71,7 +73,7 @@ function findTemplate(templateId: string) {
   return db
     .select({
       id: templates.id,
-      name: templates.name,
+      name: currentName(templates.id),
       teamId: templates.teamId,
       teamSlug: teams.slug,
       teamName: teams.name,

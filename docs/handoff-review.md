@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 5 | 25 | 12 | 42 |
+| Open | 0 | 4 | 25 | 12 | 41 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 17 | 10 | 2 | 30 |
+| Fixed | 1 | 18 | 10 | 2 | 31 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -359,7 +359,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I5 · High: A draft rename goes live without review
 
-- **Status:** Open
+- **Status:** Fixed. The name is a version field (`versions.name`; `templates.name` is gone), so a rename changes only the draft, shows in the submit dialog, the review rail and Compare, and reaches the render titles, the API and notices only when its version goes live ([decision 0016](decisions/0016-the-name-is-versioned.md)).
 - **Where:** `src/server/drafts/apply-patch.ts` line 165; `src/server/render/channels/web.ts` line 79
 - **What happens:** Autosave writes `templates.name` directly. The name isn't versioned, so the Active version's web ``, PDF title metadata, API `name` and notice payloads change the moment an author types. The RenderDoc documents the name as internal-only, yet browsers show both titles to customers.
 - **Fix:** Make the name a version field, and give customer output its own title (the first heading or a dedicated field).

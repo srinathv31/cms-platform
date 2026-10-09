@@ -116,7 +116,7 @@ describe("searchActiveTemplates", () => {
   it("an empty query lists every template with an Active version, by name", async () => {
     const results = await search("", 50);
     const active = await db
-      .select({ id: templates.id, name: templates.name })
+      .select({ id: templates.id, name: versions.name })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(eq(versions.state, "active"));
@@ -169,9 +169,10 @@ describe("searchActiveTemplates", () => {
   });
 
   it("orders names by code point, not by the server's locale: a lower-case name comes after every capital", async () => {
-    const [template] = await db.select({ id: templates.id, name: templates.name }).from(templates).where(eq(templates.id, id("cash-back")));
+    const live = and(eq(versions.templateId, id("cash-back")), eq(versions.state, "active"));
+    const [template] = await db.select({ id: versions.templateId, name: versions.name }).from(versions).where(live);
     // "cash Back…" sorts after "Statement…" by code point; any locale collation puts it among the C's.
-    await db.update(templates).set({ name: `c${template!.name.slice(1)}` }).where(eq(templates.id, template!.id));
+    await db.update(versions).set({ name: `c${template!.name.slice(1)}` }).where(live);
     try {
       const names = (await search("", 50)).map((r) => r.name);
       expect(names.at(-1)).toBe(`c${template!.name.slice(1)}`);
@@ -180,7 +181,7 @@ describe("searchActiveTemplates", () => {
         expect((await searchPages("", limit)).flatMap((p) => p.results.map((r) => r.name)), `by ${limit}`).toEqual(names);
       }
     } finally {
-      await db.update(templates).set({ name: template!.name }).where(eq(templates.id, template!.id));
+      await db.update(versions).set({ name: template!.name }).where(live);
     }
   });
 
@@ -225,6 +226,26 @@ describe("searchActiveTemplates", () => {
 // ── One template ─────────────────────────────────────────────────────────────
 
 describe("getTemplateDetail", () => {
+  // The name is versioned: "the template" is named by the Active version, else by what still renders.
+  it("names the template by the Active version; after a revoke by the version that still renders, then by the newest", async () => {
+    const versionOf = (number: number) => and(eq(versions.templateId, id("balance-transfer")), eq(versions.number, number));
+    const [v1, v2] = await Promise.all([1, 2].map((n) => db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!)));
+    await db.update(versions).set({ name: "Balance Transfer Intro — Card Terms" }).where(versionOf(2));
+    try {
+      expect((await detail("balance-transfer")).name, "v2 is Active").toBe("Balance Transfer Intro — Card Terms");
+
+      const revoke = { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() };
+      await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
+      expect((await detail("balance-transfer")).name, "v2 revoked: v1 still renders").toBe("Balance Transfer Intro — Terms");
+
+      await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - DAY) }).where(versionOf(1));
+      expect((await detail("balance-transfer")).name, "nothing renders: the newest released").toBe("Balance Transfer Intro — Card Terms");
+    } finally {
+      await db.update(versions).set({ name: v2.name, state: v2.state, revoke: v2.revoke }).where(versionOf(2));
+      await db.update(versions).set({ sunsetAt: v1.sunsetAt }).where(versionOf(1));
+    }
+  });
+
   it("defaults to the Active version's contract; lists released versions newest first", async () => {
     const d = await detail("balance-transfer");
     expect(d).toMatchObject({

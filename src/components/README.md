@@ -46,7 +46,7 @@ Feature folders:
 | `library/` | Library view and browser, New template dialog, starter gallery, file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. | `workspace/`, `review/` |
-| `redline/` | `RedlineDocument`, a version diff painted like the document. | `review/`, `versions/compare-panel.tsx` |
+| `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
 | `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`. | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |

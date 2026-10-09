@@ -35,11 +35,11 @@ const one = async (sql: string, args: InValue[]) => (await rowsOf(db, sql, args)
 test.beforeAll(async () => {
   db = openDb();
   const inReview = await one(
-    "SELECT v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE t.name = ? AND v.state = 'in_review'",
+    "SELECT v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = 'in_review'",
     [CASH_BACK],
   );
   const active = await one(
-    "SELECT v.id, v.template_id, v.number, v.body FROM versions v JOIN templates t ON t.id = v.template_id WHERE t.name = ? AND v.state = 'active'",
+    "SELECT v.id, v.template_id, v.number, v.body FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = 'active'",
     [BALANCE],
   );
   if (!inReview || !active) throw new Error("This spec needs the fresh seed (npm run db:reset).");

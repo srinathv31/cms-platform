@@ -1,10 +1,12 @@
 import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
+import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { parseCsv } from "@/domain/audit";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
+import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
@@ -168,6 +170,32 @@ describe("getAuditExport", () => {
     // Chris's request reason has a comma and an apostrophe: it survives the round trip.
     const request = lines.find((l) => l[5] === "Access requested")!;
     expect(request[6]).toContain("I'm joining the Offers content team next week");
+  });
+
+  // The name is versioned: an event about a version keeps the name that version had, in the page and the
+  // export; an event about the template alone (its creation), and the Template filter, use today's name.
+  it("names each event's template as its version had it; the filter lists the template by its current name", async () => {
+    as("taylor");
+    const { versions } = schema;
+    const [v2] = await db.select().from(versions).where(and(eq(versions.name, "Balance Transfer Intro — Terms"), eq(versions.number, 2)));
+    const v2Only = and(eq(versions.templateId, v2!.templateId), eq(versions.number, 2));
+    await db.update(versions).set({ name: "Balance Transfer Intro — Card Terms" }).where(v2Only);
+    try {
+      const page = await getAuditPage("all", { template: v2!.templateId });
+      const named = (number: number | null, action?: string) =>
+        new Set(page.rows.filter((r) => r.versionNumber === number && (!action || r.action === action)).map((r) => r.template?.name));
+      expect(named(1)).toEqual(new Set(["Balance Transfer Intro — Terms"]));
+      expect(named(2)).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
+      expect(named(null, "template.created")).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
+      expect(page.options.templates.find((t) => t.id === v2!.templateId)?.name).toBe("Balance Transfer Intro — Card Terms");
+
+      const out = await getAuditExport(people.taylor!, "all", { template: v2!.templateId });
+      if (!out.ok) throw new Error(out.reason);
+      const templates = new Set(parseCsv(out.csv).slice(1).filter((l) => l[4] === "v1").map((l) => l[3]));
+      expect(templates).toEqual(new Set([`Balance Transfer Intro — Terms (${v2!.templateId})`]));
+    } finally {
+      await db.update(versions).set({ name: "Balance Transfer Intro — Terms" }).where(v2Only);
+    }
   });
 
   it("refuses a space without audit.view (403) and an unknown team (404)", async () => {

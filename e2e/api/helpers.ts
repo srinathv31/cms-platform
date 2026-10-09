@@ -23,6 +23,7 @@ export interface Variable {
 export interface SeedVersion {
   id: string;
   templateId: string;
+  /** The name this version has (the name is a version field). */
   templateName: string;
   teamId: string;
   /** null for an open draft. */
@@ -41,7 +42,7 @@ export interface SeedVersion {
 /** Every version in the seed, with what the render rules look at. Nothing is hardcoded by id. */
 export async function allVersions(db: Client): Promise<SeedVersion[]> {
   const { rows } = await db.execute(`
-    SELECT v.id, v.template_id, t.name AS template_name, t.team_id, v.number, v.state, v.channels, v.variables,
+    SELECT v.id, v.template_id, v.name AS template_name, t.team_id, v.number, v.state, v.channels, v.variables,
            v.sunset_at, v.revoke,
            (SELECT a.number FROM versions a WHERE a.template_id = v.template_id AND a.state = 'active') AS active_number
     FROM versions v JOIN templates t ON t.id = v.template_id

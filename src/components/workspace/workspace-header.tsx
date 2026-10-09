@@ -72,9 +72,9 @@ export async function WorkspaceHeader({
       {/* The value row sits on the status row's line. */}
       <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
       {t.activeNumber !== null ? (
-        // The SHARE signature: Active versions only.
+        // The SHARE signature: Active versions only. It shows what consumers get, so the Active version's name.
         <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start">
-          <WorkspaceShare templateId={t.id} templateName={t.name} activeVersion={t.activeNumber} />
+          <WorkspaceShare templateId={t.id} templateName={t.activeName ?? t.name} activeVersion={t.activeNumber} />
         </div>
       ) : null}
     </header>

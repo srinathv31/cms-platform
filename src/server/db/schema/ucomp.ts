@@ -118,7 +118,7 @@ export const templates = sqliteTable(
     contentTypeId: text("content_type_id")
       .notNull()
       .references(() => contentTypes.id),
-    name: text("name").notNull(),
+    // No name here: each version carries its own (`versions.name`), so a rename goes through review.
     createdBy: text("created_by").notNull().references(() => users.id),
     createdAt: ts("created_at").notNull(),
     starterKey: text("starter_key"),
@@ -135,6 +135,9 @@ export const versions = sqliteTable(
       .references(() => templates.id),
     number: integer("number"), // null while draft; assigned at submit, then frozen
     state: text("state").$type<VersionState>().notNull(),
+    // The template's name as this version has it: an author renames the open draft, and customers see
+    // the name of the version they render (the Active one's, where the API speaks of the template).
+    name: text("name").notNull(),
     basedOnVersionId: text("based_on_version_id"),
     body: json<JSONContent>("body").notNull(), // TipTap JSON; variable nodes hold only their key
     emailSubject: json<JSONContent>("email_subject"),

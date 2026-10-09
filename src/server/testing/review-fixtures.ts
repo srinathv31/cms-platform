@@ -75,12 +75,16 @@ export async function createTemplateWithDraft(
     id: templateId,
     teamId: opts.teamId,
     contentTypeId: "ct_disclosure",
-    name: opts.name ?? changes.template.name,
     createdBy: opts.createdBy,
     createdAt: opts.at,
     starterKey: changes.template.starterKey,
   });
-  await db.insert(schema.versions).values({ id: draftId, templateId, ...changes.draft });
+  await db.insert(schema.versions).values({
+    id: draftId,
+    templateId,
+    ...changes.draft,
+    name: opts.name ?? changes.draft.name,
+  });
   return { templateId, draftId };
 }
 

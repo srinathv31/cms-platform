@@ -26,7 +26,7 @@ test.beforeAll(async () => {
   const [v1] = await rows(
     db,
     `SELECT v.template_id, v.sunset_at FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE t.team_id = ? AND t.name = ? AND v.number = 1 AND v.state = 'superseded'`,
+     WHERE t.team_id = ? AND v.name = ? AND v.number = 1 AND v.state = 'superseded'`,
     [TEAM, NAME],
   );
   if (!v1?.sunset_at) throw new Error("The seed has no Balance Transfer v1 (Superseded, with a sunset). Run npm run db:reset.");

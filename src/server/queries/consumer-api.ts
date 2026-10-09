@@ -5,6 +5,7 @@ import { contractDiff } from "@/domain/golive/contract-diff";
 import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
 import { apiVariables, contractJsonSchema } from "@/domain/golive/json-schema";
 import { noticeView } from "@/domain/golive/notices";
+import { contractBaseline } from "@/domain/lifecycle";
 import type {
   ApiContract,
   ApiError,
@@ -88,13 +89,15 @@ export interface SearchPage {
  * Templates with an Active version that match `q`: the id (with or without "UC-", any case) or every
  * word in the name. An exact id first, then names that start with the query, then the rest; ties by
  * name, then id (`compareSearchKeys`). An empty query lists every Active template. One page of `limit`
- * results after the key `after` (from the request's cursor; null for the first page).
+ * results after the key `after` (from the request's cursor; null for the first page). The name is the
+ * Active version's, for matching, ordering, the cursor and the result alike: a draft's rename shows
+ * here only once that draft goes live.
  */
 export async function searchActiveTemplates(q: string, limit: number, after: SearchKey | null = null): Promise<SearchPage> {
   const rows = await db
     .select({
       id: templates.id,
-      name: templates.name,
+      name: versions.name,
       teamId: teams.id,
       teamName: teams.name,
       contentTypeKey: contentTypes.key,
@@ -192,7 +195,6 @@ export async function getTemplateDetail(
   const [template] = await db
     .select({
       id: templates.id,
-      name: templates.name,
       teamId: teams.id,
       teamName: teams.name,
       contentTypeKey: contentTypes.key,
@@ -215,6 +217,9 @@ export async function getTemplateDetail(
 
   const active = released.find((v) => v.state === "active") ?? null;
   const activeNumber = active?.number ?? null;
+  // The template's name is the Active version's. With none Active (it was revoked), the name of the
+  // version consumers can still render (`contractBaseline`); with nothing rendering, the newest released one's.
+  const name = (contractBaseline(released, now) ?? released[0]!).name;
 
   /** A version a consumer may read by number: 404 when there's none, 409 when it isn't released. */
   const readable = (number: number) => {
@@ -253,7 +258,7 @@ export async function getTemplateDetail(
         variables: apiVariables(target.variables),
         jsonSchema: contractJsonSchema({
           templateId: template.id,
-          templateName: template.name,
+          templateName: target.name,
           versionNumber: target.number!,
           variables: target.variables,
         }),
@@ -262,7 +267,7 @@ export async function getTemplateDetail(
 
   const detail: ApiTemplateDetail = {
     id: template.id,
-    name: template.name,
+    name,
     team: { id: template.teamId, name: template.teamName },
     contentType: { key: template.contentTypeKey, name: template.contentTypeName },
     asOf: now.toISOString(),

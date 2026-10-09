@@ -43,6 +43,7 @@ export async function getSubmitSummary(input: { templateId: string }): Promise<A
       state: versions.state,
       rev: versions.rev,
       sunsetAt: versions.sunsetAt,
+      name: versions.name,
       channels: versions.channels,
       variables: versions.variables,
       sampleSets: versions.sampleSets,
@@ -70,10 +71,14 @@ export async function getSubmitSummary(input: { templateId: string }): Promise<A
       templateId: template.id,
       rev: draft.rev,
       number: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0) + 1,
+      name: draft.name,
       channels: CHANNELS.filter((channel) => draft.channels.includes(channel)),
       sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map((set) => set.name),
       variables: draft.variables,
-      baseline: baseline && baseline.number !== null ? { number: baseline.number, variables: baseline.variables } : null,
+      baseline:
+        baseline && baseline.number !== null
+          ? { number: baseline.number, name: baseline.name, variables: baseline.variables }
+          : null,
     },
   };
 }
