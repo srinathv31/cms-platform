@@ -79,8 +79,11 @@ import {
 // scenario 11 (reset) have no spec of their own: they are implemented here.
 //
 // The demo clock moves only through the Demo pill (+15 days in scenario 5, the custom field in scenario 8).
-// It ends on the drawer's Reset, so it leaves the starting data behind; a failure leaves the DB as it was
-// when it failed (the next run starts with a reset).
+// The story ends on the drawer's Reset, and afterAll re-seeds the database again however the run ended: a
+// failed step, a timeout, a closed page. Playwright runs afterAll after a failed test too, with a timeout of
+// its own, and the reset needs no browser. So the specs after this one always start from the seed, on the
+// real day, with Coral's links as seeded: a failure here stays in this spec. Only the worker process dying
+// outright skips afterAll.
 //
 // One test, one page: console errors and page errors anywhere in the run fail it (the `problems` fixture;
 // in the `demo` project the recording harness's own noise is dropped by `dropDemoNoise`). Stills at the key
@@ -357,8 +360,15 @@ test.beforeAll(() => {
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
+// Whatever happened: the story moves the clock, lapses access and relinks Coral's offers, and the specs after
+// this one expect the seed.
 test.afterAll(() => {
-  db?.close();
+  test.setTimeout(120_000);
+  try {
+    resetDemoData();
+  } finally {
+    db?.close();
+  }
 });
 
 test("the demo script, scenarios 1–11, as one story from a fresh reset", async ({ page, request }) => {

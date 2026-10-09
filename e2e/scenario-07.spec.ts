@@ -1,7 +1,8 @@
-import type { Client } from "@libsql/client";
+import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { demoNow, openDb } from "./api/helpers";
 import { click, closeSettings, openSettings, settingsDialog, strip, switchPersona } from "./helpers/access";
+import { rowsOf } from "./helpers/cleanup";
 import { asPersona, beat, demoTimeout, documentEditor, expect, hydrated, liveEditor, openLibrary, shoot, test } from "./helpers/scenario";
 
 // Phase 6 gate: demo scenario 7 ("Teams and roles"), each persona through the persona switcher or its own cookie.
@@ -16,8 +17,9 @@ import { asPersona, beat, demoTimeout, documentEditor, expect, hydrated, liveEdi
 //   4. Taylor (Auditor) sees All teams, and in the Audit page both of Riley's events, by Riley, with times
 //      on the demo clock. Filtering by person narrows it, and Export follows the filter.
 //
-// The only thing it changes is Disclosure's Email rule, which it puts back; the audit events stay (the log
-// is append-only). Console and page errors fail it.
+// The only thing it changes is Disclosure's Email rule. Step 3 turns it back on, and afterAll puts the
+// rule back as the run found it however the run ended, so a failure between the two doesn't leave Email off
+// for the specs after this one. The audit events stay (the log is append-only). Console and page errors fail it.
 
 const CORAL_DRAFT = "Annual Fee Waiver — Terms";
 const DEPOSITS_ACTIVE = "Everyday Checking — Fee Schedule";
@@ -40,13 +42,22 @@ const viewOnly = (page: Page) => page.getByText("View only", { exact: true });
 const newTemplate = (page: Page) => page.getByRole("button", { name: "New template" });
 
 let db: Client;
+/** Disclosure's allowed channels as the run found them. */
+let channelsBefore: InValue | undefined;
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   db = openDb();
+  const [disclosure] = await rowsOf(db, "SELECT allowed_channels FROM content_types WHERE key = 'disclosure'");
+  channelsBefore = disclosure?.allowed_channels;
 });
 
-test.afterAll(() => {
-  db?.close();
+test.afterAll(async () => {
+  if (!db) return;
+  try {
+    if (channelsBefore !== undefined) await rowsOf(db, "UPDATE content_types SET allowed_channels = ? WHERE key = 'disclosure'", [channelsBefore]);
+  } finally {
+    db.close();
+  }
 });
 
 test.describe("scenario 7: teams and roles", () => {
