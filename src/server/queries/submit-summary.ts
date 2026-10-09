@@ -6,6 +6,7 @@ import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
 import { now } from "@/server/clock";
 import { getViewer } from "@/server/viewer";
+import { contractBaseline } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { ActionResult } from "@/domain/review-types";
 import { CHANNELS } from "@/domain/types";
@@ -39,6 +40,7 @@ export async function getSubmitSummary(input: { templateId: string }): Promise<A
     .select({
       number: versions.number,
       state: versions.state,
+      sunsetAt: versions.sunsetAt,
       channels: versions.channels,
       variables: versions.variables,
       sampleSets: versions.sampleSets,
@@ -55,8 +57,10 @@ export async function getSubmitSummary(input: { templateId: string }): Promise<A
         : "There is no draft to submit.",
     };
   }
-  const active = list.find((v) => v.state === "active");
-  const today = (await now()).toISOString().slice(0, 10);
+  const at = await now();
+  // What submit will compare with: the newest version that still renders (the Active one, if any).
+  const baseline = contractBaseline(list, at);
+  const today = at.toISOString().slice(0, 10);
 
   return {
     ok: true,
@@ -66,7 +70,7 @@ export async function getSubmitSummary(input: { templateId: string }): Promise<A
       channels: CHANNELS.filter((channel) => draft.channels.includes(channel)),
       sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map((set) => set.name),
       variables: draft.variables,
-      baseline: active && active.number !== null ? { number: active.number, variables: active.variables } : null,
+      baseline: baseline && baseline.number !== null ? { number: baseline.number, variables: baseline.variables } : null,
     },
   };
 }

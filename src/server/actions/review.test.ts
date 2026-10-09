@@ -3,19 +3,24 @@ import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { describeChanges } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
-import type { Viewer } from "@/domain/types";
+import type { Variable, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { saveDraft } from "@/server/drafts/save-draft";
+import { getSubmitSummary } from "@/server/queries/submit-summary";
+import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
 import { seedDatabase } from "@/server/seed";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { createTemplateWithDraft, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
-import { submitDraft } from "./templates";
+import { startDraft, submitDraft } from "./templates";
 import {
   approveVersion,
   cancelRevoke,
@@ -40,6 +45,11 @@ vi.mock("@/server/db/client", async () => {
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
+// startDraft (Edit) ends in a redirect; the queries keep the real notFound.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  redirect: vi.fn(),
+}));
 
 const {
   approvals,
@@ -51,6 +61,7 @@ const {
   membershipRoles,
   memberships,
   notifications,
+  renderLog,
   versions,
 } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
@@ -764,6 +775,182 @@ describe("the two-person revoke (scenario 6)", () => {
 
     as("jordan");
     expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, reason: REFUSALS.noRevokePending });
+  });
+});
+
+// ── After the Active version is revoked (handoff review D1) ───
+
+describe("after the Active version is revoked (handoff review D1)", () => {
+  const NAME = "Revoke Recovery — Terms";
+  const PROMO: Variable = { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "SPRING" };
+  const FEE: Variable = { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95.00" };
+  let templateId: string;
+
+  /** Saves the open draft's variables the way autosave does. */
+  async function saveVariables(userId: string, change: (variables: Variable[]) => Variable[]) {
+    const draft = (await draftOf(templateId))!;
+    const saved = await saveDraft(people[userId]!, draft.id, {
+      rev: draft.rev,
+      sessionKey: `d1-${minute}`,
+      variables: change(draft.variables),
+    });
+    expect(saved).toMatchObject({ ok: true });
+  }
+
+  /** Revokes a version: Jordan starts it, Alex confirms it. */
+  async function revoke(versionNumber: number) {
+    as("jordan");
+    expect(await startRevoke({ templateId, versionNumber, reason: "Wrong APR in the legal notices." })).toEqual({ ok: true });
+    as("alex");
+    expect(await confirmRevoke({ templateId, versionNumber })).toEqual({ ok: true });
+    expect((await version(templateId, versionNumber))?.state).toBe("revoked");
+  }
+
+  // v1 goes live; v2 adds an optional promo code and replaces it, so v1 is Superseded with no sunset
+  // and still renders; Coral renders v2; then v2 is revoked. Nothing is Active.
+  beforeAll(async () => {
+    ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+
+    as("maya");
+    await startDraft({ templateId });
+    await saveVariables("maya", (variables) => [...variables, PROMO]);
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 2 });
+    const at = as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+
+    const v2 = (await version(templateId, 2))!;
+    await db.insert(renderLog).values({
+      id: "rl_test_d1",
+      at,
+      templateId,
+      versionId: v2.id,
+      versionNumber: 2,
+      consumerId: "coral",
+      channel: "web",
+      isPreview: false,
+      correlationId: "test-d1",
+      outcome: "ok",
+    });
+    await revoke(2);
+    expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: null });
+  });
+
+  it("offers Edit, which starts the corrected draft from the revoked version", async () => {
+    as("maya");
+    expect(await getWorkspaceHeader("coral-offers", templateId)).toMatchObject({
+      status: "revoked",
+      activeNumber: null,
+      canStartDraft: true,
+    });
+    as("sam");
+    expect((await getWorkspaceHeader("coral-offers", templateId)).canStartDraft, "a viewer can't edit").toBe(false);
+
+    const at = as("maya");
+    vi.mocked(redirect).mockClear();
+    await startDraft({ templateId });
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith(`/coral-offers/templates/${templateId}`, "replace");
+
+    const v2 = (await version(templateId, 2))!;
+    const draft = (await draftOf(templateId))!;
+    expect(draft).toMatchObject({
+      number: null,
+      basedOnVersionId: v2.id,
+      createdBy: "maya",
+      body: v2.body,
+      variables: v2.variables,
+      channels: v2.channels,
+      emailSubject: v2.emailSubject,
+      emailPreheader: v2.emailPreheader,
+      sampleSets: v2.sampleSets,
+      contractChanges: null,
+    });
+    expect(blockIds(draft.body), "the same block ids, so comment threads carry over").toEqual(blockIds(v2.body));
+    expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([["draft.started", { basedOn: 2 }]]);
+    expect((await version(templateId, 2))?.state, "the revoked version stays revoked").toBe("revoked");
+
+    const header = await getWorkspaceHeader("coral-offers", templateId);
+    expect(header).toMatchObject({ status: "draft", versionLabel: "Based on v2", basedOnNumber: 2, canStartDraft: false });
+  });
+
+  it("compares the draft with v1, the newest version that still renders, in the workspace and the submit dialog", async () => {
+    as("maya");
+    await saveVariables("maya", (variables) => [...variables, FEE]);
+    const v1 = (await version(templateId, 1))!;
+
+    const document = await getWorkspaceDocument("coral-offers", templateId);
+    expect(document.baseline).toEqual(v1.variables);
+    expect(document.baseline?.map((v) => v.key)).not.toContain(PROMO.key);
+
+    const summary = await getSubmitSummary({ templateId });
+    expect(summary).toMatchObject({ ok: true, summary: { number: 3, baseline: { number: 1, variables: v1.variables } } });
+  });
+
+  it("submit freezes the contract changes against v1, not the revoked v2", async () => {
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 3 });
+    const v3 = (await version(templateId, 3))!;
+    expect(v3.contractChanges).toEqual([
+      { kind: "added", key: PROMO.key, breaking: false, type: "text", required: false },
+      { kind: "added", key: FEE.key, breaking: true, type: "currency", required: true },
+    ]);
+  });
+
+  it("Jordan approves v3: it goes live over nothing, v2 stays Revoked, v1 keeps rendering, and Coral is told", async () => {
+    const v1Before = (await version(templateId, 1))!;
+    const v2Before = (await version(templateId, 2))!;
+    const at = as("jordan");
+    // There's no previous Active version for a sunset to land on: the date is ignored.
+    const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
+    expect(await approveVersion({ templateId, versionNumber: 3, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] })).toEqual({
+      ok: true,
+      wentLive: true,
+      number: 3,
+    });
+
+    expect(await version(templateId, 3)).toMatchObject({ state: "active", activatedAt: at });
+    expect(await version(templateId, 2)).toEqual(v2Before);
+    expect(await version(templateId, 1)).toEqual(v1Before);
+    expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
+      ["version.activated", { number: 3, supersedes: null, stage: "Team approver" }],
+    ]);
+
+    const notices = await noticesAt(at);
+    expect(notices.map((n) => [n.consumerId, n.kind])).toEqual([["coral", "new_version"]]);
+    expect(notices[0]!.payload).toMatchObject({
+      templateName: NAME,
+      versionNumber: 3,
+      activeVersion: 3,
+      contractLines: describeChanges((await version(templateId, 3))!.contractChanges!, 3),
+    });
+    expect(notices[0]!.payload).toMatchObject({
+      contractLines: ["v3 adds optional `promo_code` (Text).", "v3 adds required `annual_fee` (Currency)."],
+    });
+
+    as("maya");
+    expect(await getWorkspaceHeader("coral-offers", templateId)).toMatchObject({
+      status: "active",
+      activeNumber: 3,
+      canStartDraft: true,
+    });
+  });
+
+  it("with nothing left that renders, the corrected draft has no baseline, like a first version", async () => {
+    await revoke(3);
+    // v1's sunset passes as well.
+    const passed = new Date(env.now.getTime() - DAY);
+    await db.update(versions).set({ sunsetAt: passed }).where(and(eq(versions.templateId, templateId), eq(versions.number, 1)));
+
+    as("maya");
+    await startDraft({ templateId });
+    expect((await draftOf(templateId))?.basedOnVersionId).toBe((await version(templateId, 3))!.id);
+    expect((await getWorkspaceDocument("coral-offers", templateId)).baseline).toBeNull();
+    expect(await getSubmitSummary({ templateId })).toMatchObject({ ok: true, summary: { number: 4, baseline: null } });
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 4 });
+    expect((await version(templateId, 4))?.contractChanges).toBeNull();
   });
 });
 

@@ -65,7 +65,7 @@ Server and domain code use only the server-safe ones: `schema`, `model/*` and `p
 interface EditorRootProps {
   variables: Variable[];                          // read once; the root owns the list from then on
   onVariablesChange?: (variables: Variable[]) => void;  // after every list change; never on mount
-  baseline?: Variable[] | null;                   // the Active version's list: contract flags
+  baseline?: Variable[] | null;                   // the list consumers render now: contract flags
   requiredSections?: RequiredSection[];           // the content type's sections (for reference; see Behavior)
   readOnly?: boolean;                             // view only
   requiredNote?: string;                          // default "Required for disclosures"

@@ -7,8 +7,8 @@
 // `server/effects.ts` writes in the same transaction.
 //
 //   createDraft    — → Draft (a new template from a starter)
-//   editActive     Active → a new Draft copied from it ("Draft of v3")
-//   submit         Draft → In review, numbered; the approvers are notified
+//   editLatest     the latest version, Active or Revoked → a new Draft copied from it ("Based on v3")
+//   submit         Draft → In review, numbered, with its contract changes against `contractBaseline`
 //   requestChanges In review → Changes requested, plus a new Draft carrying the block ids (and so the threads)
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
 //   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes
@@ -189,13 +189,15 @@ export function createDraft(input: {
   };
 }
 
-// ── Editing an Active template ────────────────────────────────
+// ── Editing a template ────────────────────────────────────────
 
 /**
  * What "Edit" on a template does, given its versions: go to the open draft if there is one
- * (one open draft per template), copy the Active version if it is the template's latest, or say
- * it can't. A newer version in review (or any other newer version) blocks it: editing the Active
- * version then would fork the template and drop the newer version's changes.
+ * (one open draft per template), copy the template's latest version if it is Active or Revoked, or
+ * say it can't. A Revoked latest version was the Active one until it was withdrawn: the corrected
+ * draft starts from its content (decision 0009). A pending revoke leaves the version Active, so it is
+ * edited as Active. A newer version in review (or any other newer version) blocks it: editing then
+ * would fork the template and drop the newer version's changes.
  */
 export type DraftStartPlan =
   | { kind: "open"; versionId: string }
@@ -212,33 +214,34 @@ export function planDraftStart(
     (best, v) => (best === undefined || (v.number ?? 0) > (best.number ?? 0) ? v : best),
     undefined,
   );
-  if (latest?.state === "active") return { kind: "create", from: latest.id };
+  if (latest?.state === "active" || latest?.state === "revoked") return { kind: "create", from: latest.id };
   if (latest?.state === "in_review") {
     return { kind: "blocked", reason: "A newer version is in review." };
   }
-  return { kind: "blocked", reason: "Only an Active template can be edited." };
+  return { kind: "blocked", reason: "Only an Active or Revoked template can be edited." };
 }
 
 /**
- * A new draft copied from the Active version: body (block ids included, so comments and the redline
- * keep their anchors), variables, channels, email fields and sample sets. Contract changes are
- * worked out against the Active version when the draft is submitted, so none are recorded here.
+ * A new draft copied from the version `planDraftStart` chose, the template's latest, Active or
+ * Revoked: body (block ids included, so comments and the redline keep their anchors), variables,
+ * channels, email fields and sample sets. `basedOnVersionId` is that version, revoked or not.
+ * Contract changes are worked out at submit, against `contractBaseline`, so none are recorded here.
  * Its writers start afresh with the person who pressed Edit: who wrote a released version doesn't
  * keep anyone from deciding the next one.
  */
-export function editActive(input: {
-  active: VersionSnapshot;
+export function editLatest(input: {
+  from: VersionSnapshot;
   createdBy: string;
   now: Date;
 }): LifecycleResult<{ draft: DraftFields }> {
-  const { active, createdBy, now } = input;
-  if (active.state !== "active") {
-    throw new LifecycleError(`Only an Active version can be edited, not ${active.state}.`);
+  const { from, createdBy, now } = input;
+  if (from.state !== "active" && from.state !== "revoked") {
+    throw new LifecycleError(`Only an Active or Revoked version can be edited, not ${from.state}.`);
   }
 
   return {
-    changes: { draft: copyToDraft(active, createdBy, now, [createdBy]) },
-    effects: [{ kind: "audit", action: "draft.started", details: { basedOn: active.number } }],
+    changes: { draft: copyToDraft(from, createdBy, now, [createdBy]) },
+    effects: [{ kind: "audit", action: "draft.started", details: { basedOn: from.number } }],
   };
 }
 
@@ -250,6 +253,27 @@ export function editActive(input: {
  */
 export function withWriter(writers: readonly string[], userId: string): string[] {
   return writers.includes(userId) ? [...writers] : [...writers, userId];
+}
+
+// ── The contract baseline ─────────────────────────────────────
+
+/**
+ * The version a draft's contract changes are worked out against: the newest one consumers can still
+ * render. That is the Active version when there is one. When there's none (the Active version was
+ * revoked), it is the highest-numbered Superseded version whose sunset hasn't passed. A version
+ * waiting on a revoke confirmation still renders, so it counts. Null when nothing renders, the same
+ * as for a first version. Submit stores the diff against it, and the submit dialog and the
+ * workspace's variable flags compare with the same version.
+ */
+export function contractBaseline<V extends { state: VersionState; number: number | null; sunsetAt: Date | null }>(
+  versions: readonly V[],
+  now: Date,
+): V | null {
+  const active = versions.find((v) => v.state === "active");
+  if (active) return active;
+  return versions
+    .filter((v) => v.state === "superseded" && !sunsetPassed(v, now))
+    .reduce<V | null>((best, v) => (best === null || (v.number ?? 0) > (best.number ?? 0) ? v : best), null);
 }
 
 // ── Submit for review ─────────────────────────────────────────
@@ -278,7 +302,7 @@ export interface SubmitChanges {
   submitNote: string | null;
   /** The approval chain starts at its first stage. */
   currentStage: 0;
-  /** How the variable list differs from the Active version's; null when there is no Active version. */
+  /** How the variable list differs from the baseline's (`contractBaseline`); null when there is no baseline. */
   contractChanges: ContractChange[] | null;
 }
 
@@ -289,7 +313,7 @@ export interface SubmitInput {
   draft: SubmitDraft;
   /** The template's highest version number (0 when it has none). */
   highestNumber: number;
-  /** The Active version's variable list, or null when nothing is Active. */
+  /** The variable list of the newest version that still renders (`contractBaseline`), or null when none does. */
   baseline: readonly Variable[] | null;
   now: Date;
   submittedBy: string;
@@ -580,7 +604,10 @@ export function approve(input: {
   actorId: string;
   actorName: string;
   now: Date;
-  /** The template's Active version, which this one replaces when it goes live. */
+  /**
+   * The template's Active version, which this one replaces when it goes live. Null for a first version
+   * and after the Active version was revoked: nothing is superseded, and `sunsetPrevious` is ignored.
+   */
   active: { id: string; number: number } | null;
   sunsetPrevious: Date | null;
   sampleSetsSeen: readonly string[];
@@ -863,7 +890,9 @@ export function startRevoke(input: {
 
 /**
  * A different approver confirms: Revoked, and its renders fail at once. Revoking the Active version
- * leaves the template with no Active version; nothing is reinstated automatically.
+ * leaves the template with no Active version; nothing is reinstated automatically. Edit then starts
+ * the corrected draft from the revoked version (`planDraftStart`), and approving it goes live with
+ * nothing to supersede.
  */
 export function confirmRevoke(input: {
   version: ReviewVersion;
@@ -1001,7 +1030,7 @@ function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string |
 }
 
 /**
- * A new draft copied from a version (Edit on the Active version, or a change request): body with every
+ * A new draft copied from a version (Edit on the latest version, or a change request): body with every
  * block id (so comment threads and the redline keep their anchors), variables, channels, email fields
  * and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */

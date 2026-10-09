@@ -231,5 +231,6 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, `/design`, `/editor-lab`, router prefetch. |
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |
+| `e2e/revoke-recovery.spec.ts` | After the Active version is revoked: Edit from the revoked content, contract changes against the version that still renders, approve, render. |
 | `e2e/demo-script.spec.ts` | The whole demo script on one database state. |
 | `e2e/api/consumer.spec.ts`, `render.spec.ts`, `imports.spec.ts` | The `/api/v1` GET routes, the render route, and the import routes over HTTP. |

@@ -64,8 +64,9 @@ export interface EditorRootProps {
   /** Fires after every change to the list: create, label, key, type, required, sample, delete. */
   onVariablesChange?: (variables: Variable[]) => void;
   /**
-   * The Active version's variable list, when the template has one. Key, type and required changes
-   * against it are contract changes: the panel flags them as they happen.
+   * The variable list consumers render now, when there is one (in Stencil, the newest version that
+   * still renders). Key, type and required changes against it are contract changes: the panel flags
+   * them as they happen.
    */
   baseline?: Variable[] | null;
   /**

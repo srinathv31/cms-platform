@@ -3,7 +3,7 @@
 import { RedirectType, redirect } from "next/navigation";
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -14,7 +14,7 @@ import { getViewer } from "@/server/viewer";
 import { newId } from "@/server/ids";
 import { draftRow } from "@/server/templates/create";
 import { assertCan } from "@/domain/permissions";
-import { editActive, planDraftStart, type VersionSnapshot } from "@/domain/lifecycle";
+import { editLatest, planDraftStart, type VersionSnapshot } from "@/domain/lifecycle";
 
 // Template editing. Every action checks permissions first, writes in one transaction, refreshes
 // what it changed, and redirects last. New template (`createTemplate`) is in `create-template.ts`,
@@ -31,13 +31,14 @@ function refreshLists(templateId?: string) {
   if (templateId) revalidatePath("/[team]/templates/[templateId]", "layout");
 }
 
-// ── Edit an Active template ───────────────────────────────────
+// ── Edit a template ───────────────────────────────────────────
 
 const StartDraftInput = z.object({ templateId: z.string().min(1).max(32) });
 
 /**
- * "Edit" on an Active template. Opens the template's draft: the one already open if there is
- * one (a template has at most one), otherwise a new draft copied from the Active version.
+ * "Edit" on a template whose latest version is Active, or Revoked (the corrected draft after a revoke).
+ * Opens the template's draft: the one already open if there is one (a template has at most one),
+ * otherwise a new draft copied from that latest version (`planDraftStart`, `editLatest`).
  */
 export async function startDraft(input: { templateId: string }): Promise<void> {
   const viewer = await getViewer();
@@ -73,23 +74,23 @@ export async function startDraft(input: { templateId: string }): Promise<void> {
     if (plan.kind === "open") return { opened: true as const };
     if (plan.kind === "blocked") throw new Error(plan.reason);
 
-    const active = await tx.query.versions.findFirst({
-      where: and(eq(versions.id, plan.from), eq(versions.state, "active")),
+    const latest = await tx.query.versions.findFirst({
+      where: and(eq(versions.id, plan.from), inArray(versions.state, ["active", "revoked"])),
     });
-    if (!active) throw new Error("The Active version changed. Try again.");
+    if (!latest) throw new Error("The latest version changed. Try again.");
 
     const snapshot: VersionSnapshot = {
-      id: active.id,
-      number: active.number,
-      state: active.state,
-      body: active.body,
-      emailSubject: active.emailSubject,
-      emailPreheader: active.emailPreheader,
-      channels: active.channels,
-      variables: active.variables,
-      sampleSets: active.sampleSets,
+      id: latest.id,
+      number: latest.number,
+      state: latest.state,
+      body: latest.body,
+      emailSubject: latest.emailSubject,
+      emailPreheader: latest.emailPreheader,
+      channels: latest.channels,
+      variables: latest.variables,
+      sampleSets: latest.sampleSets,
     };
-    const { changes, effects } = editActive({ active: snapshot, createdBy: viewer.userId, now: at });
+    const { changes, effects } = editLatest({ from: snapshot, createdBy: viewer.userId, now: at });
     const draftId = newId("v");
 
     await tx.insert(versions).values(draftRow(changes.draft, { id: draftId, templateId: found.id }));

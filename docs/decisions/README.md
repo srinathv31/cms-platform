@@ -14,6 +14,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0006](0006-page-notices-by-commit-order.md) | Page notices and search with an opaque cursor, notices in commit order | Accepted |
 | [0007](0007-maker-checker-covers-every-writer.md) | Maker-checker covers everyone who wrote a version | Accepted |
 | [0008](0008-a-chain-must-be-approvable.md) | A saved approval chain must be one somebody can approve | Accepted |
+| [0009](0009-correct-a-revoked-version-from-its-content.md) | Correct a revoked version from its content | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

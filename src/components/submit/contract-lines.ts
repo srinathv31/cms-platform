@@ -1,5 +1,6 @@
-// The submit dialog's contract section: the draft's variable list against the Active version's, as the
-// plain-English lines from domain/contract.ts, each flagged breaking or not. Pure, so it is tested alone.
+// The submit dialog's contract section: the draft's variable list against the baseline's (the newest
+// version that still renders, `contractBaseline` in domain/lifecycle.ts), as the plain-English lines from
+// domain/contract.ts, each flagged breaking or not. Pure, so it is tested alone.
 //
 // The diff is the one the server freezes at submit (`diffVariables` with no rename history), so what the
 // author reads here is what the reviewer reads on the review screen.
@@ -14,14 +15,14 @@ export interface ContractLine {
 }
 
 export interface ContractSection {
-  /** The Active version the draft is compared with. */
+  /** The version the draft is compared with. */
   baselineNumber: number;
   /** Breaking changes first, each group in the order the diff lists them. */
   lines: ContractLine[];
   breaking: boolean;
 }
 
-/** null when there is no Active version: there is nothing to compare with, so the dialog has no section. */
+/** null when no version still renders: there is nothing to compare with, so the dialog has no section. */
 export function contractSection(input: {
   baseline: { number: number; variables: readonly Variable[] } | null;
   variables: readonly Variable[];
