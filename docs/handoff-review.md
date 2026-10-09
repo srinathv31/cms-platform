@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 6 | 29 | 12 | 47 |
+| Open | 0 | 6 | 28 | 12 | 46 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 16 | 6 | 2 | 25 |
+| Fixed | 1 | 16 | 7 | 2 | 26 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -195,7 +195,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S6 · Medium: Body size limits trust the declared Content-Length
 
-- **Status:** Open
+- **Status:** Fixed. Both routes read the body with `readBodyCapped` and answer 413 past the cap, chunked or not; autosave checks access from the version id before reading a byte; and each render value is at most 1,000 characters in validation and the published schema ([decision 0011](decisions/0011-cap-each-render-value.md)).
 - **Where:** `src/app/api/drafts/[versionId]/route.ts` line 18; `src/app/api/v1/templates/[templateId]/render/route.ts` line 127
 - **What happens:** Both routes compare the `Content-Length` header, then call `request.text()`. A chunked body has no length, so the whole body is buffered. The autosave route reads the body before any permission check and never checks the size after reading; the render route is anonymous. Render values have no length cap either: one 100,000-word value costs about a second of main-thread CPU in the PDF.
 - **Fix:** Reuse `readBodyCapped` from `src/server/import/read-body.ts`, authorize before reading, and add a `maxLength` per value in validation and the schema.

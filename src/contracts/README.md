@@ -25,6 +25,13 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
 previews.
 
+A render body is at most 1,000,000 bytes (`MAX_BODY_BYTES`), else 413 `body_too_large`; the route counts the bytes as
+it reads, so a chunked body is held to the limit too. Each value is at most 1,000 characters, counted in Unicode code
+points (`MAX_VALUE_LENGTH`), else 422 `invalid_values` with `maxLength` on that key's `details.invalid` entry. A value
+is never cut, because it prints exactly as sent. The published JSON Schema gives every property the same
+`maxLength`. Both limits are in `src/domain/render/types.ts`, and why the value limit is 1,000 is
+[decision 0011](../../docs/decisions/0011-cap-each-render-value.md).
+
 The two lists page the same way (`ApiPage`): a call returns `nextCursor` and `hasMore`, and the next call passes
 the cursor back as `after`. Notices come oldest first in the order Stencil wrote them, so a consumer that keeps the
 last `nextCursor` gets every notice once, however many arrive between polls. A cursor is opaque to consumers and
@@ -49,10 +56,11 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | 404 | `template_not_found`, `version_not_found`, `consumer_not_found` |
 | 409 | `version_not_released` |
 | 410 | `version_sunset`, `version_revoked` |
+| 413 | `body_too_large` |
 | 422 | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
 | 500 | `render_failed` |
 
-`consumer_not_found` and `consumer_mismatch` belong to the notices route. The other 14 are the render codes
+`consumer_not_found` and `consumer_mismatch` belong to the notices route. The other 15 are the render codes
 (`RenderErrorCode` in `src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS`
 repeats their statuses and is read only by `src/domain/render/errors.test.ts`; take statuses from `API_ERROR_STATUS`.
 

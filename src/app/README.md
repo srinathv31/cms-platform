@@ -167,10 +167,13 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
 (status from `importStatus`), `{ error: "not_found" }` with 404 (import reads, palette), and plain text (audit
 export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read).
 
-**Body caps.** Drafts: 2,000,000 (`MAX_BODY_SIZE` in `src/server/drafts/parse-patch.ts`), checked against the
-declared `Content-Length` and again against the text's length. Render: 1,000,000, the same two checks.
-Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room. Permission is checked before any byte
-is read, then `readBodyCapped` counts bytes, because a declared length is only a hint. Drafts and imports are
+**Body caps.** Drafts: 2,000,000 bytes (`MAX_BODY_SIZE` in `src/server/drafts/parse-patch.ts`), 413 with the
+route's `invalid` body. Render: 1,000,000 bytes (`MAX_BODY_BYTES` in `src/domain/render/types.ts`), 413
+`body_too_large`. Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room, 413 `size`. Every one
+refuses a declared `Content-Length` over its cap before reading, then reads with `readBodyCapped`, which counts bytes
+and stops at the cap, because a declared length is only a hint and a chunked body has none. Drafts and imports
+check permission before any byte is read: drafts from the version id in the path (`draftAccessRefusal`), imports from
+the team in the query. Render is anonymous, so the cap is all that stands before its read. Drafts and imports are
 route handlers, not server actions, because actions run one at a time per client and cap bodies at 1 MB.
 
 ## Add a page

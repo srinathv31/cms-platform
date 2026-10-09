@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Variable, VariableType } from "../types";
-import type { ValueErrorDetails } from "./types";
+import { MAX_VALUE_LENGTH, type ValueErrorDetails } from "./types";
 import { validateValues } from "./validate";
 
 const v = (key: string, type: VariableType, required = true): Variable => ({
@@ -187,5 +187,65 @@ describe("validateValues: invalid", () => {
       }),
     );
     expect(JSON.stringify(error)).not.toContain("SECRET");
+  });
+});
+
+describe("validateValues: the length limit", () => {
+  const AT_LIMIT = "a".repeat(MAX_VALUE_LENGTH);
+
+  it("is 1000 characters", () => {
+    expect(MAX_VALUE_LENGTH).toBe(1000);
+  });
+
+  it("takes a value of exactly the limit, as sent", () => {
+    expect(validateValues(VARIABLES, { ...GOOD, first_name: AT_LIMIT })).toMatchObject({ ok: true, values: { first_name: AT_LIMIT } });
+    const digits = `1${"0".repeat(MAX_VALUE_LENGTH - 1)}`;
+    expect(validateValues(VARIABLES, { ...GOOD, bonus_points: digits })).toMatchObject({ ok: true, values: { bonus_points: digits } });
+  });
+
+  it("refuses a value one character longer, with the limit in the sentence and the details, and never cuts it", () => {
+    const error = failure(validateValues(VARIABLES, { ...GOOD, first_name: `${AT_LIMIT}b` }));
+    expect(error).toEqual({
+      code: "invalid_values",
+      message: "first_name must be at most 1,000 characters.",
+      details: { missing: [], invalid: [{ key: "first_name", expected: "text", maxLength: 1000 }] },
+    });
+    expect(JSON.stringify(error)).not.toContain("aaaa");
+  });
+
+  it("applies to every type, ahead of the type's own check", () => {
+    const long = "9".repeat(MAX_VALUE_LENGTH + 1);
+    const error = failure(validateValues(VARIABLES, { ...GOOD, annual_fee: long, home_state: ` NJ${" ".repeat(MAX_VALUE_LENGTH)}` }));
+    expect(error.message).toBe("annual_fee must be at most 1,000 characters. home_state must be at most 1,000 characters.");
+    expect(error.details).toEqual({
+      missing: [],
+      invalid: [
+        { key: "annual_fee", expected: "currency", maxLength: 1000 },
+        { key: "home_state", expected: "us_state", maxLength: 1000 },
+      ],
+    });
+  });
+
+  it("counts characters, not UTF-16 units: 1000 emoji fit, 1001 don't", () => {
+    const emoji = "😀".repeat(MAX_VALUE_LENGTH);
+    expect(emoji.length).toBe(2 * MAX_VALUE_LENGTH);
+    expect(validateValues([v("note", "text")], { note: emoji }).ok).toBe(true);
+    expect(failure(validateValues([v("note", "text")], { note: `${emoji}😀` })).message).toBe("note must be at most 1,000 characters.");
+    // A lone surrogate is one, as JavaScript's string iterator and JSON Schema validators count it.
+    const lone = `${"\ud800".repeat(MAX_VALUE_LENGTH - 1)}😀`;
+    expect([...lone]).toHaveLength(MAX_VALUE_LENGTH);
+    expect(validateValues([v("note", "text")], { note: lone }).ok).toBe(true);
+    expect(validateValues([v("note", "text")], { note: `\udc00${lone}` }).ok).toBe(false);
+  });
+
+  it("runs after the blank check: any amount of whitespace is still no value", () => {
+    const blank = " ".repeat(MAX_VALUE_LENGTH * 5);
+    expect(failure(validateValues(VARIABLES, { ...GOOD, first_name: blank })).code).toBe("missing_variables");
+    expect(validateValues(VARIABLES, { ...GOOD, promo_code: blank }).ok).toBe(true);
+  });
+
+  it("joins a missing sentence the same way", () => {
+    const error = failure(validateValues(VARIABLES, { ...GOOD, first_name: "", promo_code: `${AT_LIMIT}!` }));
+    expect(error.message).toBe("Missing required variables: first_name. promo_code must be at most 1,000 characters.");
   });
 });

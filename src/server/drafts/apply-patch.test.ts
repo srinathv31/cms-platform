@@ -9,7 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { DraftPatch, DraftSaveResponse, JSONContent, MembershipStatus, TeamRole, Variable, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { applyDraftPatch } from "./apply-patch";
+import { accessRefusal, applyDraftPatch } from "./apply-patch";
 
 const { auditEvents, contentTypes, teams, templates, users, versions } = schema;
 
@@ -360,6 +360,30 @@ describe("applyDraftPatch: refusals change nothing", () => {
 
   it("does not leave half a save behind when the name is the bad part", async () => {
     await expectUntouched(() => save({ body: doc(para("Changed", "p1")), name: " " }));
+  });
+});
+
+describe("accessRefusal: who may save, before the body is read", () => {
+  it("is null for an author of the draft's team, whatever the draft's state", async () => {
+    expect(await accessRefusal(db, maya, "v_draft")).toBeNull();
+    await db.update(versions).set({ state: "active", number: 1 }).where(eq(versions.id, "v_draft"));
+    expect(await accessRefusal(db, maya, "v_draft")).toBeNull(); // not_draft is the save's to answer
+  });
+
+  it("answers not_found and forbidden exactly as the save does", async () => {
+    const cases: [Viewer, string][] = [
+      [maya, "v_missing"],
+      [viewer("sam", ["viewer"]), "v_draft"],
+      [viewer("jordan", ["approver"]), "v_draft"],
+      [viewer("dee", ["author"], { status: "lapsed" }), "v_draft"],
+      [viewer("dee", ["author"], { team: "deposits" }), "v_draft"],
+      [viewer("dee", ["author"], { team: "deposits" }), "v_missing"],
+    ];
+    for (const [who, id] of cases) {
+      const refused = await accessRefusal(db, who, id);
+      expect(refused, `${who.userId} ${id}`).toEqual(await save({ body: doc(para("x")) }, { by: who, id }));
+      expect(refused?.error).toBe(id === "v_missing" ? "not_found" : "forbidden");
+    }
   });
 });
 

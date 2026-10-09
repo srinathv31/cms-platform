@@ -16,6 +16,7 @@ Where this document and the code disagree, one of them has a bug. The example ta
 | Links | `src/editor/model/links.test.ts` (`links.ts`) |
 | Values | `src/editor/model/variables.test.ts` (`variables.ts`) |
 | JSON numbers in requests | `src/domain/render/json-number-text.test.ts` |
+| Value checks, the length limit among them | `src/domain/render/validate.test.ts` (`validate.ts`) |
 | Byte-level channel output | the golden files, `src/server/render/golden/` |
 | RenderDoc shape | `src/domain/render/types.ts` |
 
@@ -55,7 +56,7 @@ Contents:
 | 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF (section 10) | 500 `render_failed` |
 | 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values) | — |
 
-Before stage 1 the route checks the request itself: the body's size and shape, `version: "draft"` only with `preview: true`, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
+Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
 Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that for email stage 7 also checks the subject and preheader and stage 8 resolves them, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
@@ -252,6 +253,8 @@ A hard break ends the current line and starts a new one. A paragraph's lines are
 
 **Present.** A present value must be a string, or a JSON number (read from its exact source text, see below), and fit its type; otherwise it is invalid (`invalid_values`). Surrounding whitespace is ignored for every type but `text`.
 
+**Length.** A present value is at most 1,000 characters as sent, whatever its type, counted in Unicode code points before any trimming (an emoji is one; Java: `codePointCount`, never `length()`). A longer value is invalid (`invalid_values`, "{key} must be at most 1,000 characters.") and its type isn't checked. It is never cut: a value prints exactly as sent or is refused. The check comes after the absent check, so a string of only whitespace is absent at any length. The published JSON Schema gives every property `"maxLength": 1000`, which counts the same way. The limit and why it is 1,000 are in [decision 0011](decisions/0011-cap-each-render-value.md).
+
 **Decimals (currency, percent, number) are exact strings.** They are never converted to a binary number (no `Number`, `parseFloat`, `Intl`, `double`, `BigDecimal` arithmetic). Canonical = the digits as sent with the allowed decoration removed. Display = canonical plus the type's symbol and thousands commas. Nothing is rounded, cut, padded or rewritten; trailing zeros stay.
 
 Accepted decimal grammar, after trimming:
@@ -264,7 +267,7 @@ digits    = whole [ "." 1*DIGIT ]
 whole     = "0" | NONZERO *DIGIT | NONZERO 0*2DIGIT 1*( "," 3DIGIT )
 ```
 
-ASCII digits only. The space before `%` is U+0020. There is no length limit. Refused: badly grouped commas (`1,00`, `1000,000`), `.5`, `5.`, `+5`, leading zeros (`007`, `00`; `0` and `0.5` are fine), negative zero in any form (`-0`, `-0.00`, `-$0`), exponents (`1e3`), anything else.
+ASCII digits only. The space before `%` is U+0020. There is no limit on the digits beyond every value's length limit. Refused: badly grouped commas (`1,00`, `1000,000`), `.5`, `5.`, `+5`, leading zeros (`007`, `00`; `0` and `0.5` are fine), negative zero in any form (`-0`, `-0.00`, `-$0`), exponents (`1e3`), anything else.
 
 Display: currency `-$1,234.5` (the sign goes before the `$`), percent `21.90%`, number `1,234.567`. Commas go every three digits of the whole part, from the right.
 
@@ -619,19 +622,21 @@ The adapter returns `{ subject, preheader, html, text }`.
 
 ## 11. Errors
 
-Every error is JSON `{ "error": { "code", "message", "details"? } }`. The codes and statuses are unchanged (`src/domain/render/types.ts`). Messages are exact sentences; they never echo a submitted value, with one exception below.
+Every error is JSON `{ "error": { "code", "message", "details"? } }`. The codes and statuses are in `src/domain/render/types.ts`. Messages are exact sentences; they never echo a submitted value, with one exception below.
 
 | Situation | Code (status) | Message |
 | --- | --- | --- |
 | Required values missing | `missing_variables` (422) | "Missing required variables: first_name, purchase_apr." (keys joined by ", "), then each invalid sentence, separated by one space |
 | A value doesn't fit its type | `invalid_values` (422) | one sentence per key, separated by one space: "{key} must be text." / "… an amount, like 1000 or 1000.50." / "… a percentage, like 21.99." / "… a date, like 2027-03-04." / "… a number, like 20000." / "… a US state, like NJ." |
+| A value is longer than 1,000 characters | `invalid_values` (422) | "{key} must be at most 1,000 characters." in the same list, in the version's variable order |
+| The body is larger than 1,000,000 bytes | `body_too_large` (413) | "The body must be at most 1,000,000 bytes." Before stage 1, not logged |
 | The stored document fails the document check, or the resolver refuses it | `render_failed` (500) | "The PDF couldn't be rendered. {sentence}" e.g. "The PDF couldn't be rendered. Tables can have at most 12 columns." The sentence is one of section 3's (the limits, or "This document has content Stencil doesn't support." from the schema parse), or, for email only, "The email subject and preheader can hold only one line of text and variables." `details: { "reason": "document" }` |
 | The PDF font can't draw some characters | `render_failed` (500) | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹)." `details: { "reason": "glyphs", "characters": ["U+1EA1", "U+20B9"] }` |
 | Anything else that fails in stages 7–9, or outside the engine (the database, the log write) | `render_failed` (500) | "The PDF couldn't be rendered. Try again." (as today), no `details` |
 
 "The PDF" is the channel's subject: "The PDF", "The web page", "The email".
 
-Both value codes carry `details: { "missing": [ key, … ], "invalid": [ { "key", "expected": type }, … ] }`, keys in the version's variable order. `missing_variables` is returned whenever anything is missing, otherwise `invalid_values`. Each invalid key reads `{key} must be {noun}.`; the nouns are text "text", currency "an amount, like 1000 or 1000.50", percent "a percentage, like 21.99", date "a date, like 2027-03-04", number "a number, like 20000", us_state "a US state, like NJ". Sentences are joined by one space.
+Both value codes carry `details: { "missing": [ key, … ], "invalid": [ { "key", "expected": type, "maxLength"? }, … ] }`, keys in the version's variable order. `maxLength` (1000) is there only for a value over the length limit. `missing_variables` is returned whenever anything is missing, otherwise `invalid_values`. Each invalid key reads `{key} must be {noun}.`, or `{key} must be at most 1,000 characters.` when it has `maxLength`; the nouns are text "text", currency "an amount, like 1000 or 1000.50", percent "a percentage, like 21.99", date "a date, like 2027-03-04", number "a number, like 20000", us_state "a US state, like NJ". Sentences are joined by one space.
 
 Unrenderable characters are listed once each, in the order of each one's first occurrence that can't be drawn (the footer's last), as `U+` and at least four uppercase hex digits, a space and the character in parentheses, joined by `, `. At most ten are named; past ten, ` and N more` follows the tenth with no comma: "… U+1EA9 (ẩ) and 3 more." `details.characters` lists all of them. This is the one message that may show characters from a value: single characters, never a value.
 
@@ -725,7 +730,7 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 
 ## 14. What stays the same, what changes
 
-**Unchanged:** the route, its headers, request and response shapes, error codes and statuses (one sentence changes, below; the import gains one refusal code, `content`); the pipeline order; block ids; the `variable` key on resolved runs; link grouping; the template name staying out of the body; the email layout (600 px card, hidden preheader); the PDF's page size, fonts, footer and pagination rules; the callout's look in every channel; the web document's structure.
+**Unchanged:** the route, its headers, request and response shapes, error codes and statuses (one sentence changes, and the body size and value length limits below add a code, `body_too_large`, and the optional `maxLength` in `invalid_values` details; the import gains one refusal code, `content`); the pipeline order; block ids; the `variable` key on resolved runs; link grouping; the template name staying out of the body; the email layout (600 px card, hidden preheader); the PDF's page size, fonts, footer and pagination rules; the callout's look in every channel; the web document's structure.
 
 **Changed by this specification:**
 
@@ -748,6 +753,8 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 | Currency `invalid_values` sentence | "… an amount, like 1000.00." | "… an amount, like 1000 or 1000.50." |
 | Value forms | loose (`.5`, `5.`, `007`, `1,00`, `-0`, `$-5`, several spaces before `%` accepted) | the section 5 grammar; those are refused |
 | JSON numbers in `values` | binary (21.90 read as 21.9) | exact source text |
+| Value length | unlimited | at most 1,000 characters each; longer is `invalid_values`, and the schema says `maxLength: 1000` |
+| Body size | 400 `bad_request` "The body is too large.", from `Content-Length` and the text read (a chunked body was buffered whole first) | 413 `body_too_large`, counted as the body is read |
 | Dates | years 0100–9999 | 0001–9999 |
 | Published values schema | any `-?digits(.digits)` | the canonical grammar; dates from 0001 |
 | Links | three different checks | one check, with normalization |

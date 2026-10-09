@@ -8,6 +8,8 @@
 // from their source text, same grammar); the schema doesn't advertise them, so a consumer that
 // validates against it always sends something the route accepts, with any standard 2020-12 validator
 // (format is only an annotation there, so the date pattern itself checks the calendar):
+//   - every value is at most MAX_VALUE_LENGTH characters (`maxLength`, which counts code points, as the
+//     route does);
 //   - a required text must have a non-blank character (the route reads blank as missing);
 //   - numeric types are decimal strings only, exactly the route's canonical grammar (no leading
 //     zeros, no negative zero, no exponent, a point only between digits); a pattern can't constrain
@@ -17,6 +19,7 @@
 
 import { TYPE_META, US_STATES, validateValue } from "@/editor/model/variables";
 import type { ApiJsonSchema, ApiJsonSchemaProperty, ApiVariable, Variable } from "../golive-types";
+import { MAX_VALUE_LENGTH } from "../render/types";
 import type { VariableType } from "../types";
 
 export const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema" as const;
@@ -29,7 +32,7 @@ export function jsonSchemaId(templateId: string, versionNumber: number): string 
 /**
  * A canonical decimal, exactly what the render route accepts and produces once decoration is off:
  * "1000", "1000.50", "-12.5", "0", "0.5". Not "007", ".5", "5.", "-0" or "1e3". The digits render as
- * sent (no rounding), so there is no length limit.
+ * sent (no rounding), so the only limit on them is every value's `maxLength`.
  */
 export const DECIMAL_PATTERN = "^(?!-0(?:\\.0+)?$)-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$";
 /**
@@ -68,7 +71,12 @@ export function exampleOf(variable: Pick<Variable, "type" | "sample">): string {
 }
 
 function propertyOf(variable: Variable): ApiJsonSchemaProperty {
-  const base = { title: variable.label, description: DESCRIPTIONS[variable.type], examples: [exampleOf(variable)] };
+  const base = {
+    title: variable.label,
+    description: DESCRIPTIONS[variable.type],
+    examples: [exampleOf(variable)],
+    maxLength: MAX_VALUE_LENGTH,
+  };
   switch (variable.type) {
     case "text":
       return variable.required ? { ...base, type: "string", minLength: 1, pattern: NON_BLANK_PATTERN } : { ...base, type: "string" };

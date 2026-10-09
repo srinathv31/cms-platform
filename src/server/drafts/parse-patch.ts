@@ -10,11 +10,14 @@ import { isValidKey } from "@/editor/model/variables";
 import { changedFields } from "./audit-merge";
 
 /**
- * Largest request body accepted. A long disclosure is well under 1 MB of JSON. The route checks it
- * against Content-Length before reading, and `parseDraftPatchText` checks the characters read.
+ * Largest request body accepted, in bytes. A long disclosure is well under 1 MB of JSON. The route
+ * refuses a larger Content-Length before reading and reads with a byte counter that stops here (413);
+ * `parseDraftPatchText` checks the characters it's given too.
  */
 export const MAX_BODY_SIZE = 2_000_000;
 export const MAX_NAME_LENGTH = 120;
+
+export const TOO_LARGE_MESSAGE = "The draft is too large to save.";
 
 const MAX_DEPTH = 40;
 const MAX_NODES = 100_000;
@@ -163,7 +166,7 @@ function sampleValuesAsText(parsed: JsonWithNumberText): unknown {
 
 /** Reads and parses a request body with the size guard. `text` is the raw body. */
 export function parseDraftPatchText(text: string): ParseResult {
-  if (text.length > MAX_BODY_SIZE) return { ok: false, message: "The draft is too large to save." };
+  if (text.length > MAX_BODY_SIZE) return { ok: false, message: TOO_LARGE_MESSAGE };
   let parsed: JsonWithNumberText;
   try {
     parsed = parseJsonWithNumberText(text);

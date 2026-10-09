@@ -3,6 +3,7 @@ import { formatValue } from "@/editor/model/variables";
 import {
   BAD_REQUEST_MESSAGES,
   badRequest,
+  bodyTooLarge,
   channelNotAllowed,
   channelNotEnabled,
   consumerRequired,
@@ -82,6 +83,7 @@ describe("fixed messages", () => {
     [badRequest(BAD_REQUEST_MESSAGES.channel), "bad_request", "channel must be one of pdf, web, email."],
     [badRequest(BAD_REQUEST_MESSAGES.version), "bad_request", "version must be a version number."],
     [consumerRequired(), "consumer_required", "X-Consumer-Id is required."],
+    [bodyTooLarge(), "body_too_large", "The body must be at most 1,000,000 bytes."],
     [unknownConsumer("acme"), "unknown_consumer", 'Consumer "acme" isn\'t registered.'],
     [previewForbidden(), "preview_forbidden", "You can't preview this template."],
     [templateNotFound("UC-4F7K2Q"), "template_not_found", "Template UC-4F7K2Q doesn't exist."],
@@ -98,6 +100,7 @@ describe("fixed messages", () => {
   it("every code has a status", () => {
     expect(RENDER_ERROR_STATUS[templateNotFound("UC-1").code]).toBe(404);
     expect(RENDER_ERROR_STATUS[renderFailed("pdf").code]).toBe(500);
+    expect(RENDER_ERROR_STATUS[bodyTooLarge().code]).toBe(413);
   });
 });
 
@@ -232,6 +235,15 @@ describe("value messages", () => {
       code: "invalid_values",
       message: "home_state must be a US state, like NJ.",
       details: only,
+    });
+  });
+
+  it("a value over the length limit names the limit instead of the type", () => {
+    const tooLong = { missing: [], invalid: [{ key: "first_name", expected: "text" as const, maxLength: 1000 }, ...details.invalid] };
+    expect(invalidValues(tooLong)).toEqual({
+      code: "invalid_values",
+      message: "first_name must be at most 1,000 characters. home_state must be a US state, like NJ.",
+      details: tooLong,
     });
   });
 

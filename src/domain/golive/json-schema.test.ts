@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { TYPE_META, US_STATES, validateValue } from "@/editor/model/variables";
+import { MAX_VALUE_LENGTH } from "../render/types";
 import { validateValues } from "../render/validate";
 import { VARIABLE_TYPES, type Variable, type VariableType } from "../types";
 import { apiVariables, contractJsonSchema, exampleOf, jsonSchemaId, US_STATE_CODES } from "./json-schema";
@@ -74,8 +75,8 @@ describe("contractJsonSchema", () => {
 
   it("types each property: strings (a required text non-blank), numbers as decimal strings, dates, state codes", () => {
     const { properties: p } = schemaFor(ALL);
-    expect(p.first_name).toEqual({ title: "first name", description: "Text.", type: "string", minLength: 1, pattern: "\\S", examples: ["Maya"] });
-    expect(schemaFor([v("nickname", "text", false)]).properties.nickname).toEqual({ title: "nickname", description: "Text.", type: "string", examples: ["Maya"] });
+    expect(p.first_name).toEqual({ title: "first name", description: "Text.", type: "string", minLength: 1, pattern: "\\S", maxLength: 1000, examples: ["Maya"] });
+    expect(schemaFor([v("nickname", "text", false)]).properties.nickname).toEqual({ title: "nickname", description: "Text.", type: "string", maxLength: 1000, examples: ["Maya"] });
     expect(p.annual_fee).toMatchObject({
       type: "string",
       description: "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent.",
@@ -157,6 +158,22 @@ describe("contractJsonSchema: validated", () => {
           expect(pattern.test(value), value).toBe(validateValues(date, { d: value }).ok);
         }
       }
+    }
+  });
+
+  it("every value is at most 1000 characters, in the schema and in the route alike", () => {
+    expect(MAX_VALUE_LENGTH).toBe(1000);
+    for (const property of Object.values(schemaFor(ALL).properties)) expect(property.maxLength).toBe(MAX_VALUE_LENGTH);
+    const text = [v("x", "text")];
+    const number = [v("x", "number")];
+    for (const [variables, atLimit] of [
+      [text, "a".repeat(MAX_VALUE_LENGTH)],
+      [number, "9".repeat(MAX_VALUE_LENGTH)],
+    ] as const) {
+      expect(accepts(variables, { x: atLimit })).toBe(true);
+      expect(validateValues(variables, { x: atLimit }).ok).toBe(true);
+      expect(accepts(variables, { x: `${atLimit}9` })).toBe(false);
+      expect(validateValues(variables, { x: `${atLimit}9` }).ok).toBe(false);
     }
   });
 
