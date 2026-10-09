@@ -60,7 +60,7 @@ async function saveFirst(session: WorkspaceSession): Promise<ActionResult> {
   // The host publishes the outcome of that flush on the next render: wait one task for it.
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
   const saved = session.getStatus();
-  return saved.status === "error" ? { ok: false, reason: saved.error ?? NOT_SAVED } : { ok: true };
+  return saved.status === "error" ? { ok: false, code: "failed", reason: saved.error ?? NOT_SAVED } : { ok: true };
 }
 
 /**
@@ -231,7 +231,7 @@ export function SubmitButton({ templateId }: { templateId: string }) {
           return result;
         }}
         onSubmit={async (note) => {
-          if (!summary) return { ok: false, reason: SUBMIT_FAILED };
+          if (!summary) return { ok: false, code: "failed", reason: SUBMIT_FAILED };
           // Anything still waiting to save goes out first. If something does, the draft has moved past
           // the summary, and the server says so rather than freezing what the dialog didn't list.
           const saved = await saveFirst(session);

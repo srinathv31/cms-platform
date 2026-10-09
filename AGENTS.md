@@ -83,11 +83,14 @@ Next.js API; Next's own note about it is at the end of this file.
 
 - A server action: `getViewer()`, parse with zod, check permission, `now()` once, then one `inTransaction`. Inside
   it, re-read, ask the domain, write with a compare-and-set, and write the effects (audit rows, notifications,
-  consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, reason }`); throw
-  only for bugs. Inside a transaction, read and write through `tx`, never `db`.
-- A domain rule takes facts and `now`, writes nothing, and returns a refusal with the sentence people read, or what
-  to write plus `effects`.
-- Refusal sentences are UI copy, and some UI code compares them. Search a constant's uses before you reword it.
+  consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
+  throw only for bugs. Inside a transaction, read and write through `tx`, never `db`.
+- A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people
+  read), or what to write plus `effects`.
+- Every refusal comes from a table in `src/domain` built with `refusal(code, sentence)`
+  ([refusals.ts](src/domain/refusals.ts)), with a code no other refusal has. Code that tells refusals apart branches
+  on `code`, never on the sentence, so a sentence is UI copy you can reword freely; a code is the contract the
+  backend keeps.
 - Never store or log variable values. The render log, messages, and notices hold keys only.
 - Every stored document goes through `prepareBody` or `prepareField` in `src/server/documents/prepare.ts`.
 
@@ -132,7 +135,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common ones:
-actions that throw instead of returning a result (`startDraft`, `createTemplate`); private copies of `Refusal`,
+actions that throw instead of returning a result (`startDraft`, `createTemplate`); private copies of `RefusalError`,
 `check`, and `transact` in three action files; bare `<Suspense>` instead of `<Stream>`; and copied `plural`,
 "days ago", and number formatters. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
 

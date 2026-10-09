@@ -144,7 +144,7 @@ describe("importTemplate", () => {
   it("checks the permission first: no create rights, or an unknown team, is 403 with the reason", async () => {
     for (const [who, team] of [["taylor", "coral-offers"], ["sam", "coral-offers"], ["maya", "nope"], ["maya", ""]] as const) {
       const res = await run(who, { name: "x.doc", bytes: new Uint8Array([0xd0, 0xcf]) }, team);
-      expect(res).toEqual({ ok: false, code: "permission", reason: REASONS.generic });
+      expect(res).toEqual({ ok: false, code: "permission", reason: REASONS.generic.reason });
       expect(importStatus(res)).toBe(403);
     }
   });

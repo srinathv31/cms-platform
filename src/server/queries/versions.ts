@@ -5,6 +5,7 @@ import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
+import { refuse, type Refusal } from "@/domain/refusals";
 import type { VersionTimelineItem, VersionsData } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, RevokeRecord, VersionState, Viewer } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
@@ -24,8 +25,8 @@ import {
 const DAY_MS = 86_400_000;
 
 /**
- * What the viewer may do on one version right now: the permission (with its reason) first, then the
- * version's state, in the domain's words (`REFUSALS`, the same sentences the transitions refuse with).
+ * What the viewer may do on one version right now: the permission (with its code and reason) first,
+ * then the version's state, as the domain words it (`REFUSALS`, the same refusals the transitions return).
  * A pending revoke is checked before the confirm permission, so the starter reads "You started this
  * revoke. Another approver must confirm it." only while there is one to confirm. A Superseded
  * version's passed sunset comes before the permission: it is a fact about the version, final for
@@ -38,17 +39,14 @@ export function versionActions(
   now: Date,
 ): VersionTimelineItem["can"] {
   const pending = revokePending(version);
-  const then = (permission: PermissionResult, blocked: string | null): PermissionResult =>
-    !permission.ok ? permission : blocked ? { ok: false, reason: blocked } : permission;
-  const noPending: PermissionResult = {
-    ok: false,
-    reason: version.state === "revoked" ? REFUSALS.alreadyRevoked : REFUSALS.noRevokePending,
-  };
+  const then = (permission: PermissionResult, blocked: Refusal | null): PermissionResult =>
+    !permission.ok ? permission : blocked ? refuse(blocked) : permission;
+  const noPending = refuse(version.state === "revoked" ? REFUSALS.alreadyRevoked : REFUSALS.noRevokePending);
 
   return {
     setSunset:
       version.state === "superseded" && sunsetPassed(version, now)
-        ? { ok: false, reason: REFUSALS.sunsetPassed }
+        ? refuse(REFUSALS.sunsetPassed)
         : then(
             can(viewer, "version.setSunset", { teamId }),
             version.state === "superseded" ? null : REFUSALS.sunsetNotSuperseded,

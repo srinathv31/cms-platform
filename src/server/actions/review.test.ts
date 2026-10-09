@@ -159,7 +159,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("a second submit is refused and writes nothing", async () => {
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: false, reason: "This version is already in review." });
+    expect(await submitNow(templateId)).toEqual({ ok: false, code: "already_in_review", reason: "This version is already in review." });
     expect(await auditAt(at)).toEqual([]);
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -168,11 +168,11 @@ describe("the review loop (scenario 3)", () => {
     as("maya");
     expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
       ok: false,
-      reason: REASONS.ownVersion,
+      ...REASONS.ownVersion,
     });
     expect(await requestChanges({ templateId, versionNumber: 1, reason: "x" })).toEqual({
       ok: false,
-      reason: REASONS.ownVersion,
+      ...REASONS.ownVersion,
     });
   });
 
@@ -180,7 +180,7 @@ describe("the review loop (scenario 3)", () => {
     as("jordan");
     expect(await requestChanges({ templateId, versionNumber: 1, reason: "   " })).toEqual({
       ok: false,
-      reason: REFUSALS.giveReason,
+      ...REFUSALS.giveReason,
     });
     expect((await version(templateId, 1))?.state).toBe("in_review");
   });
@@ -229,7 +229,7 @@ describe("the review loop (scenario 3)", () => {
     const at = as("jordan");
     expect(await requestChanges({ templateId, versionNumber: 1, reason: "Again" })).toEqual({
       ok: false,
-      reason: REFUSALS.notInReview,
+      ...REFUSALS.notInReview,
     });
     expect(await auditAt(at)).toEqual([]);
     const v1 = (await version(templateId, 1))!;
@@ -265,7 +265,7 @@ describe("the review loop (scenario 3)", () => {
     as("alex");
     expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual({
       ok: false,
-      reason: REFUSALS.notInReview,
+      ...REFUSALS.notInReview,
     });
   });
 });
@@ -421,12 +421,13 @@ describe("approveVersion over an Active version", () => {
     const today = at.toISOString().slice(0, 10);
     expect(await approveVersion({ templateId, versionNumber: 1, sunsetPrevious: "2026-02-30", sampleSetsSeen: [] })).toEqual({
       ok: false,
+      code: "invalid_date",
       reason: "Pick a valid date.",
     });
     // No Active version to sunset here, but the date is still checked.
     expect(await approveVersion({ templateId, versionNumber: 1, sunsetPrevious: today, sampleSetsSeen: [] })).toEqual({
       ok: false,
-      reason: REFUSALS.sunsetAfterToday,
+      ...REFUSALS.sunsetAfterToday,
     });
     expect((await version(templateId, 1))?.state).toBe("in_review");
   });
@@ -469,6 +470,7 @@ describe("a two-stage chain", () => {
     as("jordan");
     expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
       ok: false,
+      code: "waiting_on_stage",
       reason: "Waiting on Legal.",
     });
 
@@ -526,7 +528,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     expect(saved.ok, `${userId}'s save lands`).toBe(true);
   }
 
-  const wrote = { ok: false, reason: REASONS.wroteVersion };
+  const wrote = { ok: false, ...REASONS.wroteVersion };
   const decisionsOn = async (templateId: string, number: number) =>
     db.select().from(approvals).where(eq(approvals.versionId, (await version(templateId, number))!.id));
 
@@ -706,7 +708,7 @@ describe("setSunset", () => {
       env.now = new Date("2026-10-05T03:30:00.000Z"); // 23:30 EDT on October 4; already the 5th in UTC
       expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-04" })).toEqual({
         ok: false,
-        reason: REFUSALS.sunsetAfterToday,
+        ...REFUSALS.sunsetAfterToday,
       });
       expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-05" })).toEqual({ ok: true });
       expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2026-10-05T04:00:00.000Z")); // in half an hour
@@ -719,20 +721,21 @@ describe("setSunset", () => {
     const later = new Date(at.getTime() + 40 * DAY).toISOString().slice(0, 10);
     expect(await setSunset({ templateId, versionNumber: 2, sunsetAt: later })).toEqual({
       ok: false,
-      reason: REFUSALS.sunsetNotSuperseded,
+      ...REFUSALS.sunsetNotSuperseded,
     });
     expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: "2026-01-01" })).toEqual({
       ok: false,
-      reason: REFUSALS.sunsetAfterToday,
+      ...REFUSALS.sunsetAfterToday,
     });
     expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: "soon" })).toEqual({
       ok: false,
+      code: "invalid_date",
       reason: "Pick a valid date.",
     });
     as("maya");
     expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: later })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
   });
 
@@ -750,7 +753,7 @@ describe("setSunset", () => {
       for (const day of [1, 40].map((n) => new Date(at.getTime() + n * DAY)).concat(passed)) {
         expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day.toISOString().slice(0, 10) })).toEqual({
           ok: false,
-          reason: REFUSALS.sunsetPassed,
+          ...REFUSALS.sunsetPassed,
         });
       }
       expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: passed, rev });
@@ -782,9 +785,9 @@ describe("the two-person revoke (scenario 6)", () => {
     as("jordan");
     expect(await startRevoke({ templateId, versionNumber: 1, reason })).toEqual({
       ok: false,
-      reason: REFUSALS.revokePending,
+      ...REFUSALS.revokePending,
     });
-    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, reason: REASONS.ownRevoke });
+    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REASONS.ownRevoke });
     expect((await version(templateId, 1))?.state).toBe("superseded");
   });
 
@@ -804,16 +807,16 @@ describe("the two-person revoke (scenario 6)", () => {
     ]);
 
     as("jordan");
-    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, reason: REFUSALS.alreadyRevoked });
-    expect(await cancelRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, reason: REFUSALS.alreadyRevoked });
+    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
+    expect(await cancelRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
   });
 
   it("an author can't start, confirm or cancel a revoke", async () => {
     const templateId = ids["holiday-points"]!;
     as("maya");
-    expect(await startRevoke({ templateId, versionNumber: 2, reason })).toEqual({ ok: false, reason: REASONS.generic });
-    expect(await confirmRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, reason: REASONS.generic });
-    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await startRevoke({ templateId, versionNumber: 2, reason })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await confirmRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REASONS.generic });
   });
 
   it("another approver may cancel a pending revoke; the version keeps its state", async () => {
@@ -826,7 +829,7 @@ describe("the two-person revoke (scenario 6)", () => {
     expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.revoke_cancelled"]);
 
     as("jordan");
-    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, reason: REFUSALS.noRevokePending });
+    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REFUSALS.noRevokePending });
   });
 });
 
@@ -1136,7 +1139,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
     const at = as("maya");
     expect(await submitVersion({ templateId, note: "Ready.", rev: read.summary.rev })).toEqual({
       ok: false,
-      reason: REFUSALS.summaryStale,
+      ...REFUSALS.summaryStale,
     });
     expect(await draftOf(templateId), "still the same draft, unfrozen, with the late save in it").toEqual(before);
     expect(await auditAt(at)).toEqual([]);
@@ -1177,11 +1180,11 @@ describe("permission checks come first", () => {
   it("refuses a viewer, and an unknown template the same way, without writing", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     const at = as("sam");
-    expect(await submitNow(templateId)).toEqual({ ok: false, reason: REASONS.generic });
-    expect(await submitVersion({ templateId: "UC-ZZZZZZ", rev: 0 })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await submitNow(templateId)).toEqual({ ok: false, ...REASONS.generic });
+    expect(await submitVersion({ templateId: "UC-ZZZZZZ", rev: 0 })).toEqual({ ok: false, ...REASONS.generic });
     expect(await requestChanges({ templateId: ids["cash-back"]!, versionNumber: 2, reason: "x" })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
     expect((await draftOf(templateId))?.state).toBe("draft");
     expect(await auditAt(at)).toEqual([]);
@@ -1192,7 +1195,7 @@ describe("permission checks come first", () => {
     const deposits = ids["high-yield-savings"]!;
     expect(await startRevoke({ templateId: deposits, versionNumber: 2, reason: "x" })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
   });
 });

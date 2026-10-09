@@ -62,7 +62,7 @@ describe("DecisionRail: one geometry for every viewer", () => {
     expect(step).toContain("Waiting for a decision");
   });
 
-  it.each([REASONS.ownVersion, REASONS.wroteVersion, "Waiting on Legal reviewer."])(
+  it.each([REASONS.ownVersion.reason, REASONS.wroteVersion.reason, "Waiting on Legal reviewer."])(
     "blocked (%s): both are greyed but take focus, and the reason on the stage line describes them",
     (reason) => {
       const host = rail({ kind: "blocked", reason });
@@ -89,7 +89,7 @@ describe("DecisionRail: one geometry for every viewer", () => {
       <DecisionRail
         steps={[{ position: 0, name: "Team approver", status: "done" }]}
         nowIso={NOW}
-        access={{ kind: "blocked", reason: REASONS.ownVersion }}
+        access={{ kind: "blocked", reason: REASONS.ownVersion.reason }}
         line={null}
         onApprove={() => {}}
         onRequest={() => {}}
@@ -103,7 +103,7 @@ describe("DecisionRail: one geometry for every viewer", () => {
     document.body.append(host);
     const buttons = [...host.querySelectorAll("[data-rail-head] button")] as HTMLButtonElement[];
     expect(host.querySelector(`#${BLOCKED_ID}`)).toBeNull();
-    for (const b of buttons) expect(description(b)).toBe(REASONS.ownVersion);
+    for (const b of buttons) expect(description(b)).toBe(REASONS.ownVersion.reason);
   });
 
   it("someone who isn't an approver gets no buttons, and the row stays", () => {
@@ -149,7 +149,7 @@ describe("DecisionBar (the stacked layout)", () => {
   });
 
   it("greys them for the author but keeps them focusable, described by the reason beside them", () => {
-    const host = bar({ kind: "blocked", reason: REASONS.wroteVersion });
+    const host = bar({ kind: "blocked", reason: REASONS.wroteVersion.reason });
     document.body.append(host);
     const buttons = [...host.querySelectorAll("button")];
     expect(buttons.map((b) => [b.textContent, b.disabled, b.getAttribute("aria-disabled")])).toEqual([
@@ -159,9 +159,9 @@ describe("DecisionBar (the stacked layout)", () => {
     for (const b of buttons) {
       b.focus();
       expect(document.activeElement).toBe(b);
-      expect(description(b)).toBe(REASONS.wroteVersion);
+      expect(description(b)).toBe(REASONS.wroteVersion.reason);
     }
-    expect(host.textContent).toContain(REASONS.wroteVersion);
+    expect(host.textContent).toContain(REASONS.wroteVersion.reason);
   });
 
   it("is absent for someone who isn't an approver, and for a version that was decided before", () => {

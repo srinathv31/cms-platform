@@ -21,8 +21,8 @@ import { DOCUMENT_THREAD } from "./review-types";
 import { VERSION_STATES, type TeamRole, type Viewer } from "./types";
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
-const GENERIC = { ok: false, reason: REASONS.generic };
-const CLOSED = { ok: false, reason: COMMENT_REFUSALS.closed };
+const GENERIC = { ok: false, ...REASONS.generic };
+const CLOSED = { ok: false, ...COMMENT_REFUSALS.closed };
 
 function person(userId: string, teams: Record<string, TeamRole[]> = {}, platformRole: Viewer["platformRole"] = null): Viewer {
   return {
@@ -161,10 +161,10 @@ describe("canActOnThread: who may reply, resolve and reopen", () => {
 describe("commentText: what a comment may say", () => {
   it("is trimmed, not empty, and at most COMMENT_MAX characters", () => {
     expect(commentText("  Fine.  ")).toEqual({ ok: true, body: "Fine." });
-    expect(commentText(" \n ")).toEqual({ ok: false, reason: COMMENT_REFUSALS.empty });
+    expect(commentText(" \n ")).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
     expect(commentText("x".repeat(COMMENT_MAX))).toEqual({ ok: true, body: "x".repeat(COMMENT_MAX) });
-    expect(commentText("x".repeat(COMMENT_MAX + 1))).toEqual({ ok: false, reason: COMMENT_REFUSALS.tooLong });
-    expect(COMMENT_REFUSALS.tooLong).toBe("Keep a comment under 4,000 characters.");
+    expect(commentText("x".repeat(COMMENT_MAX + 1))).toEqual({ ok: false, ...COMMENT_REFUSALS.tooLong });
+    expect(COMMENT_REFUSALS.tooLong.reason).toBe("Keep a comment under 4,000 characters.");
   });
 });
 
@@ -218,12 +218,12 @@ describe("addComment", () => {
   });
 
   it("refuses a comment with nothing in it, or too much", () => {
-    expect(addComment(input({ body: "   " }))).toEqual({ ok: false, reason: COMMENT_REFUSALS.empty });
-    expect(addComment(input({ body: "x".repeat(COMMENT_MAX + 1) }))).toEqual({ ok: false, reason: COMMENT_REFUSALS.tooLong });
+    expect(addComment(input({ body: "   " }))).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
+    expect(addComment(input({ body: "x".repeat(COMMENT_MAX + 1) }))).toEqual({ ok: false, ...COMMENT_REFUSALS.tooLong });
   });
 
   it("needs the block in a frozen version's body; a draft takes any block, and any version takes the whole-version thread", () => {
-    expect(addComment(input({ blockId: "b_gone" }))).toEqual({ ok: false, reason: COMMENT_REFUSALS.noBlock });
+    expect(addComment(input({ blockId: "b_gone" }))).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
     expect(addComment(input({ blockId: DOCUMENT_THREAD }))).toMatchObject({ ok: true });
     const draft = version({ id: "v_draft", number: null, state: "draft", submittedBy: null });
     expect(addComment(input({ version: draft, blockId: "b_not_saved_yet" }))).toMatchObject({ ok: true });
@@ -299,7 +299,7 @@ describe("reply", () => {
   it("asks where the thread can be answered, then the text", () => {
     expect(reply(input({ template: template({ inReview: null }) }))).toEqual(CLOSED);
     expect(reply(input({ viewer: naomi, template: reviewNaming("naomi", "x"), thread: onDraft() }))).toEqual(GENERIC);
-    expect(reply(input({ body: "" }))).toEqual({ ok: false, reason: COMMENT_REFUSALS.empty });
+    expect(reply(input({ body: "" }))).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { STAGE_REFUSALS } from "@/domain/approval-chain";
 import { REASONS } from "@/domain/permissions";
+import { refuse } from "@/domain/refusals";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import {
   REASON_MAX,
@@ -64,15 +66,30 @@ describe("decisionAccess", () => {
   });
 
   it("is blocked, with the reason, for an approver who can't decide this one (maker-checker, another stage)", () => {
-    const own = { ok: false, reason: REASONS.ownVersion } as const;
+    const own = refuse(REASONS.ownVersion);
     expect(decisionAccess(own, own)).toEqual({ kind: "blocked", reason: "You submitted this version." });
-    const stage = { ok: false, reason: "Waiting on Legal reviewer." } as const;
+    const stage = refuse(STAGE_REFUSALS.waitingOn("Legal reviewer"));
     expect(decisionAccess(stage, stage)).toEqual({ kind: "blocked", reason: "Waiting on Legal reviewer." });
   });
 
   it("is hidden for someone who isn't an approver on the team: no dead buttons", () => {
-    const generic = { ok: false, reason: REASONS.generic } as const;
+    const generic = refuse(REASONS.generic);
     expect(decisionAccess(generic, generic)).toEqual({ kind: "hidden" });
+  });
+
+  it("reads the refusal's code, never its sentence (handoff review I11)", () => {
+    // Reworded copy changes nothing: `generic` still hides, with any wording.
+    const reworded = { ok: false, code: "generic", reason: "Ask a Team Admin for the Approver role." } as const;
+    expect(decisionAccess(reworded, reworded)).toEqual({ kind: "hidden" });
+    // And a sentence that happens to read like `generic` doesn't hide a refusal coded otherwise.
+    const lookalike = { ok: false, code: "submitted_version", reason: REASONS.generic.reason } as const;
+    expect(decisionAccess(lookalike, lookalike)).toEqual({ kind: "blocked", reason: REASONS.generic.reason });
+  });
+
+  it("takes Approve's refusal first, then Request changes'", () => {
+    const own = refuse(REASONS.ownVersion);
+    expect(decisionAccess(ok, own)).toEqual({ kind: "blocked", reason: REASONS.ownVersion.reason });
+    expect(decisionAccess(refuse(REASONS.generic), own)).toEqual({ kind: "hidden" });
   });
 });
 

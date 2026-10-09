@@ -130,23 +130,24 @@ describe("requesting and deciding access", () => {
     await as("morgan");
     expect(await requestAccess({ teamId: "coral-offers", role: "viewer", reason: "Also this." })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.pending("Coral Offers"),
+      ...ACCESS_REFUSALS.pending("Coral Offers"),
     });
     expect(await requestAccess({ teamId: "deposits", role: "viewer", reason: "   " })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.giveReason,
+      ...ACCESS_REFUSALS.giveReason,
     });
     expect(
       await requestAccess({ teamId: "deposits", role: "team_admin" as never, reason: "Please." }),
-    ).toEqual({ ok: false, reason: ACCESS_REFUSALS.pickRole });
+    ).toEqual({ ok: false, ...ACCESS_REFUSALS.pickRole });
     expect(await requestAccess({ teamId: "nowhere", role: "viewer", reason: "Please." })).toEqual({
       ok: false,
+      code: "team_gone",
       reason: "This team no longer exists.",
     });
     await as("maya");
     expect(await requestAccess({ teamId: "coral-offers", role: "author", reason: "Again." })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.hasRole("author", "Coral Offers"),
+      ...ACCESS_REFUSALS.hasRole("author", "Coral Offers"),
     });
     expect(await requestCount()).toBe(before);
     expect(refresh).not.toHaveBeenCalled();
@@ -156,7 +157,7 @@ describe("requesting and deciding access", () => {
     await as("jordan");
     expect(await decideAccessRequest({ requestId: morganRequest, decision: "approve" })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
     await as("alex");
     const own = await requestAccess({ teamId: "coral-offers", role: "viewer", reason: "Checking the read-only view." });
@@ -165,7 +166,7 @@ describe("requesting and deciding access", () => {
     await as("alex");
     expect(await decideAccessRequest({ requestId: own.requestId, decision: "approve" })).toEqual({
       ok: false,
-      reason: REASONS.ownRequest,
+      ...REASONS.ownRequest,
     });
     expect((await db.query.accessRequests.findFirst({ where: eq(accessRequests.id, own.requestId) }))!.status).toBe(
       "pending",
@@ -177,7 +178,7 @@ describe("requesting and deciding access", () => {
     await as("alex");
     expect(await decideAccessRequest({ requestId: chris.id, decision: "deny", note: "  " })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.denyNote,
+      ...ACCESS_REFUSALS.denyNote,
     });
     const at = await as("alex");
     expect(
@@ -219,7 +220,7 @@ describe("requesting and deciding access", () => {
     await as("alex");
     expect(await decideAccessRequest({ requestId: morganRequest, decision: "approve" })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.decided,
+      ...ACCESS_REFUSALS.decided,
     });
   });
 });
@@ -232,7 +233,7 @@ describe("the Auditor holds no team role (adversarial review fix)", () => {
     const at = await as("taylor");
     expect(await requestAccess({ teamId: "deposits", role: "approver", reason: "Spot checks." })).toEqual({
       ok: false,
-      reason: REASONS.auditorReadOnly,
+      ...REASONS.auditorReadOnly,
     });
     expect(await requestCount()).toBe(before);
     expect(await auditAt(at)).toEqual([]);
@@ -250,6 +251,7 @@ describe("the Auditor holds no team role (adversarial review fix)", () => {
     await as("alex");
     expect(await decideAccessRequest({ requestId: "ar_taylor_test", decision: "approve" })).toEqual({
       ok: false,
+      code: "requester_is_auditor",
       reason: "Taylor Nguyen is an Auditor and can't hold team roles.",
     });
     expect(await membershipOf("taylor")).toBeNull();
@@ -268,7 +270,7 @@ describe("members", () => {
       await keepInactive({ membershipId: alex }),
       await reinstateMember({ membershipId: alex }),
     ]) {
-      expect(result).toEqual({ ok: false, reason: REASONS.ownAccess });
+      expect(result).toEqual({ ok: false, ...REASONS.ownAccess });
     }
     expect((await membershipOf("alex"))!.roles).toEqual(["approver", "team_admin"]);
   });
@@ -277,12 +279,12 @@ describe("members", () => {
     await as("alex");
     expect(await removeMember({ membershipId: await membershipId("priya", "deposits") })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
     await as("maya");
     expect(await removeMember({ membershipId: await membershipId("sam") })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
   });
 
@@ -299,7 +301,7 @@ describe("members", () => {
     await as("alex");
     expect(await changeMemberRoles({ membershipId: await membershipId("morgan"), roles: [] })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.pickRoles,
+      ...ACCESS_REFUSALS.pickRoles,
     });
   });
 
@@ -314,11 +316,11 @@ describe("members", () => {
     await as("alex", staleAlex);
     expect(await changeMemberRoles({ membershipId: await membershipId("jordan"), roles: ["approver"] })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.lastAdmin("Coral Offers"),
+      ...ACCESS_REFUSALS.lastAdmin("Coral Offers"),
     });
     expect(await removeMember({ membershipId: await membershipId("jordan") })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.lastAdmin("Coral Offers"),
+      ...ACCESS_REFUSALS.lastAdmin("Coral Offers"),
     });
 
     // Put the seed back: Alex is the only Team Admin again.
@@ -339,7 +341,7 @@ describe("members", () => {
     expect((await notificationsAt(at)).map((n) => [n.userId, n.kind, n.href])).toEqual([
       ["morgan", "access_removed", "/request-access"],
     ]);
-    expect(await removeMember({ membershipId: "m_gone" })).toEqual({ ok: false, reason: "This person is no longer a member." });
+    expect(await removeMember({ membershipId: "m_gone" })).toEqual({ ok: false, code: "no_longer_member", reason: "This person is no longer a member." });
   });
 });
 
@@ -350,11 +352,11 @@ describe("inactivity", () => {
     await as("alex");
     expect(await keepInactive({ membershipId: await membershipId("maya") })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.notFlagged,
+      ...ACCESS_REFUSALS.notFlagged,
     });
     expect(await suspendInactive({ membershipId: await membershipId("maya") })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.notFlagged,
+      ...ACCESS_REFUSALS.notFlagged,
     });
   });
 
@@ -383,8 +385,8 @@ describe("inactivity", () => {
       roles: ["viewer"],
     });
     await as("alex");
-    expect(await reinstateMember({ membershipId: devon })).toEqual({ ok: false, reason: ACCESS_REFUSALS.alreadyActive });
-    expect(await keepInactive({ membershipId: devon })).toEqual({ ok: false, reason: ACCESS_REFUSALS.notFlagged });
+    expect(await reinstateMember({ membershipId: devon })).toEqual({ ok: false, ...ACCESS_REFUSALS.alreadyActive });
+    expect(await keepInactive({ membershipId: devon })).toEqual({ ok: false, ...ACCESS_REFUSALS.notFlagged });
   });
 
   it("keeps a flagged member: the clock restarts", async () => {
@@ -399,7 +401,7 @@ describe("inactivity", () => {
     await as("alex");
     expect(await keepInactive({ membershipId: await membershipId("dana") })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.notFlagged,
+      ...ACCESS_REFUSALS.notFlagged,
     });
   });
 });
@@ -415,18 +417,18 @@ describe("recertification", () => {
     await as("alex");
     expect(await decideRecertItem({ recertId: recert.id, userId: "alex", decision: "keep" })).toEqual({
       ok: false,
-      reason: REASONS.ownAccess,
+      ...REASONS.ownAccess,
     });
     expect(await decideRecertItem({ recertId: recert.id, userId: "morgan", decision: "keep" })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.notInReview,
+      ...ACCESS_REFUSALS.notInReview,
     });
     await as("jordan");
     expect(await decideRecertItem({ recertId: recert.id, userId: "sam", decision: "keep" })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, ...REASONS.generic });
   });
 
   it("keeps four, removes Priya (her access ends at once), and refuses a second decision", async () => {
@@ -447,7 +449,7 @@ describe("recertification", () => {
     await as("alex");
     expect(await decideRecertItem({ recertId: recert.id, userId: "maya", decision: "remove" })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.alreadyReviewed,
+      ...ACCESS_REFUSALS.alreadyReviewed,
     });
   });
 
@@ -462,7 +464,7 @@ describe("recertification", () => {
 
     await as("alex");
     const late = await decideRecertItem({ recertId: recert.id, userId: "sam", decision: "remove" });
-    expect(late).toEqual({ ok: false, reason: expect.stringMatching(/^This review closed on /) });
+    expect(late).toEqual({ ok: false, code: "recert_closed", reason: expect.stringMatching(/^This review closed on /) });
   });
 
   it("starts a new review over the current members, due in 30 days; only one at a time", async () => {
@@ -487,7 +489,7 @@ describe("recertification", () => {
     expect((await auditAt(at)).map((r) => r.action)).toEqual(["recert.started"]);
 
     await as("alex");
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, reason: ACCESS_REFUSALS.reviewOpen });
+    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, ...ACCESS_REFUSALS.reviewOpen });
   });
 
   it("runs the sweep first: a past-due review is closed, with its lapses, before a new one starts", async () => {
@@ -499,7 +501,7 @@ describe("recertification", () => {
     await as("alex");
     env.now = new Date(open.dueAt.getTime() + DAY); // the deadline passed with nobody signing in
     // Every undecided member ended at the deadline, so nobody is left for a new review.
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, reason: ACCESS_REFUSALS.nobodyToReview });
+    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: false, ...ACCESS_REFUSALS.nobodyToReview });
     expect((await db.query.recertifications.findFirst({ where: eq(recertifications.id, open.id) }))?.completedAt).toEqual(open.dueAt);
     expect(await membershipOf("sam")).toMatchObject({ status: "lapsed", statusChangedAt: open.dueAt });
     expect(await membershipOf("alex")).toMatchObject({ status: "active" });

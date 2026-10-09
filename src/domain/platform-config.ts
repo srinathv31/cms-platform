@@ -32,6 +32,7 @@ import type {
 } from "./access-types";
 import { ROLE_LABEL } from "./access";
 import { isBusinessZone, zoneLabel, type BusinessZone } from "./business-zone";
+import { refusal, refuse, type Refusal } from "./refusals";
 import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
 import { versionsNeeding } from "./approval-chain";
 import type { ApprovalStage, VersionStage } from "./review-types";
@@ -86,37 +87,44 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "_next",
 ]);
 
+/** Why a Platform settings change can't be saved: a code to branch on, and the sentence shown at the control. */
 export const PLATFORM_REFUSALS = {
-  teamName: "Give the team a name.",
-  teamNameTooLong: `Keep the name under ${TEAM_NAME_MAX} characters.`,
-  descriptionTooLong: `Keep the description under ${TEAM_DESCRIPTION_MAX} characters.`,
-  icon: "Pick an icon.",
-  reservedName: (name: string) => `"${name}" can't be used as a team name.`,
-  teamTaken: (name: string) => `A team called ${name} already exists.`,
-  pickPerson: "Pick a person.",
-  oneSection: "Keep at least one required section.",
-  sectionTitle: "Give every section a title.",
-  sectionTitleTooLong: `Keep section titles under ${SECTION_TITLE_MAX} characters.`,
-  sectionDuplicate: (title: string) => `There are two sections called ${title}.`,
-  oneChannel: "Keep at least one channel on.",
-  oneStage: "Keep at least one stage.",
-  stageName: "Give every stage a name.",
-  stageNameTooLong: `Keep stage names under ${STAGE_NAME_MAX} characters.`,
-  stageDuplicate: (name: string) => `There are two stages called ${name}.`,
-  stageGone: "A stage changed since you opened this. Try again.",
-  pickRole: "Pick a role.",
-  roleCantApprove: (role: TeamRole) => `The ${ROLE_LABEL[role]} role can't approve.`,
-  nameYourself: "You can't name yourself as an approver.",
-  auditorCantApprove: (person: string) => `${person} is an Auditor and can't approve.`,
-  adminWithoutTeamRole: (person: string) => `${person} is a Platform Admin with no team role and can't approve.`,
-  noActiveAccess: (person: string) => `${person} has no active access.`,
-  personTwice: (person: string, stage: number) => `${person} already reviews stage ${stage}.`,
-  stageWaiting: (count: number, name: string) =>
-    `${count} ${count === 1 ? "version" : "versions"} in review still ${count === 1 ? "needs" : "need"} ${name}.`,
-  pickZone: "Pick a time zone from the list.",
+  teamName: refusal("team_name_missing", "Give the team a name."),
+  teamNameTooLong: refusal("team_name_too_long", `Keep the name under ${TEAM_NAME_MAX} characters.`),
+  descriptionTooLong: refusal("team_description_too_long", `Keep the description under ${TEAM_DESCRIPTION_MAX} characters.`),
+  icon: refusal("team_icon_missing", "Pick an icon."),
+  reservedName: refusal("team_name_reserved", (name: string) => `"${name}" can't be used as a team name.`),
+  teamTaken: refusal("team_name_taken", (name: string) => `A team called ${name} already exists.`),
+  pickPerson: refusal("pick_person", "Pick a person."),
+  /** A new team's first Team Admin: the Auditor is read-only everywhere. */
+  auditorCantBeAdmin: refusal("auditor_cant_be_admin", (person: string) => `${person} is an Auditor and can't be a Team Admin.`),
+  oneSection: refusal("last_section", "Keep at least one required section."),
+  sectionTitle: refusal("section_title_missing", "Give every section a title."),
+  sectionTitleTooLong: refusal("section_title_too_long", `Keep section titles under ${SECTION_TITLE_MAX} characters.`),
+  sectionDuplicate: refusal("section_duplicate", (title: string) => `There are two sections called ${title}.`),
+  oneChannel: refusal("last_channel", "Keep at least one channel on."),
+  oneStage: refusal("last_stage", "Keep at least one stage."),
+  stageName: refusal("stage_name_missing", "Give every stage a name."),
+  stageNameTooLong: refusal("stage_name_too_long", `Keep stage names under ${STAGE_NAME_MAX} characters.`),
+  stageDuplicate: refusal("stage_duplicate", (name: string) => `There are two stages called ${name}.`),
+  stageGone: refusal("stage_changed", "A stage changed since you opened this. Try again."),
+  pickRole: refusal("pick_stage_role", "Pick a role."),
+  roleCantApprove: refusal("role_cant_approve", (role: TeamRole) => `The ${ROLE_LABEL[role]} role can't approve.`),
+  nameYourself: refusal("names_yourself", "You can't name yourself as an approver."),
+  auditorCantApprove: refusal("auditor_cant_approve", (person: string) => `${person} is an Auditor and can't approve.`),
+  adminWithoutTeamRole: refusal(
+    "admin_without_team_role",
+    (person: string) => `${person} is a Platform Admin with no team role and can't approve.`,
+  ),
+  noActiveAccess: refusal("no_active_access", (person: string) => `${person} has no active access.`),
+  personTwice: refusal("person_on_two_stages", (person: string, stage: number) => `${person} already reviews stage ${stage}.`),
+  stageWaiting: refusal(
+    "stage_in_use",
+    (count: number, name: string) =>
+      `${count} ${count === 1 ? "version" : "versions"} in review still ${count === 1 ? "needs" : "need"} ${name}.`,
+  ),
+  pickZone: refusal("pick_zone", "Pick a time zone from the list."),
 } as const;
-
-const refuse = (reason: string): Refused => ({ ok: false, reason });
 
 function configChanged(area: PlatformArea, teamId: string | null, summary: string, details: Record<string, unknown>): AccessEffect {
   return { kind: "audit", action: "platform.config_changed", teamId, details: { area, summary, ...details } };
@@ -142,7 +150,7 @@ export interface NewTeamCheck {
   description: string;
   slug: string;
   /** The first reason `createTeam` refuses it, or null. */
-  problem: string | null;
+  problem: Refusal | null;
 }
 
 /**
@@ -160,7 +168,7 @@ export function validateNewTeam(input: {
   const name = input.name.trim().replace(/\s+/g, " ");
   const description = input.description.trim();
   const slug = slugify(name);
-  const problem = ((): string | null => {
+  const problem = ((): Refusal | null => {
     if (!name) return PLATFORM_REFUSALS.teamName;
     if (name.length > TEAM_NAME_MAX) return PLATFORM_REFUSALS.teamNameTooLong;
     if (description.length > TEAM_DESCRIPTION_MAX) return PLATFORM_REFUSALS.descriptionTooLong;
@@ -249,7 +257,7 @@ export function sectionKey(title: string): string {
  * and every title given, at most 60 characters and unlike the others (case-insensitive). The sections
  * editor runs it as the admin types; `updateRequiredSections` refuses with it.
  */
-export function validateRequiredSections(next: readonly { title: string }[]): string | null {
+export function validateRequiredSections(next: readonly { title: string }[]): Refusal | null {
   if (next.length === 0) return PLATFORM_REFUSALS.oneSection;
   const titles = new Set<string>();
   for (const s of next) {
@@ -263,7 +271,7 @@ export function validateRequiredSections(next: readonly { title: string }[]): st
 }
 
 /** Why a section can't be removed from a list of `count`, or null: at least one section stays. */
-export function removeSectionRefusal(count: number): string | null {
+export function removeSectionRefusal(count: number): Refusal | null {
   return count <= 1 ? PLATFORM_REFUSALS.oneSection : null;
 }
 
@@ -301,7 +309,7 @@ function planSections(current: readonly RequiredSection[], next: readonly Requir
 
 export interface SectionsChange {
   /** The first reason the list can't be saved (`validateRequiredSections`), or null. */
-  problem: string | null;
+  problem: Refusal | null;
   /** Saving would change something: a section added, removed, renamed or moved. */
   changed: boolean;
   /** The strip's lines: the scope, said from the start, then what changes once something does. */
@@ -423,7 +431,7 @@ export function channelOffConsequences(contentTypeName: string, channel: Channel
  * must be a channel, and at least one channel stays on. The channel rules read model asks it for
  * every switch, so the last one on shows disabled with the reason.
  */
-export function channelRuleRefusal(allowedChannels: readonly Channel[], channel: Channel, allowed: boolean): string | null {
+export function channelRuleRefusal(allowedChannels: readonly Channel[], channel: Channel, allowed: boolean): Refusal | null {
   if (!(CHANNELS as readonly string[]).includes(channel)) return PLATFORM_REFUSALS.oneChannel;
   const next = CHANNELS.filter((c) => (c === channel ? allowed : allowedChannels.includes(c)));
   return next.length === 0 ? PLATFORM_REFUSALS.oneChannel : null;
@@ -542,7 +550,7 @@ export function describeChainChange(input: {
     const count = input.waiting?.[s.id!] ?? 0;
     lines.push(
       count > 0
-        ? PLATFORM_REFUSALS.stageWaiting(count, s.name)
+        ? PLATFORM_REFUSALS.stageWaiting(count, s.name).reason
         : `${type} submissions will no longer wait on ${s.name}.`,
     );
   }
@@ -556,11 +564,10 @@ export function describeChainChange(input: {
   return { now, after, lines: changed ? lines : [], changed };
 }
 
-/** A reason a chain can't be saved, tied to the stage (its index) and the field it's about. */
-export interface StageProblem {
+/** A reason a chain can't be saved (its code and sentence), tied to the stage (its index) and the field it's about. */
+export interface StageProblem extends Refusal {
   stage: number;
   field: "name" | "reviewer";
-  reason: string;
 }
 
 /**
@@ -569,7 +576,7 @@ export interface StageProblem {
  * `namedApprover`); a platform role alone is no approve power. It holds whoever named them and
  * whenever, so `validateChain` checks it for every named person on every save.
  */
-export function cannotApprove(person: ApproverFacts): string | null {
+export function cannotApprove(person: ApproverFacts): Refusal | null {
   if (person.platformRole === "auditor") return PLATFORM_REFUSALS.auditorCantApprove(person.name);
   if (!person.activeTeamRole) {
     return person.platformRole === "platform_admin"
@@ -586,7 +593,7 @@ export function cannotApprove(person: ApproverFacts): string | null {
  * named the actor on stays theirs when the actor saves the chain. The chain picker offers only the
  * people this returns null for.
  */
-export function approverProblem(person: ApproverFacts, actorId: string): string | null {
+export function approverProblem(person: ApproverFacts, actorId: string): Refusal | null {
   if (person.id === actorId) return PLATFORM_REFUSALS.nameYourself;
   return cannotApprove(person);
 }
@@ -626,11 +633,11 @@ export function validateChain(input: {
           ? PLATFORM_REFUSALS.stageDuplicate(name)
           : null;
     if (name) names.add(key);
-    if (nameReason) problems.push({ stage: index, field: "name", reason: nameReason });
+    if (nameReason) problems.push({ stage: index, field: "name", ...nameReason });
 
     const keptByActor = stage.id !== undefined && actorsStages.has(stage.id);
     const reviewerReason = reviewerProblem(stage.rule, input, keptByActor, namedOn, index);
-    if (reviewerReason) problems.push({ stage: index, field: "reviewer", reason: reviewerReason });
+    if (reviewerReason) problems.push({ stage: index, field: "reviewer", ...reviewerReason });
   });
   return problems;
 }
@@ -641,7 +648,7 @@ function reviewerProblem(
   keptByActor: boolean,
   namedOn: Map<string, number>,
   index: number,
-): string | null {
+): Refusal | null {
   if (rule.kind === "team_role") {
     if (!(TEAM_ROLES as readonly string[]).includes(rule.role)) return PLATFORM_REFUSALS.pickRole;
     return rule.role === "approver" ? null : PLATFORM_REFUSALS.roleCantApprove(rule.role);
@@ -663,7 +670,7 @@ function reviewerProblem(
  * stays (`waiting`, from `versionsNeeding`). The chain editor shows it at the stage's Remove;
  * `saveApprovalChain` refuses with it.
  */
-export function removeStageRefusal(stage: { name: string; waiting: number }, remaining: number): string | null {
+export function removeStageRefusal(stage: { name: string; waiting: number }, remaining: number): Refusal | null {
   if (remaining < 1) return PLATFORM_REFUSALS.oneStage;
   if (stage.waiting > 0) return PLATFORM_REFUSALS.stageWaiting(stage.waiting, stage.name);
   return null;
@@ -702,7 +709,7 @@ export function saveApprovalChain(input: {
     if (s.id) ids.add(s.id);
   }
   const problem = validateChain({ stages: input.next, current, actorId: input.actor.id, people })[0];
-  if (problem) return refuse(problem.reason);
+  if (problem) return refuse(problem);
 
   const needing = versionsNeeding(input.inReview, current);
   for (const s of current) {
@@ -742,7 +749,7 @@ export function saveApprovalChain(input: {
 
 export interface ZoneChange {
   /** Why the zone picked can't be saved (one off the list), or null. */
-  problem: string | null;
+  problem: Refusal | null;
   /** The zone picked differs from the one in force. */
   changed: boolean;
   /** "New sunset dates end at 00:00 Pacific (America/Los_Angeles).", once a different zone is picked. */

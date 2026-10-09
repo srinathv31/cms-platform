@@ -163,22 +163,22 @@ describe("getReviewScreen", () => {
     as("maya");
     const own = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
     expect(own.can).toEqual({
-      approve: { ok: false, reason: REASONS.ownVersion },
-      requestChanges: { ok: false, reason: REASONS.ownVersion },
+      approve: { ok: false, ...REASONS.ownVersion },
+      requestChanges: { ok: false, ...REASONS.ownVersion },
       comment: { ok: true },
     });
 
     as("sam");
     const viewer = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
-    expect(viewer.can.approve).toEqual({ ok: false, reason: REASONS.generic });
-    expect(viewer.can.comment).toEqual({ ok: false, reason: REASONS.generic });
+    expect(viewer.can.approve).toEqual({ ok: false, ...REASONS.generic });
+    expect(viewer.can.comment).toEqual({ ok: false, ...REASONS.generic });
 
     as("jordan");
     const active = await getReviewScreen("coral-offers", ids["cash-back"]!, 2);
     expect(active.baseline).toBeNull(); // the Active version is this one
-    expect(active.can.approve).toEqual({ ok: false, reason: REFUSALS.notInReview });
+    expect(active.can.approve).toEqual({ ok: false, ...REFUSALS.notInReview });
     // A decided version is a record: nobody comments on it, and the screen says why.
-    expect(active.can.comment).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+    expect(active.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
     expect(active.steps).toEqual([
       expect.objectContaining({ status: "done", decidedBy: expect.objectContaining({ id: "jordan" }) }),
     ]);
@@ -202,8 +202,8 @@ describe("getReviewScreen", () => {
     try {
       const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
       expect(screen.can).toEqual({
-        approve: { ok: false, reason: REASONS.wroteVersion },
-        requestChanges: { ok: false, reason: REASONS.wroteVersion },
+        approve: { ok: false, ...REASONS.wroteVersion },
+        requestChanges: { ok: false, ...REASONS.wroteVersion },
         comment: { ok: true },
       });
       const queue = await getReviewQueue("coral-offers");
@@ -274,12 +274,12 @@ describe("getVersions", () => {
       can: {
         setSunset: { ok: true },
         startRevoke: { ok: true },
-        confirmRevoke: { ok: false, reason: REFUSALS.noRevokePending },
-        cancelRevoke: { ok: false, reason: REFUSALS.noRevokePending },
+        confirmRevoke: { ok: false, ...REFUSALS.noRevokePending },
+        cancelRevoke: { ok: false, ...REFUSALS.noRevokePending },
       },
     });
     expect(v1!.renders30d).toBeGreaterThan(0);
-    expect(v2!.can.setSunset).toEqual({ ok: false, reason: REFUSALS.sunsetNotSuperseded });
+    expect(v2!.can.setSunset).toEqual({ ok: false, ...REFUSALS.sunsetNotSuperseded });
     expect(v2!.revoke).toBeUndefined();
     expect(data.consumerUsage.map((u) => [u.consumerId, u.versionNumber])).toEqual([
       ["coral", 2],
@@ -291,7 +291,7 @@ describe("getVersions", () => {
 
     as("maya");
     const author = await getVersions("coral-offers", ids["balance-transfer"]!);
-    expect(author.items[1]!.can.setSunset).toEqual({ ok: false, reason: REASONS.generic });
+    expect(author.items[1]!.can.setSunset).toEqual({ ok: false, ...REASONS.generic });
   });
 
   it("once Balance Transfer v1's sunset passes, its sunset is refused to everyone, with the reason", async () => {
@@ -307,10 +307,10 @@ describe("getVersions", () => {
       });
 
       env.now = sunsetAt;
-      const passed = { ok: false, reason: REFUSALS.sunsetPassed };
+      const passed = { ok: false, ...REFUSALS.sunsetPassed };
       const [v2, v1] = (await getVersions("coral-offers", templateId)).items;
       expect(v1).toMatchObject({ state: "superseded", sunsetPassed: true, can: { setSunset: passed, startRevoke: { ok: true } } });
-      expect(v2!.can.setSunset).toEqual({ ok: false, reason: REFUSALS.sunsetNotSuperseded });
+      expect(v2!.can.setSunset).toEqual({ ok: false, ...REFUSALS.sunsetNotSuperseded });
 
       // A fact about the version, not the viewer: an author reads the same reason.
       as("maya");
@@ -348,8 +348,8 @@ describe("getVersions", () => {
       confirmedBy: expect.objectContaining({ name: expect.any(String) }),
       confirmedAt: expect.stringMatching(ISO),
     });
-    expect(revoked.can.startRevoke).toEqual({ ok: false, reason: REFUSALS.alreadyRevoked });
-    expect(revoked.can.confirmRevoke).toEqual({ ok: false, reason: REFUSALS.alreadyRevoked });
+    expect(revoked.can.startRevoke).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
+    expect(revoked.can.confirmRevoke).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
   });
 
   it("with a revoke pending, the starter may cancel but not confirm; another approver may do both", async () => {
@@ -363,9 +363,9 @@ describe("getVersions", () => {
       as("jordan");
       const starter = (await getVersions("coral-offers", templateId)).items[0]!.can;
       expect(starter).toEqual({
-        setSunset: { ok: false, reason: REFUSALS.sunsetNotSuperseded },
-        startRevoke: { ok: false, reason: REFUSALS.revokePending },
-        confirmRevoke: { ok: false, reason: REASONS.ownRevoke },
+        setSunset: { ok: false, ...REFUSALS.sunsetNotSuperseded },
+        startRevoke: { ok: false, ...REFUSALS.revokePending },
+        confirmRevoke: { ok: false, ...REASONS.ownRevoke },
         cancelRevoke: { ok: true },
       });
       as("alex");
@@ -540,7 +540,7 @@ describe("the workspace's comment permission", () => {
     as("sam");
     expect((await getWorkspaceDocument("coral-offers", ids["annual-fee-waiver"]!)).can.comment).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
   });
 
@@ -548,6 +548,6 @@ describe("the workspace's comment permission", () => {
     as("maya");
     const document = await getWorkspaceDocument("coral-offers", ids["rate-change-notice"]!);
     expect(document.versionNumber).toBe(1);
-    expect(document.can.comment).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+    expect(document.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
   });
 });

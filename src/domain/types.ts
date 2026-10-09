@@ -15,6 +15,7 @@ export type {
 export { VARIABLE_TYPES } from "@/editor/model/types";
 
 import type { JSONContent, SampleSet, Variable } from "@/editor/model/types";
+import type { Refused } from "./refusals";
 
 // ── Channels ──────────────────────────────────────────────────
 export const CHANNELS = ["pdf", "web", "email"] as const;
@@ -124,7 +125,8 @@ export interface PermissionResource {
   stageApproverIds?: readonly string[] | null;
 }
 
-export type PermissionResult = { ok: true } | { ok: false; reason: string };
+/** Allowed, or refused with a stable `code` to branch on and the sentence to show (domain/refusals.ts). */
+export type PermissionResult = { ok: true } | Refused;
 
 // ── Rendering ─────────────────────────────────────────────────
 export type RenderOutcome = "ok" | "error";

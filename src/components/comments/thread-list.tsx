@@ -186,7 +186,7 @@ export function ThreadList({
           try {
             resolve(await call());
           } catch {
-            resolve({ ok: false, reason: UNREACHABLE });
+            resolve({ ok: false, code: "failed", reason: UNREACHABLE });
           }
         });
       }),

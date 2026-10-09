@@ -224,7 +224,7 @@ describe("focus while the server works", () => {
   });
 
   it("leaves focus on the Submit button after a refusal, so Tab stays in the dialog", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     const submit = button(/^Submit v3$/);
     submit.focus();
@@ -236,7 +236,7 @@ describe("focus while the server works", () => {
   });
 
   it("leaves focus in the note after a refusal from ⌘Enter", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
     note().focus();
@@ -282,7 +282,7 @@ describe("submitting", () => {
   });
 
   it("shows a refusal at the button and stays open, with the note kept", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     await typeNote("Keep me.");
     await act(async () => button(/^Submit v3$/).click());
@@ -311,7 +311,7 @@ describe("submitting", () => {
 });
 
 describe("a summary the draft has moved past (handoff review I8)", () => {
-  const STALE = { ok: false as const, reason: REFUSALS.summaryStale };
+  const STALE = { ok: false as const, ...REFUSALS.summaryStale };
   const alert = () => dialog()!.querySelector("[role='alert']")?.textContent;
   const buttonNamed = (name: RegExp) =>
     [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((b) => name.test(b.textContent ?? "")) ?? null;
@@ -321,7 +321,7 @@ describe("a summary the draft has moved past (handoff review I8)", () => {
     await render(summary());
     await typeNote("Keep me.");
     await act(async () => button(/^Submit v3$/).click());
-    expect(alert()).toBe(REFUSALS.summaryStale);
+    expect(alert()).toBe(REFUSALS.summaryStale.reason);
     expect(closed).not.toHaveBeenCalledWith(false);
     expect(buttonNamed(/^Submit v3$/), "it no longer offers to submit what it shows").toBeNull();
     expect(buttonNamed(/^Refresh summary$/)).not.toBeNull();
@@ -345,7 +345,7 @@ describe("a summary the draft has moved past (handoff review I8)", () => {
     onSubmit.mockResolvedValueOnce(STALE);
     await render(summary());
     await press(note(), { key: "Enter", metaKey: true });
-    expect(alert()).toBe(REFUSALS.summaryStale);
+    expect(alert()).toBe(REFUSALS.summaryStale.reason);
     await press(note(), { key: "Enter", metaKey: true });
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -354,7 +354,7 @@ describe("a summary the draft has moved past (handoff review I8)", () => {
 
   it("keeps offering the refresh when it fails, with its reason", async () => {
     onSubmit.mockResolvedValueOnce(STALE);
-    onRefresh.mockResolvedValueOnce({ ok: false, reason: "Your latest changes aren't saved yet." });
+    onRefresh.mockResolvedValueOnce({ ok: false, code: "failed", reason: "Your latest changes aren't saved yet." });
     await render(summary());
     await act(async () => button(/^Submit v3$/).click());
     await act(async () => button(/^Refresh summary$/).click());
@@ -368,7 +368,24 @@ describe("a summary the draft has moved past (handoff review I8)", () => {
   });
 
   it("offers no refresh for any other refusal", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
+    await render(summary());
+    await act(async () => button(/^Submit v3$/).click());
+    expect(buttonNamed(/^Refresh summary$/)).toBeNull();
+    expect(buttonNamed(/^Submit v3$/)).not.toBeNull();
+  });
+
+  it("reads the refusal's code, never its sentence (handoff review I11)", async () => {
+    // Reworded copy changes nothing: `summary_stale` still offers the refresh, and shows the new words.
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "summary_stale", reason: "Someone saved this draft since. Look again." });
+    await render(summary());
+    await act(async () => button(/^Submit v3$/).click());
+    expect(alert()).toBe("Someone saved this draft since. Look again.");
+    expect(buttonNamed(/^Refresh summary$/)).not.toBeNull();
+  });
+
+  it("offers no refresh for another refusal worded like a stale summary", async () => {
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "not_draft", reason: REFUSALS.summaryStale.reason });
     await render(summary());
     await act(async () => button(/^Submit v3$/).click());
     expect(buttonNamed(/^Refresh summary$/)).toBeNull();

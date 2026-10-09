@@ -97,7 +97,7 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
     current: type.requiredSections,
     next,
   });
-  const removeBlocked = removeSectionRefusal(rows.length);
+  const removeBlocked = removeSectionRefusal(rows.length)?.reason ?? null;
 
   const move = (index: number, by: -1 | 1) =>
     setRows((list) => {
@@ -175,7 +175,7 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
         lines={lines}
         confirmLabel="Save sections"
         blocked={!changed || !!problem}
-        message={problem}
+        message={problem?.reason ?? null}
         onConfirm={() => updateContentType({ contentTypeId: type.id, requiredSections: next })}
         onCancel={onClose}
         onDone={onClose}

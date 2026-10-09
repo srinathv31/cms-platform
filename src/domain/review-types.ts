@@ -15,6 +15,7 @@ import type {
   Variable,
   VersionState,
 } from "./types";
+import type { Refused } from "./refusals";
 
 // ── People ───────────────────────────────────────────────────────────────────
 
@@ -373,4 +374,8 @@ export interface ActivityItem {
 
 // ── Server action results ────────────────────────────────────────────────────
 
-export type ActionResult<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; reason: string };
+/**
+ * What a server action or an on-demand read answers: done, with what it carries, or refused with a
+ * stable `code` to branch on and the sentence to show (domain/refusals.ts).
+ */
+export type ActionResult<T = Record<never, never>> = ({ ok: true } & T) | Refused;

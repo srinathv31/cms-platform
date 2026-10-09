@@ -4,7 +4,7 @@ import { getCopilotPrompt } from "@/server/queries/copilot";
 import { getViewer } from "@/server/viewer";
 
 // The Copilot prompt, built from the saved draft each time its dialog opens:
-// GET → { ok: true, prompt } | { ok: false, reason }, with 400, 403, 404 or 409 (src/server/api/reads.ts).
+// GET → { ok: true, prompt } | { ok: false, code, reason }, with 400, 403, 404 or 409 (src/server/api/reads.ts).
 // Only someone who may edit the team's drafts. Request-time only: it reads the persona cookie first.
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/copilot-prompt">) {

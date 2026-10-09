@@ -17,6 +17,7 @@ import {
   type ThreadStatusResult,
 } from "@/domain/comments";
 import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS, refuse, type Refused } from "@/domain/refusals";
 import type { ActionResult, VersionStage } from "@/domain/review-types";
 import type { PermissionResult, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
@@ -41,12 +42,7 @@ import { getViewer } from "@/server/viewer";
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
-const REFUSED = { ok: false, reason: REASONS.generic } as const;
-
-const NOT_FOUND = {
-  noVersion: "This version no longer exists.",
-  noThread: "This comment thread no longer exists.",
-} as const;
+const REFUSED = refuse(REASONS.generic);
 
 // ── Facts ─────────────────────────────────────────────────────
 
@@ -175,7 +171,7 @@ function effectContext(viewer: Viewer, template: { id: string; teamId: string },
   return { at, actorId: viewer.userId, teamId: template.teamId, templateId: template.id, versionId };
 }
 
-function refusal(result: PermissionResult): { ok: false; reason: string } | null {
+function refusal(result: PermissionResult): Refused | null {
   return result.ok ? null : result;
 }
 
@@ -218,7 +214,7 @@ export async function addComment(input: {
   const at = await now();
   const result = await inTransaction(db, async (tx): Promise<ActionResult<{ threadId: string }>> => {
     const facts = await loadVersion(tx, parsed.data.templateId, parsed.data.versionId);
-    if (!facts) return { ok: false, reason: NOT_FOUND.noVersion };
+    if (!facts) return refuse(REQUEST_REFUSALS.versionGone);
     const outcome = addCommentTransition({
       viewer,
       ...facts,
@@ -261,7 +257,7 @@ export async function reply(input: { threadId: string; body: string }): Promise<
   const at = await now();
   const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
     const facts = await loadThread(tx, parsed.data.threadId);
-    if (!facts) return { ok: false, reason: NOT_FOUND.noThread };
+    if (!facts) return refuse(REQUEST_REFUSALS.threadGone);
     const participants = await tx
       .selectDistinct({ authorId: comments.authorId })
       .from(comments)
@@ -313,7 +309,7 @@ async function setStatus(
   let wrote = false;
   const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
     const facts = await loadThread(tx, parsed.data.threadId);
-    if (!facts) return { ok: false, reason: NOT_FOUND.noThread };
+    if (!facts) return refuse(REQUEST_REFUSALS.threadGone);
     const outcome: ThreadStatusResult = transition({ viewer, ...facts, now: at });
     if (!outcome.ok) return outcome;
     if (!outcome.changes) return { ok: true };

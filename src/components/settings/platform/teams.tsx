@@ -112,7 +112,7 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
   const check = validateNewTeam({ name, description, icon, existing: section.teams });
   const trimmed = check.name;
   // Nothing is flagged before a name is typed; until then Create team just isn't offered.
-  const problem = trimmed ? check.problem : null;
+  const problem = trimmed ? (check.problem?.reason ?? null) : null;
   const ready = !!trimmed && !!admin && !problem;
   const id = useId();
 

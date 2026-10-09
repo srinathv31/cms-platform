@@ -4,6 +4,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import {
+  ACCESS_REFUSALS,
   changeRoles,
   decideAccessRequest as decideRequestTransition,
   decideRecertItem as decideRecertTransition,
@@ -26,6 +27,7 @@ import {
   type RequestableRole,
 } from "@/domain/access-types";
 import { PermissionError, REASONS, assertCan } from "@/domain/permissions";
+import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
 import { TEAM_ROLES, type Action, type PermissionResource, type TeamRole, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { loadMembershipFacts, loadRecertFacts, loadRequestFacts, runAccessSweep } from "@/server/access-sweep";
@@ -48,34 +50,27 @@ import { getViewer } from "@/server/viewer";
 // A double click or a colleague acting first is refused with the domain's sentence and writes nothing.
 // A "use server" file may export only async functions: the helpers below stay private.
 
-const MISSING = {
-  team: "This team no longer exists.",
-  request: "This request no longer exists.",
-  member: "This person is no longer a member.",
-  review: "This review no longer exists.",
-} as const;
-
 // ── Helpers ───────────────────────────────────────────────────
 
 /** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class Refusal extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
-    this.name = "Refusal";
+class RefusalError extends Error {
+  constructor(readonly refusal: Refusal) {
+    super(refusal.reason);
+    this.name = "RefusalError";
   }
 }
 
-function refuse(reason: string): never {
-  throw new Refusal(reason);
+function refuse(refusal: Refusal): never {
+  throw new RefusalError(refusal);
 }
 
 /** `assertCan`, with the refusal returned as the action's answer instead of thrown. */
-function check(viewer: Viewer, action: Action, resource: PermissionResource): { ok: false; reason: string } | null {
+function check(viewer: Viewer, action: Action, resource: PermissionResource): Refused | null {
   try {
     assertCan(viewer, action, resource);
     return null;
   } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, reason: error.reason };
+    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
     throw error;
   }
 }
@@ -91,9 +86,9 @@ async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<
   try {
     return await inTransaction(db, run);
   } catch (error) {
-    if (!(error instanceof Refusal)) throw error;
+    if (!(error instanceof RefusalError)) throw error;
     if (sweptSomething) refreshAfter(); // the refusal changed nothing, but the sweep did
-    return { ok: false, reason: error.reason };
+    return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
   }
 }
 
@@ -102,10 +97,7 @@ function refreshAfter() {
   refresh();
 }
 
-const invalid = (error: z.ZodError): { ok: false; reason: string } => ({
-  ok: false,
-  reason: error.issues[0]?.message ?? "Check the details and try again.",
-});
+const invalid = (error: z.ZodError): Refused => ({ ok: false, ...REQUEST_REFUSALS.invalidInput(error.issues[0]?.message) });
 
 async function teamNamed(tx: Tx, id: string): Promise<Named | null> {
   const rows = await tx.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.id, id)).limit(1);
@@ -151,11 +143,11 @@ async function memberContext(tx: Tx, membershipId: string) {
     .where(eq(memberships.id, membershipId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!ref) refuse(MISSING.member);
+  if (!ref) refuse(ACCESS_REFUSALS.noLongerMember);
   const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, ref.teamId));
   const membership = teamMemberships.find((m) => m.id === membershipId)!;
   const member = await personNamed(tx, membership.userId);
-  const team = (await teamNamed(tx, membership.teamId)) ?? refuse(MISSING.team);
+  const team = (await teamNamed(tx, membership.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
   return { membership, teamMemberships, member, team };
 }
 
@@ -172,13 +164,13 @@ async function memberAction(
     team: Named;
     actor: Named;
     now: Date;
-  }) => { ok: true; membership: MembershipChange | null; effects: AccessEffect[] } | { ok: false; reason: string },
+  }) => { ok: true; membership: MembershipChange | null; effects: AccessEffect[] } | Refused,
 ): Promise<ActionResult> {
   const parsed = z.object({ membershipId: Id }).safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   const viewer = await getViewer();
   const ref = await findMembership(parsed.data.membershipId);
-  if (!ref) return { ok: false, reason: MISSING.member };
+  if (!ref) return { ok: false, ...ACCESS_REFUSALS.noLongerMember };
   const denied = check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: ref.userId });
   if (denied) return denied;
 
@@ -186,7 +178,7 @@ async function memberAction(
   const result = await transact(async (tx) => {
     const ctx = await memberContext(tx, parsed.data.membershipId);
     const outcome = run({ ...ctx, actor: actorOf(viewer), now: at });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     await commit(tx, outcome.membership, outcome.effects, at, viewer);
     return { ok: true };
   });
@@ -198,7 +190,8 @@ async function memberAction(
 
 const RequestInput = z.object({
   teamId: Id,
-  role: z.enum(["viewer", "author", "approver"], { message: "Pick Viewer, Author or Approver." }),
+  // Any team role parses; the domain refuses one that can't be requested (`pick_requestable_role`).
+  role: z.enum(TEAM_ROLES),
   reason: z.string().max(ACCESS_REASON_MAX * 2),
 });
 
@@ -212,13 +205,13 @@ export async function requestAccess(input: {
   if (!parsed.success) return invalid(parsed.error);
   const viewer = await getViewer();
   // The Auditor is read-only everywhere: no team role for them, so no request either (said plainly).
-  if (viewer.platformRole === "auditor") return { ok: false, reason: REASONS.auditorReadOnly };
+  if (viewer.platformRole === "auditor") return { ok: false, ...REASONS.auditorReadOnly };
   const denied = check(viewer, "access.request", { teamId: parsed.data.teamId });
   if (denied) return denied;
 
   const at = await now();
   const result = await transact<{ requestId: string }>(async (tx) => {
-    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(MISSING.team);
+    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
     const outcome = requestTransition({
       requester: actorOf(viewer),
       team,
@@ -228,7 +221,7 @@ export async function requestAccess(input: {
       memberships: await loadMembershipFacts(tx, eq(memberships.userId, viewer.userId)),
       requests: await loadRequestFacts(tx, eq(accessRequests.userId, viewer.userId)),
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     const requestId = newId("ar");
     await tx.insert(accessRequests).values({
       id: requestId,
@@ -266,20 +259,20 @@ export async function decideAccessRequest(input: {
     .where(eq(accessRequests.id, parsed.data.requestId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!ref) return { ok: false, reason: MISSING.request };
+  if (!ref) return { ok: false, ...REQUEST_REFUSALS.requestGone };
   const denied = check(viewer, "team.decideAccessRequest", { teamId: ref.teamId, requesterId: ref.userId });
   if (denied) return denied;
 
   const at = await now();
   const result = await transact(async (tx) => {
     const [request] = await loadRequestFacts(tx, eq(accessRequests.id, parsed.data.requestId));
-    if (!request) refuse(MISSING.request);
-    const team = (await teamNamed(tx, request.teamId)) ?? refuse(MISSING.team);
+    if (!request) refuse(REQUEST_REFUSALS.requestGone);
+    const team = (await teamNamed(tx, request.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
     const requester = await personNamed(tx, request.userId);
     // A request made before the requester became an Auditor (or written around the request check)
     // can't be approved: an Auditor holds no team role. Denying it still works.
     if (parsed.data.decision === "approve" && (await isAuditor(tx, request.userId))) {
-      refuse(`${requester.name} is an Auditor and can't hold team roles.`);
+      refuse(ACCESS_REFUSALS.auditorRequester(requester.name));
     }
     const [membership] = await loadMembershipFacts(
       tx,
@@ -295,14 +288,14 @@ export async function decideAccessRequest(input: {
       now: at,
       membership: membership ?? null,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     // Compare-and-set on the pending status: a colleague deciding first wins.
     const updated = await tx
       .update(accessRequests)
       .set(outcome.request)
       .where(and(eq(accessRequests.id, request.id), eq(accessRequests.status, "pending")))
       .returning({ id: accessRequests.id });
-    if (updated.length === 0) refuse("This request was already decided.");
+    if (updated.length === 0) refuse(ACCESS_REFUSALS.decided);
     await commit(tx, outcome.membership, outcome.effects, at, viewer);
     return { ok: true };
   });
@@ -317,7 +310,7 @@ const Roles = z.array(z.enum(TEAM_ROLES)).max(TEAM_ROLES.length);
 /** Replace a member's roles. A team keeps at least one active Team Admin. */
 export async function changeMemberRoles(input: { membershipId: string; roles: TeamRole[] }): Promise<ActionResult> {
   const roles = Roles.safeParse(input?.roles);
-  if (!roles.success) return { ok: false, reason: "Pick at least one role." };
+  if (!roles.success) return { ok: false, ...ACCESS_REFUSALS.pickRoles };
   return memberAction(input, (ctx) => changeRoles({ ...ctx, roles: roles.data }));
 }
 
@@ -361,15 +354,15 @@ export async function decideRecertItem(input: {
     .where(eq(recertifications.id, recertId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!ref) return { ok: false, reason: MISSING.review };
+  if (!ref) return { ok: false, ...REQUEST_REFUSALS.reviewGone };
   const denied = check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: userId });
   if (denied) return denied;
 
   const at = await now();
   const result = await transact(async (tx) => {
     const [recert] = await loadRecertFacts(tx, eq(recertifications.id, recertId));
-    if (!recert) refuse(MISSING.review);
-    const team = (await teamNamed(tx, recert.teamId)) ?? refuse(MISSING.team);
+    if (!recert) refuse(REQUEST_REFUSALS.reviewGone);
+    const team = (await teamNamed(tx, recert.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
     const member = await personNamed(tx, userId);
     const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, recert.teamId));
     const outcome = decideRecertTransition({
@@ -382,13 +375,13 @@ export async function decideRecertItem(input: {
       now: at,
       teamMemberships,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     const updated = await tx
       .update(recertItems)
       .set(outcome.item)
       .where(and(eq(recertItems.recertId, recertId), eq(recertItems.userId, userId), isNull(recertItems.decision)))
       .returning({ userId: recertItems.userId });
-    if (updated.length === 0) refuse("This member was already reviewed.");
+    if (updated.length === 0) refuse(ACCESS_REFUSALS.alreadyReviewed);
     if (outcome.completedAt) {
       await tx
         .update(recertifications)
@@ -412,7 +405,7 @@ export async function startRecertification(input: { teamId: string }): Promise<A
 
   const at = await now();
   const result = await transact<{ recertId: string }>(async (tx) => {
-    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(MISSING.team);
+    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
     const outcome = startRecert({
       team,
       actor: actorOf(viewer),
@@ -423,7 +416,7 @@ export async function startRecertification(input: { teamId: string }): Promise<A
         and(eq(recertifications.teamId, team.id), isNull(recertifications.completedAt)),
       ),
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     const recertId = newId("rc");
     const { items, ...recert } = outcome.recert;
     await tx.insert(recertifications).values({ id: recertId, ...recert, completedAt: null });

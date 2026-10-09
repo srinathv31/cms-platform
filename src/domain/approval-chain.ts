@@ -12,6 +12,7 @@
 // module answers only "is this stage theirs?".
 
 import { rolesOn } from "./permissions";
+import { refusal, refuse } from "./refusals";
 import type { ApprovalStage, Person, Recipients, StepView, VersionStage } from "./review-types";
 import type { ApproverRule, PermissionResult, VersionState, Viewer } from "./types";
 
@@ -105,12 +106,17 @@ export function versionsNeeding(
 
 // ── Who decides a stage ──────────────────────────────────────────────────────
 
+/** Why the viewer can't decide the stage a version waits on. */
+export const STAGE_REFUSALS = {
+  waitingOn: refusal("waiting_on_stage", (stage: string) => `Waiting on ${stage}.`),
+} as const;
+
 /**
  * Whether the viewer is who the stage's rule names: a team role held (actively) on the template's
  * team, or one named user. The reason names the stage the version is waiting on.
  */
 export function canActOnStage(viewer: Viewer, stage: ApprovalStage, teamId: string): PermissionResult {
-  return ruleMatches(viewer, stage.rule, teamId) ? { ok: true } : { ok: false, reason: `Waiting on ${stage.name}.` };
+  return ruleMatches(viewer, stage.rule, teamId) ? { ok: true } : refuse(STAGE_REFUSALS.waitingOn(stage.name));
 }
 
 function ruleMatches(viewer: Viewer, rule: ApproverRule, teamId: string): boolean {

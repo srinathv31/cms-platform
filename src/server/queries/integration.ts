@@ -10,6 +10,7 @@ import { CONSUMER_ERRORS, integrationSamples, renderPathOf, RESPONSE_FORMATS } f
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { can } from "@/domain/permissions";
 import { CHANNELS, type Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
@@ -117,11 +118,6 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
   };
 }
 
-const REASONS = {
-  noTemplate: "This template no longer exists.",
-  noActive: "This template has no Active version yet.",
-} as const;
-
 const Input = z.object({ templateId: z.string().trim().min(1).max(64) });
 
 /** "https://ucomp.example": the origin the page was requested on (behind a proxy, its forwarded host). */
@@ -136,7 +132,7 @@ async function requestOrigin(): Promise<string> {
 /** The panel for someone who may see the integration details; read-only, so nothing is refreshed or audited. */
 export async function loadIntegrationPanel(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ panel: IntegrationPanelData }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REASONS.noTemplate);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateGone);
   const { templateId } = parsed.data;
 
   const [template] = await db
@@ -144,11 +140,11 @@ export async function loadIntegrationPanel(viewer: Viewer, input: { templateId: 
     .from(templates)
     .where(eq(templates.id, templateId))
     .limit(1);
-  if (!template) return refusal(404, REASONS.noTemplate);
+  if (!template) return refusal(404, REQUEST_REFUSALS.templateGone);
 
   const permitted = can(viewer, "integration.view", { teamId: template.teamId });
-  if (!permitted.ok) return refusal(403, permitted.reason);
+  if (!permitted.ok) return refusal(403, permitted);
 
   const panel = await getIntegrationPanel(templateId, await requestOrigin());
-  return panel ? { ok: true, panel } : refusal(409, REASONS.noActive);
+  return panel ? { ok: true, panel } : refusal(409, REQUEST_REFUSALS.noActiveVersion);
 }

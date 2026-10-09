@@ -19,7 +19,7 @@ import { GET as submitSummary } from "./submit-summary/route";
 // The template reads a screen makes on demand, end to end: HTTP in, the real query against a temporary
 // database filled by the real seed, HTTP out. Only the database handle, the clock, the request headers
 // and the persona (`getViewer`) are swapped. Each route answers a refusal with its status and
-// `{ ok: false, reason }`, and never lets the answer be cached.
+// `{ ok: false, code, reason }`, and never lets the answer be cached.
 //
 // Seed facts used: Annual Fee Waiver (Coral Offers) has v1 Changes requested and an open draft started
 // from it; Cash Back has v1 Superseded, v2 Active, v3 In review; Balance Transfer has v2 Active. Maya is
@@ -116,7 +116,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     for (const query of ["", `?from=${v1.id}`, `?from=${v1.id}&to=`, `?from=${v1.id}&to=${"v".repeat(65)}`]) {
       expect(await answer(get(compare, "compare", cashBack, query))).toEqual({
         status: 400,
-        body: { ok: false, reason: "This template isn't available to you." },
+        body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
       });
     }
   });
@@ -127,7 +127,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     const [v1, v2] = [await versionOf(cashBack, { number: 1 }), await versionOf(cashBack, { number: 2 })];
     expect(await answer(get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`))).toEqual({
       status: 403,
-      body: { ok: false, reason: "This template isn't available to you." },
+      body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
     });
   });
 
@@ -137,7 +137,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     expect((await answer(get(compare, "compare", "UC-ZZZZZZ", `?from=${v1.id}&to=${other.id}`))).status).toBe(404);
     expect(await answer(get(compare, "compare", ids["cash-back"]!, `?from=${v1.id}&to=${other.id}`))).toEqual({
       status: 404,
-      body: { ok: false, reason: "This version isn't available." },
+      body: { ok: false, code: "version_unavailable", reason: "This version isn't available." },
     });
   });
 });
@@ -155,7 +155,7 @@ describe("GET /api/templates/[templateId]/base-version", () => {
     for (const query of ["", "?draft=", `?draft=${"v".repeat(65)}`]) {
       expect(await answer(get(baseVersion, "base-version", ids["annual-fee-waiver"]!, query))).toEqual({
         status: 400,
-        body: { ok: false, reason: "This template isn't available." },
+        body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
       });
     }
   });
@@ -167,7 +167,7 @@ describe("GET /api/templates/[templateId]/base-version", () => {
       as(persona);
       const { status, body } = await answer(get(baseVersion, "base-version", fee, `?draft=${draft.id}`));
       expect(status, persona).toBe(403);
-      expect(body).toEqual({ ok: false, reason: expect.stringMatching(/\S/) });
+      expect(body).toEqual({ ok: false, code: expect.any(String), reason: expect.stringMatching(/\S/) });
     }
   });
 
@@ -177,7 +177,7 @@ describe("GET /api/templates/[templateId]/base-version", () => {
     expect((await answer(get(baseVersion, "base-version", "UC-ZZZZZZ", `?draft=${v1.id}`))).status).toBe(404);
     expect(await answer(get(baseVersion, "base-version", fee, `?draft=${v1.id}`))).toEqual({
       status: 409,
-      body: { ok: false, reason: "There is no draft to revert." },
+      body: { ok: false, code: "no_draft_to_revert", reason: "There is no draft to revert." },
     });
   });
 });
@@ -194,7 +194,7 @@ describe("GET /api/templates/[templateId]/submit-summary", () => {
   it("400 for a malformed template id", async () => {
     expect(await answer(get(submitSummary, "submit-summary", "U".repeat(65)))).toEqual({
       status: 400,
-      body: { ok: false, reason: "This template isn't available." },
+      body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
     });
   });
 
@@ -207,7 +207,7 @@ describe("GET /api/templates/[templateId]/submit-summary", () => {
     expect((await answer(get(submitSummary, "submit-summary", "UC-ZZZZZZ"))).status).toBe(404);
     expect(await answer(get(submitSummary, "submit-summary", ids["cash-back"]!))).toEqual({
       status: 409,
-      body: { ok: false, reason: "This version is already in review." },
+      body: { ok: false, code: "already_in_review", reason: "This version is already in review." },
     });
   });
 });
@@ -224,7 +224,7 @@ describe("GET /api/templates/[templateId]/copilot-prompt", () => {
     expect((await answer(get(copilotPrompt, "copilot-prompt", "UC-ZZZZZZ"))).status).toBe(404);
     expect(await answer(get(copilotPrompt, "copilot-prompt", ids["cash-back"]!))).toEqual({
       status: 409,
-      body: { ok: false, reason: "There is no draft to write." },
+      body: { ok: false, code: "no_draft_to_write", reason: "There is no draft to write." },
     });
     as("taylor");
     expect((await answer(get(copilotPrompt, "copilot-prompt", ids["annual-fee-waiver"]!))).status).toBe(403);
@@ -248,7 +248,7 @@ describe("GET /api/templates/[templateId]/integration", () => {
     expect((await answer(get(integration, "integration", "UC-ZZZZZZ"))).status).toBe(404);
     expect(await answer(get(integration, "integration", ids["annual-fee-waiver"]!))).toEqual({
       status: 409,
-      body: { ok: false, reason: "This template has no Active version yet." },
+      body: { ok: false, code: "no_active_version", reason: "This template has no Active version yet." },
     });
     as("morgan");
     expect((await answer(get(integration, "integration", ids["balance-transfer"]!))).status).toBe(403);

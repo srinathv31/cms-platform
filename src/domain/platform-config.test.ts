@@ -107,18 +107,18 @@ describe("createTeam", () => {
   });
 
   it("refuses an empty, long, reserved or taken name, a long description and an unknown icon", () => {
-    expect(run({ name: "  " })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.teamName });
-    expect(run({ name: "x".repeat(61) })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.teamNameTooLong });
-    expect(run({ name: "All" })).toEqual({ ok: false, reason: '"All" can\'t be used as a team name.' });
-    expect(run({ name: "!!!" })).toEqual({ ok: false, reason: '"!!!" can\'t be used as a team name.' });
-    expect(run({ name: "coral offers" })).toEqual({ ok: false, reason: "A team called Coral Offers already exists." });
-    expect(run({ name: "DEPOSITS" })).toEqual({ ok: false, reason: "A team called Deposits already exists." });
-    expect(run({ description: "x".repeat(201) })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.descriptionTooLong });
-    expect(run({ icon: "skull" })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.icon });
+    expect(run({ name: "  " })).toEqual({ ok: false, ...PLATFORM_REFUSALS.teamName });
+    expect(run({ name: "x".repeat(61) })).toEqual({ ok: false, ...PLATFORM_REFUSALS.teamNameTooLong });
+    expect(run({ name: "All" })).toEqual({ ok: false, code: "team_name_reserved", reason: '"All" can\'t be used as a team name.' });
+    expect(run({ name: "!!!" })).toEqual({ ok: false, code: "team_name_reserved", reason: '"!!!" can\'t be used as a team name.' });
+    expect(run({ name: "coral offers" })).toEqual({ ok: false, code: "team_name_taken", reason: "A team called Coral Offers already exists." });
+    expect(run({ name: "DEPOSITS" })).toEqual({ ok: false, code: "team_name_taken", reason: "A team called Deposits already exists." });
+    expect(run({ description: "x".repeat(201) })).toEqual({ ok: false, ...PLATFORM_REFUSALS.descriptionTooLong });
+    expect(run({ icon: "skull" })).toEqual({ ok: false, ...PLATFORM_REFUSALS.icon });
   });
 
   it("refuses a name whose slug is a top-level route: every top-level segment under src/app is reserved", () => {
-    expect(run({ name: "SIM" })).toEqual({ ok: false, reason: '"SIM" can\'t be used as a team name.' });
+    expect(run({ name: "SIM" })).toEqual({ ok: false, code: "team_name_reserved", reason: '"SIM" can\'t be used as a team name.' });
     // Route groups "(x)" are looked through; dynamic "[x]", private "_x" and files are not segments.
     const segments = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true })
@@ -158,9 +158,9 @@ describe("validateNewTeam (the Create team form, as the admin types)", () => {
       const { problem } = check(over);
       expect(problem).not.toBeNull();
       const created = createTeam({ name: "Home Loans", description: "", icon: "home", admin: alex, actor: riley, now: NOW, existing: EXISTING, ...over });
-      expect(created).toEqual({ ok: false, reason: problem });
+      expect(created).toEqual({ ok: false, ...problem });
     }
-    expect(check({ name: "coral offers" }).problem).toBe("A team called Coral Offers already exists.");
+    expect(check({ name: "coral offers" }).problem).toEqual({ code: "team_name_taken", reason: "A team called Coral Offers already exists." });
     expect(check({ name: "Sim", description: "x".repeat(201) }).problem).toBe(PLATFORM_REFUSALS.descriptionTooLong);
   });
 
@@ -248,11 +248,12 @@ describe("updateRequiredSections", () => {
   });
 
   it("refuses no sections, a blank, long or duplicate title", () => {
-    expect(run([])).toEqual({ ok: false, reason: PLATFORM_REFUSALS.oneSection });
-    expect(run([{ key: "", title: " " }])).toEqual({ ok: false, reason: PLATFORM_REFUSALS.sectionTitle });
-    expect(run([{ key: "", title: "x".repeat(61) }])).toEqual({ ok: false, reason: PLATFORM_REFUSALS.sectionTitleTooLong });
+    expect(run([])).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneSection });
+    expect(run([{ key: "", title: " " }])).toEqual({ ok: false, ...PLATFORM_REFUSALS.sectionTitle });
+    expect(run([{ key: "", title: "x".repeat(61) }])).toEqual({ ok: false, ...PLATFORM_REFUSALS.sectionTitleTooLong });
     expect(run([SECTIONS[0]!, { key: "", title: "offer DETAILS" }])).toEqual({
       ok: false,
+      code: "section_duplicate",
       reason: "There are two sections called offer DETAILS.",
     });
   });
@@ -267,7 +268,7 @@ describe("the sections editor: validateRequiredSections, removeSectionRefusal, d
     for (const next of lists) {
       const problem = validateRequiredSections(next);
       expect(problem).not.toBeNull();
-      expect(updateRequiredSections({ contentType: disclosure, next, actor: riley, now: NOW })).toEqual({ ok: false, reason: problem });
+      expect(updateRequiredSections({ contentType: disclosure, next, actor: riley, now: NOW })).toEqual({ ok: false, ...problem });
     }
     expect(validateRequiredSections(SECTIONS)).toBeNull();
   });
@@ -341,7 +342,7 @@ describe("channelRuleRefusal (whether a switch may flip)", () => {
     const ct = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["email" as const] };
     expect(setChannelRule({ contentType: ct, channel: "email", allowed: false, activeUsing: 0, actor: riley, now: NOW })).toEqual({
       ok: false,
-      reason: channelRuleRefusal(["email"], "email", false),
+      ...channelRuleRefusal(["email"], "email", false),
     });
   });
 });
@@ -385,7 +386,7 @@ describe("setChannelRule", () => {
   });
 
   it("keeps at least one channel on", () => {
-    expect(run({ contentType: { ...ct, allowedChannels: ["email"] } })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.oneChannel });
+    expect(run({ contentType: { ...ct, allowedChannels: ["email"] } })).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneChannel });
   });
 });
 
@@ -431,7 +432,7 @@ describe("validateChain", () => {
 
   it("refuses one person on two stages, at the later stage", () => {
     expect(check([team, LEGAL, naming("dana", "Final sign-off")])).toEqual([
-      { stage: 2, field: "reviewer", reason: "Dana Park already reviews stage 2." },
+      { stage: 2, field: "reviewer", code: "person_on_two_stages", reason: "Dana Park already reviews stage 2." },
     ]);
   });
 
@@ -442,18 +443,18 @@ describe("validateChain", () => {
       ["team_admin", "Team Admin"],
     ] as const) {
       expect(check([team, { name: "Second look", rule: { kind: "team_role", role } }])).toEqual([
-        { stage: 1, field: "reviewer", reason: `The ${label} role can't approve.` },
+        { stage: 1, field: "reviewer", code: "role_cant_approve", reason: `The ${label} role can't approve.` },
       ]);
     }
     expect(check([{ name: "Boss", rule: { kind: "team_role", role: "boss" as never } }])).toEqual([
-      { stage: 0, field: "reviewer", reason: PLATFORM_REFUSALS.pickRole },
+      { stage: 0, field: "reviewer", ...PLATFORM_REFUSALS.pickRole },
     ]);
   });
 
   it("refuses the admin naming themselves", () => {
-    expect(check([team, naming("riley")])).toEqual([{ stage: 1, field: "reviewer", reason: "You can't name yourself as an approver." }]);
+    expect(check([team, naming("riley")])).toEqual([{ stage: 1, field: "reviewer", code: "names_yourself", reason: "You can't name yourself as an approver." }]);
     expect(check([team, naming("riley")], "pat")).toEqual([
-      { stage: 1, field: "reviewer", reason: "Riley Brooks is a Platform Admin with no team role and can't approve." },
+      { stage: 1, field: "reviewer", code: "admin_without_team_role", reason: "Riley Brooks is a Platform Admin with no team role and can't approve." },
     ]);
   });
 
@@ -471,45 +472,45 @@ describe("validateChain", () => {
 
     it("can't newly name themselves on another stage", () => {
       expect(check([caseyStage, { id: "stage_team", ...team }, naming("casey", "Final sign-off")], "casey", saved)).toEqual([
-        { stage: 2, field: "reviewer", reason: "You can't name yourself as an approver." },
+        { stage: 2, field: "reviewer", code: "names_yourself", reason: "You can't name yourself as an approver." },
       ]);
     });
 
     it("can't swap a stage's reviewer to themselves after someone else held it", () => {
       expect(check([{ id: "stage_team", ...naming("casey", "Team approver") }], "casey", saved)).toEqual([
-        { stage: 0, field: "reviewer", reason: "You can't name yourself as an approver." },
+        { stage: 0, field: "reviewer", code: "names_yourself", reason: "You can't name yourself as an approver." },
       ]);
     });
 
     it("still can't keep a stage that would stall: the other checks apply to stages the actor kept", () => {
       const lapsed = [{ id: "stage_casey", rule: { kind: "user" as const, userId: "pat" } }];
       expect(check([{ id: "stage_casey", ...naming("pat") }], "pat", lapsed)).toEqual([
-        { stage: 0, field: "reviewer", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
+        { stage: 0, field: "reviewer", code: "admin_without_team_role", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
       ]);
     });
   });
 
   it("refuses an Auditor", () => {
-    expect(check([team, naming("taylor")])).toEqual([{ stage: 1, field: "reviewer", reason: "Taylor Nguyen is an Auditor and can't approve." }]);
+    expect(check([team, naming("taylor")])).toEqual([{ stage: 1, field: "reviewer", code: "auditor_cant_approve", reason: "Taylor Nguyen is an Auditor and can't approve." }]);
   });
 
   it("refuses someone who can't approve: no active team role, whatever their platform role", () => {
-    expect(check([team, naming("morgan")])).toEqual([{ stage: 1, field: "reviewer", reason: "Morgan Lee has no active access." }]);
+    expect(check([team, naming("morgan")])).toEqual([{ stage: 1, field: "reviewer", code: "no_active_access", reason: "Morgan Lee has no active access." }]);
     expect(check([team, naming("pat")])).toEqual([
-      { stage: 1, field: "reviewer", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
+      { stage: 1, field: "reviewer", code: "admin_without_team_role", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
     ]);
-    expect(check([team, naming("nobody")])).toEqual([{ stage: 1, field: "reviewer", reason: PLATFORM_REFUSALS.pickPerson }]);
+    expect(check([team, naming("nobody")])).toEqual([{ stage: 1, field: "reviewer", ...PLATFORM_REFUSALS.pickPerson }]);
   });
 
   it("checks every stage, names too, in stage order with the name first", () => {
     expect(check([{ name: " ", rule: { kind: "team_role", role: "author" } }, naming("taylor", "team APPROVER"), naming("morgan", "Team approver")])).toEqual([
-      { stage: 0, field: "name", reason: PLATFORM_REFUSALS.stageName },
-      { stage: 0, field: "reviewer", reason: "The Author role can't approve." },
-      { stage: 1, field: "reviewer", reason: "Taylor Nguyen is an Auditor and can't approve." },
-      { stage: 2, field: "name", reason: "There are two stages called Team approver." },
-      { stage: 2, field: "reviewer", reason: "Morgan Lee has no active access." },
+      { stage: 0, field: "name", ...PLATFORM_REFUSALS.stageName },
+      { stage: 0, field: "reviewer", code: "role_cant_approve", reason: "The Author role can't approve." },
+      { stage: 1, field: "reviewer", code: "auditor_cant_approve", reason: "Taylor Nguyen is an Auditor and can't approve." },
+      { stage: 2, field: "name", code: "stage_duplicate", reason: "There are two stages called Team approver." },
+      { stage: 2, field: "reviewer", code: "no_active_access", reason: "Morgan Lee has no active access." },
     ]);
-    expect(check([{ ...team, name: "x".repeat(41) }])).toEqual([{ stage: 0, field: "name", reason: PLATFORM_REFUSALS.stageNameTooLong }]);
+    expect(check([{ ...team, name: "x".repeat(41) }])).toEqual([{ stage: 0, field: "name", ...PLATFORM_REFUSALS.stageNameTooLong }]);
   });
 
   it("offers in the picker only the people approverProblem allows", () => {
@@ -521,7 +522,10 @@ describe("validateChain", () => {
 describe("removeStageRefusal (the chain editor's Remove)", () => {
   it("keeps the last stage, and a stage a version in review still needs", () => {
     expect(removeStageRefusal({ name: "Team approver", waiting: 0 }, 0)).toBe(PLATFORM_REFUSALS.oneStage);
-    expect(removeStageRefusal({ name: "Legal reviewer", waiting: 2 }, 1)).toBe("2 versions in review still need Legal reviewer.");
+    expect(removeStageRefusal({ name: "Legal reviewer", waiting: 2 }, 1)).toEqual({
+      code: "stage_in_use",
+      reason: "2 versions in review still need Legal reviewer.",
+    });
     expect(removeStageRefusal({ name: "Legal reviewer", waiting: 0 }, 1)).toBeNull();
   });
 
@@ -540,7 +544,7 @@ describe("removeStageRefusal (the chain editor's Remove)", () => {
       actor: riley,
       now: NOW,
     });
-    expect(saved).toEqual({ ok: false, reason: removeStageRefusal({ name: "Legal reviewer", waiting: 1 }, 1) });
+    expect(saved).toEqual({ ok: false, ...removeStageRefusal({ name: "Legal reviewer", waiting: 1 }, 1) });
   });
 });
 
@@ -612,8 +616,8 @@ describe("saveApprovalChain", () => {
         { versionId: "v3", stages: both, currentStage: 1 },
         { versionId: "v4", stages: both, currentStage: 1 },
       ];
-      expect(run({ current, next, inReview: waiting })).toEqual({ ok: false, reason: "2 versions in review still need Legal reviewer." });
-      expect(run({ current, next, inReview: [waiting[0]!] })).toEqual({ ok: false, reason: "1 version in review still needs Legal reviewer." });
+      expect(run({ current, next, inReview: waiting })).toEqual({ ok: false, code: "stage_in_use", reason: "2 versions in review still need Legal reviewer." });
+      expect(run({ current, next, inReview: [waiting[0]!] })).toEqual({ ok: false, code: "stage_in_use", reason: "1 version in review still needs Legal reviewer." });
     });
 
     it("refuses while it is ahead of a version in that version's own stages", () => {
@@ -621,6 +625,7 @@ describe("saveApprovalChain", () => {
       const legalFirst = [both[1]!, both[0]!];
       expect(run({ current, next, inReview: [{ versionId: "v3", stages: both, currentStage: 0 }] })).toEqual({
         ok: false,
+        code: "stage_in_use",
         reason: "1 version in review still needs Legal reviewer.",
       });
       expect(run({ current, next, inReview: [{ versionId: "v4", stages: legalFirst, currentStage: 1 }] }).ok).toBe(true);
@@ -634,25 +639,26 @@ describe("saveApprovalChain", () => {
   });
 
   it("refuses no stages, blank, long or duplicate names, an unknown person or role, and a stale stage id", () => {
-    expect(run({ next: [] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.oneStage });
-    expect(run({ next: [{ ...LEGAL, name: " " }] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.stageName });
-    expect(run({ next: [{ ...LEGAL, name: "x".repeat(41) }] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.stageNameTooLong });
+    expect(run({ next: [] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneStage });
+    expect(run({ next: [{ ...LEGAL, name: " " }] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.stageName });
+    expect(run({ next: [{ ...LEGAL, name: "x".repeat(41) }] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.stageNameTooLong });
     expect(run({ next: [LEGAL, { ...LEGAL, name: "legal REVIEWER" }] })).toEqual({
       ok: false,
+      code: "stage_duplicate",
       reason: "There are two stages called legal REVIEWER.",
     });
     expect(run({ next: [{ name: "Legal", rule: { kind: "user", userId: "nobody" } }] })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.pickPerson,
+      ...PLATFORM_REFUSALS.pickPerson,
     });
     expect(run({ next: [{ name: "Boss", rule: { kind: "team_role", role: "boss" as never } }] })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.pickRole,
+      ...PLATFORM_REFUSALS.pickRole,
     });
-    expect(run({ next: [{ id: "stage_gone", ...LEGAL }] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.stageGone });
+    expect(run({ next: [{ id: "stage_gone", ...LEGAL }] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.stageGone });
     expect(run({ next: [{ id: "stage_team", ...LEGAL }, { id: "stage_team", name: "Again", rule: TEAM.rule }] })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.stageGone,
+      ...PLATFORM_REFUSALS.stageGone,
     });
   });
 
@@ -663,11 +669,11 @@ describe("saveApprovalChain", () => {
 
   it("refuses a chain nobody can approve with validateChain's first problem, and writes nothing", () => {
     const team = { id: "stage_team", name: "Team approver", rule: TEAM.rule };
-    expect(run({ next: [team, LEGAL, naming("dana", "Final sign-off")] })).toEqual({ ok: false, reason: "Dana Park already reviews stage 2." });
-    expect(run({ next: [{ ...team, rule: { kind: "team_role", role: "viewer" } }] })).toEqual({ ok: false, reason: "The Viewer role can't approve." });
-    expect(run({ next: [team, naming("riley")] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.nameYourself });
-    expect(run({ next: [team, naming("taylor")] })).toEqual({ ok: false, reason: "Taylor Nguyen is an Auditor and can't approve." });
-    expect(run({ next: [team, naming("morgan")] })).toEqual({ ok: false, reason: "Morgan Lee has no active access." });
+    expect(run({ next: [team, LEGAL, naming("dana", "Final sign-off")] })).toEqual({ ok: false, code: "person_on_two_stages", reason: "Dana Park already reviews stage 2." });
+    expect(run({ next: [{ ...team, rule: { kind: "team_role", role: "viewer" } }] })).toEqual({ ok: false, code: "role_cant_approve", reason: "The Viewer role can't approve." });
+    expect(run({ next: [team, naming("riley")] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.nameYourself });
+    expect(run({ next: [team, naming("taylor")] })).toEqual({ ok: false, code: "auditor_cant_approve", reason: "Taylor Nguyen is an Auditor and can't approve." });
+    expect(run({ next: [team, naming("morgan")] })).toEqual({ ok: false, code: "no_active_access", reason: "Morgan Lee has no active access." });
   });
 
   it("lets an admin save a chain another admin named them on, but not swap a stage to themselves", () => {
@@ -678,7 +684,7 @@ describe("saveApprovalChain", () => {
     expect(run({ actor: casey, current, next: [{ id: "stage_team", name: "Team sign-off", rule: TEAM.rule }, kept] }).ok).toBe(true);
     expect(run({ actor: casey, current, next: [{ id: "stage_team", name: "Team approver", rule: caseyStage.rule }, kept] })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.nameYourself,
+      ...PLATFORM_REFUSALS.nameYourself,
     });
   });
 
@@ -686,7 +692,7 @@ describe("saveApprovalChain", () => {
     const legal = { id: "stage_legal", position: 1, ...LEGAL };
     const lapsed = approvers.map((p) => (p.id === "dana" ? { ...p, activeTeamRole: false } : p));
     const renamed = [{ id: "stage_team", name: "Team sign-off", rule: TEAM.rule }, { id: "stage_legal", ...LEGAL }];
-    expect(run({ current: [TEAM, legal], next: renamed, people: lapsed })).toEqual({ ok: false, reason: "Dana Park has no active access." });
+    expect(run({ current: [TEAM, legal], next: renamed, people: lapsed })).toEqual({ ok: false, code: "no_active_access", reason: "Dana Park has no active access." });
     expect(run({ current: [TEAM, legal], next: renamed }).ok).toBe(true);
   });
 });
@@ -790,7 +796,7 @@ describe("the business time zone (decision 0017)", () => {
     expect(setBusinessZone({ current: "UTC", next: "UTC", pendingSunsets: 0, actor: riley, now: NOW })).toEqual({ ok: true, zone: "UTC", effects: [] });
     expect(setBusinessZone({ current: "UTC", next: "Mars/Olympus", pendingSunsets: 0, actor: riley, now: NOW })).toEqual({
       ok: false,
-      reason: describeZoneChange({ current: "UTC", next: "Mars/Olympus" }).problem,
+      ...describeZoneChange({ current: "UTC", next: "Mars/Olympus" }).problem,
     });
   });
 });

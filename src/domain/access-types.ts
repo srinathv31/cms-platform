@@ -7,6 +7,7 @@
 //   domain/platform-config.ts  teams, content types, channel rules, approval chains
 //   domain/audit.ts            audit sentences, action groups, filters, CSV
 
+import type { Refused } from "./refusals";
 import type { ActionResult, ApprovalStage, NotificationKind, Person, VersionStage } from "./review-types";
 import type {
   ApproverRule,
@@ -206,7 +207,7 @@ export interface AccessNotificationEffect {
 export type AccessEffect = AccessAuditEffect | AccessNotificationEffect;
 
 export type Ok<T> = { ok: true } & T;
-export type Refused = { ok: false; reason: string };
+export type { Refused };
 
 // ── The sweep (clock-driven; domain/access.ts `sweepAccess`) ─────────────────
 

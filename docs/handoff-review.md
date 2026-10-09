@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 18 | 9 | 30 |
+| Open | 0 | 3 | 17 | 9 | 29 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 17 | 4 | 41 |
+| Fixed | 1 | 19 | 18 | 4 | 42 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -407,7 +407,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I11 · Medium: The UI branches on exact English sentences
 
-- **Status:** Open
+- **Status:** Fixed. Every refusal is `{ ok: false, code, reason }`: each table entry in `src/domain` carries a stable snake_case code (`RefusalCode`, unique across tables, checked by `refusals.test.ts`), read models and action results pass it through, and the three screens branch on `generic`, `own_revoke` and `summary_stale` instead of the sentence ([decision 0025](decisions/0025-refusals-carry-stable-codes.md)).
 - **Where:** `src/components/review/decision-model.ts` line 42; `src/components/versions/version-actions.tsx` line 157
 - **What happens:** `reason === REASONS.generic` decides hidden versus blocked, and `reason === REASONS.ownRevoke` decides whether Confirm revoke shows. A copy edit, or a Spring backend wording things differently, silently changes behavior.
 - **Fix:** Give every permission result a stable `code` and branch on it.

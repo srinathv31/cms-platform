@@ -61,13 +61,13 @@ export async function setSunset(input: { templateId: string; versionNumber: numb
   const found = parsed.success ? await findVersion(…) : undefined;     //    read only to learn the team
   const refused = check(viewer, "version.setSunset", { teamId: found?.teamId ?? null }); // 3. permission
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
   const at = await now();                                              // 4. the clock, once
   const result = await transact(async (tx) => {                        // 5. one transaction
     const version = await loadVersion(tx, found, parsed.data.versionNumber); // re-read inside it
     const zone = await readBusinessZone(tx);                           //    and the settings it needs
     const outcome = setSunsetTransition({ version, sunsetDay, zone, now: at, … }); // 6. the domain decides
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded); // 7. compare-and-set
     await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at)); // 8. effects
     return { ok: true };
@@ -81,15 +81,15 @@ export async function setSunset(input: { templateId: string; versionNumber: numb
 2. Input is parsed with zod. The record is then read outside the transaction only to learn its team.
 3. `check()` wraps `assertCan` from `@/domain/permissions` and returns the refusal instead of throwing. An unknown id gives `teamId: null`, so a missing record and a forbidden one fail the same way, before any input error.
 4. `now()` is read once, before the transaction.
-5. `transact(run)` is `inTransaction(db, run)` plus a catch: `refuse(reason)` anywhere inside throws a `Refusal`, which rolls the whole transaction back and becomes `{ ok: false, reason }`.
-6. A transition from `@/domain/lifecycle` returns `{ ok: true, changes, effects }` or `{ ok: false, reason }`. The action writes `changes`; it doesn't decide.
-7. `updateVersion` updates only while `state`, `rev`, and `currentStage` still match, and bumps `rev`. A miss is refused, so a double click writes nothing. The `rev` bump also makes an autosave still in flight fail rather than land on a frozen version. When the person acts on content they were shown, the client sends the `rev` it was shown with, and the transition refuses a row that has moved on: `submitVersion` takes the submit summary's `rev`, and `submit` refuses with `REFUSALS.summaryStale` when the draft changed after the summary was read.
+5. `transact(run)` is `inTransaction(db, run)` plus a catch: `refuse(refusal)` anywhere inside throws a `RefusalError`, which rolls the whole transaction back and becomes `{ ok: false, code, reason }`. Every refusal is an entry from a domain table ([domain/refusals.ts](../domain/refusals.ts)): what the action itself checks before the rule runs (input, a record that's gone, a compare-and-set that missed) comes from `REQUEST_REFUSALS`.
+6. A transition from `@/domain/lifecycle` returns `{ ok: true, changes, effects }` or `{ ok: false, code, reason }`. The action writes `changes`; it doesn't decide.
+7. `updateVersion` updates only while `state`, `rev`, and `currentStage` still match, and bumps `rev`. A miss is refused, so a double click writes nothing. The `rev` bump also makes an autosave still in flight fail rather than land on a frozen version. When the person acts on content they were shown, the client sends the `rev` it was shown with, and the transition refuses a row that has moved on: `submitVersion` takes the submit summary's `rev`, and `submit` refuses with `REFUSALS.summaryStale` (code `summary_stale`) when the draft changed after the summary was read.
 8. `writeEffects(tx, effects, ctx)` ([effects.ts](effects.ts)) writes audit rows, notifications (to a user or a team role, never to the actor), and consumer notices (consumers with a non-preview render in the last 90 days), all in the same transaction.
 9. Only on success: `revalidatePath()` for the other routes that show the change, then `refresh()` to re-render the page the person is on. Route handlers can't call `refresh()`; they use `revalidatePath()` (`src/app/api/imports/route.ts`).
 
 Variations today:
-- The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true } & T) | { ok: false; reason: string }`), re-exported by `@/domain/access-types`.
-- `Refusal`, `refuse`, `check`, and `transact` are private copies in [actions/review.ts](actions/review.ts), [actions/access.ts](actions/access.ts), and [actions/platform.ts](actions/platform.ts) (where `check` is `checkManage`). [actions/comments.ts](actions/comments.ts) has none of them: its permission check is the domain's (`canComment`, `canActOnThread` in `@/domain/comments`), and it calls `inTransaction` directly, returning a refusal from inside the transaction before anything is written.
+- The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true } & T) | Refused`, where `Refused` is `{ ok: false; code; reason }`), re-exported by `@/domain/access-types`.
+- `RefusalError`, `refuse`, `check`, and `transact` are private copies in [actions/review.ts](actions/review.ts), [actions/access.ts](actions/access.ts), and [actions/platform.ts](actions/platform.ts) (where `check` is `checkManage`). [actions/comments.ts](actions/comments.ts) has none of them: its permission check is the domain's (`canComment`, `canActOnThread` in `@/domain/comments`), and it calls `inTransaction` directly, returning a refusal from inside the transaction before anything is written.
 - [actions/access.ts](actions/access.ts) reports bad input and a missing record before the permission check. Its `transact` runs `runAccessSweep()` first, in its own transaction, so a refusal doesn't roll the sweep back. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
 - `startDraft` and `createTemplate` throw (`PermissionError` from `assertCan`, or `Error`) and end in `redirect()`. `advanceClockAction` and `switchPersona` also throw on bad input. A client sees these as a rejected promise, not a `reason`.
 - [actions/notifications.ts](actions/notifications.ts) writes without a transaction; the row's owner is the permission check.
@@ -102,11 +102,11 @@ A read model:
 - is usually wrapped in React `cache()`, so calls within one request share a result. Nothing in `src` uses `"use cache"`; every read happens at request time.
 - checks access first. `requireSpace(slug)` returns 404 for an unknown team and redirects when the viewer can't see it. `requireTemplate()` and `requireReviewVersion()` return 404. They call `getViewer()`, which reads cookies, so the caller must sit inside Suspense.
 - reads the time through `demoNow()` ([queries/dynamic.ts](queries/dynamic.ts)).
-- returns a plain, serializable type declared in `src/domain/*-types.ts` (`VersionsData`, `MembersSection`, …). Dates are ISO strings (`iso()`, `isoOrUndefined()`), days are `YYYY-MM-DD` (`dayOf()`), and people are `Person` (`getPeople()`, `personOf()`). Permissions come decided: `can: { <action>: PermissionResult }`, so a client component can disable a control and show the reason without calling `can()`. The settings sections also carry what each action does, worded by the domain with the demo clock (`consequences: { <action>: string }`), so a screen never words a rule or works out a deadline. See `versionActions()` in [queries/versions.ts](queries/versions.ts) and `getMembersSection()` in [queries/access.ts](queries/access.ts).
+- returns a plain, serializable type declared in `src/domain/*-types.ts` (`VersionsData`, `MembersSection`, …). Dates are ISO strings (`iso()`, `isoOrUndefined()`), days are `YYYY-MM-DD` (`dayOf()`), and people are `Person` (`getPeople()`, `personOf()`). Permissions come decided: `can: { <action>: PermissionResult }`, so a client component can disable a control and show the reason without calling `can()`, and tell one refusal from another by its `code`. The settings sections also carry what each action does, worded by the domain with the demo clock (`consequences: { <action>: string }`), so a screen never words a rule or works out a deadline. See `versionActions()` in [queries/versions.ts](queries/versions.ts) and `getMembersSection()` in [queries/access.ts](queries/access.ts).
 
 Older read models use a different shape. `getWorkspaceHeader` ([queries/workspace.ts](queries/workspace.ts)) and `getLibraryRows` ([queries/library.ts](queries/library.ts)) return `Date` objects, boolean flags (`canEdit`, `canSubmit`), and preformatted strings (`lastEdited`).
 
-Reads a screen makes on demand, when a dialog or a menu opens, are GET route handlers under `src/app/api/templates/[templateId]/`, never server actions: an action is a public POST endpoint that runs one at a time with the page's mutations, so a read would hold up Edit or Submit (or wait behind them). Each route calls `getViewer()` and passes the viewer and the raw request values to its query, which parses them with zod, checks `can()`, writes nothing, and returns a `ReadResult` ([api/reads.ts](api/reads.ts)): the data, or a refusal with its sentence and status (400 unparsable, 403 not permitted, 404 no such template or version, 409 not in a state to read). `readResponse()` sends it as the `ActionResult` the client reads, uncached. The five:
+Reads a screen makes on demand, when a dialog or a menu opens, are GET route handlers under `src/app/api/templates/[templateId]/`, never server actions: an action is a public POST endpoint that runs one at a time with the page's mutations, so a read would hold up Edit or Submit (or wait behind them). Each route calls `getViewer()` and passes the viewer and the raw request values to its query, which parses them with zod, checks `can()`, writes nothing, and returns a `ReadResult` ([api/reads.ts](api/reads.ts)): the data, or a refusal with its code, its sentence and a status (400 unparsable, 403 not permitted, 404 no such template or version, 409 not in a state to read). `readResponse()` sends it as the `ActionResult` the client reads, uncached. The five:
 
 | Route (`/api/templates/[templateId]/…`) | Query | For |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ These stand in for things a production deployment would have. None is gated by e
 
 ## Don't copy
 
-- **Copied helpers.** `Refusal`, `refuse`, `check`, and `transact` are copied in three action files. Follow their shape. If another file needs them, move them to one shared server module rather than adding a copy.
+- **Copied helpers.** `RefusalError`, `refuse`, `check`, and `transact` are copied in three action files. Follow their shape. If another file needs them, move them to one shared server module rather than adding a copy.
 - **Throwing actions.** `startDraft` and `createTemplate` throw instead of returning `ActionResult`. New actions return a result.
 - **A second busy retry.** [drafts/apply-patch.ts](drafts/apply-patch.ts) has its own `isBusy` and `retryWhenBusy`, and [import/create.ts](import/create.ts) calls `db.transaction` with no retry. Use `inTransaction()`.
 - **A second `draftRow`.** [actions/review.ts](actions/review.ts) keeps a private copy of `draftRow` from [templates/create.ts](templates/create.ts). Import the shared one.

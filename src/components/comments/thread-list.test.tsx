@@ -198,7 +198,7 @@ describe("ThreadList: changes show at once, and the server's answer settles them
   });
 
   it("puts a refused resolve back and says why, at the card", async () => {
-    actions.resolveThread.mockResolvedValue({ ok: false, reason: "Only authors and approvers on this team can comment." });
+    actions.resolveThread.mockResolvedValue({ ok: false, code: "generic", reason: "Only authors and approvers on this team can comment." });
     act(() => root.render(<Host initial={THREADS} />));
     click(button(card("spend"), "Resolve"));
     await flush();
@@ -241,7 +241,7 @@ describe("ThreadList: changes show at once, and the server's answer settles them
   });
 
   it("takes a refused reply back out of the card, and brings the field back with its text and the reason", async () => {
-    const answer = deferred<{ ok: false; reason: string }>();
+    const answer = deferred<{ ok: false; code: "comments_closed"; reason: string }>();
     actions.reply.mockReturnValue(answer.promise);
     act(() => root.render(<Host initial={THREADS} />));
     click(button(card("spend"), /Reply/));
@@ -257,7 +257,7 @@ describe("ThreadList: changes show at once, and the server's answer settles them
 
     // The version was approved meanwhile: the server refuses, and the list is the server's again.
     const closed = "Only a draft or a version in review takes comments.";
-    await act(async () => answer.resolve({ ok: false, reason: closed }));
+    await act(async () => answer.resolve({ ok: false, code: "comments_closed", reason: closed }));
     await flush();
     expect(card("spend").querySelectorAll("time")).toHaveLength(1);
     expect(card("spend").querySelector("textarea")?.value).toBe("Too late?");
@@ -328,7 +328,7 @@ describe("ThreadList: a new thread", () => {
   });
 
   it("brings the composer back with its text and the reason when the post is refused", async () => {
-    actions.addComment.mockResolvedValue({ ok: false, reason: "That block isn't in this version any more." });
+    actions.addComment.mockResolvedValue({ ok: false, code: "block_gone", reason: "That block isn't in this version any more." });
     act(() => root.render(<ComposerHost onClosed={() => {}} />));
     click(container.querySelector<HTMLElement>("[data-open]")!);
     type(compose().querySelector("textarea")!, "Name the bonus.");

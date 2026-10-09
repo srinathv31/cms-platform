@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult } from "@/domain/access-types";
+import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { notifications } from "@/server/db/schema/ucomp";
@@ -13,21 +14,17 @@ import { getViewer } from "@/server/viewer";
 // the row's owner, so nobody can mark someone else's). Read times are on the demo clock. Marking an
 // already-read one again is a no-op that succeeds (a double click, two tabs).
 
-const REASONS = {
-  notFound: "This notification no longer exists.",
-} as const;
-
 const MarkInput = z.object({ id: z.string().min(1).max(64) });
 
 export async function markNotificationRead(input: { id: string }): Promise<ActionResult> {
   const parsed = MarkInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.notFound };
+  if (!parsed.success) return refuse(REQUEST_REFUSALS.notificationGone);
   const viewer = await getViewer();
   const row = await db.query.notifications.findFirst({
     where: and(eq(notifications.id, parsed.data.id), eq(notifications.userId, viewer.userId)),
   });
   // Someone else's notification reads as missing: it doesn't confirm the id exists.
-  if (!row) return { ok: false, reason: REASONS.notFound };
+  if (!row) return refuse(REQUEST_REFUSALS.notificationGone);
   if (row.readAt === null) {
     await db
       .update(notifications)

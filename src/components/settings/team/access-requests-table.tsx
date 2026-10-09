@@ -43,7 +43,7 @@ function pendingRow(r: AccessRequestRow, today: string): RowData {
           consequence: r.consequences.deny,
           confirmLabel: "Deny request",
           detail: reason,
-          note: { label: `Note for ${first}`, max: DECISION_NOTE_MAX, problem: (note) => validateDecisionNote("deny", note) },
+          note: { label: `Note for ${first}`, max: DECISION_NOTE_MAX, problem: (note) => validateDecisionNote("deny", note)?.reason ?? null },
           run: (note) => decideAccessRequest({ requestId: r.id, decision: "deny", note }),
         },
       },

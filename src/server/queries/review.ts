@@ -7,6 +7,7 @@ import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
+import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
@@ -217,7 +218,7 @@ export const getReviewBadgeCount = cache(async (spaceSlug: string): Promise<numb
 /** Approve and Request changes share one answer: the decide check, then the version's state. */
 function decideOnScreen(check: PermissionResult, state: string): PermissionResult {
   if (!check.ok) return check;
-  return state === "in_review" ? check : { ok: false, reason: REFUSALS.notInReview };
+  return state === "in_review" ? check : refuse(REFUSALS.notInReview);
 }
 
 /** Everything `/{team}/review/{templateId}/{n}` shows. 404 when the version doesn't exist or isn't visible. */

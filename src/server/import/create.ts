@@ -56,7 +56,7 @@ export async function importPermission(
 ): Promise<{ ok: true; team: typeof teams.$inferSelect } | (ImportResponse & { ok: false })> {
   const team = teamSlug ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) }) : undefined;
   const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
-  if (!allowed.ok || !team) return { ok: false, code: "permission", reason: allowed.ok ? REASONS.generic : allowed.reason };
+  if (!allowed.ok || !team) return { ok: false, code: "permission", reason: allowed.ok ? REASONS.generic.reason : allowed.reason };
   return { ok: true, team };
 }
 

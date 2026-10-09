@@ -2,6 +2,7 @@
 
 import { rolesLabel } from "@/domain/access";
 import type { InactivityRow, InactivitySection } from "@/domain/access-types";
+import type { PermissionResult } from "@/domain/types";
 import { keepInactive, reinstateMember, suspendInactive } from "@/server/actions/access";
 import { daysUntil, firstName, fmtDay, plural } from "./format";
 import { GroupHeading, RowTable, type RowAct, type RowData } from "./rows";
@@ -20,7 +21,7 @@ function IdleTrack({ days, flagDays, suspendDays }: { days: number; flagDays: nu
   );
 }
 
-const reasonOf = (r: { ok: true } | { ok: false; reason: string }) => (r.ok ? null : r.reason);
+const reasonOf = (r: PermissionResult) => (r.ok ? null : r.reason);
 
 export function InactivityView({ section, today }: { section: InactivitySection; today: string }) {
   const { thresholds } = section;

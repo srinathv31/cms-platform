@@ -6,6 +6,7 @@ import { buildCopilotPrompt } from "@/domain/copilot";
 import type { CopilotPrompt } from "@/domain/import-types";
 import { can } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -18,14 +19,9 @@ import { contentTypes, teams, templates, versions } from "@/server/db/schema/uco
 
 const Input = z.object({ templateId: z.string().min(1).max(64) });
 
-const REASONS = {
-  missing: "This template isn't available.",
-  noDraft: "There is no draft to write.",
-} as const;
-
 export async function getCopilotPrompt(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ prompt: CopilotPrompt }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REASONS.missing);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
 
   const template = await db
     .select({
@@ -41,10 +37,10 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
     .where(eq(templates.id, parsed.data.templateId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!template) return refusal(404, REASONS.missing);
+  if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
 
   const allowed = can(viewer, "draft.edit", { teamId: template.teamId });
-  if (!allowed.ok) return refusal(403, allowed.reason);
+  if (!allowed.ok) return refusal(403, allowed);
 
   const draft = await db
     .select({ name: versions.name, body: versions.body, channels: versions.channels, variables: versions.variables })
@@ -52,7 +48,7 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
     .where(and(eq(versions.templateId, template.id), eq(versions.state, "draft")))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!draft) return refusal(409, REASONS.noDraft);
+  if (!draft) return refusal(409, REQUEST_REFUSALS.noDraftToWrite);
 
   const prompt = buildCopilotPrompt({
     templateName: draft.name,

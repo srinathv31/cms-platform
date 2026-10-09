@@ -80,6 +80,7 @@ describe("getBaseVersion", () => {
     expect(await getBaseVersion(people.maya!, { templateId, versionId: v1.id })).toEqual({
       ok: false,
       status: 409,
+      code: "no_draft_to_revert",
       reason: "There is no draft to revert.",
     });
   });
@@ -89,6 +90,7 @@ describe("getBaseVersion", () => {
     expect(await getBaseVersion(people.maya!, { templateId: ids["cash-back"]!, versionId: draft.id })).toEqual({
       ok: false,
       status: 404,
+      code: "no_draft_to_revert",
       reason: "There is no draft to revert.",
     });
   });
@@ -104,6 +106,7 @@ describe("getBaseVersion", () => {
     expect(await getBaseVersion(people.maya!, { templateId: "UC-ZZZZZZ", versionId: "v_none" })).toEqual({
       ok: false,
       status: 404,
+      code: "template_unavailable",
       reason: "This template isn't available.",
     });
   });
@@ -111,7 +114,7 @@ describe("getBaseVersion", () => {
   it("refuses input that doesn't parse", async () => {
     const templateId = ids["annual-fee-waiver"]!;
     for (const input of [{ templateId, versionId: "" }, { templateId, versionId: "v".repeat(65) }, { templateId, versionId: null }, { templateId }]) {
-      expect(await getBaseVersion(people.maya!, input as never)).toEqual({ ok: false, status: 400, reason: "This template isn't available." });
+      expect(await getBaseVersion(people.maya!, input as never)).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
     }
   });
 });

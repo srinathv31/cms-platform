@@ -31,11 +31,12 @@ const TEAMS = {
 } as const;
 type TeamSlug = keyof typeof TEAMS;
 
-const GENERIC = "You don't have access to do this.";
-const OWN_VERSION = "You submitted this version.";
-const WROTE_VERSION = "You wrote part of this version.";
-const OWN_REVOKE = "You started this revoke. Another approver must confirm it.";
-const OWN_REQUEST = "You can't decide your own access request.";
+// Each refusal's code (what the UI branches on) and its sentence (the copy), pinned.
+const GENERIC = { code: "generic", reason: "You don't have access to do this." } as const;
+const OWN_VERSION = { code: "submitted_version", reason: "You submitted this version." } as const;
+const WROTE_VERSION = { code: "wrote_version", reason: "You wrote part of this version." } as const;
+const OWN_REVOKE = { code: "own_revoke", reason: "You started this revoke. Another approver must confirm it." } as const;
+const OWN_REQUEST = { code: "own_request", reason: "You can't decide your own access request." } as const;
 
 function member(
   team: TeamSlug,
@@ -77,7 +78,7 @@ const cardStatements = { teamId: "card-statements" } satisfies PermissionResourc
 const allTeams = { teamId: ALL_SPACE } satisfies PermissionResource;
 
 const allow = { ok: true };
-const deny = (reason: string) => ({ ok: false, reason });
+const deny = (refusal: { code: string; reason: string }) => ({ ok: false, ...refusal });
 
 // ── The permission matrix ─────────────────────────────────────
 // A literal copy of the build plan's matrix. The last row ("Anyone") spans every column.
@@ -178,7 +179,7 @@ function expectedIn(column: Column, cell: string): Record<Context, boolean> {
 }
 
 /** The qualified cells: allowed, except on the holder's own item. */
-const SELF_RULES: Record<string, { action: Action; field: keyof PermissionResource; reason: string }> = {
+const SELF_RULES: Record<string, { action: Action; field: keyof PermissionResource; reason: { code: string; reason: string } }> = {
   "Yes, never on a version they authored": { action: "version.decide", field: "submittedBy", reason: OWN_VERSION },
   "Start or confirm; confirmer must be a different approver": { action: "version.revoke.confirm", field: "revokeStartedBy", reason: OWN_REVOKE },
   "Yes, never their own request": { action: "team.decideAccessRequest", field: "requesterId", reason: OWN_REQUEST },
@@ -287,8 +288,8 @@ describe("maker-checker", () => {
   });
 
   it("asks makerCheckerRefusal, which the review transitions share", () => {
-    expect(makerCheckerRefusal("priya", { submittedBy: "maya", writers: ["maya", "priya"] })).toBe(WROTE_VERSION);
-    expect(makerCheckerRefusal("maya", { submittedBy: "maya", writers: ["maya", "priya"] })).toBe(OWN_VERSION);
+    expect(makerCheckerRefusal("priya", { submittedBy: "maya", writers: ["maya", "priya"] })).toEqual(WROTE_VERSION);
+    expect(makerCheckerRefusal("maya", { submittedBy: "maya", writers: ["maya", "priya"] })).toEqual(OWN_VERSION);
     expect(makerCheckerRefusal("jordan", { submittedBy: "maya", writers: ["maya", "priya"] })).toBeNull();
   });
 });
@@ -329,12 +330,12 @@ describe("access requests", () => {
 });
 
 describe("own access (Phase 6)", () => {
-  const OWN_ACCESS = "You can't change your own access.";
+  const OWN_ACCESS = { code: "own_access", reason: "You can't change your own access." } as const;
 
   it("a Team Admin manages other members, never their own membership", () => {
     expect(can(alex, "team.manageMembers", { ...coral, subjectUserId: "jordan" })).toEqual(allow);
     expect(can(alex, "team.manageMembers", { ...coral, subjectUserId: "alex" })).toEqual(deny(OWN_ACCESS));
-    expect(REASONS.ownAccess).toBe(OWN_ACCESS);
+    expect(REASONS.ownAccess).toEqual(OWN_ACCESS);
   });
 
   it("without a subject it is the plain settings-access check", () => {
@@ -574,7 +575,7 @@ describe("spaces", () => {
 });
 
 describe("assertCan", () => {
-  it("throws a PermissionError carrying the reason", () => {
+  it("throws a PermissionError carrying the code and the reason", () => {
     let error: unknown;
     try {
       assertCan(jordan, "version.decide", { ...coral, submittedBy: "jordan" });
@@ -582,7 +583,7 @@ describe("assertCan", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(PermissionError);
-    expect(error).toMatchObject({ reason: OWN_VERSION, action: "version.decide", message: OWN_VERSION });
+    expect(error).toMatchObject({ ...OWN_VERSION, action: "version.decide", message: OWN_VERSION.reason });
   });
 
   it("returns quietly when allowed", () => {
@@ -590,6 +591,6 @@ describe("assertCan", () => {
   });
 
   it("keeps every reason short and plain, ending with a period", () => {
-    for (const reason of Object.values(REASONS)) expect(reason).toMatch(/^[A-Z][^.]{0,60}\.( [A-Z][^.]{0,60}\.)?$/);
+    for (const { reason } of Object.values(REASONS)) expect(reason).toMatch(/^[A-Z][^.]{0,60}\.( [A-Z][^.]{0,60}\.)?$/);
   });
 });

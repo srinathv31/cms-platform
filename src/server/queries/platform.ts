@@ -15,6 +15,7 @@ import { versionsNeeding } from "@/domain/approval-chain";
 import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
 import { approverProblem, channelRuleRefusal, ruleLabel, TEAM_ICONS, zoneChangeConsequences } from "@/domain/platform-config";
+import { refuse } from "@/domain/refusals";
 import { CHANNELS, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
@@ -151,8 +152,8 @@ export const getChannelRulesSection = cache(async (): Promise<ChannelRulesSectio
         activeUsing: perChannel((c) => mine.filter((v) => v.channels.includes(c)).length),
         can: {
           toggle: perChannel((c): PermissionResult => {
-            const reason = channelRuleRefusal(t.allowedChannels, c, !t.allowedChannels.includes(c));
-            return reason ? { ok: false, reason } : { ok: true };
+            const refusal = channelRuleRefusal(t.allowedChannels, c, !t.allowedChannels.includes(c));
+            return refusal ? refuse(refusal) : { ok: true };
           }),
         },
       };

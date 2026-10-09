@@ -4,9 +4,10 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { now } from "@/server/clock";
-import { contractBaseline } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import { listSets } from "@/components/preview/sample-sets/model";
@@ -21,21 +22,19 @@ import type { SubmitSummary } from "@/components/submit/types";
 
 const Input = z.object({ templateId: z.string().min(1).max(64) });
 
-const MISSING = "This template isn't available.";
-
 export async function getSubmitSummary(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ summary: SubmitSummary }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, MISSING);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const template = await db
     .select({ id: templates.id, teamId: templates.teamId })
     .from(templates)
     .where(eq(templates.id, parsed.data.templateId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!template) return refusal(404, MISSING);
+  if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
 
   const allowed = can(viewer, "version.submit", { teamId: template.teamId });
-  if (!allowed.ok) return refusal(403, allowed.reason);
+  if (!allowed.ok) return refusal(403, allowed);
 
   const list = await db
     .select({
@@ -53,10 +52,7 @@ export async function getSubmitSummary(viewer: Viewer, input: { templateId: stri
 
   const draft = list.find((v) => v.state === "draft");
   if (!draft) {
-    return refusal(
-      409,
-      list.some((v) => v.state === "in_review") ? "This version is already in review." : "There is no draft to submit.",
-    );
+    return refusal(409, list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
   }
   const at = await now();
   // What submit will compare with: the newest version that still renders (the Active one, if any).

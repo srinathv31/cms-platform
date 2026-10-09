@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } from "@/domain/approval-chain";
 import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
 import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -216,10 +217,10 @@ export function decideCheck(
     stageApproverIds: stageApproverIds(input.stage),
   });
   if (!permitted.ok) return permitted;
-  if (!input.stage) return { ok: false, reason: REFUSALS.stageMissing };
+  if (!input.stage) return refuse(REFUSALS.stageMissing);
   const onStage = canActOnStage(viewer, input.stage, input.teamId);
   if (!onStage.ok) return onStage;
-  return input.approvedBy?.includes(viewer.userId) ? { ok: false, reason: REFUSALS.approvedEarlierStage } : onStage;
+  return input.approvedBy?.includes(viewer.userId) ? refuse(REFUSALS.approvedEarlierStage) : onStage;
 }
 
 // ── Render-log usage ──────────────────────────────────────────

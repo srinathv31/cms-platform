@@ -29,7 +29,7 @@ export async function runAction<T = Record<never, never>>(action: () => Promise<
   try {
     return await action();
   } catch {
-    return { ok: false, reason: GENERIC_FAILURE };
+    return { ok: false, code: "failed", reason: GENERIC_FAILURE };
   }
 }
 

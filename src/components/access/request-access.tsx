@@ -115,7 +115,8 @@ function RequestForm({
   }, []);
 
   const trimmed = reason.trim();
-  const invalid = trimmed === "" ? ACCESS_REFUSALS.giveReason : trimmed.length > ACCESS_REASON_MAX ? ACCESS_REFUSALS.reasonTooLong : null;
+  const invalid =
+    trimmed === "" ? ACCESS_REFUSALS.giveReason.reason : trimmed.length > ACCESS_REASON_MAX ? ACCESS_REFUSALS.reasonTooLong.reason : null;
   const adminNames = team.admins.map((a) => a.name);
   const noAdmin = adminNames.length === 0;
   const shown = error ?? (attempted ? invalid : null);

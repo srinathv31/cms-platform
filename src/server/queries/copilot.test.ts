@@ -54,8 +54,8 @@ describe("getCopilotPrompt", () => {
 
   it("says so when there is no draft, or no such template", async () => {
     const maya = people.maya!;
-    expect(await getCopilotPrompt(maya, { templateId: ids["cash-back"]! })).toEqual({ ok: false, status: 409, reason: "There is no draft to write." });
-    expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, reason: "This template isn't available." });
-    expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, reason: "This template isn't available." });
+    expect(await getCopilotPrompt(maya, { templateId: ids["cash-back"]! })).toEqual({ ok: false, status: 409, code: "no_draft_to_write", reason: "There is no draft to write." });
+    expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, code: "template_unavailable", reason: "This template isn't available." });
+    expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
   });
 });

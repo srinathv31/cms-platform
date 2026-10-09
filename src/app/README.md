@@ -191,10 +191,10 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   and a strict CSP on web HTML.
 
 **Internal routes** answer errors in five shapes: `DraftSaveResponse` (status from `statusOf`), `ImportResponse`
-(status from `importStatus`), `{ ok: false, reason }` (the `ActionResult` the template reads and the palette answer,
-with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and plain text
-(audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read,
-on every template read and on the palette).
+(status from `importStatus`), `{ ok: false, code, reason }` (the `ActionResult` the template reads and the palette
+answer, with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and
+plain text (audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful
+import read, on every template read and on the palette).
 
 **Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
 opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs

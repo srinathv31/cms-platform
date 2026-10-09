@@ -15,7 +15,7 @@ import {
   type StageDecision,
 } from "./approval-chain";
 import type { ApprovalStage, Person, StepView, VersionStage } from "./review-types";
-import type { MembershipStatus, TeamRole, VersionState, Viewer } from "./types";
+import type { MembershipStatus, PermissionResult, TeamRole, VersionState, Viewer } from "./types";
 
 const TEAM = "coral-offers";
 
@@ -138,31 +138,31 @@ describe("the default stage", () => {
 });
 
 describe("canActOnStage", () => {
-  it.each<[string, Viewer, ApprovalStage, { ok: true } | { ok: false; reason: string }]>([
+  it.each<[string, Viewer, ApprovalStage, PermissionResult]>([
     ["an approver on the team acts on a team-role stage", viewer("jordan", ["approver"]), TEAM_STAGE, { ok: true }],
     ["a team admin who is also an approver", viewer("alex", ["team_admin", "approver"]), TEAM_STAGE, { ok: true }],
-    ["an author doesn't", viewer("maya", ["author"]), TEAM_STAGE, { ok: false, reason: "Waiting on Team approver." }],
-    ["a team admin alone doesn't", viewer("alex", ["team_admin"]), TEAM_STAGE, { ok: false, reason: "Waiting on Team approver." }],
+    ["an author doesn't", viewer("maya", ["author"]), TEAM_STAGE, { ok: false, code: "waiting_on_stage", reason: "Waiting on Team approver." }],
+    ["a team admin alone doesn't", viewer("alex", ["team_admin"]), TEAM_STAGE, { ok: false, code: "waiting_on_stage", reason: "Waiting on Team approver." }],
     [
       "an approver on another team doesn't",
       viewer("naomi", ["approver"], { team: "deposits" }),
       TEAM_STAGE,
-      { ok: false, reason: "Waiting on Team approver." },
+      { ok: false, code: "waiting_on_stage", reason: "Waiting on Team approver." },
     ],
     [
       "a suspended approver doesn't",
       viewer("jordan", ["approver"], { status: "suspended" }),
       TEAM_STAGE,
-      { ok: false, reason: "Waiting on Team approver." },
+      { ok: false, code: "waiting_on_stage", reason: "Waiting on Team approver." },
     ],
     [
       "a platform admin doesn't",
       viewer("riley", [], { platformRole: "platform_admin" }),
       TEAM_STAGE,
-      { ok: false, reason: "Waiting on Team approver." },
+      { ok: false, code: "waiting_on_stage", reason: "Waiting on Team approver." },
     ],
     ["the named user acts on a user stage", viewer("dana", []), LEGAL_STAGE, { ok: true }],
-    ["a team approver doesn't, on a user stage", viewer("jordan", ["approver"]), LEGAL_STAGE, { ok: false, reason: "Waiting on Legal reviewer." }],
+    ["a team approver doesn't, on a user stage", viewer("jordan", ["approver"]), LEGAL_STAGE, { ok: false, code: "waiting_on_stage", reason: "Waiting on Legal reviewer." }],
   ])("%s", (_, who, stage, expected) => {
     expect(canActOnStage(who, stage, TEAM)).toEqual(expected);
   });

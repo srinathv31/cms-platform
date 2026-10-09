@@ -332,12 +332,12 @@ describe("requestAccess", () => {
 
   it("offers Viewer, Author and Approver only", () => {
     for (const role of ["viewer", "author", "approver"] as TeamRole[]) expect(requestAccess({ ...base, role }).ok).toBe(true);
-    expect(requestAccess({ ...base, role: "team_admin" })).toEqual({ ok: false, reason: ACCESS_REFUSALS.pickRole });
+    expect(requestAccess({ ...base, role: "team_admin" })).toEqual({ ok: false, ...ACCESS_REFUSALS.pickRole });
   });
 
   it("needs a reason, kept short", () => {
-    expect(requestAccess({ ...base, reason: "   " })).toEqual({ ok: false, reason: "Add a reason." });
-    expect(requestAccess({ ...base, reason: "x".repeat(501) })).toEqual({ ok: false, reason: ACCESS_REFUSALS.reasonTooLong });
+    expect(requestAccess({ ...base, reason: "   " })).toEqual({ ok: false, code: "request_reason_missing", reason: "Add a reason." });
+    expect(requestAccess({ ...base, reason: "x".repeat(501) })).toEqual({ ok: false, ...ACCESS_REFUSALS.reasonTooLong });
     expect(requestAccess({ ...base, reason: "x".repeat(500) }).ok).toBe(true);
   });
 
@@ -345,6 +345,7 @@ describe("requestAccess", () => {
     const pending = request({ userId: "morgan", teamId: CORAL.id });
     expect(requestAccess({ ...base, requests: [pending] })).toEqual({
       ok: false,
+      code: "request_pending",
       reason: "You already asked for access to Coral Offers.",
     });
     expect(requestAccess({ ...base, team: DEPOSITS, requests: [pending] }).ok).toBe(true);
@@ -356,6 +357,7 @@ describe("requestAccess", () => {
     const viewer = membership("priya", ["viewer"], { teamId: DEPOSITS.id });
     expect(requestAccess({ ...priya, team: DEPOSITS, role: "viewer", memberships: [viewer] })).toEqual({
       ok: false,
+      code: "has_role",
       reason: "You already have Viewer access to Deposits.",
     });
     expect(requestAccess({ ...priya, team: DEPOSITS, role: "author", memberships: [viewer] }).ok).toBe(true);
@@ -384,6 +386,7 @@ describe("decideAccessRequest", () => {
   it("never on your own request", () => {
     expect(decideAccessRequest({ ...base, request: request({ userId: "alex" }), requester: PEOPLE.alex })).toEqual({
       ok: false,
+      code: "own_request",
       reason: "You can't decide your own access request.",
     });
   });
@@ -391,6 +394,7 @@ describe("decideAccessRequest", () => {
   it("only while pending", () => {
     expect(decideAccessRequest({ ...base, request: request({ status: "approved" }) })).toEqual({
       ok: false,
+      code: "request_decided",
       reason: "This request was already decided.",
     });
   });
@@ -446,6 +450,7 @@ describe("decideAccessRequest", () => {
   it("denying needs a note, which the requester sees", () => {
     expect(decideAccessRequest({ ...base, decision: "deny", note: "  " })).toEqual({
       ok: false,
+      code: "deny_note_missing",
       reason: "Add a note to explain the decision.",
     });
     const result = decideAccessRequest({ ...base, decision: "deny", note: " Ask Jordan first. " });
@@ -465,7 +470,7 @@ describe("decideAccessRequest", () => {
   it("keeps the note short", () => {
     expect(decideAccessRequest({ ...base, note: "x".repeat(501) })).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.noteTooLong,
+      ...ACCESS_REFUSALS.noteTooLong,
     });
   });
 });
@@ -495,12 +500,13 @@ describe("changeRoles", () => {
   });
 
   it("needs at least one role", () => {
-    expect(changeRoles({ ...base, roles: [] })).toEqual({ ok: false, reason: "Pick at least one role." });
+    expect(changeRoles({ ...base, roles: [] })).toEqual({ ok: false, code: "no_roles", reason: "Pick at least one role." });
   });
 
   it("never your own", () => {
     expect(changeRoles({ ...base, membership: alex, member: PEOPLE.alex, roles: ["approver"] })).toEqual({
       ok: false,
+      code: "own_access",
       reason: "You can't change your own access.",
     });
   });
@@ -509,6 +515,7 @@ describe("changeRoles", () => {
     const lapsed = { ...jordan, status: "lapsed" as const };
     expect(changeRoles({ ...base, membership: lapsed, roles: ["author"] })).toEqual({
       ok: false,
+      code: "membership_not_active",
       reason: "This member's access isn't active.",
     });
   });
@@ -524,7 +531,7 @@ describe("changeRoles", () => {
     // ...but not when Alex is the only one.
     expect(
       changeRoles({ ...base, membership: alex, member: PEOPLE.alex, actor: PEOPLE.jordan, roles: ["approver"] }),
-    ).toEqual({ ok: false, reason: "Coral Offers needs at least one Team Admin." });
+    ).toEqual({ ok: false, code: "last_admin", reason: "Coral Offers needs at least one Team Admin." });
   });
 });
 
@@ -548,10 +555,12 @@ describe("removeMember", () => {
   it("never yourself, never the last Team Admin", () => {
     expect(removeMember({ ...base, membership: team[0]!, member: PEOPLE.alex })).toEqual({
       ok: false,
+      code: "own_access",
       reason: "You can't change your own access.",
     });
     expect(removeMember({ ...base, actor: PEOPLE.jordan, membership: team[0]!, member: PEOPLE.alex })).toEqual({
       ok: false,
+      code: "last_admin",
       reason: "Coral Offers needs at least one Team Admin.",
     });
   });
@@ -589,6 +598,7 @@ describe("suspendInactive and keepInactive", () => {
     const fresh = membership("devon", ["viewer"], { lastActiveAt: at(0) });
     expect(suspendInactive({ ...base, membership: fresh, now: at(90, -1) })).toEqual({
       ok: false,
+      code: "not_inactive",
       reason: "This member signed in within 90 days.",
     });
     expect(suspendInactive({ ...base, membership: fresh, now: at(90) }).ok).toBe(true);
@@ -598,11 +608,12 @@ describe("suspendInactive and keepInactive", () => {
 
   it("refuses an inactive membership and your own", () => {
     const suspended = { ...devon, status: "suspended" as const };
-    expect(suspendInactive({ ...base, membership: suspended })).toEqual({ ok: false, reason: ACCESS_REFUSALS.notActive });
-    expect(keepInactive({ ...base, membership: suspended })).toEqual({ ok: false, reason: ACCESS_REFUSALS.notActive });
+    expect(suspendInactive({ ...base, membership: suspended })).toEqual({ ok: false, ...ACCESS_REFUSALS.notActive });
+    expect(keepInactive({ ...base, membership: suspended })).toEqual({ ok: false, ...ACCESS_REFUSALS.notActive });
     const alexIdle = { ...team[0]!, lastActiveAt: ago(100) };
     expect(suspendInactive({ ...base, membership: alexIdle, member: PEOPLE.alex })).toEqual({
       ok: false,
+      code: "own_access",
       reason: "You can't change your own access.",
     });
   });
@@ -660,11 +671,13 @@ describe("reinstate", () => {
   it("refuses an active member and yourself", () => {
     expect(reinstate({ ...base, membership: membership("devon", ["viewer"]) })).toEqual({
       ok: false,
+      code: "membership_already_active",
       reason: "This member's access is already active.",
     });
     const lapsed = membership("alex", ["approver"], { status: "lapsed" });
     expect(reinstate({ ...base, member: PEOPLE.alex, membership: lapsed })).toEqual({
       ok: false,
+      code: "own_access",
       reason: "You can't change your own access.",
     });
   });
@@ -692,14 +705,14 @@ describe("startRecert", () => {
   });
 
   it("refuses while a review is open or upcoming, and allows it once closed", () => {
-    expect(startRecert({ ...base, unfinished: [recert()] })).toEqual({ ok: false, reason: "A review is already open." });
+    expect(startRecert({ ...base, unfinished: [recert()] })).toEqual({ ok: false, code: "recert_open", reason: "A review is already open." });
     expect(startRecert({ ...base, unfinished: [recert({ startsAt: at(5), dueAt: at(35) })] }).ok).toBe(false);
     // Deadline reached but not swept yet: it counts as closed.
     expect(startRecert({ ...base, unfinished: [recert({ dueAt: at(0) })] }).ok).toBe(true);
   });
 
   it("refuses when there's nobody to review", () => {
-    expect(startRecert({ ...base, memberships: [coral()[0]!] })).toEqual({ ok: false, reason: "There's nobody to review." });
+    expect(startRecert({ ...base, memberships: [coral()[0]!] })).toEqual({ ok: false, code: "nobody_to_recertify", reason: "There's nobody to review." });
   });
 });
 
@@ -745,6 +758,7 @@ describe("decideRecertItem", () => {
     expect(decideRecertItem({ ...base, now: at(30, -1) }).ok).toBe(true);
     expect(decideRecertItem({ ...base, now: at(30) })).toEqual({
       ok: false,
+      code: "recert_closed",
       reason: "This review closed on March 3, 2027.",
     });
   });
@@ -753,6 +767,7 @@ describe("decideRecertItem", () => {
     const later = recert({ startsAt: at(10), dueAt: at(40) });
     expect(decideRecertItem({ ...base, recert: later })).toEqual({
       ok: false,
+      code: "recert_not_started",
       reason: "This review starts on February 11, 2027.",
     });
   });
@@ -760,17 +775,20 @@ describe("decideRecertItem", () => {
   it("refuses yourself, outsiders, repeats and people already gone", () => {
     expect(decideRecertItem({ ...base, userId: "alex", member: PEOPLE.alex })).toEqual({
       ok: false,
+      code: "own_access",
       reason: "You can't change your own access.",
     });
     expect(decideRecertItem({ ...base, userId: "morgan", member: PEOPLE.morgan })).toEqual({
       ok: false,
+      code: "not_in_recert",
       reason: "This person isn't part of this review.",
     });
     const decided = recert();
     decided.items[1]!.decision = "keep";
-    expect(decideRecertItem({ ...base, recert: decided })).toEqual({ ok: false, reason: "This member was already reviewed." });
+    expect(decideRecertItem({ ...base, recert: decided })).toEqual({ ok: false, code: "already_recertified", reason: "This member was already reviewed." });
     expect(decideRecertItem({ ...base, teamMemberships: team.filter((m) => m.userId !== "maya") })).toEqual({
       ok: false,
+      code: "no_longer_member",
       reason: "This person is no longer a member.",
     });
   });
@@ -1175,7 +1193,7 @@ describe("the roles editor's line (describeRoleChange) and validateRoles", () =>
       teamMemberships: coral(),
       roles: [],
     });
-    expect(refused).toEqual({ ok: false, reason: validateRoles([]) });
+    expect(refused).toEqual({ ok: false, ...validateRoles([]) });
   });
 
   it("firstName is the first word", () => {
@@ -1199,7 +1217,7 @@ describe("deciding a request: requestDecisionRefusal and validateDecisionNote", 
     const input = { request: request(), requester: PEOPLE.morgan, team: CORAL, actor: PEOPLE.alex, now: at(0), membership: null };
     expect(decideAccessRequest({ ...input, decision: "deny", note: " " })).toEqual({
       ok: false,
-      reason: validateDecisionNote("deny", " "),
+      ...validateDecisionNote("deny", " "),
     });
   });
 });

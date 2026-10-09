@@ -119,7 +119,7 @@ export function ReviewMock({ initial }: { initial: ReviewInitial }) {
   // ── Who, and what state ────────────────────────────────────────
 
   const me = persona === "maya" ? MAYA : JORDAN;
-  const can: PermissionResult = persona === "maya" ? { ok: false, reason: "You submitted this version." } : { ok: true };
+  const can: PermissionResult = persona === "maya" ? { ok: false, code: "submitted_version", reason: "You submitted this version." } : { ok: true };
 
   const live = outcome === "active" || (outcome === "live" && flipped);
   const status: VersionState = outcome === "returned" ? "changes_requested" : live ? "active" : "in_review";

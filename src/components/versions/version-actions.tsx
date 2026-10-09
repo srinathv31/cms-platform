@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { cn } from "@/lib/utils";
-import { REASONS } from "@/domain/permissions";
 import type { ConsumerUsage, SunsetCalendar, VersionTimelineItem } from "@/domain/review-types";
 import { cancelRevoke } from "@/server/actions/review";
 import { DESTRUCTIVE_PRIMARY, GENERIC_FAILURE, runAction } from "./action-dialog";
@@ -163,7 +162,8 @@ export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: I
 
   const headingId = entryHeadingId(item.id);
   const { confirmRevoke: confirm, cancelRevoke: cancel } = item.can;
-  const showConfirm = confirm.ok || (!confirm.ok && confirm.reason === REASONS.ownRevoke);
+  // The approver who started the revoke sees Confirm disabled, with why: another approver must confirm it.
+  const showConfirm = confirm.ok || confirm.code === "own_revoke";
   const showWithdraw = cancel.ok;
   if (!showConfirm && !showWithdraw) return null;
 
