@@ -1,5 +1,3 @@
-import { versionTakesComments } from "@/components/comments/thread-state";
-import { can } from "@/domain/permissions";
 import { now } from "@/server/clock";
 import { getPeople, personOf, requireTemplate } from "@/server/queries/review-shared";
 import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
@@ -13,13 +11,11 @@ export async function WorkspaceContent({
 }) {
   const { team, templateId } = await params;
   const doc = await getWorkspaceDocument(team, templateId);
-  // Review comments: who is looking (their comments show at once, under their name), and whether they may comment.
-  // Only a draft or a version in review takes them: on an Active (or any decided) version the threads are a record,
-  // as on the review screen. (The shown version is the latest one, whose state the header carries.)
-  const { space, template } = await requireTemplate(team, templateId);
+  // Review comments: who is looking (their comments show at once, under their name). Whether they may comment comes
+  // decided with the document (`doc.can.comment`).
+  const { space } = await requireTemplate(team, templateId);
   const { status, versionNumber } = await getWorkspaceHeader(team, templateId);
   const viewer = personOf(await getPeople(), space.viewer.userId);
-  const canComment = can(space.viewer, "review.comment", { teamId: template.teamId }).ok && versionTakesComments(status);
   const nowIso = (await now()).toISOString();
   // A version in review opens on the review screen, in this space (anyone who sees the template here can).
   const reviewHref = status === "in_review" ? `/${team}/review/${templateId}/${versionNumber}` : null;
@@ -46,7 +42,7 @@ export async function WorkspaceContent({
       today={doc.today}
       editable={doc.editable}
       threads={doc.threads}
-      canComment={canComment}
+      canComment={doc.can.comment.ok}
       viewer={viewer}
       now={nowIso}
       importOriginal={doc.importOriginal}

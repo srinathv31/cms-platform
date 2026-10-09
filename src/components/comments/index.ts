@@ -10,4 +10,4 @@ export {
   type ReviewThreads,
 } from "./use-review-threads";
 export { blockTextOf, type VariableLabels } from "./block-text";
-export { versionTakesComments, type ThreadMutation } from "./thread-state";
+export { type ThreadMutation } from "./thread-state";

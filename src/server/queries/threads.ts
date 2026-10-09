@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { threadBeganBy } from "@/domain/comments";
 import { DOCUMENT_THREAD, type CommentView, type ThreadView } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
 import { db } from "@/server/db/client";
@@ -10,16 +11,8 @@ import { pickLatest } from "./library";
 import { blockIdsOf, getPeople, iso, isoOrUndefined, personOf, requireTemplate } from "./review-shared";
 
 // Review threads. A thread belongs to the template and anchors to a stable block id, so a draft made
-// from a version (same block ids) shows the version's threads in its margin with no copying.
-
-/**
- * Whether a thread belongs on a frozen version's screen: it began no later than that version. A thread
- * that began in the open draft (no number yet) counts as the next number, the one the draft will take.
- * (A thread begun in v4's review is not part of v2's record.)
- */
-export function threadBeganBy(originNumber: number | null, throughVersion: number, nextNumber: number): boolean {
-  return (originNumber ?? nextNumber) <= throughVersion;
-}
+// from a version (same block ids) shows the version's threads in its margin with no copying. A frozen
+// version shows the threads that began by it (`threadBeganBy` in domain/comments.ts).
 
 export interface LoadThreadsOptions {
   /**

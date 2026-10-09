@@ -239,6 +239,30 @@ describe("ThreadList: changes show at once, and the server's answer settles them
     expect(actions.reply).toHaveBeenCalledWith({ threadId: "spend", body: "Added the variable." });
     await act(async () => answer.resolve({ ok: true }));
   });
+
+  it("takes a refused reply back out of the card, and brings the field back with its text and the reason", async () => {
+    const answer = deferred<{ ok: false; reason: string }>();
+    actions.reply.mockReturnValue(answer.promise);
+    act(() => root.render(<Host initial={THREADS} />));
+    click(button(card("spend"), /Reply/));
+    const field = card("spend").querySelector("textarea")!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Too late?");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    click(button(card("spend"), "Reply"));
+    await flush();
+    // One comment row per comment (each has its time): the reply shows at once.
+    expect(card("spend").querySelectorAll("time")).toHaveLength(2);
+
+    // The version was approved meanwhile: the server refuses, and the list is the server's again.
+    const closed = "Only a draft or a version in review takes comments.";
+    await act(async () => answer.resolve({ ok: false, reason: closed }));
+    await flush();
+    expect(card("spend").querySelectorAll("time")).toHaveLength(1);
+    expect(card("spend").querySelector("textarea")?.value).toBe("Too late?");
+    expect(card("spend").querySelector('[role="alert"]')?.textContent).toBe(closed);
+  });
 });
 
 describe("ThreadList: a new thread", () => {

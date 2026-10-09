@@ -27,8 +27,8 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 - **This code runs in the browser.** Client components import it (for example
   [sunset-dialog.tsx](../components/versions/sunset-dialog.tsx) recomputes `consequences` as the date changes).
   No Node APIs, no `server-only`, no heavy dependencies.
-- **Wording is behavior.** Refusal sentences (`REFUSALS`, `REASONS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`,
-  `IMPORT_REFUSALS`) are shown as is, and the UI compares some of them:
+- **Wording is behavior.** Refusal sentences (`REFUSALS`, `REASONS`, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`,
+  `PLATFORM_REFUSALS`, `IMPORT_REFUSALS`) are shown as is, and the UI compares some of them:
   [decision-model.ts](../components/review/decision-model.ts) hides the decision buttons when the reason is
   `REASONS.generic`, and [version-actions.tsx](../components/versions/version-actions.tsx) checks
   `REASONS.ownRevoke`. Search for a constant's uses before you reword it.
@@ -45,6 +45,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with. |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, for the review screen. |
+| | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
 | | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. |
 | | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve). |
@@ -134,8 +135,6 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 | Rule | Where it lives today |
 | --- | --- |
-| Comment policy: length (`COMMENT_MAX`), the block must exist on a frozen version, who is notified; effects built inline | [actions/comments.ts](../server/actions/comments.ts) |
-| Which states take comments (`draft`, `in_review`); `addComment` doesn't check the version's state | `versionTakesComments` in [thread-state.ts](../components/comments/thread-state.ts) |
 | Re-notifying the people a stage names when its rule changes | `saveApprovalChain` in [actions/platform.ts](../server/actions/platform.ts) |
 | The default chain (`DEFAULT_CHAIN`), the combined decide check (`decideCheck`), and `waitingStage`, which reads an out-of-range stage as the last one where `stageAt` returns null | [queries/review-shared.ts](../server/queries/review-shared.ts) |
 | A new template's channels (wanted and allowed, else the first allowed) | `conformToContentType` in [templates/create.ts](../server/templates/create.ts) |
@@ -182,7 +181,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Testing
 
-- Every rule file has a colocated `*.test.ts` (22 files). `dates.ts`, `status.ts`, the types files, and
+- Every rule file has a colocated `*.test.ts` (25 files). `dates.ts`, `status.ts`, the types files, and
   `render/index.ts` have none.
   Run `npx vitest run src/domain`; it takes under a second in the `node` environment.
 - Tests pin time by passing `now`, never with fake timers: `const NOW = new Date("2026-10-04T12:00:00.000Z")`

@@ -86,7 +86,7 @@ export async function setSunset(input: { templateId: string; versionNumber: numb
 
 Variations today:
 - The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true } & T) | { ok: false; reason: string }`), re-exported by `@/domain/access-types`.
-- `Refusal`, `refuse`, `check`, and `transact` are private copies in [actions/review.ts](actions/review.ts), [actions/access.ts](actions/access.ts), and [actions/platform.ts](actions/platform.ts) (where `check` is `checkManage`). [actions/comments.ts](actions/comments.ts) has its own `check` and calls `inTransaction` directly.
+- `Refusal`, `refuse`, `check`, and `transact` are private copies in [actions/review.ts](actions/review.ts), [actions/access.ts](actions/access.ts), and [actions/platform.ts](actions/platform.ts) (where `check` is `checkManage`). [actions/comments.ts](actions/comments.ts) has none of them: its permission check is the domain's (`canComment`, `canActOnThread` in `@/domain/comments`), and it calls `inTransaction` directly, returning a refusal from inside the transaction before anything is written.
 - [actions/access.ts](actions/access.ts) reports bad input and a missing record before the permission check. Its `transact` runs `runAccessSweep()` first, in its own transaction, so a refusal doesn't roll the sweep back. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
 - `startDraft` and `createTemplate` throw (`PermissionError` from `assertCan`, or `Error`) and end in `redirect()`. `advanceClockAction` and `switchPersona` also throw on bad input. A client sees these as a rejected promise, not a `reason`.
 - [actions/notifications.ts](actions/notifications.ts) writes without a transaction; the row's owner is the permission check.
@@ -167,12 +167,12 @@ These stand in for things a production deployment would have. None is gated by e
 
 ## Don't copy
 
-- **Copied helpers.** `Refusal`, `refuse`, `check`, and `transact` are copied in three action files, plus a fourth `check` in [actions/comments.ts](actions/comments.ts). Follow their shape. If another file needs them, move them to one shared server module rather than adding a copy.
+- **Copied helpers.** `Refusal`, `refuse`, `check`, and `transact` are copied in three action files. Follow their shape. If another file needs them, move them to one shared server module rather than adding a copy.
 - **Throwing actions.** `startDraft` and `createTemplate` throw instead of returning `ActionResult`. New actions return a result.
 - **A second busy retry.** [drafts/apply-patch.ts](drafts/apply-patch.ts) has its own `isBusy` and `retryWhenBusy`, and [import/create.ts](import/create.ts) calls `db.transaction` with no retry. Use `inTransaction()`.
 - **A second `draftRow`.** [actions/review.ts](actions/review.ts) keeps a private copy of `draftRow` from [templates/create.ts](templates/create.ts). Import the shared one.
 - **`submitDraft`** in [actions/templates.ts](actions/templates.ts) is an alias for `submitVersion` that only a test calls. Call `submitVersion`.
-- **Rules outside the domain.** The Auditor checks in `createTeam` ([actions/platform.ts](actions/platform.ts)) and `requestAccess` ([actions/access.ts](actions/access.ts)), the comment length and emptiness checks in [actions/comments.ts](actions/comments.ts), and the published-channels filter in [queries/consumer-api.ts](queries/consumer-api.ts) are business rules in this layer. New rules go in `src/domain`.
+- **Rules outside the domain.** The Auditor checks in `createTeam` ([actions/platform.ts](actions/platform.ts)) and `requestAccess` ([actions/access.ts](actions/access.ts)), and the published-channels filter in [queries/consumer-api.ts](queries/consumer-api.ts) are business rules in this layer. New rules go in `src/domain`.
 - **Server importing components.** [actions/create-template.ts](actions/create-template.ts) imports `@/components/workspace/just-created`, and [queries/submit-summary.ts](queries/submit-summary.ts) imports from `@/components/preview/sample-sets/model` and `@/components/submit/types`. No lint rule stops this. Put shared types and constants in `src/domain`.
 - **Older read-model shapes.** `getWorkspaceHeader` and `getLibraryRows` return `Date` objects and booleans. Return ISO strings and `can` results.
 - **Patching a domain result.** [import/create.ts](import/create.ts) overwrites `starterKey` and the audit details on the result of `createDraft()`. Have the domain return the right result.

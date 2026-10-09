@@ -130,7 +130,7 @@ skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you th
 (`settings/team/inactivity-view.tsx` is a client component): look for `"use client"`.
 
 **Permissions.** The server decides. Read models carry `PermissionResult`s (`{ ok: true } | { ok: false; reason }`)
-or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.approve` in
+or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.approve` and `data.can.comment` in
 `review/review-workspace.tsx`, `canSubmit` in `workspace/workspace-tab-bar.tsx`. The settings rows render a
 refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`).
 
@@ -186,9 +186,9 @@ State shared across subtrees is a small store read with `useSyncExternalStore` (
   `workspace/workspace-actions.tsx`, `workspace/workspace-share.tsx`, and `workspace/copilot/copilot-prompt.tsx`
   read data through `"use server"` functions. For a new read, prefer props from a server component, or a route
   handler when it must load on demand (as `app-shell/command-palette.tsx` reads `/api/palette/[space]`).
-- **Permissions decided here.** `library/library-view.tsx`, `app-shell/top-bar-hole.tsx`, and
-  `workspace/content/workspace-content.tsx` call `can()`; `review/decision-model.ts` hides a control when the reason
-  is `REASONS.generic`; `versions/version-actions.tsx` branches on `REASONS.ownRevoke`. Have the query return the result.
+- **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`;
+  `review/decision-model.ts` hides a control when the reason is `REASONS.generic`; `versions/version-actions.tsx`
+  branches on `REASONS.ownRevoke`. Have the query return the result.
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
   and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
   `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.

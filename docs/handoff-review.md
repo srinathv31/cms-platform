@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 7 | 30 | 13 | 50 |
+| Open | 0 | 7 | 29 | 12 | 48 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 15 | 5 | 1 | 22 |
+| Fixed | 1 | 15 | 6 | 2 | 24 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -203,7 +203,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S7 · Medium: Comments are accepted on any version state
 
-- **Status:** Open
+- **Status:** Fixed. The comment policy is `src/domain/comments.ts`; the actions ask it again inside their transaction, so a comment, reply, resolve or reopen where no draft or version in review shows the thread is refused and writes nothing, and the review and workspace read models return `can.comment` decided.
 - **Where:** `src/server/actions/comments.ts` line 75; `src/components/comments/thread-state.ts` line 109
 - **What happens:** Only drafts and versions in review take comments, but that rule lives in `versionTakesComments` on the client. `addComment`, `reply` and `resolveThread` check permission only, so a direct call comments on an Active or Superseded version. The whole comment policy (length, block must exist, recipients) sits in the action with no `domain/comments.ts`.
 - **Fix:** A domain comment policy enforced in the actions, with the read model returning `can.comment`.
@@ -219,7 +219,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S9 · Low: Cross-team stage reviewers can act on any thread of the template
 
-- **Status:** Open
+- **Status:** Fixed. A user the waiting stage names counts only for the version in review and the threads its screen shows (`canActOnThread` in `src/domain/comments.ts`); a thread begun in the draft is refused to them like a missing one.
 - **Where:** `src/server/actions/comments.ts` line 271
 - **What happens:** `reply`, `resolveThread` and `reopenThread` accept a named stage reviewer for any thread on the template while any version is in review, including draft-only threads they can't see.
 - **Fix:** Scope the check to threads on the version in review.
@@ -613,7 +613,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B2 · High: About a third of the business rules live outside src/domain
 
-- **Status:** Partly fixed. The document rules (normalization, the content check, markers, links) are now single shared modules under `src/editor/model/` (PR #6). The lifecycle, comment and approver rules listed here are unchanged.
+- **Status:** Partly fixed. The document rules (normalization, the content check, markers, links) are now single shared modules under `src/editor/model/` (PR #6). The comment policy has moved to `src/domain/comments.ts` ([S7](#s7--medium-comments-are-accepted-on-any-version-state)). The lifecycle and approver rules listed here are unchanged.
 - **Where:** `src/server/actions/review.ts` line 312; `src/server/queries/review-shared.ts` line 207; `src/server/queries/consumer-api.ts` line 32
 - **What happens:** Submit auto-resolves threads; request-changes reuses an open draft; the comment policy; who may be named approver or Team Admin; channel defaults; which versions count as released and how search ranks; Auditor rules. Several are duplicated and drifting: `decideCheck` re-implements `approvedEarlierStage`, two copies of "who may see a version in review", the submit summary re-derives refusal sentences, and three components call `can()` themselves.
 - **Fix:** One domain function per rule; read models return capability flags.

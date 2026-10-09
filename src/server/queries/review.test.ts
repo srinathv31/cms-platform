@@ -3,6 +3,7 @@ import type { Client } from "@libsql/client";
 import { and, eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { COMMENT_REFUSALS } from "@/domain/comments";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
@@ -14,7 +15,7 @@ import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "./review";
-import { getThreads, loadThreads, threadBeganBy } from "./threads";
+import { getThreads, loadThreads } from "./threads";
 import { getVersions } from "./versions";
 import { getWorkspaceDocument } from "./workspace";
 
@@ -174,6 +175,8 @@ describe("getReviewScreen", () => {
     const active = await getReviewScreen("coral-offers", ids["cash-back"]!, 2);
     expect(active.baseline).toBeNull(); // the Active version is this one
     expect(active.can.approve).toEqual({ ok: false, reason: REFUSALS.notInReview });
+    // A decided version is a record: nobody comments on it, and the screen says why.
+    expect(active.can.comment).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
     expect(active.steps).toEqual([
       expect.objectContaining({ status: "done", decidedBy: expect.objectContaining({ id: "jordan" }) }),
     ]);
@@ -390,9 +393,10 @@ describe("threads", () => {
     expect(open.resolvedBy).toBeUndefined();
     expect(open.comments[0]).toMatchObject({ kind: "change_request", createdAt: expect.stringMatching(ISO) });
 
-    // The workspace carries the same threads for the editor margin.
+    // The workspace carries the same threads for the editor margin, on a draft that takes comments.
     const document = await getWorkspaceDocument("coral-offers", ids["annual-fee-waiver"]!);
     expect(document.threads).toEqual(threads);
+    expect(document.can.comment).toEqual({ ok: true });
   });
 
   it("lists the document thread first and orphaned threads last", async () => {
@@ -492,14 +496,6 @@ describe("threads on a submitted version", () => {
       await cleanup();
     }
   });
-
-  it("threadBeganBy: no later than the version; a draft origin is the next number", () => {
-    expect(threadBeganBy(1, 2, 4)).toBe(true);
-    expect(threadBeganBy(2, 2, 4)).toBe(true);
-    expect(threadBeganBy(4, 2, 5)).toBe(false);
-    expect(threadBeganBy(null, 3, 4)).toBe(false);
-    expect(threadBeganBy(null, 4, 4)).toBe(true);
-  });
 });
 
 describe("the review screen's version", () => {
@@ -510,5 +506,24 @@ describe("the review screen's version", () => {
     expect(superseded.version.sunsetAt).toMatch(ISO);
     const active = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 2);
     expect(active.version.sunsetAt).toBeNull();
+  });
+});
+
+describe("the workspace's comment permission", () => {
+  it("lets the team's authors and approvers comment on an open draft, not its viewers", async () => {
+    as("maya");
+    expect((await getWorkspaceDocument("coral-offers", ids["annual-fee-waiver"]!)).can.comment).toEqual({ ok: true });
+    as("sam");
+    expect((await getWorkspaceDocument("coral-offers", ids["annual-fee-waiver"]!)).can.comment).toEqual({
+      ok: false,
+      reason: REASONS.generic,
+    });
+  });
+
+  it("lets nobody comment on a template whose latest version has been decided", async () => {
+    as("maya");
+    const document = await getWorkspaceDocument("coral-offers", ids["rate-change-notice"]!);
+    expect(document.versionNumber).toBe(1);
+    expect(document.can.comment).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
   });
 });

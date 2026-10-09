@@ -100,8 +100,8 @@ export function ReviewWorkspace({
   const { threads, threadsForEditor, editorActiveThreadId, activeThreadId, setActive, composer, openComposer, closeComposer, mutate } =
     useReviewThreads(data.threads);
   // Comments belong to the review: once the version has been decided it is a record, and its threads are read-only
-  // (the author answers them in the new draft).
-  const canComment = can.comment.ok && version.state === "in_review";
+  // (the author answers them in the new draft). The server decides it with the rest of the screen.
+  const canComment = can.comment.ok;
   const openThreads = threads.filter((t) => t.status === "open").length;
 
   // Where a block sits in the document, so a new thread slots into document order at once.

@@ -10,7 +10,6 @@ import {
   optimisticId,
   reduceThreads,
   samePresence,
-  versionTakesComments,
   withBlockPresence,
 } from "./thread-state";
 
@@ -112,16 +111,6 @@ describe("optimistic ids", () => {
   it("are recognizable", () => {
     expect(isOptimistic(optimisticId("thread", 3))).toBe(true);
     expect(isOptimistic("th_4F7K2Q")).toBe(false);
-  });
-});
-
-describe("versionTakesComments", () => {
-  it("is true while a version is being written or reviewed, and false once it is a record", () => {
-    expect(versionTakesComments("draft")).toBe(true);
-    expect(versionTakesComments("in_review")).toBe(true);
-    for (const state of ["active", "superseded", "revoked", "changes_requested"] as const) {
-      expect(versionTakesComments(state)).toBe(false);
-    }
   });
 });
 
