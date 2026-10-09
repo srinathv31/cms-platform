@@ -145,6 +145,10 @@ export const versions = sqliteTable(
     currentStage: integer("current_stage").notNull().default(0),
     rev: integer("rev").notNull().default(0), // autosave ordering
     createdBy: text("created_by").notNull().references(() => users.id),
+    // User ids of everyone who wrote this version (maker-checker: none of them may decide it). Whoever
+    // started the draft, everyone whose autosave landed, the submitter, and, for a draft a change
+    // request opened, the writers of the version sent back. A draft from the Active version starts afresh.
+    writers: json<string[]>("writers").notNull().default(sql`'[]'`),
     createdAt: ts("created_at").notNull(),
     updatedAt: ts("updated_at").notNull(),
     submittedBy: text("submitted_by").references(() => users.id),

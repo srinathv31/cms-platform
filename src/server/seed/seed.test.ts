@@ -261,13 +261,24 @@ describe("lifecycle states", () => {
     expect(v1.revoke?.startedBy).not.toBe(v1.revoke?.confirmedBy);
   });
 
-  it("keeps the maker-checker rule: nobody approves what they submitted", async () => {
+  it("keeps the maker-checker rule: nobody approves what they submitted or wrote", async () => {
     const approvals = await db.select().from(ucomp.approvals);
     expect(approvals.length).toBeGreaterThan(0);
     for (const a of approvals) {
       const v = versions.find((x) => x.id === a.versionId)!;
       expect(a.actorId).not.toBe(v.submittedBy);
+      expect(v.writers).not.toContain(a.actorId);
     }
+  });
+
+  it("records who wrote each version: its creator and submitter, and a returned round's writers in its draft", () => {
+    for (const v of versions) {
+      expect(v.writers).toContain(v.createdBy);
+      if (v.submittedBy) expect(v.writers).toContain(v.submittedBy);
+    }
+    expect(version("annual-fee-waiver", null).writers).toEqual(version("annual-fee-waiver", 1).writers);
+    // Cash Back v3 was copied from the Active v2: it starts afresh.
+    expect(version("cash-back", 3).writers).toEqual(["maya"]);
   });
 
   it("gives frozen versions the timestamps their state implies", () => {

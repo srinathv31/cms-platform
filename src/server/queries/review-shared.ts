@@ -200,17 +200,25 @@ export async function loadApprovedBy(reader: Reader, versionIds: readonly string
 
 /**
  * May the viewer approve, or request changes on, a version at its current stage? The role grant (or
- * being named on the stage) and maker-checker come from `can("version.decide")`; the stage's own rule
- * from `canActOnStage`. With `approvedBy` (the approve check), someone who approved an earlier stage
- * of the version is refused. The queue, the review screen and the actions all ask this one question.
+ * being named on the stage) and maker-checker (its submitter and `writers`) come from
+ * `can("version.decide")`; the stage's own rule from `canActOnStage`. With `approvedBy` (the approve
+ * check), someone who approved an earlier stage of the version is refused. The queue, the review screen
+ * and the actions all ask this one question.
  */
 export function decideCheck(
   viewer: Viewer,
-  input: { teamId: string; submittedBy: string | null; stage: ApprovalStage; approvedBy?: readonly string[] },
+  input: {
+    teamId: string;
+    submittedBy: string | null;
+    writers: readonly string[];
+    stage: ApprovalStage;
+    approvedBy?: readonly string[];
+  },
 ): PermissionResult {
   const permitted = can(viewer, "version.decide", {
     teamId: input.teamId,
     submittedBy: input.submittedBy,
+    writers: input.writers,
     stageApproverIds: stageApproverIds(input.stage),
   });
   if (!permitted.ok) return permitted;

@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 10 | 30 | 13 | 53 |
+| Open | 0 | 9 | 30 | 13 | 52 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 12 | 5 | 1 | 19 |
+| Fixed | 1 | 13 | 5 | 1 | 20 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -171,7 +171,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S3 · High: Maker-checker only stops the submitter, not the author
 
-- **Status:** Open
+- **Status:** Fixed. Each version records its writers (`versions.writers`: who started the draft, saved an edit, or submitted it, carried across change requests), and `can()`, `approve` and `requestChanges` refuse all of them ([decision 0007](decisions/0007-maker-checker-covers-every-writer.md)).
 - **Where:** `src/domain/permissions.ts` line 84; `src/domain/lifecycle.ts` line 565
 - **What happens:** The guard compares the approver with `submittedBy`. Holding Author and Approver on one team is normal (approving an access request adds the role). Maya writes a draft, Priya clicks Submit, and Maya approves her own content. Found independently by two reviewers.
 - **Fix:** Decide the rule (anyone who created or edited the version can't decide it), record authors from `versions.createdBy` plus `draft.edited` actors, and guard on that in both `can()` and the transition. Or forbid Author plus Approver on one team.

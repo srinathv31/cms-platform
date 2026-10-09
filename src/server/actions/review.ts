@@ -118,6 +118,7 @@ async function findVersion(templateId: string, number: number) {
       teamId: templates.teamId,
       contentTypeId: templates.contentTypeId,
       submittedBy: versions.submittedBy,
+      writers: versions.writers,
       revoke: versions.revoke,
       state: versions.state,
       currentStage: versions.currentStage,
@@ -130,14 +131,15 @@ async function findVersion(templateId: string, number: number) {
 }
 
 /**
- * The decide check's resource: the team, the submitter (maker-checker) and the users the stage the
- * version waits on names (they decide it on any team). The stage is read again in the transaction.
+ * The decide check's resource: the team, who submitted and wrote the version (maker-checker), and the
+ * users the stage the version waits on names (they decide it on any team). The stage is read again in the
+ * transaction.
  */
 async function decideResource(found: FoundVersion | undefined): Promise<PermissionResource> {
   if (!found) return { teamId: null };
   const named =
     found.state === "in_review" ? stageApproverIds(waitingStage(await loadChain(db, found.contentTypeId), found.currentStage)) : [];
-  return { teamId: found.teamId, submittedBy: found.submittedBy, stageApproverIds: named };
+  return { teamId: found.teamId, submittedBy: found.submittedBy, writers: found.writers, stageApproverIds: named };
 }
 
 type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
@@ -216,6 +218,7 @@ function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
     currentStage: draft.currentStage,
     rev: draft.rev,
     createdBy: draft.createdBy,
+    writers: draft.writers,
     createdAt: draft.createdAt,
     updatedAt: draft.updatedAt,
   };
@@ -303,6 +306,7 @@ export async function submitVersion(input: {
         number: changes.number,
         submittedBy: changes.submittedBy,
         submittedAt: changes.submittedAt,
+        writers: changes.writers,
         submitNote: changes.submitNote,
         currentStage: changes.currentStage,
         contractChanges: changes.contractChanges,

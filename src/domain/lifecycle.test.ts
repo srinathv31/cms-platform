@@ -19,6 +19,7 @@ import {
   startRevoke,
   submit,
   sunsetPassed,
+  withWriter,
   type ReviewVersion,
   type StarterContent,
   type SubmitDraft,
@@ -242,6 +243,8 @@ describe("editActive", () => {
       currentStage: 0,
       rev: 0,
       createdBy: "priya",
+      // Whoever pressed Edit; the Active version's own writers don't carry over.
+      writers: ["priya"],
       createdAt: NOW,
       updatedAt: NOW,
     });
@@ -295,6 +298,7 @@ describe("submit", () => {
     emailSubject: null,
     emailPreheader: null,
     channels: ["pdf", "web"],
+    writers: ["maya"],
   };
   const SUBMITTER = "maya";
   const run = (
@@ -347,6 +351,7 @@ describe("submit", () => {
         number: 1,
         submittedBy: "maya",
         submittedAt: NOW,
+        writers: ["maya"],
         submitNote: null,
         currentStage: 0,
         contractChanges: null,
@@ -573,6 +578,7 @@ function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
     variables: VARIABLES,
     sampleSets: SAMPLE_SETS,
     submittedBy: "maya",
+    writers: ["maya"],
     currentStage: 0,
     contractChanges: null,
     sunsetAt: null,
@@ -721,6 +727,7 @@ describe("requestChanges", () => {
         currentStage: 0,
         rev: 0,
         createdBy: "maya",
+        writers: ["maya"],
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -774,6 +781,20 @@ describe("requestChanges", () => {
 
   it("refuses the submitter: nobody decides their own version", () => {
     expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: REASONS.ownVersion });
+  });
+
+  it("refuses anyone else who wrote it: Priya edited Maya's draft, so she can't send it back", () => {
+    const version = reviewVersion({ writers: ["maya", "priya"] });
+    expect(run({ version, actorId: "priya", actorName: "Priya Raman" })).toEqual({
+      ok: false,
+      reason: REASONS.wroteVersion,
+    });
+    expect(run({ version }).ok, "Jordan wrote none of it").toBe(true);
+  });
+
+  it("hands the version's writers to the new draft, and not the approver who sent it back", () => {
+    const result = run({ version: reviewVersion({ writers: ["maya", "priya"] }) });
+    expect(result.ok && result.newDraft.writers).toEqual(["maya", "priya"]);
   });
 
   it("checks the state before who is asking", () => {
@@ -932,6 +953,15 @@ describe("approve", () => {
 
   it("refuses the submitter: nobody approves their own version", () => {
     expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: "You submitted this version." });
+  });
+
+  it("refuses anyone else who wrote it, even when someone else submitted it", () => {
+    const version = { ...v2, writers: ["priya", "maya"] };
+    expect(run({ version, actorId: "priya", actorName: "Priya Raman" })).toEqual({
+      ok: false,
+      reason: "You wrote part of this version.",
+    });
+    expect(run({ version }).ok, "Jordan wrote none of it").toBe(true);
   });
 
   it("records each sample set the approver saw once", () => {
@@ -1355,7 +1385,15 @@ describe("review helpers", () => {
 
 describe("scenario 3: the review loop", () => {
   it("submit v1, changes requested, resubmit as v2, approve: v2 is Active", () => {
-    const draft: SubmitDraft = { state: "draft", variables: VARIABLES, body: BODY, emailSubject: null, emailPreheader: null, channels: ["pdf", "web"] };
+    const draft: SubmitDraft = {
+      state: "draft",
+      variables: VARIABLES,
+      body: BODY,
+      emailSubject: null,
+      emailPreheader: null,
+      channels: ["pdf", "web"],
+      writers: ["maya"],
+    };
     const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name };
 
     const first = submit({ ...base, draft, highestNumber: 0, baseline: null });
@@ -1389,6 +1427,109 @@ describe("scenario 3: the review loop", () => {
       templateName: TEMPLATE.name,
     };
   }
+});
+
+// Maker-checker reaches everyone who wrote the version, not only whoever pressed Submit. Priya holds
+// Author and Approver on Coral Offers (an access request can add the role).
+describe("maker-checker: nobody decides a version they wrote", () => {
+  const submitAs = (draft: SubmitDraft, submittedBy: string, highestNumber: number) => {
+    const result = submit({
+      draft,
+      highestNumber,
+      baseline: null,
+      now: NOW,
+      submittedBy,
+      submitterName: submittedBy,
+      templateId: TEMPLATE.id,
+      templateName: TEMPLATE.name,
+    });
+    if (!result.ok) throw new Error(result.reason);
+    return reviewVersion({ ...draft, ...result.changes, id: `v_${result.changes.number}` });
+  };
+  const decide = (version: ReviewVersion, actorId: string) => ({
+    approve: approve({
+      version,
+      chain: CHAIN_1,
+      actorId,
+      actorName: actorId,
+      now: NOW,
+      active: null,
+      sunsetPrevious: null,
+      sampleSetsSeen: [],
+      templateName: TEMPLATE.name,
+    }),
+    requestChanges: requestChanges({
+      version,
+      chain: CHAIN_1,
+      actorId,
+      actorName: actorId,
+      reason: REASON,
+      now: NOW,
+      templateName: TEMPLATE.name,
+    }),
+  });
+  const wrote = { ok: false, reason: REASONS.wroteVersion };
+
+  const starter = { key: "card_offer_terms", name: "Card offer terms", body: BODY, variables: VARIABLES, sampleSets: SAMPLE_SETS };
+
+  it("a new template's writer is whoever made it", () => {
+    expect(createDraft({ starter, createdBy: "maya", now: NOW }).changes.draft.writers).toEqual(["maya"]);
+  });
+
+  it("withWriter adds a person once, keeping the order they first wrote in", () => {
+    expect(withWriter(["maya"], "priya")).toEqual(["maya", "priya"]);
+    expect(withWriter(["maya", "priya"], "maya")).toEqual(["maya", "priya"]);
+  });
+
+  it("Priya edits Maya's draft and Maya submits it: Priya can neither approve nor send it back; Jordan can", () => {
+    const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
+    const edited = { ...draft, writers: withWriter(draft.writers, "priya") };
+    const v1 = submitAs(edited, "maya", 0);
+    expect(v1.writers).toEqual(["maya", "priya"]);
+
+    expect(decide(v1, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
+    expect(decide(v1, "maya").approve).toEqual({ ok: false, reason: REASONS.ownVersion });
+    expect(decide(v1, "jordan").approve.ok).toBe(true);
+  });
+
+  it("Priya started the draft and someone else submitted it: she can't decide it", () => {
+    const active = { ...reviewVersion({ state: "active" }), writers: ["eli"] };
+    const { draft } = editActive({ active, createdBy: "priya", now: NOW }).changes;
+    const v2 = submitAs({ ...draft, writers: withWriter(draft.writers, "maya") }, "maya", 1);
+    expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
+  });
+
+  it("writers carry across a change request; the approver who sent it back can approve the next round", () => {
+    const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
+    const v1 = submitAs({ ...draft, writers: withWriter(draft.writers, "priya") }, "maya", 0);
+
+    const returned = decide(v1, "jordan").requestChanges;
+    if (!returned.ok) throw new Error(returned.reason);
+    expect(returned.newDraft.writers, "Jordan isn't a writer for asking").toEqual(["maya", "priya"]);
+
+    // Maya fixes it alone and resubmits: Priya wrote round one, so round two isn't hers to decide either.
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", 1);
+    expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
+    expect(decide(v2, "jordan").approve).toMatchObject({ ok: true, wentLive: true });
+  });
+
+  it("the approver who sent it back becomes a writer only by editing the next round", () => {
+    const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
+    const v1 = submitAs(draft, "maya", 0);
+    const returned = decide(v1, "priya").requestChanges;
+    if (!returned.ok) throw new Error(returned.reason);
+
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "priya") }, "maya", 1);
+    expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
+  });
+
+  it("a draft from the Active version starts afresh: writing v1 doesn't keep anyone from deciding v2", () => {
+    const active = { ...reviewVersion({ state: "active" }), writers: ["maya", "priya"] };
+    const { draft } = editActive({ active, createdBy: "maya", now: NOW }).changes;
+    const v2 = submitAs(draft, "maya", 1);
+    expect(v2.writers).toEqual(["maya"]);
+    expect(decide(v2, "priya").approve.ok).toBe(true);
+  });
 });
 
 describe("scenario 6: two-person revoke", () => {

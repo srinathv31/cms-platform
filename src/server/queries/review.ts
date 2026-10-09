@@ -44,6 +44,7 @@ const queueColumns = {
   state: versions.state,
   submittedBy: versions.submittedBy,
   submittedAt: versions.submittedAt,
+  writers: versions.writers,
   createdBy: versions.createdBy,
   createdAt: versions.createdAt,
   currentStage: versions.currentStage,
@@ -62,6 +63,7 @@ interface QueueVersion {
   state: VersionState;
   submittedBy: string | null;
   submittedAt: Date | null;
+  writers: string[];
   createdBy: string;
   createdAt: Date;
   currentStage: number;
@@ -144,6 +146,7 @@ const loadInReview = cache(async (spaceSlug: string) => {
     const check = decideCheck(viewer, {
       teamId: v.teamId,
       submittedBy: v.submittedBy,
+      writers: v.writers,
       stage: waitingStage(chain, v.currentStage),
       approvedBy: approvedBy.get(v.versionId) ?? [],
     });
@@ -238,7 +241,7 @@ export const getReviewScreen = cache(
 
     const submittedBy = version.submittedBy ?? version.createdBy;
     const stage = waitingStage(chain, version.currentStage);
-    const decideInput = { teamId: template.teamId, submittedBy: version.submittedBy, stage };
+    const decideInput = { teamId: template.teamId, submittedBy: version.submittedBy, writers: version.writers, stage };
     const decide = decideOnScreen(decideCheck(space.viewer, decideInput), version.state);
     const inReview = version.state === "in_review";
     // Two stages need two people: someone who approved an earlier stage can't approve this one.

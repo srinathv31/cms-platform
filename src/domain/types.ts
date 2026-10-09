@@ -98,8 +98,14 @@ export type Action =
  */
 export interface PermissionResource {
   teamId?: string | null;
-  /** Who submitted / authored the version (maker-checker). */
+  /** Who submitted the version (maker-checker). */
   submittedBy?: string | null;
+  /**
+   * Who wrote the version: started its draft or saved an edit to it, in this round or a change-requested
+   * round before it, plus its submitter (maker-checker, `versions.writers`). Pass it with `submittedBy`
+   * wherever `version.decide` is asked.
+   */
+  writers?: readonly string[] | null;
   /** Who started a revoke (two-person rule). */
   revokeStartedBy?: string | null;
   /** Whose access request is being decided. */

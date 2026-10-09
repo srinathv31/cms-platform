@@ -29,6 +29,13 @@
       "when": 1791511166454,
       "tag": "0003_consumer_notice_seq",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791517415269,
+      "tag": "0004_version_writers",
+      "breakpoints": true
     }
   ]
 }

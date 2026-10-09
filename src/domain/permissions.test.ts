@@ -8,6 +8,7 @@ import {
   canSeeSpace,
   defaultSpace,
   isCrossTeam,
+  makerCheckerRefusal,
   rolesOn,
   spacesFor,
 } from "./permissions";
@@ -32,6 +33,7 @@ type TeamSlug = keyof typeof TEAMS;
 
 const GENERIC = "You don't have access to do this.";
 const OWN_VERSION = "You submitted this version.";
+const WROTE_VERSION = "You wrote part of this version.";
 const OWN_REVOKE = "You started this revoke. Another approver must confirm it.";
 const OWN_REQUEST = "You can't decide your own access request.";
 
@@ -260,6 +262,34 @@ describe("maker-checker", () => {
   it("Jordan can decide Maya's version; Maya cannot decide anything", () => {
     expect(can(jordan, "version.decide", { ...coral, submittedBy: "maya" })).toEqual(allow);
     expect(can(maya, "version.decide", { ...coral, submittedBy: "jordan" }).ok).toBe(false);
+  });
+
+  // Holding Author and Approver on one team is normal: an access request can add the role.
+  const priyaBoth = person("priya", { memberships: [member("coral-offers", ["author", "approver"])] });
+
+  it("covers everyone who wrote the version, not only whoever submitted it", () => {
+    const written = { ...coral, submittedBy: "maya", writers: ["maya", "priya"] };
+    expect(can(priyaBoth, "version.decide", written)).toEqual(deny(WROTE_VERSION));
+    expect(can(jordan, "version.decide", written)).toEqual(allow);
+  });
+
+  it("the submitter reads their own sentence, whether or not they're among the writers", () => {
+    expect(can(priyaBoth, "version.decide", { ...coral, submittedBy: "priya", writers: ["maya", "priya"] })).toEqual(
+      deny(OWN_VERSION),
+    );
+    expect(can(priyaBoth, "version.decide", { ...coral, submittedBy: "priya", writers: [] })).toEqual(deny(OWN_VERSION));
+  });
+
+  it("explains it to a co-author without the Approver role, as it does to the submitter", () => {
+    expect(can(maya, "version.decide", { ...coral, submittedBy: "priya", writers: ["maya", "priya"] })).toEqual(
+      deny(WROTE_VERSION),
+    );
+  });
+
+  it("asks makerCheckerRefusal, which the review transitions share", () => {
+    expect(makerCheckerRefusal("priya", { submittedBy: "maya", writers: ["maya", "priya"] })).toBe(WROTE_VERSION);
+    expect(makerCheckerRefusal("maya", { submittedBy: "maya", writers: ["maya", "priya"] })).toBe(OWN_VERSION);
+    expect(makerCheckerRefusal("jordan", { submittedBy: "maya", writers: ["maya", "priya"] })).toBeNull();
   });
 });
 

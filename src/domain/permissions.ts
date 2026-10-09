@@ -24,6 +24,8 @@ export const ALL_SPACE = "all";
 export const REASONS = {
   generic: "You don't have access to do this.",
   ownVersion: "You submitted this version.",
+  /** Maker-checker for everyone else who wrote it: started the draft or saved an edit to it. */
+  wroteVersion: "You wrote part of this version.",
   ownRevoke: "You started this revoke. Another approver must confirm it.",
   ownRequest: "You can't decide your own access request.",
   ownAccess: "You can't change your own access.",
@@ -81,7 +83,7 @@ type Guard = (viewer: Viewer, resource: PermissionResource) => string | null;
 
 const GUARDS: Partial<Record<Action, Guard>> = {
   // Maker-checker: nobody approves their own work.
-  "version.decide": (v, r) => (r.submittedBy === v.userId ? REASONS.ownVersion : null),
+  "version.decide": (v, r) => makerCheckerRefusal(v.userId, r),
   // Two-person revoke: the confirmer must be a different approver.
   "version.revoke.confirm": (v, r) => (r.revokeStartedBy === v.userId ? REASONS.ownRevoke : null),
   "team.decideAccessRequest": (v, r) => (r.requesterId === v.userId ? REASONS.ownRequest : null),
@@ -89,13 +91,30 @@ const GUARDS: Partial<Record<Action, Guard>> = {
   "team.manageMembers": (v, r) => (r.subjectUserId === v.userId ? REASONS.ownAccess : null),
 };
 
+/**
+ * Maker-checker for approving or requesting changes: nobody decides a version they wrote
+ * (docs/decisions/0007-maker-checker-covers-every-writer.md). The submitter reads `ownVersion`; anyone
+ * else in `writers` (started the draft, or saved an edit to it, in this round or a change-requested round
+ * before it) reads `wroteVersion`. Null when the actor wrote none of it. `can("version.decide")` and the
+ * `approve` and `requestChanges` transitions all ask this.
+ */
+export function makerCheckerRefusal(
+  actorId: string,
+  version: { submittedBy?: string | null; writers?: readonly string[] | null },
+): string | null {
+  if (version.submittedBy === actorId) return REASONS.ownVersion;
+  if (version.writers?.includes(actorId)) return REASONS.wroteVersion;
+  return null;
+}
+
 // ── The check ─────────────────────────────────────────────────
 
 export function can(viewer: Viewer, action: Action, resource: PermissionResource = {}): PermissionResult {
   const teamId = teamIdOf(resource);
   const blocked = GUARDS[action]?.(viewer, resource);
   // A self-block explains itself to anyone who can see the item, role or not:
-  // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker).
+  // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker),
+  // and a co-author sees why they can't decide what they wrote.
   if (blocked && granted(viewer, "template.view", teamId)) return { ok: false, reason: blocked };
   if (!granted(viewer, action, teamId) && !namedApprover(viewer, action, resource, teamId)) {
     return { ok: false, reason: REASONS.generic };

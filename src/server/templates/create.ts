@@ -36,6 +36,7 @@ export function draftRow(draft: DraftFields, ids: { id: string; templateId: stri
     currentStage: draft.currentStage,
     rev: draft.rev,
     createdBy: draft.createdBy,
+    writers: draft.writers,
     createdAt: draft.createdAt,
     updatedAt: draft.updatedAt,
   };

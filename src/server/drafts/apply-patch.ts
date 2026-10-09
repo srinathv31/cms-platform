@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
+import { withWriter } from "@/domain/lifecycle";
 import { PermissionError, assertCan } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -93,6 +94,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       .select({
         rev: versions.rev,
         state: versions.state,
+        writers: versions.writers,
         templateId: versions.templateId,
         teamId: templates.teamId,
         allowedChannels: contentTypes.allowedChannels,
@@ -141,7 +143,12 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       return fail("invalid", "That channel isn't available for this content type.");
     }
 
-    const set: SQLiteUpdateSetSource<typeof versions> = { rev: sql`${versions.rev} + 1`, updatedAt: at };
+    // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
+    const set: SQLiteUpdateSetSource<typeof versions> = {
+      rev: sql`${versions.rev} + 1`,
+      updatedAt: at,
+      writers: withWriter(row.writers, viewer.userId),
+    };
     if (body !== undefined) set.body = body;
     if (patch.variables !== undefined) set.variables = patch.variables;
     if (patch.channels !== undefined) set.channels = patch.channels;
