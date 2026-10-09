@@ -5,8 +5,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
+import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import type { Channel, JSONContent, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
+import type { Channel, JSONContent, PermissionResult, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
@@ -142,6 +143,12 @@ export interface WorkspaceDocumentData {
   editable: boolean;
   /** The template's review threads, anchored against the shown version's blocks (the editor margin). */
   threads: ThreadView[];
+  /**
+   * What the viewer may do here. `comment`: start a thread, reply, resolve and reopen, which needs the
+   * comment permission on the team and a shown version that takes comments (the open draft, or the latest
+   * version while it is in review). Every thread shown here is one the viewer may then act on.
+   */
+  can: { comment: PermissionResult };
   /** Phase 7a: the file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
   importOriginal: ImportOriginalRef | null;
 }
@@ -207,6 +214,8 @@ export const getWorkspaceDocument = cache(
       requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
       threads,
+      // The workspace is the team's: whoever a review stage names comments from the review screen.
+      can: { comment: canComment(space.viewer, { teamId: tpl.teamId, version: { state: shown.state, stageApproverIds: [] } }) },
       importOriginal,
     };
   },

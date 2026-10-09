@@ -2,9 +2,10 @@ import "server-only";
 import { cache } from "react";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { stepperState } from "@/domain/approval-chain";
+import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
-import { can, canSeeSpace } from "@/domain/permissions";
+import { canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { db } from "@/server/db/client";
@@ -247,8 +248,6 @@ export const getReviewScreen = cache(
     // Two stages need two people: someone who approved an earlier stage can't approve this one.
     const approvedBy = inReview ? decisionRows.filter((d) => d.decision === "approved").map((d) => d.actorId) : [];
     const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
-    // Named on the stage the version waits on: may comment too (any team).
-    const namedIds = inReview ? stageApproverIds(stage) : [];
     const contractChanges = version.contractChanges ?? [];
 
     return {
@@ -294,7 +293,11 @@ export const getReviewScreen = cache(
       can: {
         approve,
         requestChanges: decide,
-        comment: can(space.viewer, "review.comment", { teamId: template.teamId, stageApproverIds: namedIds }),
+        // Authors and approvers on the team, and whoever the waiting stage names (any team), while it is in review.
+        comment: canComment(space.viewer, {
+          teamId: template.teamId,
+          version: { state: version.state, stageApproverIds: stageApproverIds(stage) },
+        }),
       },
       consumerUsage,
       today: dayOf(nowDate),

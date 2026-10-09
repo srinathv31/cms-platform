@@ -1,98 +1,169 @@
 "use server";
 
 import { refresh, revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { PermissionError, assertCan } from "@/domain/permissions";
 import {
-  DOCUMENT_THREAD,
-  type ActionResult,
-  type LifecycleEffect,
-  type NotificationLink,
-} from "@/domain/review-types";
-import type { PermissionResource, VersionState, Viewer } from "@/domain/types";
+  addComment as addCommentTransition,
+  canActOnThread,
+  canComment,
+  reopenThread as reopenTransition,
+  reply as replyTransition,
+  resolveThread as resolveTransition,
+  type CommentTemplate,
+  type CommentThread,
+  type CommentVersion,
+  type ThreadStatusResult,
+} from "@/domain/comments";
+import { REASONS } from "@/domain/permissions";
+import type { ActionResult } from "@/domain/review-types";
+import type { PermissionResult, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
+import { db, type Db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { blockIdsOf, loadChain, stageApproverIds, waitingStage } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
-// Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen.
-// Authors and approvers on the template's team comment (`review.comment`), and the same people
-// resolve and reopen; so does whoever the stage a version waits on names, on any team (Phase 6). Every action checks the permission first, writes in one transaction with its
-// audit row and notifications, and refreshes the page it came from.
+// Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen. The rules
+// are domain/comments.ts: which versions take comments (a draft, a version in review), who may act on
+// which thread, the text's limits, and who is notified. Every action has the same shape:
+//   1. read the facts outside a transaction and ask the rule, so a refused caller gets its reason at once
+//      (an unknown id is refused like a forbidden one);
+//   2. ONE transaction that reads the facts again, asks the domain transition, and writes the rows and
+//      its effects (audit, notifications). Every refusal comes before the first write, so a refused
+//      transaction writes nothing. Writes in this process take turns (src/lib/serialized-writes.ts), so
+//      what the transaction read still holds when it writes; resolve and reopen also compare-and-set
+//      the status;
+//   3. `refresh()`, so the page the person is on re-renders in place.
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
-const COMMENT_MAX = 4000;
-const QUOTE_MAX = 500;
+const REFUSED = { ok: false, reason: REASONS.generic } as const;
 
-const REASONS = {
-  empty: "Write a comment first.",
-  tooLong: `Keep a comment under ${COMMENT_MAX.toLocaleString("en-US")} characters.`,
+const NOT_FOUND = {
   noVersion: "This version no longer exists.",
   noThread: "This comment thread no longer exists.",
-  noBlock: "That block isn't in this version any more.",
 } as const;
 
-// ── Helpers ───────────────────────────────────────────────────
+// ── Facts ─────────────────────────────────────────────────────
 
-/** `assertCan`, with the refusal returned as the action's answer instead of thrown. */
-function check(viewer: Viewer, resource: PermissionResource): { ok: false; reason: string } | null {
-  try {
-    assertCan(viewer, "review.comment", resource);
-    return null;
-  } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, reason: error.reason };
-    throw error;
-  }
+/** `db` outside the transaction, `tx` inside it. */
+type Reader = Pick<Db, "select">;
+
+/** What a thread's or a version's template is, and what on it takes comments right now. */
+async function loadTemplate(reader: Reader, templateId: string): Promise<CommentTemplate | undefined> {
+  const template = await reader
+    .select({ id: templates.id, name: templates.name, teamId: templates.teamId, contentTypeId: templates.contentTypeId })
+    .from(templates)
+    .where(eq(templates.id, templateId))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (!template) return undefined;
+  const list = await reader
+    .select({ number: versions.number, state: versions.state, currentStage: versions.currentStage })
+    .from(versions)
+    .where(eq(versions.templateId, templateId))
+    .orderBy(desc(versions.number));
+  const review = list.find((v) => v.state === "in_review" && v.number !== null);
+  return {
+    ...template,
+    hasDraft: list.some((v) => v.state === "draft"),
+    inReview: review
+      ? { number: review.number!, stageApproverIds: await namedOnStage(reader, template.contentTypeId, review.currentStage) }
+      : null,
+    highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
+  };
 }
 
-/**
- * The users the stage a version waits on names: they comment on it on any team (Phase 6). With no
- * version given, the template's version in review (a thread may have started on an earlier one).
- */
-async function namedOnStage(
-  templateId: string,
-  version?: { state: VersionState; currentStage: number; contentTypeId: string },
-): Promise<string[]> {
-  const waiting =
-    version ??
-    (await db
-      .select({ state: versions.state, currentStage: versions.currentStage, contentTypeId: templates.contentTypeId })
-      .from(versions)
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(and(eq(versions.templateId, templateId), eq(versions.state, "in_review")))
-      .limit(1)
-      .then((rows) => rows[0]));
-  if (!waiting || waiting.state !== "in_review") return [];
-  return stageApproverIds(waitingStage(await loadChain(db, waiting.contentTypeId), waiting.currentStage));
+/** The users the stage a version in review waits on names. */
+async function namedOnStage(reader: Reader, contentTypeId: string, currentStage: number): Promise<string[]> {
+  return stageApproverIds(waitingStage(await loadChain(reader, contentTypeId), currentStage));
 }
 
-/** A comment's text: trimmed, not empty, not huge. */
-function commentBody(body: string): { ok: true; body: string } | { ok: false; reason: string } {
-  const trimmed = body.trim();
-  if (!trimmed) return { ok: false, reason: REASONS.empty };
-  if (trimmed.length > COMMENT_MAX) return { ok: false, reason: REASONS.tooLong };
-  return { ok: true, body: trimmed };
+/** The version a new thread goes on, with its template and the blocks in its body. */
+async function loadVersion(reader: Reader, templateId: string, versionId: string) {
+  const row = await reader
+    .select({
+      id: versions.id,
+      number: versions.number,
+      state: versions.state,
+      createdBy: versions.createdBy,
+      submittedBy: versions.submittedBy,
+      currentStage: versions.currentStage,
+      body: versions.body,
+      templateId: templates.id,
+      templateName: templates.name,
+      teamId: templates.teamId,
+      contentTypeId: templates.contentTypeId,
+    })
+    .from(versions)
+    .innerJoin(templates, eq(templates.id, versions.templateId))
+    .where(and(eq(versions.id, versionId), eq(versions.templateId, templateId)))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (!row) return undefined;
+  const version: CommentVersion = {
+    id: row.id,
+    number: row.number,
+    state: row.state,
+    createdBy: row.createdBy,
+    submittedBy: row.submittedBy,
+    stageApproverIds: row.state === "in_review" ? await namedOnStage(reader, row.contentTypeId, row.currentStage) : [],
+  };
+  return {
+    template: { id: row.templateId, name: row.templateName, teamId: row.teamId },
+    version,
+    blockIds: blockIdsOf(row.body),
+  };
 }
 
-/**
- * Where a comment notification leads: the review screen while the version is in review, else the
- * template. A numbered version also names itself, so a stage reviewer outside the team (who can't
- * open the template's workspace) gets its review screen in their own space.
- */
-function commentLink(templateId: string, version: { number: number | null; state: VersionState }): NotificationLink {
-  if (version.number === null) return { to: "template", templateId };
-  return version.state === "in_review"
-    ? { to: "review", templateId, versionNumber: version.number }
-    : { to: "template", templateId, reviewVersion: version.number };
+/** A thread, the version it began on, and its template. */
+async function loadThread(reader: Reader, threadId: string): Promise<{ template: CommentTemplate; thread: CommentThread } | undefined> {
+  const row = await reader
+    .select({
+      id: commentThreads.id,
+      blockId: commentThreads.blockId,
+      status: commentThreads.status,
+      templateId: commentThreads.templateId,
+      originId: versions.id,
+      originNumber: versions.number,
+      originState: versions.state,
+      originCreatedBy: versions.createdBy,
+      originSubmittedBy: versions.submittedBy,
+    })
+    .from(commentThreads)
+    .innerJoin(versions, eq(versions.id, commentThreads.originVersionId))
+    .where(eq(commentThreads.id, threadId))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (!row) return undefined;
+  const template = await loadTemplate(reader, row.templateId);
+  if (!template) return undefined;
+  return {
+    template,
+    thread: {
+      id: row.id,
+      blockId: row.blockId,
+      status: row.status,
+      origin: {
+        id: row.originId,
+        number: row.originNumber,
+        state: row.originState,
+        createdBy: row.originCreatedBy,
+        submittedBy: row.originSubmittedBy,
+      },
+    },
+  };
 }
 
-function versionLabel(templateName: string, version: { number: number | null }): string {
-  return version.number === null ? `the draft of ${templateName}` : `${templateName} v${version.number}`;
+function effectContext(viewer: Viewer, template: { id: string; teamId: string }, versionId: string, at: Date) {
+  return { at, actorId: viewer.userId, teamId: template.teamId, templateId: template.id, versionId };
+}
+
+function refusal(result: PermissionResult): { ok: false; reason: string } | null {
+  return result.ok ? null : result;
 }
 
 /** The pages that show threads: the template workspace (margin) and the review screens. */
@@ -113,11 +184,9 @@ const AddCommentInput = z.object({
 });
 
 /**
- * Starts a thread on one block of a version (or on the whole version: `DOCUMENT_THREAD`), with its
- * first comment. The thread belongs to the template, so drafts made from this version show it too.
- * On a frozen version the block must be in its body; a draft's newest blocks may not be saved yet,
- * so a draft takes any block id (a thread whose block never lands reads as orphaned).
- * The version's author is notified.
+ * Starts a thread on one block of a draft or a version in review (or on the whole version:
+ * `DOCUMENT_THREAD`), with its first comment. The thread belongs to the template, so drafts made from
+ * this version show it too. The version's author is notified.
  */
 export async function addComment(input: {
   templateId: string;
@@ -127,94 +196,36 @@ export async function addComment(input: {
   body: string;
 }): Promise<ActionResult<{ threadId: string }>> {
   const viewer = await getViewer();
-
-  // The version is read only to learn its team for the permission check (as in templates.ts).
   const parsed = AddCommentInput.safeParse(input);
-  const found = parsed.success
-    ? await db
-        .select({
-          templateId: templates.id,
-          templateName: templates.name,
-          teamId: templates.teamId,
-          versionId: versions.id,
-          number: versions.number,
-          state: versions.state,
-          body: versions.body,
-          submittedBy: versions.submittedBy,
-          createdBy: versions.createdBy,
-          currentStage: versions.currentStage,
-          contentTypeId: templates.contentTypeId,
-        })
-        .from(versions)
-        .innerJoin(templates, eq(templates.id, versions.templateId))
-        .where(and(eq(versions.id, parsed.data.versionId), eq(versions.templateId, parsed.data.templateId)))
-        .limit(1)
-        .then((rows) => rows[0])
-    : undefined;
-  const refused = check(viewer, {
-    teamId: found?.teamId ?? null,
-    stageApproverIds: found ? await namedOnStage(found.templateId, found) : [],
-  });
+  const found = parsed.success ? await loadVersion(db, parsed.data.templateId, parsed.data.versionId) : undefined;
+  if (!parsed.success || !found) return REFUSED;
+  const refused = refusal(canComment(viewer, { teamId: found.template.teamId, version: found.version }));
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
-
-  const text = commentBody(parsed.data.body);
-  if (!text.ok) return text;
-  const { blockId } = parsed.data;
-  if (blockId !== DOCUMENT_THREAD && found.state !== "draft" && !blockIdsOf(found.body).includes(blockId)) {
-    return { ok: false, reason: REASONS.noBlock };
-  }
-  const quote = parsed.data.quote?.trim().slice(0, QUOTE_MAX) || null;
 
   const at = await now();
-  const threadId = newId("th");
-  const effects: LifecycleEffect[] = [
-    {
-      kind: "audit",
-      action: "comment.added",
-      details: { threadId, blockId, number: found.number, ...(quote ? { quote } : {}) },
-    },
-    {
-      kind: "notification",
-      notification: "comment_added",
-      to: { kind: "user", userId: found.submittedBy ?? found.createdBy },
-      title: `${viewer.name} commented on ${versionLabel(found.templateName, found)}.`,
-      body: text.body,
-      link: commentLink(found.templateId, found),
-    },
-  ];
+  const result = await inTransaction(db, async (tx): Promise<ActionResult<{ threadId: string }>> => {
+    const facts = await loadVersion(tx, parsed.data.templateId, parsed.data.versionId);
+    if (!facts) return { ok: false, reason: NOT_FOUND.noVersion };
+    const outcome = addCommentTransition({
+      viewer,
+      ...facts,
+      blockId: parsed.data.blockId,
+      quote: parsed.data.quote,
+      body: parsed.data.body,
+      threadId: newId("th"),
+      commentId: newId("cm"),
+      now: at,
+    });
+    if (!outcome.ok) return outcome;
 
-  await inTransaction(db, async (tx) => {
-    await tx.insert(commentThreads).values({
-      id: threadId,
-      templateId: found.templateId,
-      originVersionId: found.versionId,
-      blockId,
-      quote,
-      status: "open",
-      resolvedBy: null,
-      resolvedAt: null,
-      createdAt: at,
-    });
-    await tx.insert(comments).values({
-      id: newId("cm"),
-      threadId,
-      authorId: viewer.userId,
-      body: text.body,
-      kind: "comment",
-      createdAt: at,
-    });
-    await writeEffects(tx, effects, {
-      at,
-      actorId: viewer.userId,
-      teamId: found.teamId,
-      templateId: found.templateId,
-      versionId: found.versionId,
-    });
+    await tx.insert(commentThreads).values(outcome.thread);
+    await tx.insert(comments).values(outcome.comment);
+    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.version.id, at));
+    return { ok: true, threadId: outcome.thread.id };
   });
 
-  refreshThreads();
-  return { ok: true, threadId };
+  if (result.ok) refreshThreads();
+  return result;
 }
 
 // ── Threads: reply, resolve, reopen ───────────────────────────
@@ -222,98 +233,43 @@ export async function addComment(input: {
 const ThreadInput = z.object({ threadId: z.string().min(1).max(64) });
 const ReplyInput = ThreadInput.extend({ body: z.string() });
 
-/** The thread with its template and origin version (who to tell, which team it's on). */
-async function findThread(threadId: string) {
-  return db
-    .select({
-      id: commentThreads.id,
-      blockId: commentThreads.blockId,
-      status: commentThreads.status,
-      templateId: templates.id,
-      templateName: templates.name,
-      teamId: templates.teamId,
-      versionId: versions.id,
-      number: versions.number,
-      state: versions.state,
-      submittedBy: versions.submittedBy,
-      createdBy: versions.createdBy,
-    })
-    .from(commentThreads)
-    .innerJoin(templates, eq(templates.id, commentThreads.templateId))
-    .innerJoin(versions, eq(versions.id, commentThreads.originVersionId))
-    .where(eq(commentThreads.id, threadId))
-    .limit(1)
-    .then((rows) => rows[0]);
-}
-
-type FoundThread = NonNullable<Awaited<ReturnType<typeof findThread>>>;
-
-function threadContext(thread: FoundThread, viewer: Viewer, at: Date) {
-  return {
-    at,
-    actorId: viewer.userId,
-    teamId: thread.teamId,
-    templateId: thread.templateId,
-    versionId: thread.versionId,
-  };
-}
-
 /**
- * Adds a reply to a thread (open or resolved; a reply doesn't reopen it). Everyone who has written in
- * the thread, and the author of the version it started on, is notified (never the one replying).
+ * Adds a reply to a thread (open or resolved; a reply doesn't reopen it). Everyone who has written in the
+ * thread, and the author of the version it started on, is notified (never the one replying).
  */
 export async function reply(input: { threadId: string; body: string }): Promise<ActionResult> {
   const viewer = await getViewer();
   const parsed = ReplyInput.safeParse(input);
-  const thread = parsed.success ? await findThread(parsed.data.threadId) : undefined;
-  const refused = check(viewer, {
-    teamId: thread?.teamId ?? null,
-    stageApproverIds: thread ? await namedOnStage(thread.templateId) : [],
-  });
+  const found = parsed.success ? await loadThread(db, parsed.data.threadId) : undefined;
+  if (!parsed.success || !found) return REFUSED;
+  const refused = refusal(canActOnThread(viewer, found));
   if (refused) return refused;
-  if (!parsed.success || !thread) return { ok: false, reason: REASONS.noThread };
 
-  const text = commentBody(parsed.data.body);
-  if (!text.ok) return text;
   const at = await now();
-
-  await inTransaction(db, async (tx) => {
+  const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
+    const facts = await loadThread(tx, parsed.data.threadId);
+    if (!facts) return { ok: false, reason: NOT_FOUND.noThread };
     const participants = await tx
       .selectDistinct({ authorId: comments.authorId })
       .from(comments)
-      .where(eq(comments.threadId, thread.id));
-    const recipients = new Set([thread.submittedBy ?? thread.createdBy, ...participants.map((p) => p.authorId)]);
-
-    await tx.insert(comments).values({
-      id: newId("cm"),
-      threadId: thread.id,
-      authorId: viewer.userId,
-      body: text.body,
-      kind: "comment",
-      createdAt: at,
+      .where(eq(comments.threadId, facts.thread.id));
+    const outcome = replyTransition({
+      viewer,
+      ...facts,
+      participants: participants.map((p) => p.authorId),
+      body: parsed.data.body,
+      commentId: newId("cm"),
+      now: at,
     });
-    const effects: LifecycleEffect[] = [
-      {
-        kind: "audit",
-        action: "comment.added",
-        details: { threadId: thread.id, blockId: thread.blockId, number: thread.number, reply: true },
-      },
-      ...[...recipients].sort().map(
-        (userId): LifecycleEffect => ({
-          kind: "notification",
-          notification: "comment_added",
-          to: { kind: "user", userId },
-          title: `${viewer.name} replied on ${versionLabel(thread.templateName, thread)}.`,
-          body: text.body,
-          link: commentLink(thread.templateId, thread),
-        }),
-      ),
-    ];
-    await writeEffects(tx, effects, threadContext(thread, viewer, at));
+    if (!outcome.ok) return outcome;
+
+    await tx.insert(comments).values(outcome.comment);
+    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+    return { ok: true };
   });
 
-  refreshThreads();
-  return { ok: true };
+  if (result.ok) refreshThreads();
+  return result;
 }
 
 /**
@@ -321,49 +277,45 @@ export async function reply(input: { threadId: string; body: string }): Promise<
  * resolved already and writes nothing; that still answers ok, since the thread is what was asked.
  */
 export async function resolveThread(input: { threadId: string }): Promise<ActionResult> {
-  return setStatus(input, "resolved");
+  return setStatus(input, resolveTransition);
 }
 
 /** Reopens a resolved thread (compare-and-set, as `resolveThread`). */
 export async function reopenThread(input: { threadId: string }): Promise<ActionResult> {
-  return setStatus(input, "open");
+  return setStatus(input, reopenTransition);
 }
 
-async function setStatus(input: { threadId: string }, to: "open" | "resolved"): Promise<ActionResult> {
+async function setStatus(
+  input: { threadId: string },
+  transition: typeof resolveTransition | typeof reopenTransition,
+): Promise<ActionResult> {
   const viewer = await getViewer();
   const parsed = ThreadInput.safeParse(input);
-  const thread = parsed.success ? await findThread(parsed.data.threadId) : undefined;
-  const refused = check(viewer, {
-    teamId: thread?.teamId ?? null,
-    stageApproverIds: thread ? await namedOnStage(thread.templateId) : [],
-  });
+  const found = parsed.success ? await loadThread(db, parsed.data.threadId) : undefined;
+  if (!parsed.success || !found) return REFUSED;
+  const refused = refusal(canActOnThread(viewer, found));
   if (refused) return refused;
-  if (!parsed.success || !thread) return { ok: false, reason: REASONS.noThread };
 
   const at = await now();
-  const from = to === "resolved" ? "open" : "resolved";
+  let wrote = false;
+  const result = await inTransaction(db, async (tx): Promise<ActionResult> => {
+    const facts = await loadThread(tx, parsed.data.threadId);
+    if (!facts) return { ok: false, reason: NOT_FOUND.noThread };
+    const outcome: ThreadStatusResult = transition({ viewer, ...facts, now: at });
+    if (!outcome.ok) return outcome;
+    if (!outcome.changes) return { ok: true };
 
-  const changed = await inTransaction(db, async (tx) => {
     const [row] = await tx
       .update(commentThreads)
-      .set(to === "resolved" ? { status: to, resolvedBy: viewer.userId, resolvedAt: at } : { status: to, resolvedBy: null, resolvedAt: null })
-      .where(and(eq(commentThreads.id, thread.id), eq(commentThreads.status, from)))
+      .set(outcome.changes)
+      .where(and(eq(commentThreads.id, facts.thread.id), eq(commentThreads.status, facts.thread.status)))
       .returning({ id: commentThreads.id });
-    if (!row) return false;
-    await writeEffects(
-      tx,
-      [
-        {
-          kind: "audit",
-          action: to === "resolved" ? "thread.resolved" : "thread.reopened",
-          details: { threadId: thread.id, blockId: thread.blockId, number: thread.number },
-        },
-      ],
-      threadContext(thread, viewer, at),
-    );
-    return true;
+    if (!row) return { ok: true };
+    await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+    wrote = true;
+    return { ok: true };
   });
 
-  if (changed) refreshThreads();
-  return { ok: true };
+  if (wrote) refreshThreads();
+  return result;
 }

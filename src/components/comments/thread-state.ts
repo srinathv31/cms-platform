@@ -2,7 +2,7 @@
 // update), and how a list is grouped for the rail. No React here.
 
 import { DOCUMENT_THREAD, type CommentView, type Person, type ThreadView } from "@/domain/review-types";
-import type { JSONContent, VersionState } from "@/domain/types";
+import type { JSONContent } from "@/domain/types";
 
 /** A change the author just made, applied to the list at once while the server catches up. */
 export type ThreadMutation =
@@ -100,14 +100,6 @@ export function groupThreads(threads: readonly ThreadView[]): ThreadGroups {
     else groups.anchored.push(thread);
   }
   return groups;
-}
-
-/**
- * Comments belong to a version while it is being written or reviewed. Once it has been decided (Active,
- * Superseded, Revoked, or sent back) it is a record: its threads read, and are answered in the next draft.
- */
-export function versionTakesComments(state: VersionState): boolean {
-  return state === "draft" || state === "in_review";
 }
 
 // ── Threads against the document as it is now ─────────────────────────────────────────────────────
