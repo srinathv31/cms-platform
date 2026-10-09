@@ -43,7 +43,7 @@ async function docx() {
   return { ok: true, html: result.value, messages: result.messages.map((m) => m.message), images };
 }
 
-// pdf.js runs with its worker in-process (docs/decisions/track-c.md): bundling breaks its fake-worker
+// pdf.js runs with its worker in-process (docs/decisions/prototype-log.md): bundling breaks its fake-worker
 // import, so the worker module is loaded into globalThis.pdfjsWorker BEFORE pdf.js itself.
 async function pdf() {
   globalThis.pdfjsWorker ??= await import("pdfjs-dist/legacy/build/pdf.worker.mjs");

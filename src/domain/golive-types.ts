@@ -6,7 +6,7 @@
 //   src/contracts/api-v1.ts   the /api/v1 wire shapes (both sides)          ← the consumer API
 //   src/domain/golive-types.ts this file: UCOMP's read models and signatures
 //   src/simulator/types.ts    the simulator's own read models and actions   ← Coral's side
-// Who implements what is in docs/phase-5-brief.md.
+// Who implements what is in docs/archive/phase-5-brief.md.
 
 import type {
   ApiBase64Response,

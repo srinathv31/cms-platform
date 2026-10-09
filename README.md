@@ -22,7 +22,13 @@ To see the app the way users get it, with routes prerendered and links prefetche
 npm run demo   # next build && next start
 ```
 
-To present Stencil to a new audience, follow the step-by-step [demo script](docs/demo-script.md).
+To present Stencil to a new audience, follow the step-by-step [demo script](docs/guides/demo-script.md).
+
+## Documentation
+
+Start with [docs/architecture.md](docs/architecture.md), then the README in the `src/` folder you're working in.
+[docs/README.md](docs/README.md) maps everything else. [AGENTS.md](AGENTS.md) holds the rules every change follows;
+AI agents load it automatically, and it's worth reading before your first change too.
 
 ## Checks
 
@@ -30,5 +36,6 @@ To present Stencil to a new audience, follow the step-by-step [demo script](docs
 npm run typecheck
 npm run lint
 npm test         # vitest
+npm run docs:check   # links, paths and READMEs in the docs
 npm run build && npm run e2e   # Playwright, against the production build (resets the demo DB)
 ```

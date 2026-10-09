@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { IMPORT_FAILED, precheckImport, precheckImportBytes, uploadImport } from "./upload-import";
 
 /**
- * "Import a file": the dashed row under the starter cards (docs/decisions/track-c.md, 3 and 4). A
+ * "Import a file": the dashed row under the starter cards (docs/decisions/prototype-log.md, 3 and 4). A
  * click opens the file picker, and a file dropped on the row works too. Picking a file imports it at
  * once: the row shows a spinner and "Importing <file>" until the new template opens (the name
  * selected, the rail on the Original tab on a wide canvas). A refusal is one line under the row, in a

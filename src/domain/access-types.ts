@@ -1,6 +1,6 @@
 // Phase 6 contract: access and admin. Pure types, written by the lead; every Phase 6 agent codes
 // against this file. Domain inputs use Date; read models (server/queries → UI) use ISO strings,
-// because they cross into client components. Who implements what is in docs/phase-6-brief.md.
+// because they cross into client components. Who implements what is in docs/archive/phase-6-brief.md.
 //
 //   domain/access.ts           team access rules: request/decide, members, recertification,
 //                              inactivity, and the clock-driven sweep (lapse, flag, auto-suspend)

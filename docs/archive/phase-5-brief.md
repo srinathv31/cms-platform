@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Phase 5 brief: going live (Track A)
 
 Track A, worktree `/Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/ucomp-golive`, dev server http://localhost:3001, gate port 3101. Read this instead of the long plans. They're the source if this is silent: `docs/UCOMP-Implementation-Plan.md` §9 "Phase 5" and §8 "The simulator boundary", and the build plan's "Going live (mocked)" and Demo script scenarios 4, 5 and 6.

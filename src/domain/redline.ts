@@ -1,6 +1,6 @@
 // The redline: what changed between two versions of a document, as one document a renderer can walk
 // like the original (contract: RedlineDoc in ./review-types). A pure walk over the editor's TipTap
-// JSON (docs/agent-brief.md, "TipTap JSON contract"): no TipTap runtime, so it ports as is.
+// JSON (docs/render-spec.md §2): no TipTap runtime, so it ports as is.
 //
 // How blocks line up (top level, and the same way inside lists, list items, callouts and cells):
 //   1. By `attrs.id`. Drafts keep block ids across versions, so this is the normal case.

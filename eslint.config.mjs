@@ -95,7 +95,8 @@ const eslintConfig = defineConfig([
     },
   },
 
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "data/**", "playwright-report/**", "test-results/**"]),
+  // .agents/ holds vendored agent skills and .claude/ holds local agent worktrees: neither is this app's code.
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "data/**", "playwright-report/**", "test-results/**", ".agents/**", ".claude/**"]),
 ]);
 
 export default eslintConfig;

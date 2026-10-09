@@ -37,7 +37,7 @@ import { asPersona, beat, demoTimeout, expect, hydrated, openLibrary, shoot, tap
 // Phase 5 added the simulator's send failure (step 4b): after the revoke, Coral's send on the Balance Transfer
 // offer (linked to v1) fails at once in the simulator, with the revoke message shown verbatim. Phase 6 adds the
 // Audit page; until then this spec proves the revoke through the Activity tab, the render API and the simulator
-// (docs/UCOMP-Implementation-Plan.md, Phase 4).
+// (docs/archive/implementation-plan.md, Phase 4).
 //
 // Runs from a fresh reset. It REVOKES the seeded v1, so the rows it changes are snapshotted before and put
 // back in afterAll (the version, the audit events, notifications and consumer notices it wrote for this

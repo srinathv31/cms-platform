@@ -8,7 +8,7 @@ import { isolatedPdf, type IsolationOptions } from "./isolate";
 //
 // pdf.js runs in a worker thread (convert-worker.mjs, started by isolate.ts) with a heap limit and a
 // timeout: a PDF's compressed streams can decode to far more than the upload, and a bomb must end the
-// worker, not the server. pdf.js's own worker still runs in-process inside it (docs/decisions/track-c.md).
+// worker, not the server. pdf.js's own worker still runs in-process inside it (docs/decisions/prototype-log.md).
 
 export async function convertPdf(bytes: Uint8Array, isolation?: IsolationOptions): Promise<ConvertResult> {
   const result = await isolatedPdf(bytes, isolation);

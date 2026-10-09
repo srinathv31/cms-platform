@@ -3,7 +3,7 @@
 // constants only, written by the lead; every 7a agent codes against this file. Dates in read models
 // are ISO strings (they cross into client components).
 //
-// Who implements what is in docs/phase-7a-brief.md. No schema change and no migration: the
+// Who implements what is in docs/archive/phase-7a-brief.md. No schema change and no migration: the
 // `uploads` table and `versions.import_upload_id` already exist (0000_init). If something here is
 // wrong, make the smallest additive change and say so first in your report.
 
@@ -228,7 +228,7 @@ export const JUST_IMPORTED_COOKIE = "ucomp_imported";
 
 // ── Compare with original: the rail's Original tab ───────────────────────────
 //
-// Like Preview: picking "Original" widens the rail (docs/decisions/track-c.md). The tab exists in the
+// Like Preview: picking "Original" widens the rail (docs/decisions/prototype-log.md). The tab exists in the
 // rail header whenever the template has an imported source (uploads.template_id), on every version.
 // The workspace's document data carries only the cheap ref; the Original view fetches the rest from
 // /api/imports/{uploadId}/view the first time it is shown.
