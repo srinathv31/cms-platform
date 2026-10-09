@@ -2,8 +2,9 @@
 
 The Next.js App Router tree for Stencil, the Coral simulator, and the dev mocks. Files here are thin: a page
 renders static chrome and a `<Stream>` around a server component from `src/components/` that reads the request;
-a route handler parses HTTP and calls `src/server/`. No server actions live here, and outside `(dev)` there are
-no client components. Business rules belong in `src/domain/` and `src/server/`.
+a route handler parses HTTP and calls `src/server/`. No server actions live here, and outside `(dev)` the only
+client components are the three error boundaries, which Next requires to be client components. Business rules
+belong in `src/domain/` and `src/server/`.
 
 ## Rules
 
@@ -18,9 +19,10 @@ no client components. Business rules belong in `src/domain/` and `src/server/`.
 **Cache Components.** [next.config.ts](../../next.config.ts) sets `cacheComponents: true`: the shell is static
 and every request-bound part streams. Reading request data outside `<Suspense>` is a build error.
 
-1. There is no `loading.tsx` (or `error.tsx`) anywhere. The one streaming boundary is `<Stream fallback>` from
+1. There is no `loading.tsx` anywhere. The one streaming boundary is `<Stream fallback>` from
    [stream.tsx](../components/primitives/stream.tsx): a `Suspense` plus a `ViewTransition`. The fallback must
-   have the final geometry; the principles spec requires a CLS of 0.
+   have the final geometry; the principles spec requires a CLS of 0. A throw inside a `<Stream>` goes to the
+   route's error boundary (see [Errors](#errors)); `<Stream>` doesn't catch it.
 2. Request data is read only inside a `<Stream>`. That means `getViewer()` (the `ucomp_persona` cookie through
    `cookies()`), awaited `params` and `searchParams`, database reads, and `now()`. The page's default export
    stays synchronous.
@@ -134,6 +136,26 @@ persona; the mocks read their deep-link search params.
 "router prefetch" tests in [phase-1.spec.ts](../../e2e/phase-1.spec.ts) are the canary: fewer than 60 RSC
 requests in about 3 seconds on the Library and on a workspace.
 
+## Errors
+
+Three error boundaries catch a throw by route, not by `<Stream>`
+([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). An error boundary
+doesn't cover the layout beside it, so each keeps what its segment's layouts render:
+
+| File | Catches | Shows | Keeps |
+| --- | --- | --- | --- |
+| [(product)/error.tsx](./(product)/error.tsx) | Pages inside `AppFrame`, `TeamGuard`, the `@modal` slot, the workspace layout. | `PageError`: "This page didn't load" as the page title. | Sidebar and top bar. |
+| [templates/[templateId]/error.tsx](./(product)/[team]/templates/[templateId]/error.tsx) | A workspace tab's page. | `TabError` in the document's grid cell. | Workspace header and tab bar. |
+| [global-error.tsx](global-error.tsx) | `AppFrame`'s streamed parts, the root layout, and `(simulator)`. | `GlobalErrorView`: the canvas panel with `PageError`. | Nothing. It renders its own `<html>` with `globals.css` and the fonts, and no providers. |
+
+The views live in [route-error.tsx](../components/app-shell/route-error.tsx) and
+[tab-error.tsx](../components/workspace/tab-error.tsx). Each offers Try again, which calls Next's `retry` (a
+refetch of the route), and Back to library (the URL's space, or `/`), and shows the error's `digest` when Next gives
+one. None shows the error's message or logs it; Next logs it already. Try again is the black button, except on
+`TabError`, where the tab bar keeps the workspace's black button.
+
+A `notFound()` or `redirect()` passes through these boundaries to Next's own handling.
+
 ## How route handlers answer
 
 Every handler is request-time. A POST always is; a GET is made so by reading the persona cookie
@@ -236,4 +258,5 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |
 | `e2e/revoke-recovery.spec.ts` | After the Active version is revoked: Edit from the revoked content, contract changes against the version that still renders, approve, render. |
 | `e2e/demo-script.spec.ts` | The whole demo script on one database state. |
+| `e2e/error-boundaries.spec.ts` | Each error boundary, reached by breaking a stored JSON value for one test: what it shows and keeps, and Try again once the value is back. |
 | `e2e/api/consumer.spec.ts`, `render.spec.ts`, `imports.spec.ts` | The `/api/v1` GET routes, the render route, and the import routes over HTTP. |

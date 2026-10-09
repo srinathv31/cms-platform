@@ -30,7 +30,7 @@ Convention only (nothing checks these):
 | [ui/](ui) | shadcn components, `base-nova` style on Base UI (`@base-ui/react`); see [components.json](../../components.json). |
 | [primitives/](primitives) | The shared building blocks listed under [Primitives](#primitives). |
 | [motion/](motion) | `Providers` (motion, tooltips, toasts) mounted by [src/app/layout.tsx](../app/layout.tsx), and the presets. |
-| [app-shell/](app-shell) | The product frame: sidebar, top bar, ⌘K palette, notifications, profile and persona switch, `ScrimDialogContent` (the surface every dialog uses), `UserAvatar`, skeletons, canvas scroll restore. `*-hole.tsx` files are the streamed, viewer-dependent parts of the static `AppFrame`. |
+| [app-shell/](app-shell) | The product frame: sidebar, top bar, ⌘K palette, notifications, profile and persona switch, `ScrimDialogContent` (the surface every dialog uses), `UserAvatar`, skeletons, canvas scroll restore, and the page and global error views (`route-error.tsx`, used by `src/app/(product)/error.tsx` and `src/app/global-error.tsx`). `*-hole.tsx` files are the streamed, viewer-dependent parts of the static `AppFrame`. |
 
 Feature folders:
 
@@ -54,7 +54,7 @@ Feature folders:
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
 | `versions/` | Versions timeline, compare, sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
-| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`), autosave, session store, Copilot prompt, save status, SHARE. | `/[team]/templates/[templateId]` layout and Content page |
+| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`), autosave, session store, Copilot prompt, save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks
 
@@ -77,7 +77,7 @@ Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` 
 | --- | --- | --- |
 | `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). Server-safe. |
 | `PageHeader` | [page-header.tsx](primitives/page-header.tsx) | Serif page title, optional caps eyebrow, a slot for the screen's one primary action. |
-| `Stream` | [stream.tsx](primitives/stream.tsx) | The streaming boundary: `Suspense` plus `ViewTransition`, skeleton out, content in. |
+| `Stream` | [stream.tsx](primitives/stream.tsx) | The streaming boundary: `Suspense` plus `ViewTransition`, skeleton out, content in. It catches no errors; the route's `error.tsx` does ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). |
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
 | `TemplateId` | [template-id.tsx](primitives/template-id.tsx) | A template ID with a copy button (client). |
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
