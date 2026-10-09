@@ -10,6 +10,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0002](0002-a-passed-sunset-is-final.md) | A passed sunset is final | Accepted |
 | [0003](0003-undo-redo-always-shown.md) | Undo and redo are always shown, greyed out when idle, before the save status | Accepted |
 | [0004](0004-email-fields-hidden-not-unmounted.md) | Email fields are hidden while Email is off, not unmounted | Accepted |
+| [0005](0005-revert-undo-goes-when-anything-changes.md) | A revert's Undo goes as soon as anything else changes | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

@@ -13,6 +13,10 @@ import type { Channel, JSONContent, SampleSet, Variable } from "@/domain/types";
 // "Revert to v3". The client puts it on screen and saves it through autosave like any other edit (so
 // the toast can undo it), which keeps the permission, rev and audit rules in one place. Nothing is
 // written, audited or refreshed here.
+//
+// The client names the draft on its screen (`versionId`) and gets that draft's base, or a refusal:
+// never the base of another draft the template has by now (the one on screen was submitted, and
+// someone started a new one).
 
 /** The draft's fields as they are in the version it was started from. */
 export interface BaseVersionContent {
@@ -25,19 +29,22 @@ export interface BaseVersionContent {
   sampleSets: SampleSet[];
 }
 
-const Input = z.object({ templateId: z.string().min(1).max(64) });
+const Input = z.object({ templateId: z.string().min(1).max(64), versionId: z.string().min(1).max(64) });
 
-export async function getBaseVersion(input: { templateId: string }): Promise<ActionResult<{ base: BaseVersionContent }>> {
+export async function getBaseVersion(input: {
+  templateId: string;
+  /** The draft on screen (the workspace session's binding). */
+  versionId: string;
+}): Promise<ActionResult<{ base: BaseVersionContent }>> {
   const viewer = await getViewer();
   const parsed = Input.safeParse(input);
-  const template = parsed.success
-    ? await db
-        .select({ id: templates.id, teamId: templates.teamId })
-        .from(templates)
-        .where(eq(templates.id, parsed.data.templateId))
-        .limit(1)
-        .then((rows) => rows[0])
-    : undefined;
+  if (!parsed.success) return { ok: false, reason: "This template isn't available." };
+  const template = await db
+    .select({ id: templates.id, teamId: templates.teamId })
+    .from(templates)
+    .where(eq(templates.id, parsed.data.templateId))
+    .limit(1)
+    .then((rows) => rows[0]);
   if (!template) return { ok: false, reason: "This template isn't available." };
 
   const allowed = can(viewer, "draft.edit", { teamId: template.teamId });
@@ -59,8 +66,8 @@ export async function getBaseVersion(input: { templateId: string }): Promise<Act
     .from(versions)
     .where(eq(versions.templateId, template.id));
 
-  const draft = list.find((v) => v.state === "draft");
-  if (!draft) return { ok: false, reason: "There is no draft to revert." };
+  const draft = list.find((v) => v.id === parsed.data.versionId);
+  if (!draft || draft.state !== "draft") return { ok: false, reason: "There is no draft to revert." };
   const base = draft.basedOnVersionId ? list.find((v) => v.id === draft.basedOnVersionId) : undefined;
   if (!base || base.number === null) return { ok: false, reason: "This draft wasn't started from an earlier version." };
 

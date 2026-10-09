@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { blockTextOf } from "@/components/comments/block-text";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-list";
@@ -23,6 +23,9 @@ import { Rail } from "./rail";
 
 /** The fields this page shows, which a revert can put back. */
 const CONTENT_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
+
+/** The app's one scrolling element (AppFrame's canvas), which the document scrolls in. */
+const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
 
 export interface ContentWorkspaceProps {
   templateId: string;
@@ -126,6 +129,16 @@ export function ContentWorkspace({
   const [opening] = useState(() => ({ body, variables, channels: initialChannels, emailSubject, emailPreheader, sampleSets }));
   const [shown, setShown] = useState(() => ({ gen: 0, ...opening }));
 
+  // A revert is pressed from a button, so it must not scroll the page. The old editor leaving shortens
+  // the page for a moment, and the browser clamps the canvas's scroll: put it back as the new one lands.
+  const keptScroll = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const top = keptScroll.current;
+    keptScroll.current = null;
+    const canvas = canvasElement();
+    if (top !== null && canvas && canvas.scrollTop !== top) canvas.scrollTo({ top, behavior: "instant" });
+  }, [shown.gen]);
+
   // ── Review comments: the state the document's highlights and markers, and the rail's list, share.
   const review = useReviewThreads(threads);
   const { setActive, openComposer, closeComposer, activeThreadId, trackDocument } = review;
@@ -172,6 +185,7 @@ export function ContentWorkspace({
         liveBody.current = next.body;
         trackDocument(next.body);
         setChannels(next.channels);
+        keptScroll.current = canvasElement()?.scrollTop ?? null;
         setShown((prev) => ({ gen: prev.gen + 1, ...next }));
       },
     });

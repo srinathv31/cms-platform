@@ -16,6 +16,8 @@
 //     the page that can show other values, so the header's "Revert to when you opened it" can put
 //     everything back, "Revert to v3" can put another version's content in, and their toast's Undo
 //     can put the changes back again.
+//   - an edit generation that moves with every edit, so that Undo is refused once anything else
+//     has changed since the revert it undoes.
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -113,6 +115,12 @@ export interface WorkspaceSession {
   getCanRevert: () => boolean;
   /** When the draft was bound (Date.now()): "when you opened it". */
   getOpenedAt: () => number;
+  /**
+   * Moves with every edit: each `save`, revert, replace and restore, and binding another draft (or
+   * none). Subscribers hear about each move. A revert's Undo keeps the value from just after the
+   * revert, and `restore` refuses once it has moved.
+   */
+  getEditGeneration: () => number;
   /** The fields some part of the page on screen can show other values of, sorted and comma-joined (a stable snapshot). */
   getOwnedFields: () => string;
 
@@ -148,8 +156,18 @@ export interface WorkspaceSession {
    * can't (see `getCanRevert`).
    */
   revert: () => SaveFields | null;
-  /** Shows and saves these values: undoing a revert. */
-  restore: (fields: SaveFields) => void;
+  /**
+   * Undo for a revert can still run: nothing was edited since (the edit generation is still
+   * `since`, read just after the revert), a draft is bound, and every one of `fields` has a part
+   * of the page on screen to show it.
+   */
+  canRestore: (fields: SaveFields, since: number) => boolean;
+  /**
+   * Shows and saves these values: undoing a revert. Refuses, changing nothing and returning false,
+   * when `canRestore` says no: putting them back then would drop a newer edit, or save content
+   * that a hidden tab doesn't show (and that its next keystroke would save over).
+   */
+  restore: (fields: SaveFields, since: number) => boolean;
   /**
    * Shows and saves `fields` as an edit like any other ("Revert to v3"). Returns the values they
    * replaced (hand them to `restore` to undo it), or null when a field has no part on screen to show it.
@@ -197,6 +215,7 @@ export function createWorkspaceSession(): WorkspaceSession {
   let edited: SaveFields | null = null;
   // Set when a draft is bound (an effect): the store itself is made during render, where the clock can't be read.
   let openedAt = 0;
+  let editGeneration = 0;
   let canRevert = false;
   let ownedFields = "";
   const targets = new Set<RestoreTarget>();
@@ -252,6 +271,11 @@ export function createWorkspaceSession(): WorkspaceSession {
     waiting = [];
     for (const resolve of release) resolve();
   };
+  const canRestore = (fields: SaveFields, since: number) => {
+    if (binding === null || since !== editGeneration) return false;
+    const mine = owned();
+    return Object.keys(fields).every((key) => mine.has(key));
+  };
 
   return {
     subscribe(listener) {
@@ -270,6 +294,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     getCanRevert: () => canRevert,
     getOpenedAt: () => openedAt,
     getOwnedFields: () => ownedFields,
+    getEditGeneration: () => editGeneration,
 
     bind(next) {
       if (next === null) {
@@ -278,6 +303,7 @@ export function createWorkspaceSession(): WorkspaceSession {
         status = SAVED;
         held = null;
         edited = null;
+        editGeneration += 1;
         syncCanRevert();
         releaseWaiting();
         emit();
@@ -288,6 +314,7 @@ export function createWorkspaceSession(): WorkspaceSession {
       binding = next;
       status = SAVED;
       edited = null;
+      editGeneration += 1;
       openedAt = Date.now();
       syncCanRevert();
       emit();
@@ -321,9 +348,13 @@ export function createWorkspaceSession(): WorkspaceSession {
 
     save(fields) {
       send(fields);
-      if (binding === null) return;
-      edited = mergeFields(edited, fields);
-      if (syncCanRevert()) emit();
+      editGeneration += 1;
+      if (binding !== null) {
+        edited = mergeFields(edited, fields);
+        syncCanRevert();
+      }
+      // Every edit is news to a revert's toast: its Undo goes once something else has changed.
+      emit();
     },
 
     flush() {
@@ -361,16 +392,22 @@ export function createWorkspaceSession(): WorkspaceSession {
       const back = Object.fromEntries(Object.keys(changed).map((key) => [key, opening[key as keyof SaveFields]])) as SaveFields;
       apply(back);
       edited = null;
+      editGeneration += 1;
       syncCanRevert();
       emit();
       return changed;
     },
 
-    restore(fields) {
+    canRestore,
+
+    restore(fields, since) {
+      if (!canRestore(fields, since)) return false;
       apply(fields);
-      if (binding === null) return;
       edited = mergeFields(edited, fields);
-      if (syncCanRevert()) emit();
+      editGeneration += 1;
+      syncCanRevert();
+      emit();
+      return true;
     },
 
     replace(fields) {
@@ -380,7 +417,9 @@ export function createWorkspaceSession(): WorkspaceSession {
       const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, current[key as keyof SaveFields]])) as SaveFields;
       apply(fields);
       edited = mergeFields(edited, fields);
-      if (syncCanRevert()) emit();
+      editGeneration += 1;
+      syncCanRevert();
+      emit();
       return previous;
     },
 
