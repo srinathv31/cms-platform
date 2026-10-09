@@ -4,7 +4,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult, ApproverFacts } from "@/domain/access-types";
-import { stageRecipients } from "@/domain/approval-chain";
+import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
 import { PermissionError, assertCan } from "@/domain/permissions";
 import {
   createTeam as createTeamRule,
@@ -28,6 +28,7 @@ import {
 } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
+import { loadDecisions } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
 // Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules and
@@ -275,9 +276,10 @@ async function approverFacts(tx: Tx): Promise<ApproverFacts[]> {
  * Saves the whole chain, in order. Every stage must pass the domain's `validateChain`, which the chain
  * editor also runs as the admin edits: the Approver role or a person who can approve, never one person
  * on two stages, and never the admin naming themselves (a stage another admin named them on stays
- * theirs). Every named person is checked, including people named before who have since lost access. Existing stages keep their id; versions in review keep waiting on
- * the same stage wherever it moves (their currentStage is remapped, compare-and-set). Removing a stage
- * a version waits on is refused.
+ * theirs). Every named person is checked, including people named before who have since lost access.
+ * Existing stages keep their id. Versions in review go through the stages they recorded at submit, so
+ * nothing about them is rewritten; a new rule on a stage reaches them because each stage's rule is read
+ * by id when a version reaches it. Removing a stage an in-review version still needs is refused.
  */
 export async function saveApprovalChain(input: {
   contentTypeId: string;
@@ -306,6 +308,7 @@ export async function saveApprovalChain(input: {
     const inReview = await tx
       .select({
         versionId: versions.id,
+        stages: versions.stages,
         currentStage: versions.currentStage,
         number: versions.number,
         writers: versions.writers,
@@ -322,7 +325,7 @@ export async function saveApprovalChain(input: {
       contentType: { id: type.id, name: type.name },
       current,
       next: parsed.data.stages,
-      inReview: inReview.map(({ versionId, currentStage }) => ({ versionId, currentStage })),
+      inReview: inReview.map(({ versionId, stages, currentStage }) => ({ versionId, stages, currentStage })),
       people,
       actor: actorOf(viewer),
       now: at,
@@ -338,28 +341,25 @@ export async function saveApprovalChain(input: {
       if (stage.id) await tx.update(approvalStages).set(row).where(eq(approvalStages.id, stage.id));
       else await tx.insert(approvalStages).values({ id: newId("stage"), contentTypeId: type.id, ...row });
     }
-    for (const move of outcome.moves) {
-      const [moved] = await tx
-        .update(versions)
-        .set({ currentStage: move.to })
-        .where(and(eq(versions.id, move.versionId), eq(versions.state, "in_review"), eq(versions.currentStage, move.from)))
-        .returning({ id: versions.id });
-      if (!moved) refuse("A version moved on while you were editing. Try again.");
-    }
     // A stage that now names someone else (same stage, new rule): whoever it names now is told
-    // about the versions already waiting on it, as if those had just arrived.
+    // about the versions already waiting on it, as if those had just arrived, unless they approved a
+    // stage of that version already and so can't take this one. The version's own name for the
+    // stage, as its stepper shows it.
+    const decisions = await loadDecisions(tx, inReview.map((v) => v.versionId));
     for (const v of inReview) {
-      const before = current[Math.min(Math.max(v.currentStage, 0), current.length - 1)];
+      const before = currentStageOf(v, current);
       const after = before && outcome.stages.find((s) => s.id === before.id);
       if (!before || !after || sameRule(before.rule, after.rule) || v.number === null) continue;
+      const asked = stageRecipients({ ...before, rule: after.rule }, v.writers, approvedThisRound(decisions.get(v.versionId) ?? []));
+      if (!asked) continue;
       await writeEffects(
         tx,
         [
           {
             kind: "notification",
             notification: "review_requested",
-            to: stageRecipients(after, v.writers),
-            title: `${v.templateName} v${v.number} is waiting on ${after.name}.`,
+            to: asked,
+            title: `${v.templateName} v${v.number} is waiting on ${before.name}.`,
             link: { to: "review", templateId: v.templateId, versionNumber: v.number },
           },
         ],

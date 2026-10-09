@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 6 | 25 | 12 | 43 |
+| Open | 0 | 5 | 25 | 12 | 42 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 16 | 10 | 2 | 29 |
+| Fixed | 1 | 17 | 10 | 2 | 30 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -237,7 +237,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D1 · High: Revoking the live version freezes the template for good
 
-- **Status:** Fixed. When the latest version is Revoked, Edit starts the corrected draft from its content, and contract changes compare with the newest version that still renders (`contractBaseline`), or none when nothing does ([decision 0007](decisions/0009-correct-a-revoked-version-from-its-content.md)).
+- **Status:** Fixed. When the latest version is Revoked, Edit starts the corrected draft from its content, and contract changes compare with the newest version that still renders (`contractBaseline`), or none when nothing does ([decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md)).
 - **Where:** `src/domain/lifecycle.ts` line 198; `src/domain/lifecycle.test.ts` line 203
 - **What happens:** Revoke is allowed on the Active version, the emergency case for wrong legal text. Afterwards `planDraftStart` finds the latest version revoked and refuses with "Only an Active template can be edited." Nobody can make the corrected draft. A test asserts this behavior; the demo only revokes Superseded versions, so it never shows.
 - **Fix:** Product call needed: allow a new draft from the revoked or latest released content, using the newest version that still renders as the contract baseline. Update the test.
@@ -253,7 +253,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D3 · High: Editing the approval chain mid-review stalls or skips stages
 
-- **Status:** Open
+- **Status:** Fixed. A version records its stages (ids and names) at submit and goes through them whatever the chain becomes, reading each stage's rule live by id; decisions record the stage id and the stepper matches by it; whoever approved any stage of the version still can't approve another; and a stage an in-review version still needs can't be removed ([decision 0015](decisions/0015-a-version-keeps-the-stages-it-was-submitted-with.md)).
 - **Where:** `src/domain/platform-config.ts` line 486; `src/domain/approval-chain.ts` line 68
 - **What happens:** Chain [Legal (Dana), Team]: Dana approves Legal, the chain is reordered to [Team, Legal], Jordan approves Team, the version waits on Legal again and Dana is refused as having approved an earlier stage. It's stuck for good. Adding a stage before the current one lets waiting versions skip it. The stepper reads past decisions against today's chain by position, so Jordan's old approval shows as "Legal: done by Jordan". `versions.current_stage` is a position, not a stage id.
 - **Fix:** Snapshot the chain (stage ids and names) on each version at submit and match decisions by stage id.

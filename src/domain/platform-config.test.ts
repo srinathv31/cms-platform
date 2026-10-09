@@ -282,7 +282,7 @@ describe("setChannelRule", () => {
 
 // ── Approval chains ──────────────────────────────────────────────────────────
 
-const TEAM: ApprovalStage & { id: string } = {
+const TEAM: ApprovalStage = {
   id: "stage_team",
   position: 0,
   name: "Team approver",
@@ -423,13 +423,12 @@ describe("saveApprovalChain", () => {
     });
 
   it("adds Dana Park's Legal reviewer stage after the team's approvers", () => {
-    expect(run({ inReview: [{ versionId: "v3", currentStage: 0 }] })).toEqual({
+    expect(run({ inReview: [{ versionId: "v3", stages: [{ id: "stage_team", name: "Team approver" }], currentStage: 0 }] })).toEqual({
       ok: true,
       stages: [
         { id: "stage_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
         { id: null, position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
       ],
-      moves: [],
       effects: [
         {
           kind: "audit",
@@ -446,44 +445,57 @@ describe("saveApprovalChain", () => {
               { name: "Team approver", rule: { kind: "team_role", role: "approver" } },
               { name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
             ],
-            moved: 0,
           },
         },
       ],
     });
   });
 
-  it("in-review versions keep waiting on the same stage wherever it moves", () => {
+  it("reorders and renames stages, keeping their ids; versions in review are left as they are", () => {
     const result = run({
       next: [LEGAL, { id: "stage_team", name: "Team approval", rule: TEAM.rule }],
-      inReview: [
-        { versionId: "v3", currentStage: 0 },
-        { versionId: "v9", currentStage: 4 }, // past the end: reads as the last stage
-      ],
+      inReview: [{ versionId: "v3", stages: [{ id: "stage_team", name: "Team approver" }], currentStage: 0 }],
     });
-    expect(result.ok && result.moves).toEqual([
-      { versionId: "v3", from: 0, to: 1 },
-      { versionId: "v9", from: 4, to: 1 },
-    ]);
     expect(result.ok && result.stages.map((s) => [s.id, s.name])).toEqual([
       [null, "Legal reviewer"],
       ["stage_team", "Team approval"],
     ]);
+    expect(result.ok && Object.keys(result)).toEqual(["ok", "stages", "effects"]);
   });
 
-  it("refuses to remove a stage a version waits on, and allows it once nothing does", () => {
+  describe("removing a stage", () => {
     const legal = { id: "stage_legal", position: 1, ...LEGAL };
     const current = [TEAM, legal];
     const next = [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }];
-    const waiting = [
-      { versionId: "v3", currentStage: 1 },
-      { versionId: "v4", currentStage: 1 },
+    const both = [
+      { id: "stage_team", name: "Team approver" },
+      { id: "stage_legal", name: "Legal reviewer" },
     ];
-    expect(run({ current, next, inReview: waiting })).toEqual({ ok: false, reason: "2 versions are waiting on Legal reviewer." });
-    expect(run({ current, next, inReview: [waiting[0]!] })).toEqual({ ok: false, reason: "1 version is waiting on Legal reviewer." });
-    const removed = run({ current, next, inReview: [{ versionId: "v5", currentStage: 0 }] });
-    expect(removed.ok && removed.stages.length).toBe(1);
-    expect(removed.ok && removed.moves).toEqual([]);
+
+    it("refuses while a version waits on it", () => {
+      const waiting = [
+        { versionId: "v3", stages: both, currentStage: 1 },
+        { versionId: "v4", stages: both, currentStage: 1 },
+      ];
+      expect(run({ current, next, inReview: waiting })).toEqual({ ok: false, reason: "2 versions in review still need Legal reviewer." });
+      expect(run({ current, next, inReview: [waiting[0]!] })).toEqual({ ok: false, reason: "1 version in review still needs Legal reviewer." });
+    });
+
+    it("refuses while it is ahead of a version in that version's own stages", () => {
+      // v3 waits on the Team approver stage and goes to Legal next; v4 recorded Legal first and passed it.
+      const legalFirst = [both[1]!, both[0]!];
+      expect(run({ current, next, inReview: [{ versionId: "v3", stages: both, currentStage: 0 }] })).toEqual({
+        ok: false,
+        reason: "1 version in review still needs Legal reviewer.",
+      });
+      expect(run({ current, next, inReview: [{ versionId: "v4", stages: legalFirst, currentStage: 1 }] }).ok).toBe(true);
+    });
+
+    it("allows it once no version in review needs it, whatever the chain looked like at their submit", () => {
+      const before = [{ id: "stage_team", name: "Team approver" }];
+      const removed = run({ current, next, inReview: [{ versionId: "v5", stages: before, currentStage: 0 }] });
+      expect(removed.ok && removed.stages.length).toBe(1);
+    });
   });
 
   it("refuses no stages, blank, long or duplicate names, an unknown person or role, and a stale stage id", () => {
@@ -579,7 +591,7 @@ describe("describeChainChange (the Now / After cards)", () => {
     });
     expect(change.now.map((s) => s.change)).toEqual([null, "removed"]);
     expect(change.after.map((s) => s.change)).toEqual(["renamed"]);
-    expect(change.lines).toEqual(["2 versions are waiting on Legal reviewer."]);
+    expect(change.lines).toEqual(["2 versions in review still need Legal reviewer."]);
 
     const swapped = describeChainChange({
       contentTypeName: "Disclosure",

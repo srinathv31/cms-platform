@@ -13,9 +13,10 @@
 //   - A channel turned off stops rendering at once, Active versions included: the consequence names
 //     how many. At least one channel stays on.
 //   - Approval chains: every stage must be one somebody can approve (`validateChain`): the Approver
-//     role, or a person who can approve and isn't on another stage. Nobody names themselves.
-//     In-review versions keep waiting on the same stage (by id) wherever it moves. A stage some
-//     version waits on can't be removed.
+//     role, or a person who can approve and isn't on another stage. Nobody names themselves. A
+//     version in review goes through the stages it recorded at submit, so an edit never moves it; a
+//     new rule on one of its stages reaches it. A stage some in-review version still needs (the one it
+//     waits on, or one ahead of it) can't be removed.
 
 import type {
   AccessEffect,
@@ -29,7 +30,8 @@ import type {
 } from "./access-types";
 import { ROLE_LABEL } from "./access";
 import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
-import type { ApprovalStage } from "./review-types";
+import { versionsNeeding } from "./approval-chain";
+import type { ApprovalStage, VersionStage } from "./review-types";
 import {
   CHANNELS,
   TEAM_ROLES,
@@ -107,7 +109,7 @@ export const PLATFORM_REFUSALS = {
   noActiveAccess: (person: string) => `${person} has no active access.`,
   personTwice: (person: string, stage: number) => `${person} already reviews stage ${stage}.`,
   stageWaiting: (count: number, name: string) =>
-    `${count} ${count === 1 ? "version is" : "versions are"} waiting on ${name}.`,
+    `${count} ${count === 1 ? "version" : "versions"} in review still ${count === 1 ? "needs" : "need"} ${name}.`,
 } as const;
 
 const refuse = (reason: string): Refused => ({ ok: false, reason });
@@ -401,11 +403,12 @@ type StageInput = { id?: string; name: string; rule: ApproverRule };
 /**
  * The "Now / After" consequence cards for a chain edit, before it is saved, with the lines under
  * them: who reviews what from now on, and that a named person reviews every team's submissions
- * (including teams they aren't a member of). `waiting` counts the versions waiting per stage id.
+ * (including teams they aren't a member of). `waiting` counts, per stage id, the versions in review
+ * that still need the stage (`versionsNeeding`).
  */
 export function describeChainChange(input: {
   contentTypeName: string;
-  current: readonly (ApprovalStage & { id: string })[];
+  current: readonly ApprovalStage[];
   next: readonly StageInput[];
   people: readonly Named[];
   waiting?: Readonly<Record<string, number>>;
@@ -557,23 +560,24 @@ function reviewerProblem(
 }
 
 /**
- * The whole chain, in order. Existing stages keep their id (and so every version waiting on one keeps
- * waiting on it, wherever it moves: `moves` remaps their currentStage); new ones get `id: null`.
- * Refuses a stale stage id, then the first of `validateChain`'s problems, then removing a stage a
- * version waits on. `people` holds everyone, with the facts `validateChain` checks.
+ * The whole chain, in order. Existing stages keep their id, so a new rule on a stage reaches the
+ * versions that will reach it; new ones get `id: null`. Versions in review go through the stages they
+ * recorded at submit, so no edit moves them. Refuses a stale stage id, then the first of
+ * `validateChain`'s problems, then removing a stage an in-review version still needs (the one it waits
+ * on, or one ahead of it in its own stages). `people` holds everyone, with the facts `validateChain`
+ * checks.
  */
 export function saveApprovalChain(input: {
   contentType: { id: string; name: string };
-  current: (ApprovalStage & { id: string })[];
+  current: ApprovalStage[];
   next: StageInput[];
-  inReview: { versionId: string; currentStage: number }[];
+  inReview: { versionId: string; stages: VersionStage[] | null; currentStage: number }[];
   people: ApproverFacts[];
   actor: Named;
   now: Date;
 }):
   | Ok<{
-      stages: (ApprovalStage & { id: string | null })[];
-      moves: { versionId: string; from: number; to: number }[];
+      stages: (Omit<ApprovalStage, "id"> & { id: string | null })[];
       effects: AccessEffect[];
     }>
   | Refused {
@@ -590,14 +594,10 @@ export function saveApprovalChain(input: {
   const problem = validateChain({ stages: input.next, current, actorId: input.actor.id, people })[0];
   if (problem) return refuse(problem.reason);
 
-  // Which stage each version waits on (a stage index past the end reads as the last, as on screen).
-  const waitingOn = input.inReview.map((v) => ({
-    ...v,
-    stageId: current.length ? current[Math.min(Math.max(v.currentStage, 0), current.length - 1)]!.id : null,
-  }));
+  const needing = versionsNeeding(input.inReview, current);
   for (const s of current) {
     if (ids.has(s.id)) continue;
-    const count = waitingOn.filter((v) => v.stageId === s.id).length;
+    const count = needing[s.id] ?? 0;
     if (count > 0) return refuse(PLATFORM_REFUSALS.stageWaiting(count, s.name));
   }
 
@@ -607,21 +607,15 @@ export function saveApprovalChain(input: {
     name: s.name.trim(),
     rule: s.rule.kind === "user" ? { kind: "user" as const, userId: s.rule.userId } : { kind: "team_role" as const, role: s.rule.role },
   }));
-  const moves = waitingOn.flatMap((v) => {
-    if (v.stageId === null) return [];
-    const to = stages.findIndex((s) => s.id === v.stageId);
-    return to >= 0 && to !== v.currentStage ? [{ versionId: v.versionId, from: v.currentStage, to }] : [];
-  });
 
   const change = describeChainChange({ contentTypeName: contentType.name, current, next: input.next, people });
-  if (!change.changed) return { ok: true, stages, moves: [], effects: [] };
+  if (!change.changed) return { ok: true, stages, effects: [] };
 
   const chainText = (list: { name: string; rule: ApproverRule }[]) =>
     list.map((s) => `${s.name} (${ruleLabel(s.rule, people)})`).join(" → ");
   return {
     ok: true,
     stages,
-    moves,
     effects: [
       configChanged("approval_chains", null, `Set ${contentType.name} approval chain: ${chainText(stages)}`, {
         contentTypeId: contentType.id,
@@ -629,7 +623,6 @@ export function saveApprovalChain(input: {
         before: current.map((s) => s.name),
         after: stages.map((s) => s.name),
         stages: stages.map((s) => ({ name: s.name, rule: s.rule })),
-        moved: moves.length,
       }),
     ],
   };

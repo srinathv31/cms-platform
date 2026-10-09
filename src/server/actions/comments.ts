@@ -3,6 +3,7 @@
 import { refresh, revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { currentStageOf } from "@/domain/approval-chain";
 import {
   addComment as addCommentTransition,
   canActOnThread,
@@ -16,14 +17,14 @@ import {
   type ThreadStatusResult,
 } from "@/domain/comments";
 import { REASONS } from "@/domain/permissions";
-import type { ActionResult } from "@/domain/review-types";
+import type { ActionResult, VersionStage } from "@/domain/review-types";
 import type { PermissionResult, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db, type Db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { inTransaction, writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { blockIdsOf, loadChain, stageApproverIds, waitingStage } from "@/server/queries/review-shared";
+import { blockIdsOf, loadChain, stageApproverIds } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
 // Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen. The rules
@@ -62,7 +63,7 @@ async function loadTemplate(reader: Reader, templateId: string): Promise<Comment
     .then((rows) => rows[0]);
   if (!template) return undefined;
   const list = await reader
-    .select({ number: versions.number, state: versions.state, currentStage: versions.currentStage })
+    .select({ number: versions.number, state: versions.state, stages: versions.stages, currentStage: versions.currentStage })
     .from(versions)
     .where(eq(versions.templateId, templateId))
     .orderBy(desc(versions.number));
@@ -71,15 +72,19 @@ async function loadTemplate(reader: Reader, templateId: string): Promise<Comment
     ...template,
     hasDraft: list.some((v) => v.state === "draft"),
     inReview: review
-      ? { number: review.number!, stageApproverIds: await namedOnStage(reader, template.contentTypeId, review.currentStage) }
+      ? { number: review.number!, stageApproverIds: await namedOnStage(reader, template.contentTypeId, review) }
       : null,
     highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
   };
 }
 
-/** The users the stage a version in review waits on names. */
-async function namedOnStage(reader: Reader, contentTypeId: string, currentStage: number): Promise<string[]> {
-  return stageApproverIds(waitingStage(await loadChain(reader, contentTypeId), currentStage));
+/** The users the stage a version in review waits on names: one of its own stages, with the rule it has now. */
+async function namedOnStage(
+  reader: Reader,
+  contentTypeId: string,
+  version: { stages: VersionStage[] | null; currentStage: number },
+): Promise<string[]> {
+  return stageApproverIds(currentStageOf(version, await loadChain(reader, contentTypeId)));
 }
 
 /** The version a new thread goes on, with its template and the blocks in its body. */
@@ -91,6 +96,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
       state: versions.state,
       createdBy: versions.createdBy,
       submittedBy: versions.submittedBy,
+      stages: versions.stages,
       currentStage: versions.currentStage,
       body: versions.body,
       templateId: templates.id,
@@ -110,7 +116,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
     state: row.state,
     createdBy: row.createdBy,
     submittedBy: row.submittedBy,
-    stageApproverIds: row.state === "in_review" ? await namedOnStage(reader, row.contentTypeId, row.currentStage) : [],
+    stageApproverIds: row.state === "in_review" ? await namedOnStage(reader, row.contentTypeId, row) : [],
   };
   return {
     template: { id: row.templateId, name: row.templateName, teamId: row.teamId },

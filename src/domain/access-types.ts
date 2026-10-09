@@ -7,7 +7,7 @@
 //   domain/platform-config.ts  teams, content types, channel rules, approval chains
 //   domain/audit.ts            audit sentences, action groups, filters, CSV
 
-import type { ActionResult, ApprovalStage, NotificationKind, Person } from "./review-types";
+import type { ActionResult, ApprovalStage, NotificationKind, Person, VersionStage } from "./review-types";
 import type {
   ApproverRule,
   Channel,
@@ -437,7 +437,10 @@ export interface ChainStageView {
   rule: ApproverRule;
   /** "Approver role" or the named person's name. */
   ruleLabel: string;
-  /** Versions in review waiting on this stage now (removing it is refused while > 0). */
+  /**
+   * Versions in review that still need this stage: the one they wait on, or one ahead of it in the
+   * stages they recorded at submit (`versionsNeeding`). Removing it is refused while > 0.
+   */
   waiting: number;
 }
 
@@ -649,22 +652,22 @@ export interface PlatformConfigDomain {
   /**
    * At least one stage, and every stage passes `validateChain`: names 1–40 chars, unique; the Approver
    * role or a person who can approve, never on two stages, and never the actor naming themselves (a
-   * stage that already named them stays theirs). A stage some in-review
-   * version waits on can't be removed ("2 versions are waiting on Legal reviewer."). In-review
-   * versions keep waiting on the same stage (by id) wherever it moves: `moves` remaps currentStage.
+   * stage that already named them stays theirs). A stage some in-review version still needs, the one
+   * it waits on or one ahead of it in its own stages, can't be removed ("2 versions in review still
+   * need Legal reviewer."). In-review versions go through the stages they recorded at submit, so an
+   * edit never moves them.
    */
   saveApprovalChain(input: {
     contentType: { id: string; name: string };
-    current: (ApprovalStage & { id: string })[];
+    current: ApprovalStage[];
     next: { id?: string; name: string; rule: ApproverRule }[];
-    inReview: { versionId: string; currentStage: number }[];
+    inReview: { versionId: string; stages: VersionStage[] | null; currentStage: number }[];
     people: ApproverFacts[];
     actor: Named;
     now: Date;
   }): Ok<{
     /** In order, positions 0..n-1. id null = a new stage (the server assigns the id). */
-    stages: (ApprovalStage & { id: string | null })[];
-    moves: { versionId: string; from: number; to: number }[];
+    stages: (Omit<ApprovalStage, "id"> & { id: string | null })[];
     effects: AccessEffect[];
   }> | Refused;
 }

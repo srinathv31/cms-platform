@@ -21,7 +21,15 @@
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
 import { usageFromJSON } from "@/editor/model/usage";
-import { orderedStages, stageAt, stageRecipients } from "./approval-chain";
+import {
+  approvedThisRound,
+  currentStageOf,
+  ownStages,
+  recordStages,
+  stageOf,
+  stageRecipients,
+  type RecordedDecision,
+} from "./approval-chain";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { formatLongDate } from "./render/errors";
@@ -31,6 +39,7 @@ import {
   type LifecycleEffect,
   type NotificationEffect,
   type Recipients,
+  type VersionStage,
 } from "./review-types";
 import type {
   Channel,
@@ -302,7 +311,12 @@ export interface SubmitChanges {
   writers: string[];
   /** The author's note to reviewers, trimmed; null when there is none. */
   submitNote: string | null;
-  /** The approval chain starts at its first stage. */
+  /**
+   * The stages this version goes through, recorded now from the chain: by id and name, in order. Later
+   * chain edits don't change them; each stage's rule is read from the chain when the version reaches it.
+   */
+  stages: VersionStage[];
+  /** The version starts at the first of its stages. */
   currentStage: 0;
   /** How the variable list differs from the baseline's (`contractBaseline`); null when there is no baseline. */
   contractChanges: ContractChange[] | null;
@@ -331,16 +345,16 @@ export interface SubmitInput {
   /** The optional note to reviewers. */
   note?: string | null;
   /**
-   * The content type's approval chain. Its first stage's rule says who is asked to review; without
-   * it, the team's approvers are (the Release 1 chain, "Team approver").
+   * The content type's approval chain, never empty (the server falls back to Release 1's "Team
+   * approver"). The version records its stages, and its first stage's rule says who is asked to review.
    */
-  chain?: readonly ApprovalStage[];
+  chain: readonly ApprovalStage[];
 }
 
 /**
  * Draft → In review, as the template's next version: a version number, the contract changes, the note,
- * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone
- * who wrote it, the submitter included).
+ * the stages it will go through (the chain as it is now), an audit event, and a `review_requested`
+ * notification to the first stage's approvers (never anyone who wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
@@ -375,7 +389,8 @@ export function submit(input: SubmitInput): SubmitResult {
   const number = highestNumber + 1;
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
   const submitNote = trimmed(input.note);
-  const firstStage = input.chain ? stageAt(input.chain, 0) : null;
+  const stages = recordStages(input.chain);
+  const firstStage = stageOf(stages, 0, input.chain);
   const writers = withWriter(draft.writers, submittedBy);
 
   return {
@@ -387,6 +402,7 @@ export function submit(input: SubmitInput): SubmitResult {
       submittedAt: now,
       writers,
       submitNote,
+      stages,
       currentStage: 0,
       contractChanges,
     },
@@ -403,7 +419,8 @@ export function submit(input: SubmitInput): SubmitResult {
       },
       notify({
         notification: "review_requested",
-        to: firstStage ? stageRecipients(firstStage, writers) : teamApproversExcept(...writers),
+        // Nobody has approved anything yet, so the first stage always has someone to ask.
+        to: (firstStage && stageRecipients(firstStage, writers)) || teamApproversExcept(...writers),
         title: `${input.submitterName} submitted ${input.templateName} v${number} for review.`,
         body: submitNote,
         link: { to: "review", templateId: input.templateId, versionNumber: number },
@@ -467,7 +484,9 @@ export interface ReviewVersion extends VersionSnapshot {
   submittedBy: string | null;
   /** Everyone who wrote it, the submitter included (`DraftFields.writers`): none of them may decide it. */
   writers: readonly string[];
-  /** Index into the approval chain (in position order). */
+  /** The stages it goes through, recorded at submit (`SubmitChanges.stages`); null only for a draft. */
+  stages: readonly VersionStage[] | null;
+  /** A position in its own `stages`. */
   currentStage: number;
   contractChanges: readonly ContractChange[] | null;
   sunsetAt: Date | null;
@@ -477,6 +496,9 @@ export interface ReviewVersion extends VersionSnapshot {
 /** A row for the `approvals` table (the id is assigned by the caller). Records what the approver saw. */
 export interface ApprovalRecord {
   versionId: string;
+  /** The chain stage decided (`approval_stages.id`): decisions are read back by it. */
+  stageId: string;
+  /** Its position in the version's own stages, and its name as the version recorded it. */
   stagePosition: number;
   stageName: string;
   actorId: string;
@@ -525,7 +547,7 @@ export function requestChanges(input: {
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
   const wrote = makerCheckerRefusal(actorId, version);
   if (wrote) return refuse(wrote);
-  const stage = stageAt(input.chain, version.currentStage);
+  const stage = currentStageOf(version, input.chain);
   if (!stage) return refuse(REFUSALS.stageMissing);
   const reason = trimmed(input.reason);
   if (!reason) return refuse(REFUSALS.giveReason);
@@ -555,6 +577,7 @@ export function requestChanges(input: {
     changes: { state: "changes_requested" },
     approval: {
       versionId: version.id,
+      stageId: stage.id,
       stagePosition: stage.position,
       stageName: stage.name,
       actorId,
@@ -573,9 +596,9 @@ export function requestChanges(input: {
 // ── Approve ───────────────────────────────────────────────────
 
 export interface ApproveChanges {
-  /** "active" when this was the chain's last stage; otherwise the version stays in review. */
+  /** "active" when this was the last of the version's own stages; otherwise the version stays in review. */
   state: "in_review" | "active";
-  /** The next stage's index; unchanged at the last stage (it records the stage that decided). */
+  /** The next stage's position in its own stages; unchanged at the last stage (it records the stage that decided). */
   currentStage: number;
   activatedAt: Date | null;
 }
@@ -600,15 +623,18 @@ export interface Approved {
 export type ApproveResult = Outcome<Approved>;
 
 /**
- * Approve the stage the version is waiting on. At an earlier stage the version moves to the next one;
- * at the last stage it goes live: Active, and the previous Active becomes Superseded (pinned consumers
- * keep rendering it), with an optional sunset date for it in the same step.
+ * Approve the stage the version is waiting on. The version goes through its own stages (recorded at
+ * submit), whatever the chain looks like now: at an earlier one it moves to the next; at its last it
+ * goes live: Active, and the previous Active becomes Superseded (pinned consumers keep rendering it),
+ * with an optional sunset date for it in the same step. Each stage's rule is the one its chain stage
+ * has now (`stageOf`).
  *
  * The caller checks who may act on the stage (`canActOnStage`); this refuses anyone who wrote the
- * version (maker-checker: its `writers` and submitter), a version no longer in review, a missing stage,
- * someone who already approved an earlier stage of this round (`approvedBy`: two stages need two
- * people), and a sunset date that isn't after today. `sampleSetsSeen` records which sample sets the
- * approver previewed.
+ * version (maker-checker: its `writers` and submitter), a version no longer in review, someone who
+ * already approved a stage of it (`approvedThisRound`: two stages need two people), a stage missing
+ * from the chain, and a sunset date that isn't after today. The next stage's "review requested" goes
+ * to nobody who approved a stage of it, this approver included. `sampleSetsSeen` records which sample
+ * sets the approver previewed.
  */
 export function approve(input: {
   version: ReviewVersion;
@@ -625,26 +651,31 @@ export function approve(input: {
   sampleSetsSeen: readonly string[];
   templateName: string;
   /**
-   * Who approved a stage of this version already (its `approved` decisions; a version is reviewed in
-   * one round, since a change request sends the next one in as a new number).
+   * The version's decisions so far (its approvals rows). A version is reviewed in one round, since a
+   * change request sends the next one in as a new number.
    */
-  approvedBy?: readonly string[];
+  decisions?: readonly RecordedDecision[];
 }): ApproveResult {
   const { version, chain, actorId, actorName, now, active, sunsetPrevious, templateName } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
   const wrote = makerCheckerRefusal(actorId, version);
   if (wrote) return refuse(wrote);
-  if (input.approvedBy?.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
-  const stages = orderedStages(chain);
+  const approved = approvedThisRound(input.decisions ?? []);
+  if (approved.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
+  const stages = ownStages(version.stages, chain);
   const index = version.currentStage;
-  const stage = stages[index];
+  const stage = stageOf(stages, index, chain);
   if (!stage) return refuse(REFUSALS.stageMissing);
+  const isLast = index === stages.length - 1;
+  const next = isLast ? null : stageOf(stages, index + 1, chain);
+  if (!isLast && !next) return refuse(REFUSALS.stageMissing);
   if (sunsetPrevious && !isAfterToday(sunsetPrevious, now)) return refuse(REFUSALS.sunsetAfterToday);
 
   const number = numberOf(version);
   const approval: ApprovalRecord = {
     versionId: version.id,
+    stageId: stage.id,
     stagePosition: stage.position,
     stageName: stage.name,
     actorId,
@@ -656,7 +687,6 @@ export function approve(input: {
   const review = { to: "review", templateId: version.templateId, versionNumber: number } as const;
 
   // ── An earlier stage: on to the next one ──
-  const next = stages[index + 1];
   if (next) {
     const effects: LifecycleEffect[] = [
       {
@@ -664,13 +694,19 @@ export function approve(input: {
         action: "version.stage_approved",
         details: { number, stage: stage.name, stagePosition: stage.position, next: next.name },
       },
-      notify({
-        notification: "review_requested",
-        to: stageRecipients(next, version.writers),
-        title: `${templateName} v${number} is waiting on ${next.name}.`,
-        link: review,
-      }),
     ];
+    // Not anyone who has approved a stage of this round, this approver included: they can't take this one.
+    const asked = stageRecipients(next, version.writers, [...approved, actorId]);
+    if (asked) {
+      effects.push(
+        notify({
+          notification: "review_requested",
+          to: asked,
+          title: `${templateName} v${number} is waiting on ${next.name}.`,
+          link: review,
+        }),
+      );
+    }
     if (version.submittedBy) {
       effects.push(
         notify({

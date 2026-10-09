@@ -324,7 +324,7 @@ describe("a stage reviewer from another team", () => {
   const ON_DRAFT = "th_test_draft_only";
   const ON_V3 = "th_test_on_v3";
   const ON_V2 = "th_test_on_v2";
-  let v3Stage = 0;
+  let v3Stages: { stages: typeof versions.$inferSelect.stages; currentStage: number } = { stages: null, currentStage: 0 };
 
   beforeAll(async () => {
     await db.insert(approvalStages).values({
@@ -334,9 +334,11 @@ describe("a stage reviewer from another team", () => {
       name: "Legal reviewer",
       approverRule: { kind: "user", userId: "naomi" },
     });
+    // As if v3 had been submitted under the two-stage chain and passed its first stage.
     const v3 = await versionOf("cash-back", 3);
-    v3Stage = v3.currentStage;
-    await db.update(versions).set({ currentStage: 1 }).where(eq(versions.id, v3.id));
+    v3Stages = { stages: v3.stages, currentStage: v3.currentStage };
+    const twoStages = [...(v3.stages ?? []), { id: "stage_test_outside", name: "Legal reviewer" }];
+    await db.update(versions).set({ stages: twoStages, currentStage: 1 }).where(eq(versions.id, v3.id));
     await openDraftOf("cash-back", "maya", DRAFT);
     const v2 = await versionOf("cash-back", 2);
     const threads = [
@@ -354,7 +356,7 @@ describe("a stage reviewer from another team", () => {
 
   afterAll(async () => {
     await remove([ON_DRAFT, ON_V3, ON_V2], DRAFT);
-    await db.update(versions).set({ currentStage: v3Stage }).where(eq(versions.id, (await versionOf("cash-back", 3)).id));
+    await db.update(versions).set(v3Stages).where(eq(versions.id, (await versionOf("cash-back", 3)).id));
     await db.delete(approvalStages).where(eq(approvalStages.id, "stage_test_outside"));
   });
 

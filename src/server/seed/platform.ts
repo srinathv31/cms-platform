@@ -5,6 +5,9 @@ import { REQUIRED_SECTIONS } from "./content";
 export const CONTENT_TYPE_ID = "ct_disclosure";
 export const CHANNELS_ALL: Channel[] = ["pdf", "web", "email"];
 
+/** The Disclosure chain's one stage, which every seeded version records (`versions.stages`) and was decided at. */
+export const TEAM_STAGE = { id: "stage_disclosure_0", name: "Team approver" } as const;
+
 export const CONSUMER_IDS = ["coral", "deposits-online"] as const;
 export type ConsumerId = (typeof CONSUMER_IDS)[number];
 
@@ -19,10 +22,10 @@ export function seedPlatform(ctx: SeedCtx) {
 
   // Release 1 has a single stage. The chain is configuration, so Riley can grow it live.
   ctx.sink.approvalStages.push({
-    id: "stage_disclosure_0",
+    id: TEAM_STAGE.id,
     contentTypeId: CONTENT_TYPE_ID,
     position: 0,
-    name: "Team approver",
+    name: TEAM_STAGE.name,
     approverRule: { kind: "team_role", role: "approver" },
   });
 

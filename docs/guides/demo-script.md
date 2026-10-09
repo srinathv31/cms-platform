@@ -2,7 +2,7 @@
 
 A guided walkthrough for people seeing Stencil for the first time. It follows one disclosure from a blank page to customers' inboxes, through a safe change and an emergency stop, then shows how the platform is governed.
 
-- **8 acts, 46 steps, about 50 minutes** (a 20-minute cut is in [Timing, cuts and rules](#timing-cuts-and-rules)).
+- **8 acts, 47 steps, about 52 minutes** (a 20-minute cut is in [Timing, cuts and rules](#timing-cuts-and-rules)).
 - **Verified:** every step was run end to end, in this order, from a fresh `npm run db:reset` against a production build of `main` @ 9a8bc38 on October 7, 2026. Dates in the app depend on the day you run it, so the steps use relative dates.
 - **Screenshots** of each act's key moments are on the [published version of this script](https://claude.ai/artifact/VqfoD2z9CuMw1RBnHc4BsU). That page is private until it's shared from its Share menu.
 
@@ -63,8 +63,8 @@ Stencil is one controlled place to author, approve and publish customer content.
 
 ### Five rules that keep the run working
 
-- Leave **Cash Back Welcome Bonus v3** alone until Act 7; it's the two-stage approval at the end.
-- Add the **Legal reviewer** stage only in Act 7, after Spring Travel's approvals. Once added, it gates every Disclosure approval.
+- Leave **Cash Back Welcome Bonus v3** alone until Act 7; its next version, v4, is the two-stage approval at the end.
+- Add the **Legal reviewer** stage only in Act 7, after Spring Travel's approvals. Once added, it gates every Disclosure version submitted after it.
 - In Act 5, pick a sunset **14 days out or less**. The default (30) breaks the +15-day step.
 - Do Sam's step and the recertification **Keeps** before advancing the clock in Act 7.
 - The clock moves twice: **+15 days** in Act 5 and **+16 days** in Act 7. If you skip Act 5, advance **31** in Act 7.
@@ -95,7 +95,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 | 4 · Customers receive it | 6 | One approved template serves every channel, and no customer data is kept. | R4, R16, R18, R30, R31, R32 |
 | 5 · Change it safely | 8 | Changes never surprise downstream systems, and a bad version can be stopped at once, by two people. | R5, R20, R32, R34 |
 | 6 · Governance | 3 | Every action is on record and exportable for compliance. | R6, R18, R27 |
-| 7 · Access and admin | 9 | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29 |
+| 7 · Access and admin | 11 | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29 |
 | 8 · Accelerators | 5 | Existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced. | R8, R11 |
 
 ## Act 1 — Orientation
@@ -237,7 +237,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 7 — Access and admin
 
-*About 9 minutes · Priya, Sam, Morgan, Alex, Riley, Jordan and Dana · changes data · moves the clock +16 days*
+*About 11 minutes · Priya, Sam, Morgan, Alex, Riley, Jordan, Maya and Dana · changes data · moves the clock +16 days*
 
 **Goal:** access is self-service but governed, and rules and approval chains are settings, not software releases.
 
@@ -263,10 +263,14 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    - In **Approval chains → Add stage**: name `Legal reviewer`, reviewer **Dana Park · Coral Offers**, then **Add Legal reviewer stage**. Close Settings.
    - **They see:** "4 Active Disclosure versions stop rendering to Email…" before committing, and Now/After cards: "Dana Park will review Disclosure submissions from every team…"
    - **Say:** "Channel rules and approval chains are settings. Adding a Legal step doesn't need a software release."
-9. **Do:** Switch to **Jordan**. **Review → Cash Back Welcome Bonus — Terms v3** ("Stage 1 of 2") → **Approve** → **Approve v3**.
-   - **They see:** "v3 moves to Legal reviewer… isn't Active until the last stage approves."
-10. **Do:** Switch to **Dana Park**. **Review → Cash Back v3** ("Stage 2 of 2") → **Approve v3**.
-    - **They see:** the go-live moment, and v3 Active.
+9. **Do:** Switch to **Jordan**. **Review → Cash Back Welcome Bonus — Terms v3** → **Approve** → **Approve v3**.
+   - **They see:** one stage on the stepper, then the go-live moment: v3 was submitted before the Legal stage existed.
+   - **Say:** "A version keeps the approval steps it was submitted with. Changing the chain never moves work that's already in review."
+10. **Do:** Switch to **Maya**. Open **Cash Back Welcome Bonus — Terms** → **Edit** → **Submit for review** → **Submit v4**.
+11. **Do:** Switch to **Jordan**. **Review → Cash Back v4** ("Stage 1 of 2") → **Approve** → **Approve v4**.
+    - **They see:** "v4 moves to Legal reviewer… isn't Active until the last stage approves."
+12. **Do:** Switch to **Dana Park**. **Review → Cash Back v4** ("Stage 2 of 2") → **Approve v4**.
+    - **They see:** the go-live moment, and v4 Active.
     - **Say:** "A two-stage approval, configured a minute ago, already enforced."
 
 ## Act 8 — Accelerators and reset
@@ -347,7 +351,7 @@ Every requirement from the Discovery Brief (DB) and the Build Plan (BP), in thei
 | R19 | Batch rendering; PDF throughput (DB · Rendering; Timeline and risks) | Out of the prototype's scope | Roadmap | Not built |
 | R20 | Pin, sunset, and a revoke that needs a reason and two people (DB · Versioning and lifecycle) | Consumers stay pinned; a sunset date set in the Approve dialog; a two-person revoke | Versions (Jordan, Alex); simulator, Act 5 | Covered |
 | R21 | Retention, review-by dates, tamper evidence (DB · Versioning and lifecycle) | For production | Roadmap | Not built |
-| R22 | Approval chain as configuration (DB · Controls and approvals) | A chain editor; a Legal stage added live. Reordering stages is still rough | Settings (Riley), Act 7 | Covered |
+| R22 | Approval chain as configuration (DB · Controls and approvals) | A chain editor; a Legal stage added live. Versions already in review keep the stages they were submitted with | Settings (Riley), Act 7 | Covered |
 | R23 | Side-by-side redline; comments pinned to blocks (DB · Controls and approvals) | Redline with "Changes only"; comments in the margin | Review (Jordan), Acts 3 and 5 | Covered |
 | R24 | Optional approval on the consumer's side (DB · Controls and approvals) | Not built | Roadmap | Not built |
 | R25 | State-specific language (DB · State- and regulation-specific language) | Parked; there's only a US-state variable type | Roadmap | Not built |
@@ -389,7 +393,7 @@ Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scop
 
 ## Timing, cuts and rules
 
-- **Full run, about 50 minutes:** Act 1 (3) · Act 2 (6) · Act 3 (6) · Act 4 (6) · Act 5 (8) · Act 6 (3) · Act 7 (9) · Act 8 (5), plus a few minutes for the story and closing.
+- **Full run, about 52 minutes:** Act 1 (3) · Act 2 (6) · Act 3 (6) · Act 4 (6) · Act 5 (8) · Act 6 (3) · Act 7 (11) · Act 8 (5), plus a few minutes for the story and closing.
 - **The 20-minute cut:** tell the story, then Acts 2 and 3, Act 4 steps 1–3, and Act 5 steps 1–5. Close with the roadmap and reset. This covers authoring, maker-checker, delivery and safe change.
 - **Independent pieces:** Acts 1 and 8 work on their own, as Maya, at any point.
 
@@ -397,7 +401,7 @@ Order rules:
 
 - Each act builds on the last. Run them in order from a fresh reset.
 - Leave Cash Back v3 for Act 7.
-- Add the Legal reviewer stage last; it gates later Disclosure approvals.
+- Add the Legal reviewer stage last; it gates Disclosure versions submitted after it.
 - Sunset v2 at most 14 days out.
 - Sam's step and the recertification Keeps come before the +16-day jump.
 - Skipped Act 5? Advance 31 days in Act 7 instead of 16.

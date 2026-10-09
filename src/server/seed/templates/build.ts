@@ -6,12 +6,12 @@ import {
   topLevelIds,
   variableKeys,
 } from "../content";
-import { CONTENT_TYPE_ID } from "../platform";
+import { CONTENT_TYPE_ID, TEAM_STAGE } from "../platform";
 import { int } from "../rng";
 import { userName } from "../people";
 import type { SeedTemplate, SeedVersion } from "./types";
 
-const STAGE_NAME = "Team approver";
+const STAGE_NAME = TEAM_STAGE.name;
 
 /** Fails the reset early if a seeded body breaks the contract (cheaper than finding it in the UI). */
 function check(spec: SeedTemplate, v: SeedVersion) {
@@ -156,6 +156,8 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       variables: v.variables,
       sampleSets: ctx.vars.sampleSets(v.variables),
       contractChanges: v.contractChanges ?? null,
+      // Every submitted version went through the one-stage chain the seed configures.
+      stages: isDraft ? null : [{ id: TEAM_STAGE.id, name: TEAM_STAGE.name }],
       currentStage: 0,
       rev: v.rev ?? (isDraft ? int(ctx.rng, 12, 40) : int(ctx.rng, 40, 190)),
       createdBy: v.createdBy,
@@ -219,6 +221,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       sink.approvals.push({
         id: ctx.id("ap"),
         versionId: info.id,
+        stageId: TEAM_STAGE.id,
         stagePosition: 0,
         stageName: STAGE_NAME,
         actorId: a.actor,

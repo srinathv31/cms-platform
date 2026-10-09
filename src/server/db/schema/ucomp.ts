@@ -26,6 +26,7 @@ import type {
   VariableValues,
   VersionState,
 } from "@/domain/types";
+import type { VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
 const json = <T>(name: string) => text(name, { mode: "json" }).$type<T>();
@@ -142,6 +143,11 @@ export const versions = sqliteTable(
     variables: json<Variable[]>("variables").notNull(),
     sampleSets: json<SampleSet[]>("sample_sets").notNull(),
     contractChanges: json<ContractChange[]>("contract_changes"),
+    // The approval stages this version goes through, recorded at submit from its content type's chain:
+    // [{ id, name }] in order. Chain edits never change it; each stage's rule is read from
+    // approval_stages by id. Null while a draft.
+    stages: json<VersionStage[]>("stages"),
+    // A position in `stages`: the stage the version waits on, or the one that decided it last.
     currentStage: integer("current_stage").notNull().default(0),
     rev: integer("rev").notNull().default(0), // autosave ordering
     createdBy: text("created_by").notNull().references(() => users.id),
@@ -179,6 +185,10 @@ export const approvals = sqliteTable("approvals", {
   versionId: text("version_id")
     .notNull()
     .references(() => versions.id),
+  // The approval_stages id decided (no foreign key: a stage behind every version may be removed). Null
+  // only for a decision from before the column whose position matched no stage of the chain then.
+  stageId: text("stage_id"),
+  // The stage's position in the version's own `stages`, and its name there.
   stagePosition: integer("stage_position").notNull(),
   stageName: text("stage_name").notNull(),
   actorId: text("actor_id").notNull().references(() => users.id),

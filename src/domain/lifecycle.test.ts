@@ -27,7 +27,7 @@ import {
   type VersionSnapshot,
 } from "./lifecycle";
 import { REASONS } from "./permissions";
-import type { ApprovalStage, Recipients } from "./review-types";
+import type { ApprovalStage, Recipients, VersionStage } from "./review-types";
 import {
   VERSION_STATES,
   type ContractChange,
@@ -40,7 +40,7 @@ import {
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 const TEMPLATE = { id: "UC-4F7K2Q", name: "Spring Travel Rewards — Terms" };
-const CHAIN_1: ApprovalStage[] = [{ position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }];
+const CHAIN_1: ApprovalStage[] = [{ id: "st_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }];
 
 const heading = (id: string, requiredKey: string, text: string): JSONContent => ({
   type: "heading",
@@ -400,7 +400,7 @@ describe("submit", () => {
       templateId: TEMPLATE.id,
       templateName: TEMPLATE.name,
       note: extra.note,
-      chain: extra.chain,
+      chain: extra.chain ?? CHAIN_1,
     });
 
   const reviewRequested = (number: number, extra: { body?: string; to?: Recipients } = {}) => ({
@@ -433,6 +433,7 @@ describe("submit", () => {
         submittedAt: NOW,
         writers: ["maya"],
         submitNote: null,
+        stages: [{ id: "st_team", name: "Team approver" }],
         currentStage: 0,
         contractChanges: null,
       },
@@ -466,22 +467,24 @@ describe("submit", () => {
     expect(result.ok && result.effects.filter((e) => e.kind === "notification")).toEqual([reviewRequested(1)]);
   });
 
-  it("asks nobody who wrote the draft, with or without a chain", () => {
+  it("asks nobody who wrote the draft", () => {
     const allWriters: Recipients = { kind: "team_role", role: "approver", exceptUserIds: ["priya", "maya"] };
     expect(run({ writers: ["priya"] })).toMatchObject({ effects: [submitted(1), reviewRequested(1, { to: allWriters })] });
-    expect(run({ writers: ["priya"] }, { chain: CHAIN_1 })).toMatchObject({
-      effects: [submitted(1), reviewRequested(1, { to: allWriters })],
-    });
   });
 
-  it("asks whoever the chain's first stage names, when the chain is given", () => {
+  it("records the chain's stages in order, and asks whoever its first stage names", () => {
     const legalFirst: ApprovalStage[] = [
-      { position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
-      { position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+      { id: "st_team", position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+      { id: "st_legal", position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
     ];
-    expect(run({}, { chain: legalFirst })).toMatchObject({
+    const result = run({}, { chain: legalFirst });
+    expect(result).toMatchObject({
       effects: [submitted(1), reviewRequested(1, { to: { kind: "user", userId: "dana" } })],
     });
+    expect(result.ok && result.changes.stages).toEqual([
+      { id: "st_legal", name: "Legal reviewer" },
+      { id: "st_team", name: "Team approver" },
+    ]);
     expect(run({}, { chain: CHAIN_1 })).toMatchObject({ effects: [submitted(1), reviewRequested(1)] });
   });
 
@@ -643,8 +646,11 @@ describe("submit", () => {
 
 const CHAIN_2: ApprovalStage[] = [
   ...CHAIN_1,
-  { position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+  { id: "st_legal", position: 1, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
 ];
+/** What a version submitted under each chain recorded. */
+const STAGES_1: VersionStage[] = [{ id: "st_team", name: "Team approver" }];
+const STAGES_2: VersionStage[] = [...STAGES_1, { id: "st_legal", name: "Legal reviewer" }];
 const TOMORROW = new Date("2026-10-05T00:00:00.000Z");
 const MARCH_1 = new Date("2027-03-01T00:00:00.000Z");
 const REASON = "The APR in Rates and fees doesn't match the offer sheet.";
@@ -679,6 +685,7 @@ function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
     sampleSets: SAMPLE_SETS,
     submittedBy: "maya",
     writers: ["maya"],
+    stages: null,
     currentStage: 0,
     contractChanges: null,
     sunsetAt: null,
@@ -805,6 +812,7 @@ describe("requestChanges", () => {
       changes: { state: "changes_requested" },
       approval: {
         versionId: "v_1",
+        stageId: "st_team",
         stagePosition: 0,
         stageName: "Team approver",
         actorId: "jordan",
@@ -914,6 +922,16 @@ describe("requestChanges", () => {
     });
   });
 
+  it("records the stage of the version's own that sent it back, by id, after the chain was reordered and renamed", () => {
+    const edited: ApprovalStage[] = [
+      { ...CHAIN_2[1]!, position: 0, name: "Legal sign-off" },
+      { ...CHAIN_2[0]!, position: 1 },
+    ];
+    const version = reviewVersion({ stages: STAGES_2, currentStage: 1 });
+    const result = run({ version, chain: edited, actorId: "dana", actorName: "Dana Park" });
+    expect(result.ok && result.approval).toMatchObject({ stageId: "st_legal", stagePosition: 1, stageName: "Legal reviewer" });
+  });
+
   it("refuses when the chain has no stage for the version", () => {
     expect(run({ chain: [] })).toEqual({ ok: false, reason: "This version's approval stage no longer exists." });
     expect(run({ version: reviewVersion({ currentStage: 1 }) })).toEqual({
@@ -977,6 +995,7 @@ describe("approve", () => {
       changes: { state: "active", currentStage: 0, activatedAt: NOW },
       approval: {
         versionId: "v_2",
+        stageId: "st_team",
         stagePosition: 0,
         stageName: "Team approver",
         actorId: "jordan",
@@ -1081,6 +1100,7 @@ describe("approve", () => {
         changes: { state: "in_review", currentStage: 1, activatedAt: null },
         approval: {
           versionId: "v_2",
+          stageId: "st_team",
           stagePosition: 0,
           stageName: "Team approver",
           actorId: "jordan",
@@ -1136,38 +1156,116 @@ describe("approve", () => {
       expect(result.ok && result.changes.currentStage).toBe(1);
     });
 
-    it("asks a team-role stage's approvers, never the submitter", () => {
+    it("asks a team-role stage's approvers, never the submitter or whoever approved a stage of this round", () => {
       const teamSecond: ApprovalStage[] = [
-        { position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
-        { position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+        { id: "st_legal", position: 0, name: "Legal reviewer", rule: { kind: "user", userId: "dana" } },
+        { id: "st_team", position: 1, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
       ];
       const result = run({ chain: teamSecond, actorId: "dana", actorName: "Dana Park" });
       expect(result.ok && result.effects[1]).toMatchObject({
         notification: "review_requested",
-        to: APPROVERS_BUT("maya"),
+        to: { kind: "team_role", role: "approver", exceptUserIds: ["maya", "dana"] },
         title: "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
       });
 
       const coWritten = run({ chain: teamSecond, version: { ...v2, writers: ["priya", "maya"] }, actorId: "dana", actorName: "Dana Park" });
       expect(coWritten.ok && coWritten.effects[1]).toMatchObject({
         notification: "review_requested",
-        to: { kind: "team_role", role: "approver", exceptUserIds: ["priya", "maya"] },
+        to: { kind: "team_role", role: "approver", exceptUserIds: ["priya", "maya", "dana"] },
       });
+    });
+
+    it("asks nobody when the next stage names someone who already approved a stage of this round", () => {
+      // Three stages, Jordan named on the third; he approved the first (rules swapped since, say).
+      const three: ApprovalStage[] = [
+        ...CHAIN_2,
+        { id: "st_final", position: 2, name: "Final sign-off", rule: { kind: "user", userId: "jordan" } },
+      ];
+      const version = { ...v2, currentStage: 1 };
+      const result = run({
+        chain: three,
+        version,
+        actorId: "dana",
+        actorName: "Dana Park",
+        decisions: [{ stageId: "st_team", actorId: "jordan", decision: "approved" }],
+      });
+      expect(result.ok && result.changes.currentStage).toBe(2);
+      expect(result.ok && result.effects.filter((e) => e.kind === "notification").map((e) => e.notification)).toEqual(["stage_approved"]);
     });
 
     it("refuses someone who approved an earlier stage of the same round", () => {
       const second = { ...v2, currentStage: 1 };
       const twoTeamStages: ApprovalStage[] = [
-        { position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
-        { position: 1, name: "Second approver", rule: { kind: "team_role", role: "approver" } },
+        { id: "st_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+        { id: "st_second", position: 1, name: "Second approver", rule: { kind: "team_role", role: "approver" } },
       ];
-      expect(run({ chain: twoTeamStages, version: second, approvedBy: ["jordan"] })).toEqual({
+      const approvedTeam = (actorId: string) => [{ stageId: "st_team", actorId, decision: "approved" as const }];
+      expect(run({ chain: twoTeamStages, version: second, decisions: approvedTeam("jordan") })).toEqual({
         ok: false,
         reason: "You approved an earlier stage.",
       });
       expect(REFUSALS.approvedEarlierStage).toBe("You approved an earlier stage.");
-      expect(run({ chain: twoTeamStages, version: second, approvedBy: ["alex"] }).ok).toBe(true);
-      expect(run({ chain: twoTeamStages, version: second, approvedBy: [] }).ok).toBe(true);
+      expect(run({ chain: twoTeamStages, version: second, decisions: approvedTeam("alex") }).ok).toBe(true);
+      expect(run({ chain: twoTeamStages, version: second, decisions: [] }).ok).toBe(true);
+    });
+  });
+
+  // Finding D3: the version goes through the stages it recorded at submit, whatever the chain becomes.
+  describe("after the chain is edited mid-review", () => {
+    const DANA_APPROVED_LEGAL = [{ stageId: "st_legal", actorId: "dana", decision: "approved" as const }];
+    const LEGAL_FIRST: VersionStage[] = [STAGES_2[1]!, STAGES_2[0]!];
+
+    it("a reorder doesn't send it back to a stage it passed: Jordan's Team approval makes it Active", () => {
+      // Submitted under [Legal, Team]; Dana approved Legal; the chain is now [Team, Legal].
+      const version = { ...v2, stages: LEGAL_FIRST, currentStage: 1 };
+      const result = run({ chain: CHAIN_2, version, decisions: DANA_APPROVED_LEGAL });
+      expect(result.ok && result.changes).toEqual({ state: "active", currentStage: 1, activatedAt: NOW });
+      expect(result.ok && result.approval).toMatchObject({ stageId: "st_team", stagePosition: 1, stageName: "Team approver" });
+    });
+
+    it("an inserted stage isn't added to it, and it still waits on the stage it was at", () => {
+      const compliance: ApprovalStage = { id: "st_comp", position: 0, name: "Compliance", rule: { kind: "user", userId: "naomi" } };
+      const inserted = [compliance, ...CHAIN_2.map((s) => ({ ...s, position: s.position + 1 }))];
+      const atTeam = run({ chain: inserted, version: { ...v2, stages: STAGES_2, currentStage: 0 } });
+      expect(atTeam.ok && atTeam.changes).toEqual({ state: "in_review", currentStage: 1, activatedAt: null });
+      expect(atTeam.ok && atTeam.effects[0]).toMatchObject({ details: { stage: "Team approver", next: "Legal reviewer" } });
+
+      const atLegal = run({ chain: inserted, version: { ...v2, stages: STAGES_2, currentStage: 1 }, actorId: "dana", actorName: "Dana Park" });
+      expect(atLegal.ok && atLegal.wentLive).toBe(true);
+      expect(atLegal.ok && atLegal.approval).toMatchObject({ stageId: "st_legal", stageName: "Legal reviewer" });
+    });
+
+    it("a stage's new rule reaches it: the stage's own name, whoever the chain names now", () => {
+      const naomiOnLegal = CHAIN_2.map((s) => (s.id === "st_legal" ? { ...s, name: "Legal sign-off", rule: { kind: "user" as const, userId: "naomi" } } : s));
+      const result = run({ chain: naomiOnLegal, version: { ...v2, stages: STAGES_2 } });
+      expect(result.ok && result.effects[1]).toMatchObject({
+        notification: "review_requested",
+        to: { kind: "user", userId: "naomi" },
+        title: "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+      });
+    });
+
+    it("on migrated data, an approval matched to the stage it waits on still bars its approver", () => {
+      // Before stage ids: chain [Team1, Team2], Jordan approved Team1, an admin removed Team1 and the
+      // version moved to position 0. The 0005 backfill then matched Jordan's position-0 approval to Team2.
+      const team2: ApprovalStage = { id: "st_team2", position: 0, name: "Second approver", rule: { kind: "team_role", role: "approver" } };
+      const version = { ...v2, stages: [{ id: "st_team2", name: "Second approver" }], currentStage: 0 };
+      const decisions = [{ stageId: "st_team2", actorId: "jordan", decision: "approved" as const }];
+      expect(run({ chain: [team2], version, decisions })).toEqual({ ok: false, reason: REFUSALS.approvedEarlierStage });
+      expect(run({ chain: [team2], version, decisions, actorId: "alex", actorName: "Alex Kim" }).ok).toBe(true);
+    });
+
+    it("a version that recorded Release 1's default stage stays decidable once the content type has a chain", () => {
+      const version = { ...v2, stages: [{ id: "default", name: "Team approver" }], currentStage: 0 };
+      const result = run({ chain: CHAIN_2, version });
+      expect(result.ok && result.wentLive).toBe(true);
+      expect(result.ok && result.approval).toMatchObject({ stageId: "default", stageName: "Team approver" });
+    });
+
+    it("refuses when the stage it waits on, or the next one, has left the chain", () => {
+      const missing = { ok: false, reason: "This version's approval stage no longer exists." };
+      expect(run({ chain: [CHAIN_2[1]!], version: { ...v2, stages: STAGES_2 } })).toEqual(missing);
+      expect(run({ chain: CHAIN_1, version: { ...v2, stages: STAGES_2 } })).toEqual(missing);
     });
   });
 
@@ -1501,7 +1599,7 @@ describe("scenario 3: the review loop", () => {
       writers: ["maya"],
       rev: 3,
     };
-    const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name };
+    const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name, chain: CHAIN_1 };
 
     const first = submit({ ...base, draft, seenRev: 3, highestNumber: 0, baseline: null });
     if (!first.ok) throw new Error(first.reason);
@@ -1550,6 +1648,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       submitterName: submittedBy,
       templateId: TEMPLATE.id,
       templateName: TEMPLATE.name,
+      chain: CHAIN_1,
     });
     if (!result.ok) throw new Error(result.reason);
     return reviewVersion({ ...draft, ...result.changes, id: `v_${result.changes.number}` });

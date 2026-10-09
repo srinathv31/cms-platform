@@ -10,6 +10,7 @@ import type {
   ContentTypesSection,
   TeamsSection,
 } from "@/domain/access-types";
+import { versionsNeeding } from "@/domain/approval-chain";
 import { can } from "@/domain/permissions";
 import { approverProblem, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
 import { CHANNELS, type Channel } from "@/domain/types";
@@ -150,7 +151,7 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
     db.select({ id: contentTypes.id, name: contentTypes.name }).from(contentTypes).orderBy(asc(contentTypes.name)),
     db.select().from(approvalStages).orderBy(asc(approvalStages.position)),
     db
-      .select({ contentTypeId: templates.contentTypeId, currentStage: versions.currentStage })
+      .select({ contentTypeId: templates.contentTypeId, stages: versions.stages, currentStage: versions.currentStage })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(eq(versions.state, "in_review")),
@@ -167,20 +168,16 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
 
   const chains: ApprovalChainView[] = types.map((type) => {
     const stages = stageRows.filter((s) => s.contentTypeId === type.id);
-    const waiting = inReview.filter((v) => v.contentTypeId === type.id);
-    // A stage index past the end reads as the last stage, as on the review screen.
-    const at = (currentStage: number) => Math.min(Math.max(currentStage, 0), stages.length - 1);
+    const chain = stages.map((s, index) => ({ id: s.id, position: index, name: s.name, rule: s.approverRule }));
+    // Per stage, the versions in review that still need it, in the stages they recorded at submit.
+    const needing = versionsNeeding(
+      inReview.filter((v) => v.contentTypeId === type.id),
+      chain,
+    );
     return {
       contentTypeId: type.id,
       name: type.name,
-      stages: stages.map((s, index) => ({
-        id: s.id,
-        position: index,
-        name: s.name,
-        rule: s.approverRule,
-        ruleLabel: ruleLabel(s.approverRule, named),
-        waiting: waiting.filter((v) => at(v.currentStage) === index).length,
-      })),
+      stages: chain.map((s) => ({ ...s, ruleLabel: ruleLabel(s.rule, named), waiting: needing[s.id] ?? 0 })),
     };
   });
 
