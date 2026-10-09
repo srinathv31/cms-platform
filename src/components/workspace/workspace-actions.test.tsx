@@ -17,14 +17,21 @@ import { createWorkspaceSession, type WorkspaceSession } from "./session/session
 let session: WorkspaceSession;
 
 const server = vi.hoisted(() => ({
-  getSubmitSummary: vi.fn<(input: { templateId: string }) => Promise<ActionResult<{ summary: SubmitSummary }>>>(),
+  /** The submit-summary route as the browser reaches it: handed the URL fetched, it gives the body (or the network fails). */
+  summaryRoute: vi.fn<(url: string) => Promise<ActionResult<{ summary: SubmitSummary }>>>(),
   submitVersion: vi.fn<(input: { templateId: string; note?: string | null; rev: number }) => Promise<ActionResult<{ number: number }>>>(),
 }));
 
 vi.mock("next/navigation", () => ({ unstable_rethrow: () => undefined, useSelectedLayoutSegment: () => null }));
 vi.mock("@/server/actions/templates", () => ({ startDraft: vi.fn() }));
 vi.mock("@/server/actions/review", () => ({ submitVersion: server.submitVersion }));
-vi.mock("@/server/queries/submit-summary", () => ({ getSubmitSummary: server.getSubmitSummary }));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: string) => {
+    const body = await server.summaryRoute(url);
+    return { status: body.ok ? 200 : 409, json: async () => body };
+  }),
+);
 vi.mock("./session/workspace-session", () => ({
   useWorkspaceSession: () => session,
   usePreviewState: () => session.getPreview(),
@@ -65,7 +72,7 @@ const click = (el: HTMLElement) => act(async () => el.click());
 const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 beforeEach(async () => {
-  server.getSubmitSummary.mockReset().mockResolvedValue({ ok: true, summary: summary() });
+  server.summaryRoute.mockReset().mockResolvedValue({ ok: true, summary: summary() });
   server.submitVersion.mockReset().mockResolvedValue({ ok: true, number: 3 });
   session = createWorkspaceSession();
   session.bind({ versionId: "v_1", rev: 0 });
@@ -91,11 +98,11 @@ describe("the page while Submit reads the summary", () => {
     await click(submitButton());
     expect(session.getInert(), "read-only before the flush resolves").toBe(true);
     expect(pending.flush).toHaveBeenCalledTimes(1);
-    expect(server.getSubmitSummary).not.toHaveBeenCalled();
+    expect(server.summaryRoute).not.toHaveBeenCalled();
 
     await pending.settle();
     await tick();
-    expect(server.getSubmitSummary).toHaveBeenCalledWith({ templateId: TEMPLATE });
+    expect(server.summaryRoute).toHaveBeenCalledWith(`/api/templates/${TEMPLATE}/submit-summary`);
     expect(dialog()?.textContent).toContain("Submit v3 for review");
     expect(session.getInert(), "still inert while the dialog is open").toBe(true);
   });
@@ -110,7 +117,7 @@ describe("the page while Submit reads the summary", () => {
   });
 
   it("is editable again, with the reason at the button, when the summary can't be read", async () => {
-    server.getSubmitSummary.mockResolvedValueOnce({ ok: false, reason: "This version is already in review." });
+    server.summaryRoute.mockResolvedValueOnce({ ok: false, reason: "This version is already in review." });
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
@@ -123,12 +130,12 @@ describe("the page while Submit reads the summary", () => {
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
-    expect(server.getSubmitSummary).not.toHaveBeenCalled();
+    expect(server.summaryRoute).not.toHaveBeenCalled();
     expect(document.body.querySelector("[role='alert']")?.textContent).toBe("Not saved. Check your connection.");
   });
 
   it("is editable again when the summary read throws", async () => {
-    server.getSubmitSummary.mockRejectedValueOnce(new Error("boom"));
+    server.summaryRoute.mockRejectedValueOnce(new Error("boom"));
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
@@ -175,10 +182,11 @@ describe("submitting", () => {
     expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(REFUSALS.summaryStale);
     expect(session.getInert()).toBe(true);
 
-    server.getSubmitSummary.mockResolvedValueOnce({ ok: true, summary: summary({ rev: 6 }) });
+    server.summaryRoute.mockResolvedValueOnce({ ok: true, summary: summary({ rev: 6 }) });
     await click(button(/^Refresh summary$/)!);
     await tick();
-    expect(server.getSubmitSummary).toHaveBeenCalledTimes(2);
+    expect(server.summaryRoute).toHaveBeenCalledTimes(2);
+    expect(server.summaryRoute).toHaveBeenLastCalledWith(`/api/templates/${TEMPLATE}/submit-summary`);
 
     await click(button(/^Submit v3$/)!);
     await tick();

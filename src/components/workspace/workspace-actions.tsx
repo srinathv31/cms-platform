@@ -12,9 +12,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { startDraft } from "@/server/actions/templates";
 import { submitVersion } from "@/server/actions/review";
 import { SubmitDialog } from "@/components/submit/submit-dialog";
-import { getSubmitSummary } from "@/server/queries/submit-summary";
 import type { SubmitSummary } from "@/components/submit/types";
 import type { ActionResult } from "@/domain/review-types";
+import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";
 import { usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
 
@@ -143,11 +143,14 @@ export function SubmitButton({ templateId }: { templateId: string }) {
     setOpen(true);
   }
 
-  /** What the dialog lists, read from the saved draft once everything typed has gone out. */
+  /**
+   * What the dialog lists, read from the saved draft once everything typed has gone out
+   * (GET /api/templates/[templateId]/submit-summary): on the click, and on "Refresh summary".
+   */
   async function readSummary(): Promise<ActionResult<{ summary: SubmitSummary }>> {
     const saved = await saveFirst(session);
     if (!saved.ok) return saved;
-    return getSubmitSummary({ templateId });
+    return readTemplate<{ summary: SubmitSummary }>(templateId, "submit-summary");
   }
 
   function openDialog() {

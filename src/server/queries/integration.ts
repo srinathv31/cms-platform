@@ -1,17 +1,22 @@
 import "server-only";
+import { headers } from "next/headers";
 import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { z } from "zod";
 import { typeLabel } from "@/domain/contract";
 import { contractDiff } from "@/domain/golive/contract-diff";
 import { contractJsonSchema, exampleOf } from "@/domain/golive/json-schema";
 import { CONSUMER_ERRORS, integrationSamples, renderPathOf, RESPONSE_FORMATS } from "@/domain/golive/samples";
 import type { IntegrationPanelData } from "@/domain/golive-types";
-import { CHANNELS } from "@/domain/types";
+import { can } from "@/domain/permissions";
+import { CHANNELS, type Viewer } from "@/domain/types";
+import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
 
 // The integration panel (the sheet behind the template's "Share" ring): what a consumer needs to
-// call the render API for the Active version. No viewer here: the action that calls it checks
-// `integration.view` first.
+// call the render API for the Active version. `loadIntegrationPanel` serves
+// GET /api/templates/[templateId]/integration, which the panel calls when it opens and on hover or
+// focus of the ring, as a prefetch; it checks `integration.view`. `getIntegrationPanel` has no viewer.
 
 /** The consumer the samples name: the template's latest non-preview renderer, else the first registered one. */
 async function sampleConsumer(templateId: string): Promise<string> {
@@ -107,4 +112,40 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
       };
     }),
   };
+}
+
+const REASONS = {
+  noTemplate: "This template no longer exists.",
+  noActive: "This template has no Active version yet.",
+} as const;
+
+const Input = z.object({ templateId: z.string().trim().min(1).max(64) });
+
+/** "https://ucomp.example": the origin the page was requested on (behind a proxy, its forwarded host). */
+async function requestOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host") || "localhost:3000";
+  const forwarded = h.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const proto = forwarded || (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host) ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+/** The panel for someone who may see the integration details; read-only, so nothing is refreshed or audited. */
+export async function loadIntegrationPanel(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ panel: IntegrationPanelData }>> {
+  const parsed = Input.safeParse(input);
+  if (!parsed.success) return refusal(400, REASONS.noTemplate);
+  const { templateId } = parsed.data;
+
+  const [template] = await db
+    .select({ teamId: templates.teamId })
+    .from(templates)
+    .where(eq(templates.id, templateId))
+    .limit(1);
+  if (!template) return refusal(404, REASONS.noTemplate);
+
+  const permitted = can(viewer, "integration.view", { teamId: template.teamId });
+  if (!permitted.ok) return refusal(403, permitted.reason);
+
+  const panel = await getIntegrationPanel(templateId, await requestOrigin());
+  return panel ? { ok: true, panel } : refusal(409, REASONS.noActive);
 }

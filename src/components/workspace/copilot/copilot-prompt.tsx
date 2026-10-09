@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
-import { getCopilotPrompt } from "@/server/actions/copilot";
+import type { CopilotPrompt } from "@/domain/import-types";
+import { readTemplate } from "@/lib/template-reads";
 import { useWorkspaceSession } from "../session/workspace-session";
 
 const NOT_SAVED = "Your latest changes aren't saved yet.";
@@ -24,10 +25,10 @@ type PromptState = { status: "loading" } | { status: "ready"; text: string } | {
 /**
  * "Copilot prompt": a quiet ghost row for the end of the rail, on a draft the viewer can edit (the
  * host decides where it shows). It opens "Prompt for Copilot": the pending autosave goes out first,
- * then the server builds the prompt from the saved draft (`getCopilotPrompt`) and the dialog shows it
- * in a read-only scrolling block, with the one black **Copy prompt**. After a copy the button reads
- * "Copied" for two seconds. The author pastes Copilot's answer back into the document, where the
- * editor merges it into the sections and turns its placeholders into chips.
+ * then the server builds the prompt from the saved draft (GET /api/templates/[templateId]/copilot-prompt)
+ * and the dialog shows it in a read-only scrolling block, with the one black **Copy prompt**. After a
+ * copy the button reads "Copied" for two seconds. The author pastes Copilot's answer back into the
+ * document, where the editor merges it into the sections and turns its placeholders into chips.
  *
  * Every open fetches a fresh prompt (the draft may have changed). Focus starts on Copy prompt, which
  * stays focusable (`aria-disabled`) until the prompt is there; closing returns focus to the row.
@@ -61,7 +62,7 @@ export function CopilotPromptButton({ templateId }: { templateId: string }) {
         setState({ status: "error", reason: saved.error ?? NOT_SAVED });
         return;
       }
-      const result = await getCopilotPrompt({ templateId });
+      const result = await readTemplate<{ prompt: CopilotPrompt }>(templateId, "copilot-prompt");
       if (id !== request.current) return;
       setState(result.ok ? { status: "ready", text: result.prompt.text } : { status: "error", reason: result.reason });
     } catch (error) {

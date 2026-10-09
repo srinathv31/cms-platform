@@ -1,16 +1,17 @@
-"use server";
+import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { can } from "@/domain/permissions";
-import type { ActionResult } from "@/domain/review-types";
-import type { JSONContent, Variable, VersionState } from "@/domain/types";
+import type { JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
+import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
-import { getViewer } from "@/server/viewer";
 
 // What the Compare dialog needs and the Versions read model doesn't carry: the names, bodies and
-// variable lists of the versions being compared. A read, so it checks only that the viewer may see the
-// template (as the Versions page itself does). The diff is computed in the dialog.
+// variable lists of the two versions being compared. Served by GET /api/templates/[templateId]/compare
+// when the dialog opens and on each change of pair. A read, so it checks only that the viewer may see
+// the template (as the Versions page itself does). The diff is computed in the dialog.
 
 export interface CompareVersion {
   id: string;
@@ -23,42 +24,50 @@ export interface CompareVersion {
   variables: Variable[];
 }
 
-export async function loadVersionsToCompare(input: {
-  templateId: string;
-  versionIds: string[];
-}): Promise<ActionResult<{ versions: CompareVersion[] }>> {
-  const viewer = await getViewer();
+const Id = z.string().min(1).max(64);
+const Input = z.object({ templateId: Id, from: Id, to: Id });
+
+const REASONS = {
+  missing: "This template isn't available to you.",
+  noVersion: "This version isn't available.",
+} as const;
+
+/** The two versions of one template, `from` the older and `to` the newer (the dialog picks them so). */
+export async function loadVersionsToCompare(
+  viewer: Viewer,
+  input: { templateId: string; from: string | null; to: string | null },
+): Promise<ReadResult<{ from: CompareVersion; to: CompareVersion }>> {
+  const parsed = Input.safeParse(input);
+  if (!parsed.success) return refusal(400, REASONS.missing);
+  const { templateId, from, to } = parsed.data;
 
   const template = await db
     .select({ teamId: templates.teamId })
     .from(templates)
-    .where(eq(templates.id, input.templateId))
+    .where(eq(templates.id, templateId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!template || !can(viewer, "template.view", { teamId: template.teamId }).ok) {
-    return { ok: false, reason: "This template isn't available to you." };
-  }
+  if (!template) return refusal(404, REASONS.missing);
+  if (!can(viewer, "template.view", { teamId: template.teamId }).ok) return refusal(403, REASONS.missing);
 
-  const ids = [...new Set(input.versionIds)].slice(0, 2);
-  const rows = ids.length
-    ? await db
-        .select({
-          id: versions.id,
-          number: versions.number,
-          state: versions.state,
-          name: versions.name,
-          body: versions.body,
-          variables: versions.variables,
-        })
-        .from(versions)
-        .where(and(eq(versions.templateId, input.templateId), inArray(versions.id, ids)))
-    : [];
+  const rows = await db
+    .select({
+      id: versions.id,
+      number: versions.number,
+      state: versions.state,
+      name: versions.name,
+      body: versions.body,
+      variables: versions.variables,
+    })
+    .from(versions)
+    .where(and(eq(versions.templateId, templateId), inArray(versions.id, [from, to])));
 
-  return {
-    ok: true,
-    versions: ids.flatMap((id) => {
-      const row = rows.find((r) => r.id === id);
-      return row ? [{ ...row, number: row.state === "draft" ? null : row.number }] : [];
-    }),
+  const pick = (id: string): CompareVersion | undefined => {
+    const row = rows.find((r) => r.id === id);
+    return row ? { ...row, number: row.state === "draft" ? null : row.number } : undefined;
   };
+  const older = pick(from);
+  const newer = pick(to);
+  if (!older || !newer) return refusal(404, REASONS.noVersion);
+  return { ok: true, from: older, to: newer };
 }

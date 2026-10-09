@@ -139,7 +139,7 @@ describe("a rename in a draft goes live only with its version", () => {
 
   it("the submit summary lists the rename against the Active version", async () => {
     as("maya");
-    const result = await getSubmitSummary({ templateId });
+    const result = await getSubmitSummary(people.maya!, { templateId });
     expect(result.ok && { name: result.summary.name, baseline: result.summary.baseline?.name }).toEqual({ name: RENAMED, baseline: LIVE });
   });
 

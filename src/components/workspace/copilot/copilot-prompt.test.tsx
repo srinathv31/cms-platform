@@ -10,7 +10,8 @@ import type { CopilotPrompt } from "@/domain/import-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-type GetPrompt = (input: { templateId: string }) => Promise<ActionResult<{ prompt: CopilotPrompt }>>;
+/** The copilot-prompt route as the browser reaches it: handed the URL fetched, it gives the body. */
+type GetPrompt = (url: string) => Promise<ActionResult<{ prompt: CopilotPrompt }>>;
 
 const calls: string[] = [];
 const getCopilotPrompt = vi.fn<GetPrompt>();
@@ -22,7 +23,13 @@ const session = {
 };
 
 vi.mock("next/navigation", () => ({ unstable_rethrow: () => undefined }));
-vi.mock("@/server/actions/copilot", () => ({ getCopilotPrompt: (input: { templateId: string }) => getCopilotPrompt(input) }));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: string) => {
+    const body = await getCopilotPrompt(url);
+    return { status: body.ok ? 200 : 403, json: async () => body };
+  }),
+);
 vi.mock("../session/workspace-session", () => ({ useWorkspaceSession: () => session }));
 
 const { CopilotPromptButton } = await import("./copilot-prompt");
@@ -72,7 +79,7 @@ describe("Copilot prompt", () => {
     await openDialog();
     expect(dialog()?.querySelector("[data-slot='dialog-title']")?.textContent).toBe("Prompt for Copilot");
     expect(calls).toEqual(["flush", "prompt"]);
-    expect(getCopilotPrompt).toHaveBeenCalledWith({ templateId: "UC-4F7K2Q" });
+    expect(getCopilotPrompt).toHaveBeenCalledWith("/api/templates/UC-4F7K2Q/copilot-prompt");
     expect(dialog()?.querySelector("pre")?.textContent).toBe(PROMPT);
   });
 

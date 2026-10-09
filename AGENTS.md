@@ -51,6 +51,9 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - `src/simulator` and `src/app/(simulator)` import nothing from `@/server`, `@/domain`, or `@/editor`, except
   `@/server/db/schema/sim`. Nothing outside them (but the seed and reset) imports simulator code or tables.
 - There is no `@/editor` barrel. Import each export from the module that defines it.
+- `"use server"` appears only in `src/server/actions/` (and the simulator's `src/simulator/actions.ts`): server
+  actions are for mutations. A read a screen loads on demand is a GET route under
+  `src/app/api/templates/[templateId]/`.
 
 Not enforced yet; follow them anyway:
 
@@ -130,9 +133,8 @@ Next.js API; Next's own note about it is at the end of this file.
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common ones:
 actions that throw instead of returning a result (`startDraft`, `createTemplate`); private copies of `Refusal`,
-`check`, and `transact` in three action files; bare `<Suspense>` instead of `<Stream>`; reads done through
-`"use server"` functions; and copied `plural`, "days ago", and number formatters. Never copy from `src/app/(dev)`:
-those are design mocks on fixture data.
+`check`, and `transact` in three action files; bare `<Suspense>` instead of `<Stream>`; and copied `plural`,
+"days ago", and number formatters. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
 
 ## Keeping the docs true
 

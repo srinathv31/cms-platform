@@ -17,6 +17,7 @@ Contents: [Rules](#rules) · [Layout](#layout) · [Anatomy of a mutation](#anato
 Lint-enforced by [eslint.config.mjs](../../eslint.config.mjs) for every file under `src/server`:
 - No `@/editor` import: there is no barrel. Import the server-safe modules `@/editor/schema`, `@/editor/model/*`, and `@/editor/paste/*`.
 - No simulator data: `@/server/db/schema/sim`, `**/schema/sim`, and `@/simulator/*` are banned. `seed/**` and `reset.ts` are exempt because they write the simulator's tables.
+- `"use server"` appears only in [actions/](actions/), as a file's first line or inside a function: everywhere else in `src` (the simulator's own `src/simulator/actions.ts` aside) it is a lint error. The directive makes every export a public POST endpoint that takes any input, so server actions are for mutations only, and each parses its input with zod.
 - Rules on other layers that protect this one: `src/domain` may not import `@/server/*`, and `src/simulator` may import only `@/server/db/schema/sim` from it.
 
 Convention only (no lint rule):
@@ -30,8 +31,8 @@ Convention only (no lint rule):
 
 | Path | What it holds |
 | --- | --- |
-| [actions/](actions/) | `"use server"` mutations, one file per area: [review.ts](actions/review.ts) (submit, approve, request changes, sunset, revoke), [comments.ts](actions/comments.ts), [access.ts](actions/access.ts), [platform.ts](actions/platform.ts), [templates.ts](actions/templates.ts) (`startDraft`), [create-template.ts](actions/create-template.ts), [notifications.ts](actions/notifications.ts), [persona.ts](actions/persona.ts), [demo.ts](actions/demo.ts). Also two reads a client calls: [copilot.ts](actions/copilot.ts), [integration.ts](actions/integration.ts). |
-| [queries/](queries/) | Read models, mostly `cache()`d `get…` functions for server components. [spaces.ts](queries/spaces.ts) (`requireSpace`, the shell) and [review-shared.ts](queries/review-shared.ts) (`requireTemplate`, people, chain and date helpers) are shared. [template-name.ts](queries/template-name.ts) (`currentName`) is the name a CMS list shows. [consumer-api.ts](queries/consumer-api.ts) serves `/api/v1`. Three files are `"use server"` reads (see below). |
+| [actions/](actions/) | `"use server"` mutations, one file per area: [review.ts](actions/review.ts) (submit, approve, request changes, sunset, revoke), [comments.ts](actions/comments.ts), [access.ts](actions/access.ts), [platform.ts](actions/platform.ts), [templates.ts](actions/templates.ts) (`startDraft`), [create-template.ts](actions/create-template.ts), [notifications.ts](actions/notifications.ts), [persona.ts](actions/persona.ts), [demo.ts](actions/demo.ts). No reads: those are GET routes (see [Anatomy of a read](#anatomy-of-a-read)). |
+| [queries/](queries/) | Read models, mostly `cache()`d `get…` functions for server components. [spaces.ts](queries/spaces.ts) (`requireSpace`, the shell) and [review-shared.ts](queries/review-shared.ts) (`requireTemplate`, people, chain and date helpers) are shared. [template-name.ts](queries/template-name.ts) (`currentName`) is the name a CMS list shows. [consumer-api.ts](queries/consumer-api.ts) serves `/api/v1`. Five reads serve the GET routes a screen calls on demand (see below). |
 | [db/](db/) | [client.ts](db/client.ts), [schema/ucomp.ts](db/schema/ucomp.ts) (app tables), [schema/sim.ts](db/schema/sim.ts) (simulator tables), [migrations/](db/migrations/). |
 | [effects.ts](effects.ts) | `inTransaction` (the busy retry), `writeEffects` (audit rows, notifications, consumer notices), `takeNoticeSeqs`, `Tx`. |
 | [access-effects.ts](access-effects.ts) | `applyMembershipChange` and `writeAccessEffects`: the same job for access and platform changes. |
@@ -44,7 +45,7 @@ Convention only (no lint rule):
 | [documents/prepare.ts](documents/prepare.ts) | The one way a document is made ready for storage: normalized, checked, block ids added. Autosave and import call it. |
 | [render/](render/) | The render pipeline ([render-template.ts](render/render-template.ts)), the engine it runs ([engine.ts](render/engine.ts)), the document check, the render log, [channels/](render/channels/) (web, email, pdf), the [golden files](render/golden/README.md), and shared test helpers in [testing/](render/testing/). |
 | [import/](import/) | File import: sniffing, converters, worker isolation, zip limits, capped body reads, upload storage. |
-| [api/http.ts](api/http.ts) | Response helpers for the `/api/v1` route handlers. |
+| [api/http.ts](api/http.ts), [api/reads.ts](api/reads.ts) | Response helpers for the `/api/v1` route handlers; `ReadResult` and `readResponse` for the on-demand read routes. |
 | [testing/review-fixtures.ts](testing/review-fixtures.ts) | `tempDatabase`, `loadPersona`, `createTemplateWithDraft` for tests. |
 
 ## Anatomy of a mutation
@@ -103,7 +104,17 @@ A read model:
 
 Older read models use a different shape. `getWorkspaceHeader` ([queries/workspace.ts](queries/workspace.ts)) and `getLibraryRows` ([queries/library.ts](queries/library.ts)) return `Date` objects, boolean flags (`canEdit`, `canSubmit`), and preformatted strings (`lastEdited`).
 
-Reads a client triggers on demand, such as when a dialog opens, are `"use server"` functions that return `ActionResult`: [queries/base-version.ts](queries/base-version.ts), [queries/compare.ts](queries/compare.ts), [queries/submit-summary.ts](queries/submit-summary.ts), [actions/copilot.ts](actions/copilot.ts), and [actions/integration.ts](actions/integration.ts). Each checks `can()` itself and writes nothing. The consumer API's reads in [queries/consumer-api.ts](queries/consumer-api.ts) have no viewer: `requireConsumer()` checks the `X-Consumer-Id` header.
+Reads a screen makes on demand, when a dialog or a menu opens, are GET route handlers under `src/app/api/templates/[templateId]/`, never server actions: an action is a public POST endpoint that runs one at a time with the page's mutations, so a read would hold up Edit or Submit (or wait behind them). Each route calls `getViewer()` and passes the viewer and the raw request values to its query, which parses them with zod, checks `can()`, writes nothing, and returns a `ReadResult` ([api/reads.ts](api/reads.ts)): the data, or a refusal with its sentence and status (400 unparsable, 403 not permitted, 404 no such template or version, 409 not in a state to read). `readResponse()` sends it as the `ActionResult` the client reads, uncached. The five:
+
+| Route (`/api/templates/[templateId]/…`) | Query | For |
+| --- | --- | --- |
+| `compare?from=&to=` | `loadVersionsToCompare` ([queries/compare.ts](queries/compare.ts)) | The Compare dialog, per pair of versions (`template.view`). |
+| `base-version?draft=` | `getBaseVersion` ([queries/base-version.ts](queries/base-version.ts)) | "Revert to v3" (`draft.edit`). |
+| `submit-summary` | `getSubmitSummary` ([queries/submit-summary.ts](queries/submit-summary.ts)) | The submit dialog, and its Refresh summary (`version.submit`). |
+| `copilot-prompt` | `getCopilotPrompt` ([queries/copilot.ts](queries/copilot.ts)) | The Copilot prompt dialog (`draft.edit`). |
+| `integration` | `loadIntegrationPanel` ([queries/integration.ts](queries/integration.ts)) | The SHARE panel, prefetched on hover or focus of the ring (`integration.view`). |
+
+The consumer API's reads in [queries/consumer-api.ts](queries/consumer-api.ts) have no viewer: `requireConsumer()` checks the `X-Consumer-Id` header.
 
 ## Database
 
@@ -142,7 +153,7 @@ SQLite and libSQL specifics:
 
 Body caps, all counted in bytes as the stream is read ([import/read-body.ts](import/read-body.ts)), after a declared `Content-Length` over the cap is refused unread: import allows 10 MiB plus 64 KiB of multipart slack, autosave 2,000,000 (`MAX_BODY_SIZE`), render 1,000,000 (`MAX_BODY_BYTES`). Each answers 413 past it. Server actions cap bodies at 1 MB, which is why import is a route handler.
 
-Each entry point has a fixed error shape: `ActionResult` (`reason`) for actions and client reads, `DraftSaveResponse` (`error`, `message`, `rev?`) for autosave, `ImportResponse` (`code`, `reason`) for import, and `{ error: { code, message } }` for `/api/v1`. Use the one your entry point already uses.
+Each entry point has a fixed error shape: `ActionResult` (`reason`) for actions and the on-demand read routes, `DraftSaveResponse` (`error`, `message`, `rev?`) for autosave, `ImportResponse` (`code`, `reason`) for import, and `{ error: { code, message } }` for `/api/v1`. Use the one your entry point already uses.
 
 ## Demo-only paths
 
@@ -162,7 +173,7 @@ These stand in for things a production deployment would have. None is gated by e
 | Write a transition's side records | `writeEffects()` in [effects.ts](effects.ts), `writeAccessEffects()` in [access-effects.ts](access-effects.ts) | Always inside the caller's `tx`. |
 | Build a read model with permissions | `getVersions()` and `versionActions()` in [queries/versions.ts](queries/versions.ts) | ISO strings and `can: PermissionResult`. |
 | Gate a page by space or template | `requireSpace()` in [queries/spaces.ts](queries/spaces.ts), `requireTemplate()` in [queries/review-shared.ts](queries/review-shared.ts) | 404 or redirect, cached per request. |
-| Serve a read a client calls | [actions/copilot.ts](actions/copilot.ts) | zod parse, `can()`, `ActionResult`, no writes. |
+| Serve a read a screen loads on demand | `getBaseVersion` in [queries/base-version.ts](queries/base-version.ts) with `src/app/api/templates/[templateId]/base-version/route.ts` | The query takes the viewer, parses with zod, checks `can()`, returns a `ReadResult`; the route is `getViewer()` and `readResponse()`. Add the read's name to `TemplateRead` in `src/lib/template-reads.ts`. |
 | Make a database function testable | `applyDraftPatch(db, …)` in [drafts/apply-patch.ts](drafts/apply-patch.ts), `runRender(db, input, at)` in [render/render-template.ts](render/render-template.ts) | Database and time are arguments; a thin wrapper passes the real ones. |
 | Insert inside the caller's transaction | `insertNewTemplate()` in [templates/create.ts](templates/create.ts) | Shared by New template and Import. |
 | Add an `/api/v1` handler | `src/app/api/v1/templates/route.ts` with [api/http.ts](api/http.ts) | Headers first, `withDemoDate`, contract errors. |
@@ -180,7 +191,6 @@ These stand in for things a production deployment would have. None is gated by e
 - **Server importing components.** [actions/create-template.ts](actions/create-template.ts) imports `@/components/workspace/just-created`, and [queries/submit-summary.ts](queries/submit-summary.ts) imports from `@/components/preview/sample-sets/model` and `@/components/submit/types`. No lint rule stops this. Put shared types and constants in `src/domain`.
 - **Older read-model shapes.** `getWorkspaceHeader` and `getLibraryRows` return `Date` objects and booleans. Return ISO strings and `can` results.
 - **Patching a domain result.** [import/create.ts](import/create.ts) overwrites `starterKey` and the audit details on the result of `createDraft()`. Have the domain return the right result.
-- **Unparsed input.** [queries/compare.ts](queries/compare.ts) doesn't parse its input with zod. Parse it as [actions/copilot.ts](actions/copilot.ts) does.
 - **Formatting here.** [queries/format.ts](queries/format.ts) has no `server-only` because it reaches a client component through `src/components/review-queue/format-row.ts`. `DAY_MS` is redefined in several files, though `src/domain/access.ts` exports it. Date formatting belongs in `src/domain/dates.ts`.
 
 ## Testing

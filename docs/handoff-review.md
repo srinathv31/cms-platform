@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 4 | 24 | 12 | 40 |
+| Open | 0 | 4 | 23 | 12 | 39 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 18 | 11 | 2 | 32 |
+| Fixed | 1 | 18 | 12 | 2 | 33 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -571,7 +571,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A6 · Medium: Reads are exposed as server actions
 
-- **Status:** Open
+- **Status:** Fixed. The five reads a screen loads on demand (compare, base version, submit summary, Copilot prompt, integration panel) are GET routes under `/api/templates/[templateId]/` whose queries parse their input with zod and keep their permission checks, and a lint rule allows `"use server"` only in `src/server/actions/` ([decision 0019](decisions/0019-on-demand-reads-are-get-routes.md)).
 - **Where:** `src/server/queries/compare.ts` line 1; `src/server/queries/base-version.ts` line 62; `src/server/queries/submit-summary.ts` line 12
 - **What happens:** Three `queries/` modules are `"use server"`, so every export is a public POST endpoint, queued one at a time with mutations (a hover prefetch in the share menu can delay Edit or Submit). `loadVersionsToCompare` has no input validation. An agent adding `"use server"` to a sibling like `library.ts`, which trusts its caller, would publish an unguarded endpoint.
 - **Fix:** Reads through server components or GET route handlers; keep `"use server"` to `actions/`, each with zod.
@@ -588,7 +588,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### A8 · Low: Sample URLs are built from request headers
 
 - **Status:** Open
-- **Where:** `src/server/actions/integration.ts` line 25
+- **Where:** `requestOrigin` in `src/server/queries/integration.ts` (was `actions/integration.ts` line 25)
 - **What happens:** The integration panel builds the consumer base URL from `X-Forwarded-Host`, contradicting decision #4 in `decisions.md`. It will be wrong once consumers call Spring.
 - **Fix:** Use a configured `CONSUMER_API_BASE_URL`.
 - **Evidence:** traced
