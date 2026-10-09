@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 19 | 9 | 31 |
+| Open | 0 | 3 | 18 | 9 | 30 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 16 | 4 | 40 |
+| Fixed | 1 | 19 | 17 | 4 | 41 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -415,7 +415,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I12 · Medium: Every page ships the whole template catalog, and the palette keeps the last persona's data
 
-- **Status:** Open
+- **Status:** Fixed. No page carries templates any more: the palette asks `GET /api/palette/[space]?q=&template=` when it opens and as the viewer types, the server searches with one domain rule (`src/domain/palette.ts`), and the palette's answers are keyed by viewer, with a new palette mounted on a persona switch ([decision 0024](decisions/0024-the-palette-searches-on-the-server.md)).
 - **Where:** `src/components/app-shell/top-bar-hole.tsx` line 12; `src/components/app-shell/command-palette.tsx` line 168
 - **What happens:** The top bar loads every visible template and its versions into the RSC payload on every page and every `refresh()`, then the palette fetches the same catalog again. Its per-space cache isn't cleared on persona change and wins over fresh props until a refetch succeeds.
 - **Fix:** Search server-side on open, and key the cache by viewer.

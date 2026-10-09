@@ -317,23 +317,29 @@ export interface PaletteGroup {
 }
 
 /**
- * Per-space facts the shell doesn't already pass the palette. GET /api/palette/{space}, fetched once
- * per space on mount (cached per space for the session). `recent`: template ids the viewer acted on
- * most recently (their audit events), newest first, ≤ 5, visible in the space.
+ * What the palette lists from the server for one space and one search: GET
+ * /api/palette/{space}?q=&template=, asked when the palette opens and as the viewer types. Templates
+ * are searched on the server (`paletteTemplates` in palette.ts), so no page carries the catalog.
  */
-export interface PaletteContext {
+export interface PaletteResults {
+  /** Who it was read for. The palette keeps answers per viewer and drops one read for anybody else. */
+  viewerId: string;
   space: string;
+  /** The search this answers, normalized (`normalizePaletteQuery`); "" at rest. */
+  query: string;
+  /** The viewer may create a template here. Never in the cross-team space, as in the Library. */
   canCreate: boolean;
-  recent: string[];
-  /**
-   * The templates the viewer can see in this space (all their spaces, for "All teams"), fresh: the
-   * shell's own list is read once per page load, so one made this session is missing from it.
-   */
-  templates?: PaletteTemplateRow[];
+  /** The template asked about (`template`, the one whose pages the viewer is on) is one they can see in this space. */
+  current: boolean;
+  /** At rest: up to five templates the viewer acted on most recently, newest first, without the current one. Empty while searching. */
+  recent: PaletteTemplateRow[];
+  /** At rest: the first page by name, without those in `recent`. Searching: the matches, best first. */
+  templates: PaletteTemplateRow[];
 }
 
 export interface PaletteTemplateRow {
   id: string;
+  /** As the Library shows it: the open draft's name, otherwise the newest version's. */
   name: string;
   teamSlug: string;
   teamName: string;

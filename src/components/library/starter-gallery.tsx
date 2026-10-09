@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardEvent, type Ref } from "react";
 import { unstable_rethrow } from "next/navigation";
-import { markPaletteStale } from "@/components/palette/palette-stale";
 import { Spinner } from "@/components/ui/spinner";
 import { createTemplate } from "@/server/actions/create-template";
 import { STARTERS, type StarterKey } from "@/server/starters/catalog";
@@ -70,7 +69,6 @@ export function StarterGallery({
     if (busy) return;
     setPicked(starterKey);
     setFailed(false);
-    markPaletteStale();
     startTransition(async () => {
       try {
         // On success the action redirects, which reaches here as an error Next handles itself.

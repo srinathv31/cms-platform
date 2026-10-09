@@ -26,21 +26,20 @@ import {
 import { Shortcut } from "@/components/primitives/keycap";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { requestLibraryIntent } from "@/components/library/library-intent";
-import { paletteGroups } from "@/components/palette/commands";
-import { paletteStaleVersion } from "@/components/palette/palette-stale";
+import { paletteGroups, templateIdFromPath } from "@/components/palette/commands";
+import { usePaletteResults } from "@/components/palette/use-palette-results";
 import { findSection } from "@/components/settings/sections";
-import type { PaletteContext, PaletteItem, TemplateTabKey } from "@/domain/import-types";
-import type { PaletteTemplate } from "@/server/queries/palette";
+import type { PaletteItem, TemplateTabKey } from "@/domain/import-types";
+import { PALETTE_QUERY_MAX } from "@/domain/palette";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { NAV_ICON_STROKE, NAV_ITEMS } from "./nav";
 import { ScrimDialogContent } from "./scrim-dialog";
 import { TeamIcon } from "./team-icon";
 
 // ⌘K: go to a template, a page, a setting or another team, or start a new template. The items are
-// built in `components/palette/commands.ts`; this renders them and handles the keys. The per-space
-// facts (can create, recent templates) come from /api/palette/{space}, once per space.
-
-const REVALIDATE_AFTER_MS = 20_000;
+// built in `components/palette/commands.ts`; this renders them and handles the keys. Templates and the
+// per-space facts (can create, recent templates) are asked of GET /api/palette/{space} when the palette
+// opens and as the viewer types (`usePaletteResults`); no page carries them.
 
 const TAB_ICON: Record<TemplateTabKey, LucideIcon> = {
   content: FileText,
@@ -91,58 +90,43 @@ function itemKey(item: PaletteItem): string {
   }
 }
 
-export function CommandPalette({
-  templates,
-  spaces,
-}: {
-  templates: PaletteTemplate[];
-  spaces: SpaceNav[];
-}) {
+export function CommandPalette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] }) {
+  // Everything the palette keeps (its answers, what was typed) is one viewer's: when the viewer changes
+  // (a persona switch, later a sign-in) a new palette starts empty, so nobody sees what was read for
+  // somebody else.
+  return <Palette key={viewerId} viewerId={viewerId} spaces={spaces} />;
+}
+
+function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const { team } = useParams<{ team?: string }>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [contexts, setContexts] = useState<Record<string, PaletteContext>>({});
-  const loaded = useRef(new Map<string, { at: number; templates: PaletteTemplate[]; stale: number }>());
+  // The row Enter opens, and the answer it was picked in (see `selected` below).
+  const [pick, setPick] = useState<{ value: string; inAnswer: string } | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const space = spaces.find((s) => s.slug === team) ?? spaces[0];
-  const spaceSlug = space?.slug;
-
-  // Fetched once per space; a persona or data refresh (new `templates`) and a long gap since the last
-  // look count as stale, so Recent follows what the viewer has just been doing.
-  const load = useCallback(
-    (slug: string, force: boolean) => {
-      const seen = loaded.current.get(slug);
-      // A template made since (a starter, an import) makes what was loaded stale at once.
-      const stale = paletteStaleVersion();
-      if (!force && seen && seen.templates === templates && seen.stale === stale && Date.now() - seen.at < REVALIDATE_AFTER_MS) return;
-      loaded.current.set(slug, { at: Date.now(), templates, stale });
-      fetch(`/api/palette/${encodeURIComponent(slug)}`)
-        .then((res) => (res.ok ? (res.json() as Promise<PaletteContext>) : null))
-        .then((context) => {
-          if (context) setContexts((prev) => ({ ...prev, [slug]: context }));
-          else loaded.current.delete(slug);
-        })
-        .catch(() => loaded.current.delete(slug));
-    },
-    [templates],
-  );
-
-  useEffect(() => {
-    if (spaceSlug) load(spaceSlug, false);
-  }, [spaceSlug, load]);
+  const { results, exact, failed } = usePaletteResults({
+    viewerId,
+    space: space?.slug ?? "",
+    current: templateIdFromPath(pathname),
+    query,
+    open: open && space !== undefined,
+  });
 
   const show = useCallback(() => {
     const active = document.activeElement;
     opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
-    if (spaceSlug) load(spaceSlug, false);
     setOpen(true);
-  }, [spaceSlug, load]);
+  }, []);
 
   const change = useCallback((next: boolean) => {
     setOpen(next);
-    if (!next) setQuery("");
+    if (!next) {
+      setQuery("");
+      setPick(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -159,22 +143,24 @@ export function CommandPalette({
   }, [open, show, change]);
 
   const groups = useMemo(
-    () =>
-      space
-        ? paletteGroups({
-            space,
-            spaces,
-            // The space's own list from the server is fresher than the shell's (a template made this session).
-            templates: contexts[space.slug]?.templates ?? templates,
-            context: contexts[space.slug] ?? null,
-            pathname,
-            query,
-          })
-        : [],
-    [space, spaces, templates, contexts, pathname, query],
+    () => (space ? paletteGroups({ space, spaces, results, pathname, query }) : []),
+    [space, spaces, results, pathname, query],
   );
 
   if (!space) return null;
+
+  // Until the first answer comes the list stays empty, so nothing it lists moves when the answer's
+  // groups arrive above the palette's own. A failed answer lists what the palette has without it.
+  const waiting = results === null && !failed;
+  // "Nothing found" only once the answer to what was typed is in (or couldn't be had).
+  const settled = exact || failed;
+
+  // cmdk moves to the first row whenever what was typed changes. The palette also goes back to it when
+  // the server's answer to what was typed replaces a narrowed one, which can put better matches above
+  // the row picked meanwhile, so Enter opens the best match, as it always has.
+  const answer = results ? `${results.query}|${exact}` : "";
+  const values = groups.flatMap((g) => g.items.map((item) => `${g.key}:${itemKey(item)}`));
+  const selected = pick && pick.inAnswer === answer && values.includes(pick.value) ? pick.value : (values[0] ?? "");
 
   // The Team/Platform tag on a settings row says which kind it is; it only helps where both kinds are listed.
   const mixedSettings = new Set(
@@ -205,43 +191,51 @@ export function CommandPalette({
           finalFocus={() => opener.current ?? true}
         >
           <DialogTitle className="sr-only">Search</DialogTitle>
-          <Command shouldFilter={false} loop className="rounded-2xl! bg-surface p-2">
-            <CommandInput aria-label="Search" value={query} onValueChange={setQuery} />
-            <CommandList className="max-h-[22rem] pt-1 pb-1">
-              <CommandEmpty className="text-text-muted">Nothing found</CommandEmpty>
-              {groups.map((group) => (
-                <CommandGroup key={group.key} heading={group.heading}>
-                  {group.items.map((item) => {
-                    const { icon: Icon, team: teamIcon } = itemIcon(item, spaces);
-                    return (
-                      <CommandItem
-                        key={itemKey(item)}
-                        value={`${group.key}:${itemKey(item)}`}
-                        onSelect={() => choose(item)}
-                        className="h-10 gap-3 px-3 data-selected:bg-hover"
-                      >
-                        {Icon ? (
-                          <Icon aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
-                        ) : teamIcon ? (
-                          <TeamIcon name={teamIcon} className="size-[18px] text-text-muted" />
-                        ) : null}
-                        <span className="min-w-0 flex-1 truncate">{itemLabel(item)}</span>
-                        {item.kind === "template" ? (
-                          <>
-                            {space.kind === "all" ? (
-                              <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{item.teamName}</span>
+          <Command
+            shouldFilter={false}
+            loop
+            value={selected}
+            onValueChange={(value) => setPick({ value, inAnswer: answer })}
+            className="rounded-2xl! bg-surface p-2"
+          >
+            <CommandInput aria-label="Search" value={query} onValueChange={setQuery} maxLength={PALETTE_QUERY_MAX} />
+            <CommandList aria-busy={waiting || undefined} className="max-h-[22rem] pt-1 pb-1">
+              {settled ? <CommandEmpty className="text-text-muted">Nothing found</CommandEmpty> : null}
+              {waiting
+                ? null
+                : groups.map((group) => (
+                    <CommandGroup key={group.key} heading={group.heading}>
+                      {group.items.map((item) => {
+                        const { icon: Icon, team: teamIcon } = itemIcon(item, spaces);
+                        return (
+                          <CommandItem
+                            key={itemKey(item)}
+                            value={`${group.key}:${itemKey(item)}`}
+                            onSelect={() => choose(item)}
+                            className="h-10 gap-3 px-3 data-selected:bg-hover"
+                          >
+                            {Icon ? (
+                              <Icon aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
+                            ) : teamIcon ? (
+                              <TeamIcon name={teamIcon} className="size-[18px] text-text-muted" />
                             ) : null}
-                            <StatusBadge state={item.status} className="shrink-0" />
-                            <span className="shrink-0 font-mono text-xs text-text-muted group-data-selected/command-item:text-text">{item.id}</span>
-                          </>
-                        ) : item.kind === "settings" && mixedSettings ? (
-                          <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{GROUP_LABEL[item.group]}</span>
-                        ) : null}
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ))}
+                            <span className="min-w-0 flex-1 truncate">{itemLabel(item)}</span>
+                            {item.kind === "template" ? (
+                              <>
+                                {space.kind === "all" ? (
+                                  <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{item.teamName}</span>
+                                ) : null}
+                                <StatusBadge state={item.status} className="shrink-0" />
+                                <span className="shrink-0 font-mono text-xs text-text-muted group-data-selected/command-item:text-text">{item.id}</span>
+                              </>
+                            ) : item.kind === "settings" && mixedSettings ? (
+                              <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{GROUP_LABEL[item.group]}</span>
+                            ) : null}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  ))}
             </CommandList>
           </Command>
         </ScrimDialogContent>
