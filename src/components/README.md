@@ -261,7 +261,7 @@ focuses registers the same way.
 ## Testing
 
 - Unit tests sit next to their code as `*.test.ts(x)`. `npx vitest run src/components src/lib` runs this
-  layer's 69 files in a few seconds; `npm test` runs everything.
+  layer's 75 files in a few seconds; `npm test` runs everything.
 - The default environment is `node` ([vitest.config.mts](../../vitest.config.mts)). A test that needs a DOM
   opts in with `// @vitest-environment happy-dom` on its first line.
 - No Testing Library. Markup tests use `renderToStaticMarkup` (`primitives/status-badge.test.tsx`); interaction

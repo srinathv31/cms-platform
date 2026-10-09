@@ -1,35 +1,37 @@
 # Codebase review (October 2026)
 
-Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7, 2026), looking for what a production dev team, or an AI agent copying the code, would trip over. This page is that review as a working backlog: every finding, its severity, where it is, what happens and how to fix it, with its current status.
+Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7, 2026), looking for what a production dev team, or an AI agent copying the code, would trip over. This page is that review as a working backlog: every finding, its severity, where it is, what happens and how to fix it, with its current status. It also holds what the fixes turned up, in [Found while fixing](#found-while-fixing).
 
 ## How to use this page
 
-- **Pick work** from [Fix first](#fix-first), top to bottom. Skip anything marked Fixed or Deferred, and don't pick from [Waits for the enterprise work](#waits-for-the-enterprise-work): those findings get fixed as part of that work.
+- **Pick work** from [Found while fixing](#found-while-fixing), most severe first, and from [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene). Every item in [Fix first](#fix-first) is fixed. Skip anything marked Fixed or Deferred, and don't pick from [Waits for the enterprise work](#waits-for-the-enterprise-work): those findings get fixed as part of that work.
 - **Fix a finding in its own PR** (or a small group of related ones), and change its **Status** line here in the same PR: `Open` → `Fixed`, with one sentence saying what changed, and update the counts in [Status](#status). Keep the heading as it is so links to it keep working. That keeps this page true; a finding marked Open must still be reproducible.
-- **Line numbers are from ec3978b.** Files touched since then have moved; find the code by the symbol or behaviour described. A path that no longer exists is marked as moved or removed.
-- **Evidence** says how sure the finding is: *measured* (from a check run for the review), *verified* (re-read in the code after the reviewer reported it), *reproduced* (proved with a throwaway test), *traced* (followed through the code, not run). Re-check a *traced* finding before fixing it.
+- **Line numbers are from ec3978b.** Files touched since then have moved; find the code by the symbol or behavior described. A path that no longer exists is marked as moved or removed. The findings in [Found while fixing](#found-while-fixing) give no line numbers, only files and symbols.
+- **Evidence** says how sure the finding is: *measured* (from a check run for the review or, in Found while fixing, for a fix), *verified* (re-read in the code after the reviewer reported it), *reproduced* (proved with a throwaway test), *traced* (followed through the code, not run). Re-check a *traced* finding before fixing it.
 - **Rules still apply.** Read [AGENTS.md](../AGENTS.md) and the README of the layer you're changing. Rendering changes must keep the golden files and parity tests green ([src/server/render/golden](../src/server/render/golden/README.md)).
 
 ## Status
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 12 | 8 | 23 |
+| Open | 0 | 3 | 14 | 27 | 44 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
 | Fixed | 1 | 19 | 23 | 5 | 48 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), and PRs #9–#40 (the Fix first list, October 2026).
 
-The findings not yet fixed fall into three groups: logic and UI fixes in [Fix first](#fix-first), tooling and hygiene to take [alongside them](#alongside-tooling-and-hygiene), and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
+The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
 **Deferred** findings are demo and login stand-ins the owner will replace with real login and by removing the demo tools; don't fix them in place.
 
 ## Fix first
 
-Everything here can be fixed now. None of it waits on real sign-in, the Java API or the enterprise font, and none of the fixes gets thrown away when those land. The groups follow what each finding puts at risk: in a product for regulated content, customers seeing only approved content comes first and authors never losing work second, then logic and UI that's wrong or fragile, then polish. Within a group, the likeliest and cheapest come first. An item that names several findings is one PR.
+Every item in this list is fixed, in PRs #9–#40. The next work is [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene), below, and the findings the fixes turned up, in [Found while fixing](#found-while-fixing).
 
-Three items need an owner decision before code: [D1](#d1--high-revoking-the-live-version-freezes-the-template-for-good) (what the corrected draft starts from), [I5](#i5--high-a-draft-rename-goes-live-without-review) (where the customer-facing title comes from) and [D6](#d6--medium-a-sunset-date-means-midnight-utc) (which time zone a sunset date means).
+None of it waited on real sign-in, the Java API or the enterprise font, and none of the fixes gets thrown away when those land. The groups follow what each finding puts at risk: in a product for regulated content, customers seeing only approved content comes first and authors never losing work second, then logic and UI that's wrong or fragile, then polish. Within a group, the likeliest and cheapest came first. An item that names several findings was one PR.
+
+The three items that needed an owner decision were decided: [D1](#d1--high-revoking-the-live-version-freezes-the-template-for-good) in [decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md) (the corrected draft starts from the revoked version's content), [I5](#i5--high-a-draft-rename-goes-live-without-review) in [decision 0016](decisions/0016-the-name-is-versioned.md) (the name is a version field) and [D6](#d6--medium-a-sunset-date-means-midnight-utc) in [decision 0017](decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md) (a sunset date ends at 00:00 in the business time zone).
 
 ### Make main green
 
@@ -79,7 +81,7 @@ Three items need an owner decision before code: [D1](#d1--high-revoking-the-live
 
 ### Alongside: tooling and hygiene
 
-Not logic or UI, and nothing to wait for. Take T4 and T3 early, since every fix above relies on the checks; fit the rest in between.
+Not logic or UI, and nothing to wait for. Take T4 and T3 first, since every fix relies on the checks; fit the rest in between the findings in [Found while fixing](#found-while-fixing).
 
 - [T4 · High](#t4--high-no-ci-node-pin-or-environment-template): No CI, Node pin or `.env.example`. A workflow running e2e would have caught [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift).
 - [T3 · High](#t3--high-database-backed-unit-tests-depend-on-order): The database-backed tests still depend on their order.
@@ -95,6 +97,178 @@ Not logic or UI, and nothing to wait for. Take T4 and T3 early, since every fix 
 - [H7 · Low](#h7--low-dead-code): Dead code.
 - [H8 · Low](#h8--low-oversized-files-and-functions): Oversized files. Split `ReviewWorkspace` before the approver-views-output follow-up adds to it.
 
+## Found while fixing
+
+The PRs that fixed the [Fix first](#fix-first) list noticed these and left them alone to stay in scope. Each was checked again in the code at `main` @ 2fca829 (October 9, 2026), and says which fix noticed it. They're ordered by severity, then, as Fix first was, by what they put at risk: what approvers and authors are told, authors' work, logic and UI, code that gets copied, then the tests and docs. None of them waits for the enterprise work.
+
+#### N1 · Medium: After a revoke, the review screen shows no redline
+
+- **Status:** Open
+- **Where:** `src/server/queries/review.ts` (`getReviewScreen`, its `baseline`); `src/components/review/review-workspace.tsx`
+- **What happens:** The review screen compares the version only with the Active one: `baseline` is null when nothing is Active. After the Active version is revoked ([D1](#d1--high-revoking-the-live-version-freezes-the-template-for-good)), the approver reviewing the correction gets no redline and no "vs vN" label, so the whole document reads as new and they can't see what the correction changed. The rename line on the same screen already compares with `contractBaseline`. Noticed while fixing D1 (PR #16).
+- **Fix:** When nothing is Active, compare with the draft's base version (`versions.basedOnVersionId`, the revoked version the correction started from) or with `contractBaseline`, and name it in the label. Keep the approve dialog's previous version apart ([N3](#n3--low-after-a-revoke-approves-consequences-read-as-a-first-version)): today it takes `baseline`'s number.
+- **Evidence:** traced
+
+#### N2 · Medium: A failed demo-script run leaves its state to the specs after it
+
+- **Status:** Open
+- **Where:** `e2e/demo-script.spec.ts` (`test.afterAll`)
+- **What happens:** The spec plays the whole demo on one database state: it resets in `beforeAll` and ends on the demo drawer's Reset. When a step fails, `afterAll` only closes the database, so the run's state stays behind: the demo clock moved on, access lapsed (Maya's, in the failed runs), and Coral's offers relinked to the story's versions. The specs after it run on that database, so one failure here cascades into dozens in specs that have nothing to do with it (principles, scenario-04, scenario-05). Its header says the next run starts with a reset, which holds only for the next run of this spec. Seen in the e2e runs of the Fix first PRs.
+- **Fix:** Reset in `afterAll` whatever happened (`resetDemoData()`, as `beforeAll` does), so a failure stays in this spec. Relates to [T7](#t7--medium-slow-and-brittle-test-habits), which would retire or merge the spec.
+- **Evidence:** measured
+
+#### N3 · Low: After a revoke, Approve's consequences read as a first version
+
+- **Status:** Open
+- **Where:** `src/domain/consequences.ts` (`approveLines`); `src/components/review/review-workspace.tsx` (`previousNumber`)
+- **What happens:** The approve dialog takes its previous version from the Active one. With nothing Active, after a revoke, it says "v3 becomes Active." and "Consumers can start using it right away.", as for a first version. Consumers still pinned to a Superseded version that renders aren't named, nor are the keys they have to map before they move ("Coral has to map `annual_fee` before it moves to v3."), though the version's contract changes were worked out against that version. Noticed while fixing D1 (PR #16).
+- **Fix:** When nothing is Active, pass the newest version that still renders (`contractBaseline`) as the version consumers move from, with an approve case for it in `consequences`: no "becomes Superseded" line, and the mapping lines for its consumers.
+- **Evidence:** traced
+
+#### N4 · Low: A passed sunset still reads as a date to come on the status badge
+
+- **Status:** Open
+- **Where:** `src/components/primitives/status-badge.tsx` (`StatusBadge`)
+- **What happens:** A Superseded version with a sunset date reads "Superseded · Sunset Oct 1" whether the day is ahead or has passed. Once it has passed the version no longer renders, but the badge still reads like a date to come, wherever it shows one: Versions, Usage and the review header among them. Versions adds "Sunset passed Oct 1" to the entry's dates; the badge beside it doesn't change. Noticed while fixing D2 (PR #9).
+- **Fix:** Pass the badge whether the sunset has passed (the Versions and Usage read models already work out `sunsetPassed`) and word it for that, for example "Superseded · Sunset passed Oct 1".
+- **Evidence:** traced
+
+#### N5 · Low: Submit's hold rearranges the variables panel and closes an open form
+
+- **Status:** Open
+- **Where:** `src/editor/components/variables-panel.tsx` (`readOnly`); `src/components/workspace/content/content-workspace.tsx` (`useInert`)
+- **What happens:** From the Submit click until the dialog closes, the page is held read-only ([I8](#i8--medium-submit-can-freeze-content-the-dialog-didnt-list)), and the variables panel switches to its read-only layout: no insert buttons, no New variable, no open form. The rail rearranges under the dialog. A variable form that was open closes, and what was typed in it and not yet applied is gone when the hold lets go, on Submit or Cancel. Noticed while fixing I8 (PR #22).
+- **Fix:** Keep the panel's editing layout while the page is held, with its controls disabled rather than removed, and keep an open form with what was typed in it.
+- **Evidence:** traced
+
+#### N6 · Low: An unparsed drop, then a block move, strips the block's ids
+
+- **Status:** Open
+- **Where:** `src/editor/extensions/field-binding.ts` (`PanelDrop`)
+- **What happens:** UniqueID marks every drop from outside the editor so that the next `transformPasted` strips the dropped blocks' ids, and only `transformPasted` clears the mark. A drop ProseMirror can't parse into content, a file for example, never reaches `transformPasted`, so the mark outlives it and the next block moved by its ⋮⋮ grip loses its id. Its comment threads fall to "On removed content", as in [I4](#i4--high-a-panel-drop-followed-by-a-block-move-orphans-comment-threads). `PanelDrop` goes ahead of UniqueID for panel rows only; the mark itself is upstream behavior. Noticed while fixing I4 (PR #18).
+- **Fix:** Have `PanelDrop` also take, and swallow, a drop that carries no text, no HTML and no `view.dragging`, so UniqueID never marks it. Report the mark's lifetime upstream.
+- **Evidence:** traced
+
+#### N7 · Low: Sample values have no 1,000-character limit where they're typed
+
+- **Status:** Open
+- **Where:** `src/components/preview/sample-sets/values-editor.tsx`; `src/editor/components/variable-form.tsx` (Sample); `src/server/drafts/parse-patch.ts`
+- **What happens:** Autosave refuses a sample value over 1,000 characters, the limit [S6](#s6--medium-body-size-limits-trust-the-declared-content-length) put on every render value, but the sample-set value inputs and the variable form's Sample field take any length, and `validateValue` doesn't check it. Past it, the save is refused and the status shows zod's message with its path: `Not saved. sampleSets.0.values.first_name Too big: expected string to have <=1000 characters`. Noticed while fixing S6 (PR #20).
+- **Fix:** A 1,000-character `maxLength` on those inputs, and a plain sentence for the refusal.
+- **Evidence:** traced
+
+#### N8 · Low: Submit stays available after saving stops
+
+- **Status:** Open
+- **Where:** `src/components/workspace/workspace-actions.tsx` (`SubmitButton`)
+- **What happens:** Once saving has stopped for good ([I6](#i6--medium-after-a-save-conflict-the-editor-stays-editable-but-nothing-saves)), Submit for review still looks available. Pressing it tries the save again, then shows the stop's reason in a popover under the button, though the reason was known before the click. Noticed while fixing I6 (PR #31).
+- **Fix:** Show Submit disabled while saving is stopped, with the reason at the control (`BlockedButton`), as the rule for unavailable controls asks.
+- **Evidence:** traced
+
+#### N9 · Low: The error boundaries leave three loose ends
+
+- **Status:** Open
+- **Where:** `src/components/workspace/workspace-tab-bar.tsx`; `src/app/global-error.tsx`; `src/components/app-shell/skeletons.tsx` (`StaticRow`)
+- **What happens:** When a workspace tab fails, its error takes the document's cell and the header and tab bar stay, with the tab bar's Edit, Submit for review and Preview still enabled, though the tab they act on didn't load. The simulator has no error boundary of its own, so a failure under `/sim` shows Stencil's global error page, whose Back to library goes to `/`. And the sidebar's skeleton, on screen while the sidebar streams in, dims its labels to 60% opacity, which axe measures at 4.39:1, under 4.5:1. Noticed while fixing I7 (PR #23).
+- **Fix:** Disable the tab bar's actions while the tab shows its error, with the reason; give `src/app/(simulator)` its own `error.tsx` that goes back to `/sim`; draw the skeleton's labels at full contrast.
+- **Evidence:** traced
+
+#### N10 · Low: The save status's chevron moves as a save lands
+
+- **Status:** Open
+- **Where:** `src/components/workspace/save-status.tsx` (`RevertMenu`'s trigger)
+- **What happens:** On a draft with something to revert to, the save status is the Revert menu's trigger, with its chevron after the text. The text changes width from "Saving…" to "Saved", so the chevron moves about 11px as each save lands: a layout shift of about 0.000002, more than 500 ms after the last keystroke, so the zero-shift rule counts it. No e2e test types into a draft and then checks layout shift, so nothing catches it. [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift)'s What happens credits the undo and redo buttons; the shift it measured came from this trigger appearing on hydration, as its Status says. Noticed while fixing T1 (PR #12).
+- **Fix:** Give the status text the width of its widest state, or put the chevron before it, and add a layout-shift check after typing to an e2e spec.
+- **Evidence:** measured
+
+#### N11 · Low: The revert toast's Undo is a second black button
+
+- **Status:** Open
+- **Where:** `src/components/workspace/save-status.tsx` (`offerUndo`); `src/components/motion/providers.tsx` (the `Toaster`)
+- **What happens:** The toast after a revert has an Undo action, which sonner draws by default as a filled button in the toast's text color, near black. On the workspace, Submit for review is already the screen's one black button. Noticed while fixing I2 (PR #15).
+- **Fix:** Style toast actions as outline buttons through the `Toaster`'s `toastOptions.classNames.actionButton`, set where it is mounted rather than in `src/components/ui/sonner.tsx`.
+- **Evidence:** traced
+
+#### N12 · Low: The heatmap legend is hover-only, and HBars color by rank
+
+- **Status:** Open
+- **Where:** `src/components/usage/charts.tsx` (`HeatLegend`, `HBars`)
+- **What happens:** The heatmap legend's swatches give the range each shade means ("2 to 9 renders in a day") only in a hover tooltip. They're `aria-hidden` and take no focus, so keyboard and screen-reader users never get the ranges. HBars draws the first row in the darkest brand step and the rest in a lighter one, so color encodes rank, which the bars' lengths already show, and reads as a category. Noticed while fixing I13 (PR #24).
+- **Fix:** Print the ranges with the legend, or add them as sr-only text, and draw every bar in one color.
+- **Evidence:** traced
+
+#### N13 · Low: The Library's status filter is a third selected style
+
+- **Status:** Open
+- **Where:** `src/components/library/library-browser.tsx` (the status filter's `ToggleGroupItem`)
+- **What happens:** H3 gave the segmented control and the tabs one look each in `src/components/primitives/`. The Library's status filter shows its pressed item a third way: rounded pills with no track, filled `bg-selected` when pressed, with the classes inline. `src/components/primitives/one-copy.test.ts` doesn't look for it. Noticed while fixing H3 (PR #40).
+- **Fix:** Use `Segmented` for the filter, or make the pill a primitive if the Library keeps pills on purpose, and record which in [decision 0030](decisions/0030-shared-primitives-have-one-home.md).
+- **Evidence:** traced
+
+#### N14 · Low: A chain change repeats a line for a person named on two stages
+
+- **Status:** Open
+- **Where:** `src/domain/platform-config.ts` (`describeChainChange`)
+- **What happens:** It adds "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of." once per stage that names a new person, so a person newly named on two stages gets the line twice. `validateChain` refuses a person on two stages, and the chain editor shows no lines while Save is blocked, so nobody sees it today; a caller that shows the lines without validating first would. Noticed while fixing D4 (PR #14).
+- **Fix:** Add each person's line once.
+- **Evidence:** traced
+
+#### N15 · Low: Coral drops a mapping on a rename and dates a sunset in UTC
+
+- **Status:** Open
+- **Where:** `src/simulator/mapping.ts` (`suggestMapping`); `src/simulator/ui/format.tsx` (`dayLabel`)
+- **What happens:** Two gaps in the simulated consumer. Relinking keeps a field's mapping only under the same key, so after a variable rename the renamed variable starts unmapped, though `/api/v1` reports the rename as one `key_renamed` change ([D8](#d8--medium-variable-renames-are-lost-between-the-panel-and-submit)). And Coral shows a sunset as its instant's date in UTC. A sunset ends at 00:00 in the business time zone ([D6](#d6--medium-a-sunset-date-means-midnight-utc)), and every zone on the list is UTC or behind it, so the date is right today; a zone ahead of UTC would show the day before. Noticed while fixing D8 (PR #32) and D6 (PR #26).
+- **Fix:** Carry a mapping across a `key_renamed` change when relinking. Show a sunset's day in the business time zone, which needs `/api/v1` to send the zone or the day beside the instant.
+- **Evidence:** traced
+
+#### N16 · Low: Two refusal rules still live outside the domain
+
+- **Status:** Open
+- **Where:** `src/components/access/request-access.tsx` (the reason check); `src/server/actions/platform.ts` (`createTeam`); `src/server/queries/platform.ts`
+- **What happens:** H2 moved the settings screens' checks into the domain; two rules outside them are still copies. Request access checks the reason itself (empty, then longer than `ACCESS_REASON_MAX`), repeating the ladder of the domain's `requestAccess`, and H2's test covers settings components only. And "an Auditor can't be a team's first Team Admin" is written twice in `src/server`: the `createTeam` action refuses it, and the platform read model leaves Auditors out of the picker. The domain's `createTeam` doesn't know it, so a port would miss it. Noticed while fixing H2 (PR #28).
+- **Fix:** Export one domain check for the request's reason and use it in the form and in `requestAccess`; move the Auditor rule into the domain's `createTeam` and have the read model ask it. Both shrink [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain).
+- **Evidence:** traced
+
+#### N17 · Low: The review actions keep a private copy of draftRow
+
+- **Status:** Open
+- **Where:** `src/server/actions/review.ts` (`draftRow`)
+- **What happens:** `requestChanges` builds its new draft row with a private copy of `draftRow`, the same as the one `src/server/templates/create.ts` exports and `src/server/actions/templates.ts` uses. A column added to versions has to be added to both, and the server README lists the copy under Don't copy. Noticed while fixing A3 (PR #39).
+- **Fix:** Import the shared `draftRow`, delete the copy, and drop its Don't copy entry.
+- **Evidence:** traced
+
+#### N18 · Low: readBodyCapped lives in the import folder
+
+- **Status:** Open
+- **Where:** `src/server/import/read-body.ts`
+- **What happens:** The byte-capped body reader serves three route handlers (import, autosave and the `/api/v1` render route), but it lives under `src/server/import/`, so the other two reach into the import feature for it, and someone looking beside the other HTTP helpers won't find it. Noticed while fixing S6 (PR #20).
+- **Fix:** Move it to `src/server/api/`, beside `http.ts`, and update the three routes and the server README.
+- **Evidence:** traced
+
+#### N19 · Low: The simulator serves reads as server actions
+
+- **Status:** Open
+- **Where:** `src/simulator/actions.ts`; `eslint.config.mjs` (the `"use server"` rule's `ignores`)
+- **What happens:** [A6](#a6--medium-reads-are-exposed-as-server-actions) made on-demand reads GET routes and allowed `"use server"` only in `src/server/actions/`, but the simulator's actions file is exempt. Beside its four writes it serves two reads, `searchTemplates` and `getDeliveryView`, so they are public POST endpoints queued with the writes: the pattern A6 removed from Stencil. Noticed while fixing A6 (PR #29).
+- **Fix:** Serve the two reads from GET route handlers or server component props, and narrow the exemption to the writes.
+- **Evidence:** traced
+
+#### N20 · Low: Five e2e specs fail now and then when runs share a machine
+
+- **Status:** Open
+- **Where:** `e2e/comment-policy.spec.ts`; `e2e/scenario-08.spec.ts`; `e2e/demo-script.spec.ts`; `e2e/scenario-02a.spec.ts`; `e2e/focus-targets.spec.ts`
+- **What happens:** While several e2e runs shared one machine, each of these failed in some run and passed when run alone: comment-policy (`SQLITE_BUSY` on its own database access), scenario-08 (its Settings link), demo-script at step 8.3, scenario-02a's keyboard-only run, and focus-targets' first test, which typed " (edited)" into the middle of the template name. A gate that fails at random gets rerun until it passes, and a real failure hides among the reruns. Seen in the e2e runs of the Fix first PRs.
+- **Fix:** Find what each one races and wait for that with a web-first assertion, retry `SQLITE_BUSY` in the specs' own database access, and check each under load with `--repeat-each`. Relates to [T7](#t7--medium-slow-and-brittle-test-habits) and [T5](#t5--medium-e2e-cant-be-pointed-at-its-own-database).
+- **Evidence:** measured
+
+#### N21 · Low: Three decision records have lines later decisions superseded
+
+- **Status:** Open
+- **Where:** `docs/decisions/0002-a-passed-sunset-is-final.md`; `docs/decisions/0007-maker-checker-covers-every-writer.md`; `docs/decisions/0025-refusals-carry-stable-codes.md`
+- **What happens:** Three accepted records state something a later record changed. [0002](decisions/0002-a-passed-sunset-is-final.md) says five other places still test "sunset passed" themselves; there is one test now, `sunsetPassed` ([decision 0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)). [0007](decisions/0007-maker-checker-covers-every-writer.md) names the edit transition `editActive`; it is `editLatest` ([decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md)). [0025](decisions/0025-refusals-carry-stable-codes.md) says `startDraft` throws `planDraftStart`'s blocked reason; it returns it ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)). Accepted records aren't rewritten, so someone reading one of them alone is misled. They went stale with D7 (PR #36), D1 (PR #16) and A3 (PR #39).
+- **Fix:** Under each record's Status, add a line naming the later record and what it changed, and leave the rest as written (or mark it "Superseded by" where the later record replaces it, as the decisions README describes).
+- **Evidence:** verified
+
 ## Waits for the enterprise work
 
 These findings are real, and several are High, but each one is fixed by building something that's on the way: real sign-in, the Java API or the enterprise font. A fix made in the prototype now would be replaced. They stay Open so that each piece of work starts with them in view, and each table says what that work has to get right.
@@ -107,7 +281,7 @@ These findings are real, and several are High, but each one is fixed by building
 | [S4 · High](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep) | Work out each membership's effective status from its recertification and inactivity deadlines when the viewer is loaded, so a lapsed approver is refused on their next request, and run the sweep on a schedule instead of on demo triggers. |
 | [S10 · Low](#s10--low-mutating-route-handlers-have-no-origin-check) | Better Auth's origin checks cover its own endpoints, not the app's. Once the cookie is a real session, the autosave and import route handlers check `Origin` or `Sec-Fetch-Site` themselves, and answer unknown and forbidden ids the same way. |
 
-The sign-in work also touches three findings filed elsewhere. [A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews): keep the session cookie off `/api/v1` by moving CMS preview to a BFF route first. [I12](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data): the palette's cache has to be keyed by viewer before two real people share a browser (item 24). [S5](#s5--high-consumer-identity-is-a-self-asserted-header): consumers are systems, not people, so they get client credentials (an Entra ID app registration can issue them), not Better Auth sessions. The app reads the session in one place, the fail-closed request context in step 1 of [the backend seam](#the-backend-seam).
+The sign-in work also touches findings filed elsewhere. [A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews): keep the session cookie off `/api/v1` by moving CMS preview to a BFF route first. [I12](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data) is fixed: the palette keeps its answers per viewer, as two real people sharing a browser need. [S5](#s5--high-consumer-identity-is-a-self-asserted-header): consumers are systems, not people, so they get client credentials (an Entra ID app registration can issue them), not Better Auth sessions. The app reads the session in one place, the fail-closed request context in step 1 of [the backend seam](#the-backend-seam).
 
 ### Demo tools
 
@@ -127,7 +301,7 @@ If the backend moves to the Spring Boot API with this app as its BFF, these find
 | [A1 · High](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews) | Do it first, before Spring owns `/api/v1`: CMS preview moves to a BFF route that calls the render engine with the session, and `/api/v1` serves consumers only. |
 | [S5 · High](#s5--high-consumer-identity-is-a-self-asserted-header) | Consumers authenticate at the gateway with client credentials or mTLS, calls are rate-limited, and unauthenticated calls write no render-log rows. The contract says so. |
 | [B1 · High](#b1--high-server-actions-are-the-service-layer) | A request context and service interfaces, with today's code as the local implementation and an HTTP one beside it. Rendering already works this way. |
-| [B2 · High](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) | Each rule it lists becomes one domain function. Fix first items that touch these rules ([S7](#s7--medium-comments-are-accepted-on-any-version-state), [D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve) and [H2](#h2--medium-client-components-re-implement-domain-rules) among them) move theirs as they go, so this list shrinks before the port. |
+| [B2 · High](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) | Each rule it lists becomes one domain function. Fix first items that touched these rules ([S7](#s7--medium-comments-are-accepted-on-any-version-state), [D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve) and [H2](#h2--medium-client-components-re-implement-domain-rules) among them) moved theirs; [N16](#n16--low-two-refusal-rules-still-live-outside-the-domain) lists two that are left. |
 | [A5 · Medium](#a5--medium-the-contract-is-typescript-only-and-the-simulator-tests-against-a-fake) | One machine-readable source for `/api/v1` (OpenAPI 3.1 or zod), and the simulator tested against the real handlers instead of a fake. |
 | [D10 · Medium](#d10--medium-audit-and-notice-payloads-are-untyped) | A typed payload per audit action and notice; they become the Java DTOs. Migrate the seed's spellings instead of aliasing them. |
 | [B3 · Medium](#b3--medium-invariants-rely-on-sqlites-single-writer) | Partial unique indexes or row locks behind the last-admin, one-open-recertification and one-pending-request rules, CHECK constraints on state, status and role, and the missing indexes. SQLite's single writer hides all of these today. |
@@ -335,7 +509,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I2 · High: The revert toast's Undo overwrites edits made after the revert
 
-- **Status:** Fixed. The session counts edits, `restore` refuses once anything was edited since the revert or a field it would put back is off screen, and the toast goes at that moment ([decision 0007](decisions/0005-revert-undo-goes-when-anything-changes.md)).
+- **Status:** Fixed. The session counts edits, `restore` refuses once anything was edited since the revert or a field it would put back is off screen, and the toast goes at that moment ([decision 0005](decisions/0005-revert-undo-goes-when-anything-changes.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 171; `src/components/workspace/session/session-store.ts` line 369
 - **What happens:** Undo stays live for the toast's lifetime and `restore(previous)` applies the pre-revert values unconditionally. Revert, type a paragraph, click Undo: the paragraph is gone, and the remount already wiped the editor's history. If the author switched tabs first, `restore` sends content the hidden editor doesn't show, and the next keystroke saves the reverted content over it. New in the undo/redo merge.
 - **Fix:** Track a save generation and make `restore` refuse (and dismiss the toast) when anything was edited since, or when not every field is on screen.
@@ -343,7 +517,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I3 · High: Renaming a variable with Email off orphans its chips in the subject
 
-- **Status:** Fixed. With Email off the Email details fields stay mounted, hidden (`InlineVariableField` takes `hidden`; the root still counts them and sends renames and deletes to them, but insert, undo and redo pass them by), so the subject follows a rename and saves it ([decision 0007](decisions/0004-email-fields-hidden-not-unmounted.md)).
+- **Status:** Fixed. With Email off the Email details fields stay mounted, hidden (`InlineVariableField` takes `hidden`; the root still counts them and sends renames and deletes to them, but insert, undo and redo pass them by), so the subject follows a rename and saves it ([decision 0004](decisions/0004-email-fields-hidden-not-unmounted.md)).
 - **Where:** `src/editor/state/editor-root.ts` line 317; `src/components/workspace/content/email-details.tsx` line 48
 - **What happens:** With Email off, the subject and preheader fields unmount, so a rename doesn't reach them. Turn Email back on: the subject shows an unknown chip, the saved subject keeps the old key, and Submit fails with "Define or remove {{first_name}}". The hidden chips aren't counted either, so the variable can be deleted as unused without the confirm dialog.
 - **Fix:** Keep the fields mounted but hidden, or apply the root's rename forwards and tombstones when a field mounts.
@@ -539,7 +713,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
-- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0007](decisions/0006-page-notices-by-commit-order.md)).
+- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
 - **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.
@@ -655,7 +829,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T1 · High: main fails e2e: the undo/redo merge added a layout shift
 
-- **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0007](decisions/0003-undo-redo-always-shown.md)).
+- **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 51; `e2e/principles.spec.ts` line 271
 - **What happens:** 4 of 241 Playwright tests fail on the project's own zero-layout-shift check, all on the template workspace and its dialogs. Each reports a 0.000004 shift at about 400 ms from the `span.inline-flex.items-center.gap-1.5` that wraps the save status and the new undo/redo buttons.
 - **Fix:** Reserve the undo/redo buttons' space from the first paint, or render them disabled until history is ready (the "disabled, not hidden" rule).

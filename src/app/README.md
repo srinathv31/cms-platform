@@ -287,6 +287,20 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |
 | `e2e/revoke-recovery.spec.ts` | After the Active version is revoked: Edit from the revoked content, contract changes against the version that still renders, approve, render. |
+| `e2e/action-refusals.spec.ts` | A refusal an action used to throw shows the domain's sentence: Edit refused because a newer version went into review. |
+| `e2e/autosave-session.spec.ts` | Autosave never drops an edit silently: a rename on the Versions tab saves, a conflict turns the page read-only with Reload, and leaving with a save out asks first. |
+| `e2e/comment-policy.spec.ts` | A reviewer comments on a version in review; an Active version's threads offer nothing to answer them with. |
+| `e2e/email-off-rename.spec.ts` | A variable renamed while Email is off is renamed in the subject too, and the draft submits. |
+| `e2e/focus-targets.spec.ts` | Where focus goes after Esc in the preview, the name and the rail, after a submit, and when an imported template's Original tab widens the rail. |
+| `e2e/list-numbering.spec.ts` | Numbering and Start at… from the block menu: the editor, the PDF and the Web preview show the same markers. |
+| `e2e/maker-checker.spec.ts` | Someone who edited a draft another author submitted can't approve it or send it back. |
+| `e2e/panel-drop-block-move.spec.ts` | A block moved by its grip after a panel drop keeps its id, and its comment thread stays on it. |
+| `e2e/revert-undo.spec.ts` | Revert to vN and its toast's Undo: Undo puts the content back, and goes once anything is typed or the tab changes. |
+| `e2e/submit-holds-draft.spec.ts` | Submit holds the draft still while it reads the summary, Cancel lets go, and a stale summary is refreshed. |
+| `e2e/sunset-passed.spec.ts` | A passed sunset: Change sunset stays disabled with its reason, and the sunset sweep's one audit row shows on Activity. |
+| `e2e/sunset-zone.spec.ts` | A sunset date ends at 00:00 in the business time zone, and changing the zone moves no sunset already set. |
+| `e2e/variable-rename.spec.ts` | A renamed variable reaches the submit dialog and the stored contract as one rename. |
+| `e2e/versioned-name.spec.ts` | A draft rename reaches customers only when its version is approved, and the review shows it. |
 | `e2e/demo-script.spec.ts` | The whole demo script on one database state. |
 | `e2e/error-boundaries.spec.ts` | Each error boundary, reached by breaking a stored JSON value for one test: what it shows and keeps, and Try again once the value is back. |
 | `e2e/api/consumer.spec.ts`, `render.spec.ts`, `imports.spec.ts` | The `/api/v1` GET routes, the render route, and the import routes over HTTP. |
