@@ -4,7 +4,6 @@
 
 import { Editor, type JSONContent } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
-import { Slice } from "@tiptap/pm/model";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -204,17 +203,20 @@ describe("chip insertion", () => {
     expect(line(editor, 2)).toBe("Hi {{first_name}} {{purchase_apr}}, your APR is {{purchase_apr}}.");
   });
 
+  /** A drop on the document, as the browser sends it, carrying `data` and landing at `pos`. */
+  function drop(editor: Editor, data: Record<string, string>, pos: number | null): DragEvent {
+    editor.view.posAtCoords = () => (pos === null ? null : { pos, inside: -1 });
+    const event = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
+    const dataTransfer = { getData: (type: string) => data[type] ?? "", types: Object.keys(data), effectAllowed: "copy", files: [] };
+    Object.defineProperties(event, { dataTransfer: { value: dataTransfer }, clientX: { value: 0 }, clientY: { value: 0 } });
+    editor.view.dom.dispatchEvent(event);
+    return event;
+  }
+
   it("drop: a panel row's key lands where it's dropped, as one undo step", () => {
     const { editor } = setup();
-    const at = after(editor, 0, "Intro");
-    editor.view.posAtCoords = () => ({ pos: at, inside: -1 });
-    const event = {
-      clientX: 0,
-      clientY: 0,
-      dataTransfer: { getData: (type: string) => (type === VARIABLE_DRAG_TYPE ? "purchase_apr" : "") },
-    } as unknown as DragEvent;
-    const handled = editor.view.someProp("handleDrop", (f) => f(editor.view, event, Slice.empty, false));
-    expect(handled).toBe(true);
+    const event = drop(editor, { [VARIABLE_DRAG_TYPE]: "purchase_apr" }, after(editor, 0, "Intro"));
+    expect(event.defaultPrevented).toBe(true);
     expect(line(editor, 0)).toBe("Intro {{purchase_apr}}");
     editor.commands.undo();
     expect(line(editor, 0)).toBe("Intro");
@@ -224,9 +226,11 @@ describe("chip insertion", () => {
 
   it("drop ignores other drags (block moves, files)", () => {
     const { editor } = setup();
-    const event = { dataTransfer: { getData: () => "" } } as unknown as DragEvent;
-    const handled = editor.view.someProp("handleDrop", (f) => f(editor.view, event, Slice.empty, false));
-    expect(handled).toBeFalsy();
+    const before = editor.state.doc;
+    // Nowhere to land, so ProseMirror's own drop does nothing either: anything that happened would be ours.
+    const event = drop(editor, { "text/plain": "Some text" }, null);
+    expect(event.defaultPrevented).toBe(false);
+    expect(editor.state.doc.eq(before)).toBe(true);
   });
 
   it("{{ opens the picker; picking a variable replaces the trigger text", async () => {

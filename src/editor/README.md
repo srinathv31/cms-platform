@@ -183,7 +183,10 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
 ## Document contract (TipTap JSON)
 
 - `doc` → blocks. Every `paragraph`, `heading`, `bulletList`, `orderedList`, `listItem`, `table`,
-  `callout`, `horizontalRule` has `attrs.id` (UniqueID). Existing ids are kept.
+  `callout`, `horizontalRule` has `attrs.id` (UniqueID). Existing ids are kept, and a block moved by
+  its ⋮⋮ grip keeps its id, so its comment threads stay on it; pasted blocks get new ones. A panel
+  row's drop is handled ahead of UniqueID (`extensions/field-binding.ts`), so it never costs the next
+  moved block its id.
 - `heading { level: 1|2|3, requiredKey?: string|null }`; HTML `data-required="<key>"`. A
   `requiredKey` appears at most once per document; pasted copies never carry one.
 - `callout` → `paragraph+`; HTML `<div data-callout>`.
