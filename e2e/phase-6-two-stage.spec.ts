@@ -22,6 +22,9 @@ import { asPersona, beat, demoTimeout, expect, hydrated, liveEditor, openLibrary
 // Cash Back v3 is the seed's own in-review version, so nothing here creates a template; it changes the
 // approval chain, the version's state and the access it grants, so afterAll re-seeds the database.
 // Console and page errors fail it.
+//
+// The last test is the chain editor's own check (domain validateChain): naming one person on two stages
+// shows the reason at the later stage and keeps Save disabled, and nothing is sent.
 
 const TEAM = "coral-offers";
 const NAME = "Cash Back Welcome Bonus — Terms";
@@ -415,6 +418,60 @@ test.describe("phase 6: two-stage approval", () => {
         ["jordan", 0, "Team approver"],
         ["alex", 1, SECOND],
       ]);
+    });
+  });
+
+  test("one person on two stages: the later stage says why, and Save stays disabled until it's fixed", async ({ page }) => {
+    test.setTimeout(demoTimeout(120_000));
+    const REASON = "Dana Park already reviews stage 2.";
+    const chainRows = () => rows("SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
+    const before = await chainRows();
+
+    await asPersona(page, "riley");
+    await openLibrary(page, "all");
+    const dialog = await openSettings(page, "Approval chains");
+    const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
+    const stages = chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem");
+    const reviewer = chain.getByRole("combobox", { name: "Reviewer" });
+    const consequence = strip(chain);
+    const save = consequence.getByRole("button", { name: "Save chain", exact: true });
+
+    await test.step("1. Riley adds a Legal reviewer and a Final sign-off stage, both naming Dana Park", async () => {
+      for (const name of [STAGE, "Final sign-off"]) {
+        await click(chain.getByRole("button", { name: "Add stage", exact: true }));
+        await expect(chain.getByRole("textbox", { name: "Stage name" })).toBeFocused();
+        await page.keyboard.type(name, { delay: 20 });
+        await reviewer.selectOption("user:dana");
+        await expect(reviewer).toHaveValue("user:dana");
+      }
+      await expect(stages).toHaveCount(3);
+    });
+
+    await test.step("2. The reason shows at the later stage, and Save is disabled with it beside", async () => {
+      await expect(stages.nth(2).locator('[data-problem="reviewer"]')).toHaveText(REASON);
+      await expect(reviewer).toHaveAttribute("aria-invalid", "true");
+      await expect(stages.nth(1).locator("[data-problem]"), "the first stage naming her is fine").toHaveCount(0);
+      await expect(save).toHaveAttribute("aria-disabled", "true");
+      await expect(consequence).toContainText(REASON);
+      await beat(page, 900);
+      await shoot(page, "riley-chain-same-person-twice");
+
+      await click(chain.getByRole("button", { name: "Done", exact: true }));
+      await expect(stages.nth(2).locator('[data-problem="reviewer"]'), "still said once the editor closes").toHaveText(REASON);
+      await expect(save).toHaveAttribute("aria-disabled", "true");
+    });
+
+    await test.step("3. Naming someone else clears it; Discard leaves the saved chain as it was", async () => {
+      await click(chain.getByRole("button", { name: "Edit Final sign-off", exact: true }));
+      await reviewer.selectOption("user:jordan");
+      await expect(chain.locator("[data-problem]")).toHaveCount(0);
+      await expect(save).not.toHaveAttribute("aria-disabled", "true");
+
+      await click(consequence.getByRole("button", { name: "Discard", exact: true }));
+      await expect(consequence).toBeHidden();
+      await expect(stages).toHaveCount(1);
+      expect(await chainRows(), "nothing was saved").toEqual(before);
+      await closeSettings(page);
     });
   });
 });

@@ -14,6 +14,7 @@ import type {
   MembershipStatus,
   MembershipStatusReason,
   PermissionResult,
+  PlatformRole,
   RequiredSection,
   TeamRole,
 } from "./types";
@@ -39,6 +40,13 @@ export const DECISION_NOTE_MAX = 500;
 export interface Named {
   id: string;
   name: string;
+}
+
+/** What `validateChain` (platform-config.ts) needs to know about a person a stage may name. */
+export interface ApproverFacts extends Named {
+  platformRole: PlatformRole | null;
+  /** Holds a role through an active membership on some team (`hasActiveTeamAccess` in permissions.ts). */
+  activeTeamRole: boolean;
 }
 
 export interface MembershipFacts {
@@ -443,7 +451,13 @@ export interface ApprovalChainsSection {
   chains: ApprovalChainView[];
   /** People a stage may name, with the teams whose templates they can see (shown beside the name). */
   people: (Person & { title: string; teams: string[] })[];
-  roles: readonly TeamRole[];
+  /**
+   * The facts `validateChain` checks, for everyone in `people` and everyone a stage names now (who may
+   * have lost access since), so the chain editor validates as the admin edits.
+   */
+  approvers: ApproverFacts[];
+  /** The Platform Admin editing: nobody names themselves. */
+  viewerId: string;
 }
 
 // ── Audit page — /{team}/audit ───────────────────────────────────────────────
@@ -633,7 +647,9 @@ export interface PlatformConfigDomain {
   }): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused;
 
   /**
-   * At least one stage; names 1–40 chars, unique; a named user must exist. A stage some in-review
+   * At least one stage, and every stage passes `validateChain`: names 1–40 chars, unique; the Approver
+   * role or a person who can approve, never on two stages, and never the actor naming themselves (a
+   * stage that already named them stays theirs). A stage some in-review
    * version waits on can't be removed ("2 versions are waiting on Legal reviewer."). In-review
    * versions keep waiting on the same stage (by id) wherever it moves: `moves` remaps currentStage.
    */
@@ -642,7 +658,7 @@ export interface PlatformConfigDomain {
     current: (ApprovalStage & { id: string })[];
     next: { id?: string; name: string; rule: ApproverRule }[];
     inReview: { versionId: string; currentStage: number }[];
-    people: Named[];
+    people: ApproverFacts[];
     actor: Named;
     now: Date;
   }): Ok<{

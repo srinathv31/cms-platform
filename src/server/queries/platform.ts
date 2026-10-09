@@ -5,13 +5,14 @@ import { asc, eq } from "drizzle-orm";
 import type {
   ApprovalChainsSection,
   ApprovalChainView,
+  ApproverFacts,
   ChannelRulesSection,
   ContentTypesSection,
   TeamsSection,
 } from "@/domain/access-types";
 import { can } from "@/domain/permissions";
-import { ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
-import { CHANNELS, TEAM_ROLES, type Channel } from "@/domain/types";
+import { approverProblem, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
+import { CHANNELS, type Channel } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -31,7 +32,9 @@ import { getPeople, iso, personOf } from "./review-shared";
 // is committed come from the pure functions in domain/platform-config.ts, fed by these models:
 //   - a channel turned off: `channelOffConsequences(row.name, channel, row.activeUsing[channel])`;
 //   - a chain edit: `describeChainChange({ contentTypeName, current: chain.stages, next, people,
-//     waiting })`, the "Now / After" cards and the lines under them.
+//     waiting })`, the "Now / After" cards and the lines under them, and `validateChain({ stages,
+//     current: chain.stages, actorId: viewerId, people: approvers })`, the reason at each stage that
+//     can't be saved.
 
 /** Platform Admin only; anyone else gets a 404 (the Platform group isn't shown to them). */
 async function requireManage() {
@@ -181,16 +184,31 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
     };
   });
 
-  // Someone a stage may name: anyone with an active team role — a person with none could never act on
-  // the stage, and a platform role alone isn't approve power — except an Auditor (read-only) and the
-  // admin choosing (nobody names themselves; actions/platform.ts unableToApprove). Beside the name:
-  // the teams whose templates they see today.
-  const choices = userRows.flatMap((u) => {
-    if (u.platformRole === "auditor" || u.id === viewer.userId) return [];
+  // What validateChain checks about each person; `members` holds only active memberships with a role.
+  const facts: ApproverFacts[] = userRows.map((u) => ({
+    id: u.id,
+    name: u.name,
+    platformRole: u.platformRole,
+    activeTeamRole: members.some((m) => m.userId === u.id),
+  }));
+  // Someone a stage may name: whoever the domain's approverProblem allows (an active team role, not an
+  // Auditor, not the admin choosing). Beside the name: the teams whose templates they see today.
+  const choices = userRows.flatMap((u, index) => {
+    if (approverProblem(facts[index]!, viewer.userId)) return [];
     const teamNames = [...new Set(members.filter((m) => m.userId === u.id).map((m) => m.teamName))].sort();
     const seen = u.platformRole ? ["All teams"] : teamNames;
-    return teamNames.length ? [{ ...personOf(people, u.id), title: u.title, teams: seen }] : [];
+    return [{ ...personOf(people, u.id), title: u.title, teams: seen }];
   });
+  // The editor validates every stage, so it needs the facts for the people stages name now as well.
+  const relevant = new Set([
+    ...choices.map((c) => c.id),
+    ...stageRows.flatMap((s) => (s.approverRule.kind === "user" ? [s.approverRule.userId] : [])),
+  ]);
 
-  return { chains, people: choices.sort(byName), roles: TEAM_ROLES };
+  return {
+    chains,
+    people: choices.sort(byName),
+    approvers: facts.filter((f) => relevant.has(f.id)),
+    viewerId: viewer.userId,
+  };
 });

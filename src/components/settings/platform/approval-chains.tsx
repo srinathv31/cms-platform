@@ -9,7 +9,9 @@ import {
   STAGE_NAME_MAX,
   describeChainChange,
   ruleLabel,
+  validateChain,
   type ChainCardStage,
+  type StageProblem,
 } from "@/domain/platform-config";
 import type { ApproverRule } from "@/domain/types";
 import { cn } from "@/lib/utils";
@@ -23,7 +25,9 @@ import { Blocked, Pick, Strip, useFocusAfterCommit } from "./ui";
 // actions inline (edit, move, remove) and an "Add stage" below. Every edit is a draft: nothing is saved
 // until the strip's confirm. The strip shows the chain Now and After side by side, then the plain lines
 // (who reviews what, that a named person reviews every team's submissions), so the consequence comes
-// before the commitment.
+// before the commitment. The draft is checked as it changes with the domain's `validateChain`, the
+// same function the server runs on save: each problem shows under the field it's about, and the
+// confirm stays disabled with the first one beside it.
 
 const COLS = "1.5rem minmax(0,0.85fr) minmax(0,1.15fr) auto";
 
@@ -73,30 +77,23 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
     setEditing(null);
   }
 
+  // `people` are the choices; `approvers` also holds whoever a stage names now, so labels and checks cover both.
   const people = section.people;
+  const approvers = section.approvers;
   const waiting = Object.fromEntries(chain.stages.map((s) => [s.id, s.waiting]));
   const next = rows.map((r) => ({ id: r.id, name: r.name.trim() || "New stage", rule: r.rule }));
   const change = describeChainChange({
     contentTypeName: chain.name,
     current: chain.stages.map((s) => ({ id: s.id, position: s.position, name: s.name, rule: s.rule })),
     next,
-    people,
+    people: approvers,
     waiting,
   });
 
-  const emptyName = rows.some((r) => !r.name.trim());
-  const seenNames = new Set<string>();
-  let problem: string | null = null;
-  for (const r of rows) {
-    const name = r.name.trim().toLowerCase();
-    if (!name) continue;
-    if (seenNames.has(name)) {
-      problem = PLATFORM_REFUSALS.stageDuplicate(r.name.trim());
-      break;
-    }
-    seenNames.add(name);
-  }
-  const blocked = emptyName || !!problem;
+  const problems = validateChain({ stages: rows, current: chain.stages, actorId: section.viewerId, people: approvers });
+  const problemAt = (index: number, field: StageProblem["field"]) =>
+    problems.find((p) => p.stage === index && p.field === field)?.reason ?? null;
+  const blocked = problems.length > 0;
 
   const added = rows.filter((r) => !r.id);
   const removed = chain.stages.filter((s) => !rows.some((r) => r.id === s.id));
@@ -152,6 +149,14 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
               : saved && saved.waiting > 0
                 ? PLATFORM_REFUSALS.stageWaiting(saved.waiting, saved.name)
                 : null;
+          // A name still being typed isn't flagged while it's empty; the strip still says why Save waits.
+          const nameProblem = isEditing && !row.name.trim() ? null : problemAt(index, "name");
+          const reviewerProblem = problemAt(index, "reviewer");
+          const nameProblemId = `${fieldId}-${row.key}-name-problem`;
+          const reviewerProblemId = `${fieldId}-${row.key}-reviewer-problem`;
+          // A person the choices leave out (they lost access since): still listed, so the select shows them.
+          const namedId = row.rule.kind === "user" ? row.rule.userId : null;
+          const unlisted = namedId !== null && !people.some((p) => p.id === namedId);
           return (
             <li
               key={row.key}
@@ -181,6 +186,8 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                       value={row.name}
                       maxLength={STAGE_NAME_MAX}
                       onChange={(e) => patch(row.key, { name: e.target.value })}
+                      aria-invalid={nameProblem ? true : undefined}
+                      aria-describedby={nameProblem ? nameProblemId : undefined}
                       className="bg-surface"
                     />
                   </div>
@@ -194,11 +201,19 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                     <span aria-hidden className="text-[13px] text-text-muted">
                       Reviewer
                     </span>
-                    <Pick label="Reviewer" value={ruleValue(row.rule)} onChange={(v) => patch(row.key, { rule: ruleFromValue(v) })} className="w-full">
+                    <Pick
+                      label="Reviewer"
+                      value={ruleValue(row.rule)}
+                      onChange={(v) => patch(row.key, { rule: ruleFromValue(v) })}
+                      invalid={!!reviewerProblem}
+                      describedBy={reviewerProblem ? reviewerProblemId : undefined}
+                      className="w-full"
+                    >
                       <option value={ruleValue(APPROVER)}>{ruleLabel(APPROVER, people)}</option>
                       {row.rule.kind === "team_role" && row.rule.role !== "approver" ? (
                         <option value={ruleValue(row.rule)}>{`${ROLE_LABEL[row.rule.role]} role`}</option>
                       ) : null}
+                      {unlisted ? <option value={ruleValue(row.rule)}>{ruleLabel(row.rule, approvers)}</option> : null}
                       <optgroup label="People">
                         {people.map((p) => (
                           <option key={p.id} value={`user:${p.id}`}>
@@ -209,7 +224,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                     </Pick>
                   </div>
                 ) : (
-                  <span className="block truncate">{ruleLabel(row.rule, people)}</span>
+                  <span className="block truncate">{ruleLabel(row.rule, approvers)}</span>
                 )}
               </div>
               <div className="flex items-center justify-end gap-1.5">
@@ -252,6 +267,16 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                   </Button>
                 </Blocked>
               </div>
+              {nameProblem ? (
+                <p id={nameProblemId} data-problem="name" className="col-start-2 pt-1 text-[13px] text-danger-text">
+                  {nameProblem}
+                </p>
+              ) : null}
+              {reviewerProblem ? (
+                <p id={reviewerProblemId} data-problem="reviewer" className="col-start-3 col-end-5 pt-1 text-[13px] text-danger-text">
+                  {reviewerProblem}
+                </p>
+              ) : null}
             </li>
           );
         })}
@@ -278,7 +303,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
           cancelLabel="Discard"
           confirmLabel={confirmLabel}
           blocked={blocked}
-          message={problem}
+          message={problems[0]?.reason ?? null}
           lines={blocked ? [] : change.lines}
           onCancel={discard}
           onDone={() => addButton.current?.focus()}
