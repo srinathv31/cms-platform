@@ -4,7 +4,7 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 ## How to use this page
 
-- **Pick work** from [Fix first](#fix-first), then by severity within an area. Skip anything marked Fixed or Deferred.
+- **Pick work** from [Fix first](#fix-first), top to bottom. Skip anything marked Fixed or Deferred, and don't pick from [Waits for the enterprise work](#waits-for-the-enterprise-work): those findings get fixed as part of that work.
 - **Fix a finding in its own PR** (or a small group of related ones), and change its **Status** line here in the same PR: `Open` → `Fixed`, with one sentence saying what changed, and update the counts in [Status](#status). Keep the heading as it is so links to it keep working. That keeps this page true; a finding marked Open must still be reproducible.
 - **Line numbers are from ec3978b.** Files touched since then have moved; find the code by the symbol or behaviour described. A path that no longer exists is marked as moved or removed.
 - **Evidence** says how sure the finding is: *measured* (from a check run for the review), *verified* (re-read in the code after the reviewer reported it), *reproduced* (proved with a throwaway test), *traced* (followed through the code, not run). Re-check a *traced* finding before fixing it.
@@ -21,25 +21,133 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
 
+Of the 71 findings not fixed, 36 are logic and UI fixes in [Fix first](#fix-first), 13 are tooling and hygiene to take [alongside them](#alongside-tooling-and-hygiene), and 22 [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
+
 **Deferred** findings are demo and login stand-ins the owner will replace with real login and by removing the demo tools; don't fix them in place.
 
 ## Fix first
 
-Open findings that lose data, break a core flow, or put the wrong content in front of a customer, in the order to take them.
+Everything here can be fixed now. None of it waits on real sign-in, the Java API or the enterprise font, and none of the fixes gets thrown away when those land. The groups follow what each finding puts at risk: in a product for regulated content, customers seeing only approved content comes first and authors never losing work second, then logic and UI that's wrong or fragile, then polish. Within a group, the likeliest and cheapest come first. An item that names several findings is one PR.
 
-1. [D1: Revoking the live version freezes the template for good](#d1--high-revoking-the-live-version-freezes-the-template-for-good)
-2. [I1: Renaming a draft outside the Content tab is never saved, but shows "Saved"](#i1--high-renaming-a-draft-outside-the-content-tab-is-never-saved-but-shows-saved)
-3. [I2: The revert toast's Undo overwrites edits made after the revert](#i2--high-the-revert-toasts-undo-overwrites-edits-made-after-the-revert)
-4. [I3: Renaming a variable with Email off orphans its chips in the subject](#i3--high-renaming-a-variable-with-email-off-orphans-its-chips-in-the-subject)
-5. [I4: A panel drop followed by a block move orphans comment threads](#i4--high-a-panel-drop-followed-by-a-block-move-orphans-comment-threads)
-6. [S3: Maker-checker only stops the submitter, not the author](#s3--high-maker-checker-only-stops-the-submitter-not-the-author)
-7. [D2: Setting a new sunset brings a sunset version back to life](#d2--high-setting-a-new-sunset-brings-a-sunset-version-back-to-life)
-8. [D3: Editing the approval chain mid-review stalls or skips stages](#d3--high-editing-the-approval-chain-mid-review-stalls-or-skips-stages)
-9. [D4: The chain editor saves chains nobody can approve](#d4--high-the-chain-editor-saves-chains-nobody-can-approve)
-10. [I5: A draft rename goes live without review](#i5--high-a-draft-rename-goes-live-without-review)
-11. [T1: main fails e2e: the undo/redo merge added a layout shift](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift)
-12. [S5: Consumer identity is a self-asserted header](#s5--high-consumer-identity-is-a-self-asserted-header)
-13. [S6: Body size limits trust the declared Content-Length](#s6--medium-body-size-limits-trust-the-declared-content-length)
+Three items need an owner decision before code: [D1](#d1--high-revoking-the-live-version-freezes-the-template-for-good) (what the corrected draft starts from), [I5](#i5--high-a-draft-rename-goes-live-without-review) (where the customer-facing title comes from) and [D6](#d6--medium-a-sunset-date-means-midnight-utc) (which time zone a sunset date means).
+
+### Make main green
+
+1. [T1 · High](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift): The suite has to pass before anything else, or the next regression hides among known failures. Render the undo/redo buttons disabled from the first paint.
+
+### Customers see content that wasn't approved
+
+2. [D2 · High](#d2--high-setting-a-new-sunset-brings-a-sunset-version-back-to-life): A passed sunset can be undone, so a withdrawn version renders again. One guard in `setSunset`.
+3. [S3 · High](#s3--high-maker-checker-only-stops-the-submitter-not-the-author): An author approves their own content when a teammate clicks Submit. Holding Author and Approver on one team is normal, so this happens in ordinary use.
+4. [D1 · High](#d1--high-revoking-the-live-version-freezes-the-template-for-good): Revoking wrong legal text leaves the template with no way to publish the correction.
+5. [D3 · High](#d3--high-editing-the-approval-chain-mid-review-stalls-or-skips-stages): Editing the chain while a version is in review can skip a stage or stall it for good. Snapshot the chain on the version at submit.
+6. [D4 · High](#d4--high-the-chain-editor-saves-chains-nobody-can-approve): The chain editor saves chains that stall every submission. Write one domain `validateChain` and use it in the action and on the screen.
+7. [A2 · High](#a2--high-consumers-polling-notices-can-silently-miss-a-revoke): A consumer can miss a revoke and keep rendering withdrawn content. Fix the contract now (oldest-first cursor, `hasMore`), before a Java team ports it as it is.
+8. [I5 · High](#i5--high-a-draft-rename-goes-live-without-review): Typing a new name changes the live version's title in customer output without review.
+
+### Authors lose work without being told
+
+9. [I2 · High](#i2--high-the-revert-toasts-undo-overwrites-edits-made-after-the-revert) and [I9 · Medium](#i9--medium-revert-to-vn-has-no-error-handling-or-pending-guard): Revert's Undo wipes edits made after the revert, and Revert has no error or pending handling. Same code, one PR.
+10. [I1 · High](#i1--high-renaming-a-draft-outside-the-content-tab-is-never-saved-but-shows-saved), [I6 · Medium](#i6--medium-after-a-save-conflict-the-editor-stays-editable-but-nothing-saves) and [I10 · Medium](#i10--medium-large-drafts-can-lose-the-last-edits-on-tab-close): Three ways the autosave session drops edits silently: a rename outside the Content tab, any edit after a save conflict, and a large draft's last edits on tab close.
+11. [I8 · Medium](#i8--medium-submit-can-freeze-content-the-dialog-didnt-list): Submit can freeze edits the summary dialog didn't show. Make submit a compare-and-set on `rev`.
+12. [I3 · High](#i3--high-renaming-a-variable-with-email-off-orphans-its-chips-in-the-subject): Renaming a variable with Email off breaks the subject line and blocks Submit.
+13. [I4 · High](#i4--high-a-panel-drop-followed-by-a-block-move-orphans-comment-threads): Dragging a block after a panel drop detaches its comment threads.
+
+### Logic and UI that's wrong or fragile
+
+14. [S7 · Medium](#s7--medium-comments-are-accepted-on-any-version-state) and [S9 · Low](#s9--low-cross-team-stage-reviewers-can-act-on-any-thread-of-the-template): The comment rules exist only in the client, so a direct call comments on an Active version, and stage reviewers can act on threads they can't see. One `domain/comments.ts`, and `can.comment` in the read model.
+15. [A6 · Medium](#a6--medium-reads-are-exposed-as-server-actions): Three read modules are public POST endpoints without validation, queued behind Edit and Submit. Read through server components or GET routes.
+16. [S6 · Medium](#s6--medium-body-size-limits-trust-the-declared-content-length): Autosave buffers a chunked body of any size before it checks permission. Reuse `readBodyCapped` and cap each value's length.
+17. [I7 · Medium](#i7--medium-no-error-boundaries-anywhere): Any thrown error replaces the whole app with Next's error page.
+18. [I11 · Medium](#i11--medium-the-ui-branches-on-exact-english-sentences): The UI branches on exact refusal sentences, so a copy edit changes behavior. Stable codes are also step 3 of [the backend seam](#the-backend-seam).
+19. [A3 · Medium](#a3--medium-six-error-shapes-and-some-actions-throw) and [H1 · Medium](#h1--medium-three-server-action-styles): `startDraft` and `createTemplate` throw, so production shows a generic error instead of the domain's sentence. One action kit and one client hook; the `/api/v1` error shape waits for [the Java API](#the-java-api).
+20. [H2 · Medium](#h2--medium-client-components-re-implement-domain-rules): Settings screens run domain rules with a blank actor and a 1970 date, and copy the server's refusals. Item 6's `validateChain` is the pattern.
+21. [D8 · Medium](#d8--medium-variable-renames-are-lost-between-the-panel-and-submit): A variable rename reaches review and consumer notices as a removal plus an addition.
+22. [D7 · Medium](#d7--medium-nothing-records-when-a-sunset-passes): Nothing records when a sunset passes, and the test for it is written four times. Its scheduled trigger comes with the sign-in work's scheduled sweep ([S4](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep)).
+23. [D6 · Medium](#d6--medium-a-sunset-date-means-midnight-utc): "Sunset on March 1" stops renders at 7 PM Eastern on February 28.
+24. [I12 · Medium](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data): Every page ships the whole template catalog, and the palette shows the previous persona's templates. With real sign-in that would be the previous user's, so fix it before sign-in lands.
+25. [I13 · Medium](#i13--medium-blocked-decisions-and-charts-arent-accessible): Blocked decisions can't be reached by keyboard, and the charts' values are hover-only.
+26. [D9 · Medium](#d9--medium-today-and-yesterday-disagree-between-screens) and [H4 · Medium](#h4--medium-formatting-helpers-are-duplicated-and-clash): Screens disagree on "today", and the date, plural and number helpers exist in many copies. One module for each.
+
+### Polish
+
+27. [I14 · Low](#i14--low-every-b-in-the-editor-also-toggles-the-hidden-sidebar): ⌘B in the editor also toggles the hidden sidebar.
+28. [H5 · Low](#h5--low-rebrand-leftovers-two-of-them-customer-visible), the email sender only: previews fall back to `no-reply@ucomp.example`. The PDF font names wait for [the enterprise font](#the-enterprise-font).
+29. [R8 · Low](#r8--low-paste-and-import-cleanup-is-skipped-if-a-document-mentions-data-pm-slice): Paste cleanup is skipped whenever the text mentions `data-pm-slice`.
+30. [I15 · Low](#i15--low-focus-and-esc-handling-is-wired-through-dom-queries): Esc and focus find their targets by label text, so renaming a label breaks them.
+31. [H3 · Medium](#h3--medium-forked-primitives): Segmented controls, stat cards, tablists and clipboard helpers exist in two to four copies each.
+
+### Alongside: tooling and hygiene
+
+Not logic or UI, and nothing to wait for. Take T4 and T3 early, since every fix above relies on the checks; fit the rest in between.
+
+- [T4 · High](#t4--high-no-ci-node-pin-or-environment-template): No CI, Node pin or `.env.example`. A workflow running e2e would have caught [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift).
+- [T3 · High](#t3--high-database-backed-unit-tests-depend-on-order): The database-backed tests still depend on their order.
+- [T5 · Medium](#t5--medium-e2e-cant-be-pointed-at-its-own-database): E2E can't point at its own database. Its raw-SQL assertions are part of [the Java API](#the-java-api) work.
+- [S8 · Medium](#s8--medium-design-mocks-and-labs-ship-in-production-builds): Design mocks and labs ship in production builds.
+- [G4 · Medium](#g4--medium-build-process-docs-and-artifacts-with-dead-paths): Dead paths and uncited media remain. Check git history for the third-party product named in `design-reference.md` before the repo is shared.
+- [B6 · Medium](#b6--medium-server-code-imports-from-components): Server code imports from components, and no lint rule stops it.
+- [G5 · Medium](#g5--medium-the-editors-public-api-is-enforced-only-in-prose): Nothing enforces the editor's public API.
+- [T6 · Medium](#t6--medium-shadcn-is-a-runtime-dependency): `shadcn` is a runtime dependency, and `next-themes` is unused.
+- [T7 · Medium](#t7--medium-slow-and-brittle-test-habits): Real sleeps in unit tests and `waitForTimeout` in e2e.
+- [T9 · Low](#t9--low-no-coverage-tooling-and-some-server-code-is-untested): No coverage tooling.
+- [G6 · Low](#g6--low-decisionsmd-is-wrong-in-three-places): Three wrong lines in the decisions log.
+- [H7 · Low](#h7--low-dead-code): Dead code.
+- [H8 · Low](#h8--low-oversized-files-and-functions): Oversized files. Split `ReviewWorkspace` before the approver-views-output follow-up adds to it.
+
+## Waits for the enterprise work
+
+These findings are real, and several are High, but each one is fixed by building something that's on the way: real sign-in, the Java API or the enterprise font. A fix made in the prototype now would be replaced. They stay Open so that each piece of work starts with them in view, and each table says what that work has to get right.
+
+### Real sign-in (Better Auth with Entra ID, SSO and MFA)
+
+| Finding | What the sign-in work has to get right |
+| --- | --- |
+| [S2 · High](#s2--high-identity-fails-open-to-the-default-persona) | With no session there is no viewer: routes answer 401 and pages redirect to sign-in, never fall back to a person. Keep the persona switcher only as a dev-only provider behind the same function. |
+| [S4 · High](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep) | Work out each membership's effective status from its recertification and inactivity deadlines when the viewer is loaded, so a lapsed approver is refused on their next request, and run the sweep on a schedule instead of on demo triggers. |
+| [S10 · Low](#s10--low-mutating-route-handlers-have-no-origin-check) | Better Auth's origin checks cover its own endpoints, not the app's. Once the cookie is a real session, the autosave and import route handlers check `Origin` or `Sec-Fetch-Site` themselves, and answer unknown and forbidden ids the same way. |
+
+The sign-in work also touches three findings filed elsewhere. [A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews): keep the session cookie off `/api/v1` by moving CMS preview to a BFF route first. [I12](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data): the palette's cache has to be keyed by viewer before two real people share a browser (item 24). [S5](#s5--high-consumer-identity-is-a-self-asserted-header): consumers are systems, not people, so they get client credentials (an Entra ID app registration can issue them), not Better Auth sessions. The app reads the session in one place, the fail-closed request context in step 1 of [the backend seam](#the-backend-seam).
+
+### Demo tools
+
+They leave with the persona switcher.
+
+| Finding | What removing them has to get right |
+| --- | --- |
+| [S1 · Critical](#s1--critical-demo-reset-and-clock-actions-are-public-and-ungated) | Remove the reset and clock actions and the demo pill, or gate them behind one `DEMO_MODE` flag that production never sets. Either way, `resetDemo()` refuses any database that isn't a local file. |
+| [A7 · Medium](#a7--medium-the-http-date-header-carries-the-demo-clock) | The HTTP `Date` header goes back to real time. If a demo mode survives, its clock travels in its own header. |
+
+### The Java API
+
+If the backend moves to the Spring Boot API with this app as its BFF, these findings are the port's work, in the order of [the backend seam](#the-backend-seam). If the backend stays in Next.js, they go back into the ordinary backlog.
+
+| Finding | What the port has to get right |
+| --- | --- |
+| [A1 · High](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews) | Do it first, before Spring owns `/api/v1`: CMS preview moves to a BFF route that calls the render engine with the session, and `/api/v1` serves consumers only. |
+| [S5 · High](#s5--high-consumer-identity-is-a-self-asserted-header) | Consumers authenticate at the gateway with client credentials or mTLS, calls are rate-limited, and unauthenticated calls write no render-log rows. The contract says so. |
+| [B1 · High](#b1--high-server-actions-are-the-service-layer) | A request context and service interfaces, with today's code as the local implementation and an HTTP one beside it. Rendering already works this way. |
+| [B2 · High](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) | Each rule it lists becomes one domain function. Fix first items that touch these rules ([S7](#s7--medium-comments-are-accepted-on-any-version-state), [D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve) and [H2](#h2--medium-client-components-re-implement-domain-rules) among them) move theirs as they go, so this list shrinks before the port. |
+| [A5 · Medium](#a5--medium-the-contract-is-typescript-only-and-the-simulator-tests-against-a-fake) | One machine-readable source for `/api/v1` (OpenAPI 3.1 or zod), and the simulator tested against the real handlers instead of a fake. |
+| [D10 · Medium](#d10--medium-audit-and-notice-payloads-are-untyped) | A typed payload per audit action and notice; they become the Java DTOs. Migrate the seed's spellings instead of aliasing them. |
+| [B3 · Medium](#b3--medium-invariants-rely-on-sqlites-single-writer) | Partial unique indexes or row locks behind the last-admin, one-open-recertification and one-pending-request rules, CHECK constraints on state, status and role, and the missing indexes. SQLite's single writer hides all of these today. |
+| [B4 · Medium](#b4--medium-sqlite-workarounds-are-spread-through-the-code) | Retries inside the database client, ordering by ULID or sequence instead of `rowid`, and filtering in SQL. |
+| [B5 · Medium](#b5--medium-autosave-conflict-recovery-reads-the-audit-log) | `rev` and the last save session live on the version row, not in the audit log. |
+| [A4 · Medium](#a4--medium-get-apiv1-routes-can-return-a-non-json-500) | Every route maps a failure to the contract's error body with a correlation id, as RFC 9457 problem details, together with the route half of [A3](#a3--medium-six-error-shapes-and-some-actions-throw). |
+| [A8 · Low](#a8--low-sample-urls-are-built-from-request-headers) | The consumer base URL comes from configuration (`CONSUMER_API_BASE_URL`). |
+| [A9 · Low](#a9--low-notifications-store-app-urls) | Notifications store the `NotificationLink` descriptor, and the BFF builds the link when it reads them. |
+| [D11 · Low](#d11--low-javascript-only-behavior-that-wont-port-cleanly) | Dates are validated by round trip (`2026-02-30` must fail, not become March 2), ids compare by code point, and lookups go through `Map`. |
+
+### The enterprise font
+
+| Finding | What the font work has to get right |
+| --- | --- |
+| [R3 · High](#r3--high-the-pdf-drops-characters-its-fonts-dont-have) | The PDF now fails with a clear error on a missing glyph. The enterprise font, with its fallbacks, has to cover every script customer names arrive in: the review's example mixes Vietnamese and Chinese, and today's heading face also lacks Greek and Cyrillic. Write the coverage into `docs/render-spec.md` for the port. |
+| [T8 · Medium](#t8--medium-runtime-paths-assume-the-dev-machine) | Fonts load from a path inside the app, not from `node_modules` under the working directory. The finding's other two paths, the uploads folder and the migration script, go with the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template). |
+| [H5 · Low](#h5--low-rebrand-leftovers-two-of-them-customer-visible) | The "UCOMP Sans" and "UCOMP Serif" family names, which show in PDF metadata, change when the font goes in. The email sender fallback doesn't wait (item 28). |
+| [H6 · Low](#h6--low-no-font-size-tokens) | If the font also replaces the UI typeface, add `--text-*` size tokens first, so its metrics are tuned in one place instead of in 382 `text-[Npx]` utilities. |
+
+After the swap, `npm run golden:update` refreshes the Node-only PDF golden files; read the diff before committing it.
 
 ## Findings
 
@@ -750,5 +858,5 @@ Rendering is already in this shape: `src/server/render/engine.ts` runs with no d
 
 - **Approver views the output before approving.** The next PR: an approver must look at every enabled channel's output before Approve is available, in a way that stays quick to use.
 - **Word import keeps the source's numbering.** Import and paste restart lists at 1 with the default style; map Word's numbering formats and start numbers into the per-list styles.
-- **The enterprise font.** Swap it into `src/server/render/channels/pdf-fonts.ts` (fix the font paths and names in [T8](#t8--medium-runtime-paths-assume-the-dev-machine) and [H5](#h5--low-rebrand-leftovers-two-of-them-customer-visible) at the same time), then `npm run golden:update` refreshes the Node-only PDF files.
+- **The enterprise font.** Swap it into `src/server/render/channels/pdf-fonts.ts`, fixing the findings listed under [The enterprise font](#the-enterprise-font) at the same time, then `npm run golden:update` refreshes the Node-only PDF files.
 - **PDF cell detection for Java.** The parity test finds PDF table cells from the rules the Node adapter draws; a Java engine needs its own way, as `docs/render-spec.md` notes.
