@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId } from "react";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import type { JSONContent } from "@/editor/model/types";
 import { useWorkspaceSession } from "../session/workspace-session";
@@ -21,42 +21,38 @@ export interface EmailDetailsProps {
  * editor root as the document, so a chip here counts in the variables panel and the picker offers
  * the same list. Both save through the workspace session, like the document does.
  *
- * A field reads its `value` once, when it mounts, and Email being turned off unmounts the fields. So
- * this holds the latest values and gives them back when Email is turned on again.
+ * With Email off the group is hidden, not unmounted: the fields stay in the editor root, so their
+ * chips still count (deleting a variable used only in the subject still asks first), and a variable
+ * renamed or deleted meanwhile reaches them, and saves, as it does the document.
  */
-export function EmailDetails({ on, editable, subject: initialSubject, preheader: initialPreheader }: EmailDetailsProps) {
+export function EmailDetails({ on, editable, subject, preheader }: EmailDetailsProps) {
   const session = useWorkspaceSession();
   const headingId = useId();
-  const [subject, setSubject] = useState(initialSubject);
-  const [preheader, setPreheader] = useState(initialPreheader);
 
-  const onSubject = useCallback(
-    (doc: JSONContent) => {
-      setSubject(doc);
-      session.save({ emailSubject: doc });
-    },
-    [session],
-  );
-  const onPreheader = useCallback(
-    (doc: JSONContent) => {
-      setPreheader(doc);
-      session.save({ emailPreheader: doc });
-    },
-    [session],
-  );
+  const onSubject = useCallback((doc: JSONContent) => session.save({ emailSubject: doc }), [session]);
+  const onPreheader = useCallback((doc: JSONContent) => session.save({ emailPreheader: doc }), [session]);
 
-  if (!on) return null;
   return (
-    <section aria-labelledby={headingId} className="mt-8 px-2">
+    <section aria-labelledby={headingId} hidden={!on} className="mt-8 px-2">
       <h2 id={headingId} className="caps-label pb-2">
         Email details
       </h2>
       <div className="flex flex-col gap-3">
         <Labelled label="Subject">
-          <InlineVariableField label="Email subject" value={subject} onChange={editable ? onSubject : undefined} />
+          <InlineVariableField
+            label="Email subject"
+            value={subject}
+            hidden={!on}
+            onChange={editable ? onSubject : undefined}
+          />
         </Labelled>
         <Labelled label="Preheader">
-          <InlineVariableField label="Email preheader" value={preheader} onChange={editable ? onPreheader : undefined} />
+          <InlineVariableField
+            label="Email preheader"
+            value={preheader}
+            hidden={!on}
+            onChange={editable ? onPreheader : undefined}
+          />
         </Labelled>
       </div>
     </section>

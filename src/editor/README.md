@@ -101,6 +101,7 @@ interface InlineVariableFieldProps {
   label: string;                                  // accessible name; how "where it's used" names it
   value: JSONContent | null;                      // one paragraph; read once
   onChange?: (value: JSONContent) => void;
+  hidden?: boolean;                               // not shown, still in the root (see Composition)
   id?: string; className?: string;
 }
 
@@ -173,6 +174,11 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   in after hydration on the same line (rows keep their height).
 - **Hidden routes.** Survives React `<Activity>` hiding: an editor destroyed while hidden comes back
   with its latest content and re-registers with its root.
+- **Hide a field, don't unmount it.** A field that leaves the tree leaves the root: its chips stop
+  counting, and a key renamed meanwhile never reaches them (they come back as unknown chips). To put
+  an inline field away for a while (the email subject while Email is off), pass `hidden`: it isn't
+  shown, but its chips still count in the panel and follow renames and deletes (reported through
+  `onChange`). Click-to-insert, undo and redo pass it by, as if it had gone, until it shows again.
 
 ## Document contract (TipTap JSON)
 
@@ -519,8 +525,9 @@ nothing above changed or went away).
 
 ## Changes since Phase 7a
 
-Undo and redo a host can show as buttons, and undo history that survives a hidden route (additive
-only; nothing above changed or went away).
+Undo and redo a host can show as buttons, undo history that survives a hidden route, and inline
+fields a host can hide without taking them out of the root (additive only; nothing above changed or
+went away).
 
 - **New exports**: `useEditorHistory()` (`components/editor-root.tsx`) and its `EditorHistory` type
   (`types.ts`). The root runtime gains `history` (a store of `{ canUndo, canRedo }`), `undo()`,
@@ -534,7 +541,10 @@ only; nothing above changed or went away).
   tab switch (document and one-line fields). Each step lands on the same document as before; a step
   is one replace of the range that changed, so the caret after an undo can sit at the start of a
   change rather than exactly where it was.
-- No new props, handle methods or dependencies.
+- **New prop**: `hidden` on `InlineVariableField`, backed by the root runtime's
+  `setFieldHidden(fieldId, hidden)`. A hidden field still counts and follows renames and deletes;
+  insert, undo and redo pass it by (see Composition).
+- No new handle methods or dependencies.
 
 ## How it's built
 
