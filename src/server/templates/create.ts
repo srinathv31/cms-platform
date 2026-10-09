@@ -9,7 +9,7 @@ import {
 } from "@/domain/lifecycle";
 import { conformToSections } from "@/domain/platform-config";
 import type { Channel, RequiredSection } from "@/domain/types";
-import { db } from "@/server/db/client";
+import { db, type Db } from "@/server/db/client";
 import { contentTypes, templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId, newTemplateId } from "@/server/ids";
@@ -43,18 +43,21 @@ export function draftRow(draft: DraftFields, ids: { id: string; templateId: stri
   };
 }
 
+/** `db`, or the caller's transaction (`tx`) when it reads inside one. */
+type Reader = Pick<Db, "query">;
+
 /** A template id nobody has. A collision on 6 Crockford characters is one in a billion; check anyway. */
-export async function freshTemplateId(): Promise<string> {
+export async function freshTemplateId(reader: Reader = db): Promise<string> {
   let templateId = newTemplateId();
-  for (let i = 0; i < 4 && (await db.query.templates.findFirst({ where: eq(templates.id, templateId) })); i++) {
+  for (let i = 0; i < 4 && (await reader.query.templates.findFirst({ where: eq(templates.id, templateId) })); i++) {
     templateId = newTemplateId();
   }
   return templateId;
 }
 
 /** The Disclosure content type every new template gets (the prototype has one). */
-export async function disclosureContentType() {
-  const contentType = await db.query.contentTypes.findFirst({ where: eq(contentTypes.key, "disclosure") });
+export async function disclosureContentType(reader: Reader = db) {
+  const contentType = await reader.query.contentTypes.findFirst({ where: eq(contentTypes.key, "disclosure") });
   if (!contentType) throw new Error("The Disclosure content type is missing");
   return contentType;
 }

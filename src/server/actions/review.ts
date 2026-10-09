@@ -21,29 +21,27 @@ import {
   type DraftFields,
   type ReviewVersion,
 } from "@/domain/lifecycle";
-import { PermissionError, assertCan } from "@/domain/permissions";
 import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
 import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
-import type { Action, PermissionResource, Viewer } from "@/domain/types";
+import type { PermissionResource, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
-import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
-import { inTransaction, writeEffects, type Tx } from "@/server/effects";
+import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { loadChain, loadDecisions, stageApproverIds } from "@/server/queries/review-shared";
-import { getViewer } from "@/server/viewer";
+import { check, refuse, serverAction, type CommitContext } from "./kit";
 
-// The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke.
-//
-// Every action has the same shape:
-//   1. `assertCan` on the template's team (a refusal is returned, not thrown);
+// The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. Each one
+// runs the server action kit (kit.ts):
+//   1. `authorize`: the version (or the template), read only to learn its team and its people, and
+//      `check` on that team. An unknown one is refused like a forbidden one, and then as gone;
 //   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle.ts),
 //      writes the changes with a compare-and-set on state and rev, and writes the transition's
 //      effects (audit, notifications, consumer notices) through server/effects.ts;
-//   3. `refresh()`, so the page the person is on re-renders in place.
+//   3. `after`: `refresh()`, so the page the person is on re-renders in place.
 // A double click or a slower colleague finds the version already moved on: the second transition
-// is refused with the domain's sentence and writes nothing. SQLITE_BUSY is retried (`inTransaction`).
+// is refused with the domain's sentence and writes nothing.
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
@@ -51,39 +49,6 @@ const NOTE_MAX = 2000;
 const REASON_MAX = 2000;
 
 // ── Helpers ───────────────────────────────────────────────────
-
-/** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class RefusalError extends Error {
-  constructor(readonly refusal: Refusal) {
-    super(refusal.reason);
-    this.name = "RefusalError";
-  }
-}
-
-function refuse(refusal: Refusal): never {
-  throw new RefusalError(refusal);
-}
-
-/** `assertCan`, with the refusal returned as the action's answer instead of thrown. */
-function check(viewer: Viewer, action: Action, resource: PermissionResource): Refused | null {
-  try {
-    assertCan(viewer, action, resource);
-    return null;
-  } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
-    throw error;
-  }
-}
-
-/** One transaction, retried when busy; a `RefusalError` anywhere in it rolls it back and is returned. */
-async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-  try {
-    return await inTransaction(db, run);
-  } catch (error) {
-    if (error instanceof RefusalError) return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
-    throw error;
-  }
-}
 
 /** The pages a lifecycle change shows on: the Library rows, the template workspace, the review queue and screens. */
 function refreshAfter() {
@@ -246,104 +211,103 @@ export async function submitVersion(input: {
   note?: string | null;
   rev: number;
 }): Promise<ActionResult<{ number: number }>> {
-  const viewer = await getViewer();
-  const parsed = SubmitInput.safeParse(input);
-  const found = parsed.success ? await findTemplate(parsed.data.templateId) : undefined;
-  const refused = check(viewer, "version.submit", { teamId: found?.teamId ?? null });
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.templateGone };
-  if ((parsed.data.note?.trim().length ?? 0) > NOTE_MAX) return { ok: false, ...REQUEST_REFUSALS.noteTooLong(NOTE_MAX) };
+  return serverAction(input, {
+    input: SubmitInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await findTemplate(input.templateId);
+      check(viewer, "version.submit", { teamId: found?.teamId ?? null });
+      if (!found) refuse(REQUEST_REFUSALS.templateGone);
+      if ((input.note?.trim().length ?? 0) > NOTE_MAX) refuse(REQUEST_REFUSALS.noteTooLong(NOTE_MAX));
+      return found;
+    },
+    transaction: async (tx, { viewer, input, found, now: at }) => {
+      const list = await tx
+        .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt })
+        .from(versions)
+        .where(eq(versions.templateId, found.id));
 
-  const at = await now();
-  const result = await transact<{ number: number }>(async (tx) => {
-    const list = await tx
-      .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt })
-      .from(versions)
-      .where(eq(versions.templateId, found.id));
+      const open = list.find((v) => v.state === "draft");
+      if (!open) refuse(list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
+      const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
+      if (!draft) refuse(REQUEST_REFUSALS.noDraftToSubmit);
 
-    const open = list.find((v) => v.state === "draft");
-    if (!open) refuse(list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
-    const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
-    if (!draft) refuse(REQUEST_REFUSALS.noDraftToSubmit);
+      const baselineId = contractBaseline(list, at)?.id;
+      const baseline = baselineId
+        ? await tx
+            .select({ variables: versions.variables })
+            .from(versions)
+            .where(eq(versions.id, baselineId))
+            .then((rows) => rows[0]?.variables ?? null)
+        : null;
 
-    const baselineId = contractBaseline(list, at)?.id;
-    const baseline = baselineId
-      ? await tx
-          .select({ variables: versions.variables })
-          .from(versions)
-          .where(eq(versions.id, baselineId))
-          .then((rows) => rows[0]?.variables ?? null)
-      : null;
+      const outcome = submit({
+        draft,
+        seenRev: input.rev,
+        highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
+        baseline,
+        now: at,
+        submittedBy: viewer.userId,
+        submitterName: viewer.name,
+        templateId: found.id,
+        templateName: draft.name,
+        note: input.note ?? null,
+        chain: await loadChain(tx, found.contentTypeId),
+      });
+      if (!outcome.ok) refuse(outcome);
+      const { changes, effects } = outcome;
 
-    const outcome = submit({
-      draft,
-      seenRev: parsed.data.rev,
-      highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
-      baseline,
-      now: at,
-      submittedBy: viewer.userId,
-      submitterName: viewer.name,
-      templateId: found.id,
-      templateName: draft.name,
-      note: parsed.data.note ?? null,
-      chain: await loadChain(tx, found.contentTypeId),
-    });
-    if (!outcome.ok) refuse(outcome);
-    const { changes, effects } = outcome;
-
-    await updateVersion(
-      tx,
-      draft,
-      {
-        state: changes.state,
-        number: changes.number,
-        submittedBy: changes.submittedBy,
-        submittedAt: changes.submittedAt,
-        writers: changes.writers,
-        submitNote: changes.submitNote,
-        stages: changes.stages,
-        currentStage: changes.currentStage,
-        contractChanges: changes.contractChanges,
-      },
-      at,
-      REQUEST_REFUSALS.draftChanged,
-    );
-    // Submitting the next version answers the change request that sent the last one back (Sri, Oct 5):
-    // open whole-version threads resolve as the submitter's, recording the version that answered them.
-    // Block comments stay as they are; the author resolves those one by one.
-    const answered = await tx
-      .select({ id: commentThreads.id, originVersionId: commentThreads.originVersionId })
-      .from(commentThreads)
-      .where(
-        and(
-          eq(commentThreads.templateId, found.id),
-          eq(commentThreads.blockId, DOCUMENT_THREAD),
-          eq(commentThreads.status, "open"),
-        ),
+      await updateVersion(
+        tx,
+        draft,
+        {
+          state: changes.state,
+          number: changes.number,
+          submittedBy: changes.submittedBy,
+          submittedAt: changes.submittedAt,
+          writers: changes.writers,
+          submitNote: changes.submitNote,
+          stages: changes.stages,
+          currentStage: changes.currentStage,
+          contractChanges: changes.contractChanges,
+        },
+        at,
+        REQUEST_REFUSALS.draftChanged,
       );
-    if (answered.length > 0) {
-      await tx
-        .update(commentThreads)
-        .set({ status: "resolved", resolvedBy: viewer.userId, resolvedAt: at })
-        .where(inArray(commentThreads.id, answered.map((t) => t.id)));
-    }
-    const answeredEffects: LifecycleEffect[] = answered.map((t) => ({
-      kind: "audit",
-      action: "thread.resolved",
-      versionId: t.originVersionId,
-      details: { threadId: t.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: changes.number },
-    }));
+      // Submitting the next version answers the change request that sent the last one back (Sri, Oct 5):
+      // open whole-version threads resolve as the submitter's, recording the version that answered them.
+      // Block comments stay as they are; the author resolves those one by one.
+      const answered = await tx
+        .select({ id: commentThreads.id, originVersionId: commentThreads.originVersionId })
+        .from(commentThreads)
+        .where(
+          and(
+            eq(commentThreads.templateId, found.id),
+            eq(commentThreads.blockId, DOCUMENT_THREAD),
+            eq(commentThreads.status, "open"),
+          ),
+        );
+      if (answered.length > 0) {
+        await tx
+          .update(commentThreads)
+          .set({ status: "resolved", resolvedBy: viewer.userId, resolvedAt: at })
+          .where(inArray(commentThreads.id, answered.map((t) => t.id)));
+      }
+      const answeredEffects: LifecycleEffect[] = answered.map((t) => ({
+        kind: "audit",
+        action: "thread.resolved",
+        versionId: t.originVersionId,
+        details: { threadId: t.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: changes.number },
+      }));
 
-    await writeEffects(
-      tx,
-      [...effects, ...answeredEffects],
-      effectContext(viewer, { teamId: found.teamId, templateId: found.id }, draft.id, at),
-    );
-    return { ok: true, number: changes.number };
+      await writeEffects(
+        tx,
+        [...effects, ...answeredEffects],
+        effectContext(viewer, { teamId: found.teamId, templateId: found.id }, draft.id, at),
+      );
+      return { ok: true, number: changes.number };
+    },
+    after: refreshAfter,
   });
-
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 // ── Request changes ───────────────────────────────────────────
@@ -361,77 +325,76 @@ export async function requestChanges(input: {
   versionNumber: number;
   reason: string;
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = RequestChangesInput.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.decide", await decideResource(found));
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, ...REQUEST_REFUSALS.reasonTooLong(REASON_MAX) };
+  return serverAction(input, {
+    input: RequestChangesInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.decide", await decideResource(found));
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      if (input.reason.trim().length > REASON_MAX) refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
+      return found;
+    },
+    transaction: async (tx, { viewer, input, found, now: at }) => {
+      const version = await loadVersion(tx, found, input.versionNumber);
+      const chain = await loadChain(tx, found.contentTypeId);
+      assertStage(viewer, chain, version, found.teamId);
 
-  const at = await now();
-  const result = await transact(async (tx) => {
-    const version = await loadVersion(tx, found, parsed.data.versionNumber);
-    const chain = await loadChain(tx, found.contentTypeId);
-    assertStage(viewer, chain, version, found.teamId);
+      const outcome = requestChangesTransition({
+        version,
+        chain,
+        actorId: viewer.userId,
+        actorName: viewer.name,
+        reason: input.reason,
+        now: at,
+        templateName: version.name,
+      });
+      if (!outcome.ok) refuse(outcome);
 
-    const outcome = requestChangesTransition({
-      version,
-      chain,
-      actorId: viewer.userId,
-      actorName: viewer.name,
-      reason: parsed.data.reason,
-      now: at,
-      templateName: version.name,
-    });
-    if (!outcome.ok) refuse(outcome);
+      await updateVersion(tx, version, { state: outcome.changes.state }, at, REFUSALS.notInReview);
+      await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
 
-    await updateVersion(tx, version, { state: outcome.changes.state }, at, REFUSALS.notInReview);
-    await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
+      // A template has at most one open draft. There is none while a version is in review, but if one
+      // exists the author keeps working in it rather than the request failing. It takes on the returned
+      // version's writers, so none of them can decide what it becomes (maker-checker). Content isn't
+      // touched, so `rev` stays and an autosave in flight still lands.
+      const openDraft = await tx.query.versions.findFirst({
+        columns: { id: true, writers: true },
+        where: and(eq(versions.templateId, found.templateId), eq(versions.state, "draft")),
+      });
+      if (!openDraft) {
+        await tx.insert(versions).values(draftRow(outcome.newDraft, { id: newId("v"), templateId: found.templateId }));
+      } else {
+        const writers = outcome.newDraft.writers.reduce((all, userId) => withWriter(all, userId), openDraft.writers);
+        await tx
+          .update(versions)
+          .set({ writers })
+          .where(and(eq(versions.id, openDraft.id), eq(versions.state, "draft")));
+      }
 
-    // A template has at most one open draft. There is none while a version is in review, but if one
-    // exists the author keeps working in it rather than the request failing. It takes on the returned
-    // version's writers, so none of them can decide what it becomes (maker-checker). Content isn't
-    // touched, so `rev` stays and an autosave in flight still lands.
-    const openDraft = await tx.query.versions.findFirst({
-      columns: { id: true, writers: true },
-      where: and(eq(versions.templateId, found.templateId), eq(versions.state, "draft")),
-    });
-    if (!openDraft) {
-      await tx.insert(versions).values(draftRow(outcome.newDraft, { id: newId("v"), templateId: found.templateId }));
-    } else {
-      const writers = outcome.newDraft.writers.reduce((all, userId) => withWriter(all, userId), openDraft.writers);
-      await tx
-        .update(versions)
-        .set({ writers })
-        .where(and(eq(versions.id, openDraft.id), eq(versions.state, "draft")));
-    }
+      const threadId = newId("th");
+      await tx.insert(commentThreads).values({
+        id: threadId,
+        templateId: found.templateId,
+        originVersionId: version.id,
+        blockId: outcome.reasonComment.blockId,
+        quote: null,
+        status: "open",
+        createdAt: at,
+      });
+      await tx.insert(comments).values({
+        id: newId("cm"),
+        threadId,
+        authorId: viewer.userId,
+        body: outcome.reasonComment.body,
+        kind: outcome.reasonComment.kind,
+        createdAt: at,
+      });
 
-    const threadId = newId("th");
-    await tx.insert(commentThreads).values({
-      id: threadId,
-      templateId: found.templateId,
-      originVersionId: version.id,
-      blockId: outcome.reasonComment.blockId,
-      quote: null,
-      status: "open",
-      createdAt: at,
-    });
-    await tx.insert(comments).values({
-      id: newId("cm"),
-      threadId,
-      authorId: viewer.userId,
-      body: outcome.reasonComment.body,
-      kind: outcome.reasonComment.kind,
-      createdAt: at,
-    });
-
-    await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-    return { ok: true };
+      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+      return { ok: true };
+    },
+    after: refreshAfter,
   });
-
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 // ── Approve ───────────────────────────────────────────────────
@@ -455,68 +418,65 @@ export async function approveVersion(input: {
   sunsetPrevious?: string | null;
   sampleSetsSeen: string[];
 }): Promise<ActionResult<{ wentLive: boolean; number: number }>> {
-  const viewer = await getViewer();
-  const parsed = ApproveInput.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.decide", await decideResource(found));
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
+  return serverAction(input, {
+    input: ApproveInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.decide", await decideResource(found));
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
+      if (input.sunsetPrevious && !isCalendarDay(input.sunsetPrevious)) refuse(REQUEST_REFUSALS.invalidDate);
+      return found;
+    },
+    transaction: async (tx, { viewer, input, found, now: at }) => {
+      const version = await loadVersion(tx, found, input.versionNumber);
+      const chain = await loadChain(tx, found.contentTypeId);
+      assertStage(viewer, chain, version, found.teamId);
+      const active = await activeVersion(tx, found.templateId);
 
-  // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
-  const sunsetPrevious = parsed.data.sunsetPrevious || null;
-  if (sunsetPrevious !== null && !isCalendarDay(sunsetPrevious)) return { ok: false, ...REQUEST_REFUSALS.invalidDate };
+      const outcome = approve({
+        version,
+        chain,
+        actorId: viewer.userId,
+        actorName: viewer.name,
+        now: at,
+        active: active && active.id !== version.id && active.number !== null ? { id: active.id, number: active.number } : null,
+        sunsetPrevious: input.sunsetPrevious || null,
+        zone: await readBusinessZone(tx),
+        sampleSetsSeen: input.sampleSetsSeen,
+        templateName: version.name,
+        decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
+      });
+      if (!outcome.ok) refuse(outcome);
 
-  const at = await now();
-  const result = await transact<{ wentLive: boolean; number: number }>(async (tx) => {
-    const version = await loadVersion(tx, found, parsed.data.versionNumber);
-    const chain = await loadChain(tx, found.contentTypeId);
-    assertStage(viewer, chain, version, found.teamId);
-    const active = await activeVersion(tx, found.templateId);
+      // The previous Active steps down before this one steps up (the one-Active index).
+      if (outcome.previous) {
+        const [superseded] = await tx
+          .update(versions)
+          .set({ ...outcome.previous.changes, rev: sql`${versions.rev} + 1`, updatedAt: at })
+          .where(and(eq(versions.id, outcome.previous.id), eq(versions.state, "active")))
+          .returning({ id: versions.id });
+        if (!superseded) refuse(REQUEST_REFUSALS.activeChanged);
+      }
 
-    const outcome = approve({
-      version,
-      chain,
-      actorId: viewer.userId,
-      actorName: viewer.name,
-      now: at,
-      active: active && active.id !== version.id && active.number !== null ? { id: active.id, number: active.number } : null,
-      sunsetPrevious,
-      zone: await readBusinessZone(tx),
-      sampleSetsSeen: parsed.data.sampleSetsSeen,
-      templateName: version.name,
-      decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
-    });
-    if (!outcome.ok) refuse(outcome);
-
-    // The previous Active steps down before this one steps up (the one-Active index).
-    if (outcome.previous) {
-      const [superseded] = await tx
-        .update(versions)
-        .set({ ...outcome.previous.changes, rev: sql`${versions.rev} + 1`, updatedAt: at })
-        .where(and(eq(versions.id, outcome.previous.id), eq(versions.state, "active")))
-        .returning({ id: versions.id });
-      if (!superseded) refuse(REQUEST_REFUSALS.activeChanged);
-    }
-
-    const { changes } = outcome;
-    await updateVersion(
-      tx,
-      version,
-      {
-        state: changes.state,
-        currentStage: changes.currentStage,
-        ...(changes.activatedAt ? { activatedAt: changes.activatedAt } : {}),
-      },
-      at,
-      REFUSALS.notInReview,
-    );
-    await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
-    await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-    return { ok: true, wentLive: outcome.wentLive, number: version.number! };
+      const { changes } = outcome;
+      await updateVersion(
+        tx,
+        version,
+        {
+          state: changes.state,
+          currentStage: changes.currentStage,
+          ...(changes.activatedAt ? { activatedAt: changes.activatedAt } : {}),
+        },
+        at,
+        REFUSALS.notInReview,
+      );
+      await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
+      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+      return { ok: true, wentLive: outcome.wentLive, number: version.number! };
+    },
+    after: refreshAfter,
   });
-
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 // ── Sunset ────────────────────────────────────────────────────
@@ -537,44 +497,45 @@ export async function setSunset(input: {
   versionNumber: number;
   sunsetAt: string;
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = SunsetInput.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-  const sunsetDay = parsed.data.sunsetAt;
-  if (!isCalendarDay(sunsetDay)) return { ok: false, ...REQUEST_REFUSALS.invalidDate };
-
-  const at = await now();
   let wrote = false;
-  const result = await transact(async (tx) => {
-    const version = await loadVersion(tx, found, parsed.data.versionNumber);
-    const zone = await readBusinessZone(tx);
-    const unchanged = version.sunsetAt?.getTime() === sunsetInstant(sunsetDay, zone).getTime();
-    if (version.state === "superseded" && unchanged && !sunsetPassed(version, at)) return { ok: true };
-    const active = await activeVersion(tx, found.templateId);
+  return serverAction(input, {
+    input: SunsetInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      if (!isCalendarDay(input.sunsetAt)) refuse(REQUEST_REFUSALS.invalidDate);
+      return found;
+    },
+    transaction: async (tx, { viewer, input, found, now: at }) => {
+      const sunsetDay = input.sunsetAt;
+      const version = await loadVersion(tx, found, input.versionNumber);
+      const zone = await readBusinessZone(tx);
+      const unchanged = version.sunsetAt?.getTime() === sunsetInstant(sunsetDay, zone).getTime();
+      if (version.state === "superseded" && unchanged && !sunsetPassed(version, at)) return { ok: true };
+      const active = await activeVersion(tx, found.templateId);
 
-    const outcome = setSunsetTransition({
-      version,
-      actorId: viewer.userId,
-      now: at,
-      sunsetDay,
-      zone,
-      activeNumber: active?.number ?? null,
-      templateName: version.name,
-      contractChanges: active?.contractChanges ?? null,
-    });
-    if (!outcome.ok) refuse(outcome);
+      const outcome = setSunsetTransition({
+        version,
+        actorId: viewer.userId,
+        now: at,
+        sunsetDay,
+        zone,
+        activeNumber: active?.number ?? null,
+        templateName: version.name,
+        contractChanges: active?.contractChanges ?? null,
+      });
+      if (!outcome.ok) refuse(outcome);
 
-    await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded);
-    await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-    wrote = true;
-    return { ok: true };
+      await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded);
+      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refreshAfter();
+    },
   });
-
-  if (result.ok && wrote) refreshAfter();
-  return result;
 }
 
 // ── Revoke (two people) ───────────────────────────────────────
@@ -587,48 +548,54 @@ export async function startRevoke(input: {
   versionNumber: number;
   reason: string;
 }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = StartRevokeInput.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, ...REQUEST_REFUSALS.reasonTooLong(REASON_MAX) };
-
-  return revokeStep(viewer, found, parsed.data.versionNumber, (version, at) =>
-    startRevokeTransition({
-      version,
-      actorId: viewer.userId,
-      actorName: viewer.name,
-      reason: parsed.data.reason,
-      now: at,
-      templateName: version.name,
-    }),
-  );
+  return serverAction(input, {
+    input: StartRevokeInput,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      if (input.reason.trim().length > REASON_MAX) refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
+      return found;
+    },
+    transaction: revokeStep((version, { viewer, input, now: at }) =>
+      startRevokeTransition({
+        version,
+        actorId: viewer.userId,
+        actorName: viewer.name,
+        reason: input.reason,
+        now: at,
+        templateName: version.name,
+      }),
+    ),
+    after: refreshAfter,
+  });
 }
 
 /** A different approver confirms the revoke: the version is Revoked and its renders fail at once. */
 export async function confirmRevoke(input: { templateId: string; versionNumber: number }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = VersionRef.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.revoke.confirm", {
-    teamId: found?.teamId ?? null,
-    revokeStartedBy: found?.revoke && !found.revoke.confirmedAt ? found.revoke.startedBy : null,
-  });
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-
-  return revokeStep(viewer, found, parsed.data.versionNumber, async (version, at, tx) => {
-    const active = await activeVersion(tx, found.templateId);
-    return confirmRevokeTransition({
-      version,
-      actorId: viewer.userId,
-      actorName: viewer.name,
-      now: at,
-      activeNumber: active?.number ?? null,
-      templateName: version.name,
-    });
+  return serverAction(input, {
+    input: VersionRef,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.revoke.confirm", {
+        teamId: found?.teamId ?? null,
+        revokeStartedBy: found?.revoke && !found.revoke.confirmedAt ? found.revoke.startedBy : null,
+      });
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      return found;
+    },
+    transaction: revokeStep(async (version, { viewer, found, now: at }, tx) => {
+      const active = await activeVersion(tx, found.templateId);
+      return confirmRevokeTransition({
+        version,
+        actorId: viewer.userId,
+        actorName: viewer.name,
+        now: at,
+        activeNumber: active?.number ?? null,
+        templateName: version.name,
+      });
+    }),
+    after: refreshAfter,
   });
 }
 
@@ -638,16 +605,19 @@ export async function confirmRevoke(input: { templateId: string; versionNumber: 
  * rendering), so the two-person rule that guards confirming doesn't apply.
  */
 export async function cancelRevoke(input: { templateId: string; versionNumber: number }): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const parsed = VersionRef.safeParse(input);
-  const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
-  const refused = check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-
-  return revokeStep(viewer, found, parsed.data.versionNumber, (version, at) =>
-    cancelRevokeTransition({ version, actorId: viewer.userId, now: at }),
-  );
+  return serverAction(input, {
+    input: VersionRef,
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber);
+      check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      return found;
+    },
+    transaction: revokeStep((version, { viewer, now: at }) =>
+      cancelRevokeTransition({ version, actorId: viewer.userId, now: at }),
+    ),
+    after: refreshAfter,
+  });
 }
 
 type RevokeOutcome =
@@ -655,22 +625,19 @@ type RevokeOutcome =
   | Refused;
 
 /** The three revoke steps share their transaction: read, transition, compare-and-set, effects. */
-async function revokeStep(
-  viewer: Viewer,
-  found: FoundVersion,
-  number: number,
-  transition: (version: ReviewVersion, at: Date, tx: Tx) => RevokeOutcome | Promise<RevokeOutcome>,
-): Promise<ActionResult> {
-  const at = await now();
-  const result = await transact(async (tx) => {
-    const version = await loadVersion(tx, found, number);
-    const outcome = await transition(version, at, tx);
+function revokeStep<I extends { versionNumber: number }>(
+  transition: (
+    version: ReviewVersion,
+    ctx: CommitContext<I, FoundVersion>,
+    tx: Tx,
+  ) => RevokeOutcome | Promise<RevokeOutcome>,
+) {
+  return async (tx: Tx, ctx: CommitContext<I, FoundVersion>): Promise<ActionResult> => {
+    const version = await loadVersion(tx, ctx.found, ctx.input.versionNumber);
+    const outcome = await transition(version, ctx, tx);
     if (!outcome.ok) refuse(outcome);
-    await updateVersion(tx, version, outcome.changes, at, REFUSALS.noRevokePending);
-    await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+    await updateVersion(tx, version, outcome.changes, ctx.now, REFUSALS.noRevokePending);
+    await writeEffects(tx, outcome.effects, effectContext(ctx.viewer, ctx.found, version.id, ctx.now));
     return { ok: true };
-  });
-
-  if (result.ok) refreshAfter();
-  return result;
+  };
 }

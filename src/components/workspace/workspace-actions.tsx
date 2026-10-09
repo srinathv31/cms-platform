@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { useActionRun } from "@/components/primitives/use-action-run";
 import { startDraft } from "@/server/actions/templates";
 import { submitVersion } from "@/server/actions/review";
 import { SubmitDialog } from "@/components/submit/submit-dialog";
@@ -22,21 +23,15 @@ import { useFocusTarget, usePreviewState, useRailOpen, useWorkspaceSession } fro
  * "Edit" on a template whose latest version is Active or Revoked: the one black button. It opens the
  * template's draft (creating it from that version if there isn't one), and the page then shows that
  * draft, editable. The action redirects, so the transition stays pending until the new page is up.
+ * A refusal (a newer version went into review meanwhile, the viewer lost the Author role) shows its
+ * sentence; a call that fails says so.
  */
 export function EditButton({ templateId }: { templateId: string }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useActionRun("Couldn't open a draft. Try again.");
 
   function edit() {
-    if (pending) return;
-    startTransition(async () => {
-      try {
-        // On success the action redirects, which reaches here as an error Next handles itself.
-        await startDraft({ templateId });
-      } catch (error) {
-        unstable_rethrow(error);
-        toast.error("Couldn't open a draft. Try again.");
-      }
-    });
+    // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
+    run(() => startDraft({ templateId }), { onRefused: ({ reason }) => toast.error(reason) });
   }
 
   return (

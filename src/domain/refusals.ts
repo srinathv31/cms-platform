@@ -91,6 +91,8 @@ export const REQUEST_REFUSALS = {
   /** The compare-and-set missed: someone changed the row between the read and the write. */
   draftChanged: refusal("draft_changed", "This draft changed. Try again."),
   activeChanged: refusal("active_changed", "The Active version changed. Try again."),
+  /** Edit: the version the new draft was to copy changed state before it was read. */
+  latestChanged: refusal("latest_changed", "The latest version changed. Try again."),
 } as const;
 
 /**

@@ -203,7 +203,7 @@ describe("planDraftStart", () => {
   it("refuses while a newer version is in review", () => {
     expect(
       planDraftStart([v("v1", "superseded", 1), v("v2", "active", 2), v("v3", "in_review", 3)]),
-    ).toEqual({ kind: "blocked", reason: "A newer version is in review." });
+    ).toEqual({ kind: "blocked", ...REFUSALS.newerInReview });
   });
 
   // Handoff review D1: revoking the Active version used to leave nothing anyone could edit.
@@ -221,19 +221,20 @@ describe("planDraftStart", () => {
   it("refuses a revoked version while a newer one is in review", () => {
     expect(planDraftStart([v("v1", "revoked", 1), v("v2", "in_review", 2)])).toEqual({
       kind: "blocked",
-      reason: "A newer version is in review.",
+      ...REFUSALS.newerInReview,
     });
   });
 
   it.each(["in_review", "changes_requested", "superseded"] as const)(
     "refuses when the only version is %s",
     (state) => {
-      expect(planDraftStart([v("v1", state, 1)]).kind).toBe("blocked");
+      const refusal = state === "in_review" ? REFUSALS.newerInReview : REFUSALS.notEditable;
+      expect(planDraftStart([v("v1", state, 1)])).toEqual({ kind: "blocked", ...refusal });
     },
   );
 
   it("refuses a template with no versions", () => {
-    expect(planDraftStart([]).kind).toBe("blocked");
+    expect(planDraftStart([])).toEqual({ kind: "blocked", ...REFUSALS.notEditable });
   });
 });
 

@@ -32,7 +32,7 @@ vi.mock("./autosave/use-draft-autosave", () => ({ useDraftAutosave: () => ({ ...
 const { SaveStatus } = await import("./save-status");
 const { WorkspaceSessionProvider, useWorkspaceSession } = await import("./session/workspace-session");
 const { toast } = await import("sonner");
-const { GENERIC_FAILURE } = await import("@/components/versions/action-dialog");
+const { GENERIC_FAILURE } = await import("@/components/primitives/use-action-run");
 
 let session: WorkspaceSession | null;
 

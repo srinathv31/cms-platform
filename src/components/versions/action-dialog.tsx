@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { useActionRun } from "@/components/primitives/use-action-run";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -22,44 +23,22 @@ import type { ActionResult } from "@/domain/review-types";
 // primary and Cancel are `aria-disabled` and their handlers are blocked, so focus stays where it was and
 // Tab stays inside.
 
-export const GENERIC_FAILURE = "Something went wrong. Try again.";
-
-/** Runs a server action, turning a thrown error into the one generic message. A successful result keeps what it carries. */
-export async function runAction<T = Record<never, never>>(action: () => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-  try {
-    return await action();
-  } catch {
-    return { ok: false, code: "failed", reason: GENERIC_FAILURE };
-  }
-}
-
 /**
- * The pending flag, the refusal reason and the submit function of one dialog. `submit` sends only
- * when `invalid` is null: a request we already know will be refused is not sent. While a request is
- * out, a second one is not started.
+ * The pending flag, the refusal reason and the submit function of one dialog, on `useActionRun`.
+ * `submit` sends only when `invalid` is null: a request we already know will be refused is not sent,
+ * and the reason shows instead. While a request is out, a second one is not started. The dialog closes
+ * on `ok`.
  */
 export function useActionDialog(close: () => void) {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const sending = useRef(false);
+  const { pending, error, setError, run } = useActionRun();
 
   function submit(invalid: string | null, action: () => Promise<ActionResult>) {
-    if (sending.current) return;
+    if (pending) return;
     if (invalid) {
       setError(invalid);
       return;
     }
-    setError(null);
-    sending.current = true;
-    start(async () => {
-      try {
-        const result = await runAction(action);
-        if (result.ok) close();
-        else setError(result.reason);
-      } finally {
-        sending.current = false;
-      }
-    });
+    run(action, { onOk: close });
   }
 
   return { pending, error, setError, submit };

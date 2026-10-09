@@ -25,13 +25,13 @@ Convention only (no lint rule):
 - [clock.ts](clock.ts) is the only reader of the current time. Read `now()` once per request, before any transaction, and pass it down as `at` or `now`. Domain functions take it as an argument.
 - This layer loads facts, asks `src/domain` what may happen, and writes the answer. A new rule goes in `src/domain`.
 - Inside `inTransaction`, read and write through `tx`. Writes take turns on one process-wide lock that a transaction holds until it ends, so a write through `db` inside one waits for that same transaction to end. It stalls for the 15 s turn timeout and fails as `SQLITE_BUSY`, which `inTransaction` then retries.
-- A `"use server"` file may export only async functions (type exports are erased, so they're fine). That is why action helpers are private.
+- A `"use server"` file may export only async functions (type exports are erased, so they're fine). That is why an action file's own helpers are private, and why the helpers every action shares live in [actions/kit.ts](actions/kit.ts), which isn't `"use server"`.
 
 ## Layout
 
 | Path | What it holds |
 | --- | --- |
-| [actions/](actions/) | `"use server"` mutations, one file per area: [review.ts](actions/review.ts) (submit, approve, request changes, sunset, revoke), [comments.ts](actions/comments.ts), [access.ts](actions/access.ts), [platform.ts](actions/platform.ts), [templates.ts](actions/templates.ts) (`startDraft`), [create-template.ts](actions/create-template.ts), [notifications.ts](actions/notifications.ts), [persona.ts](actions/persona.ts), [demo.ts](actions/demo.ts). No reads: those are GET routes (see [Anatomy of a read](#anatomy-of-a-read)). |
+| [actions/](actions/) | `"use server"` mutations, one file per area: [review.ts](actions/review.ts) (submit, approve, request changes, sunset, revoke), [comments.ts](actions/comments.ts), [access.ts](actions/access.ts), [platform.ts](actions/platform.ts), [templates.ts](actions/templates.ts) (`startDraft`), [create-template.ts](actions/create-template.ts), [notifications.ts](actions/notifications.ts), [persona.ts](actions/persona.ts), [demo.ts](actions/demo.ts). [kit.ts](actions/kit.ts) is the server action kit they run on (`serverAction`, `check`, `permit`, `refuse`), not an action itself. No reads: those are GET routes (see [Anatomy of a read](#anatomy-of-a-read)). |
 | [queries/](queries/) | Read models, mostly `cache()`d `get…` functions for server components. [spaces.ts](queries/spaces.ts) (`requireSpace`, the shell) and [review-shared.ts](queries/review-shared.ts) (`requireTemplate`, people, chain and ISO date helpers) are shared. [template-name.ts](queries/template-name.ts) (`currentName`) is the name a CMS list shows. [consumer-api.ts](queries/consumer-api.ts) serves `/api/v1`. Five reads serve the GET routes a screen calls on demand, and [palette.ts](queries/palette.ts) (`searchPalette`) the ⌘K palette's search (see below). |
 | [db/](db/) | [client.ts](db/client.ts), [schema/ucomp.ts](db/schema/ucomp.ts) (app tables), [schema/sim.ts](db/schema/sim.ts) (simulator tables), [migrations/](db/migrations/). |
 | [effects.ts](effects.ts) | `inTransaction` (the busy retry), `writeEffects` (audit rows, notifications, consumer notices; a null actor is the system), `takeNoticeSeqs`, `Tx`. |
@@ -52,48 +52,57 @@ Convention only (no lint rule):
 
 ## Anatomy of a mutation
 
-The best current example is [actions/review.ts](actions/review.ts); its header states the shape. Trimmed from `setSunset`:
+Every action runs on the server action kit, `serverAction` in [actions/kit.ts](actions/kit.ts): the action
+declares its steps, and the kit runs them in one order. The kit is a plain `server-only` module, not `"use server"`,
+so its helpers are shared instead of copied into each action file. Trimmed from `setSunset` in
+[actions/review.ts](actions/review.ts):
 
 ```ts
 "use server";
 export async function setSunset(input: { templateId: string; versionNumber: number; sunsetAt: string }): Promise<ActionResult> {
-  const viewer = await getViewer();                                    // 1. identity
-  const parsed = SunsetInput.safeParse(input);                         // 2. parse (zod)
-  const found = parsed.success ? await findVersion(…) : undefined;     //    read only to learn the team
-  const refused = check(viewer, "version.setSunset", { teamId: found?.teamId ?? null }); // 3. permission
-  if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
-  const at = await now();                                              // 4. the clock, once
-  const result = await transact(async (tx) => {                        // 5. one transaction
-    const version = await loadVersion(tx, found, parsed.data.versionNumber); // re-read inside it
-    const zone = await readBusinessZone(tx);                           //    and the settings it needs
-    const outcome = setSunsetTransition({ version, sunsetDay, zone, now: at, … }); // 6. the domain decides
-    if (!outcome.ok) refuse(outcome);
-    await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded); // 7. compare-and-set
-    await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at)); // 8. effects
-    return { ok: true };
+  let wrote = false;
+  return serverAction(input, {                                          // 1. getViewer()
+    input: SunsetInput,                                                 // 2. parse (zod)
+    authorize: async ({ viewer, input }) => {
+      const found = await findVersion(input.templateId, input.versionNumber); //    read only to learn the team
+      check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });  // 3. permission
+      if (!found) refuse(REQUEST_REFUSALS.versionGone);
+      if (!isCalendarDay(input.sunsetAt)) refuse(REQUEST_REFUSALS.invalidDate);
+      return found;
+    },                                                                  // 4. now(), once
+    transaction: async (tx, { viewer, input, found, now: at }) => {     // 5. one transaction
+      const version = await loadVersion(tx, found, input.versionNumber); //    re-read inside it
+      const zone = await readBusinessZone(tx);                          //    and the settings it needs
+      const outcome = setSunsetTransition({ version, sunsetDay: input.sunsetAt, zone, now: at, … }); // 6. the domain decides
+      if (!outcome.ok) refuse(outcome);
+      await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded); // 7. compare-and-set
+      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at)); // 8. effects
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {                                                      // 9. revalidatePath(…) + refresh()
+      if (wrote) refreshAfter();
+    },
   });
-  if (result.ok) refreshAfter();                                       // 9. revalidatePath(…) + refresh()
-  return result;
 }
 ```
 
 1. `getViewer()` returns the persona ([viewer.ts](viewer.ts)).
-2. Input is parsed with zod. The record is then read outside the transaction only to learn its team.
-3. `check()` wraps `assertCan` from `@/domain/permissions` and returns the refusal instead of throwing. An unknown id gives `teamId: null`, so a missing record and a forbidden one fail the same way, before any input error.
-4. `now()` is read once, before the transaction.
-5. `transact(run)` is `inTransaction(db, run)` plus a catch: `refuse(refusal)` anywhere inside throws a `RefusalError`, which rolls the whole transaction back and becomes `{ ok: false, code, reason }`. Every refusal is an entry from a domain table ([domain/refusals.ts](../domain/refusals.ts)): what the action itself checks before the rule runs (input, a record that's gone, a compare-and-set that missed) comes from `REQUEST_REFUSALS`.
+2. The input is parsed with zod. Input that doesn't parse is refused with `REQUEST_REFUSALS.invalidInput()` ("Check the form and try again."), or with the action's own refusal (`invalid`): access actions give the parser's first problem, `markNotificationRead` answers `notification_gone`.
+3. `authorize` reads the record outside the transaction, only to learn its team and people, then checks: `check(viewer, action, resource)` asks `can()` from `@/domain/permissions`, and `permit(result)` takes a domain rule's answer (`canComment`, `canActOnThread`). An unknown id gives `teamId: null`, so a missing record and a forbidden one fail the same way. Then it refuses what the request can't be: the record is gone, a note is too long, a date isn't one. It returns what the transaction needs (`found`).
+4. `now()` is read once, before the transaction, and handed to every step after it.
+5. `transaction` runs inside `inTransaction(db, …)`, retried when SQLite is busy. `refuse(refusal)` anywhere in `authorize` or the transaction throws a `RefusalError`, which rolls the transaction back and becomes `{ ok: false, code, reason }`; a transaction that returns a refusal is rolled back the same way. Anything else thrown is a bug and propagates. Every refusal is an entry from a domain table ([domain/refusals.ts](../domain/refusals.ts)): what the action itself checks before the rule runs (input, a record that's gone, a compare-and-set that missed) comes from `REQUEST_REFUSALS`.
 6. A transition from `@/domain/lifecycle` returns `{ ok: true, changes, effects }` or `{ ok: false, code, reason }`. The action writes `changes`; it doesn't decide.
 7. `updateVersion` updates only while `state`, `rev`, and `currentStage` still match, and bumps `rev`. A miss is refused, so a double click writes nothing. The `rev` bump also makes an autosave still in flight fail rather than land on a frozen version. When the person acts on content they were shown, the client sends the `rev` it was shown with, and the transition refuses a row that has moved on: `submitVersion` takes the submit summary's `rev`, and `submit` refuses with `REFUSALS.summaryStale` (code `summary_stale`) when the draft changed after the summary was read.
 8. `writeEffects(tx, effects, ctx)` ([effects.ts](effects.ts)) writes audit rows, notifications (to a user or a team role, never to the actor), and consumer notices (consumers with a non-preview render in the last 90 days), all in the same transaction.
-9. Only on success: `revalidatePath()` for the other routes that show the change, then `refresh()` to re-render the page the person is on. Route handlers can't call `refresh()`; they use `revalidatePath()` (`src/app/api/imports/route.ts`).
+9. `after` runs only once the transaction committed with `ok`: `revalidatePath()` for the other routes that show the change, then `refresh()` to re-render the page the person is on, and `redirect()` last (`startDraft`, `createTemplate`). Next's redirect passes through the kit untouched. Route handlers can't call `refresh()`; they use `revalidatePath()` (`src/app/api/imports/route.ts`).
+
+The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true } & T) | Refused`, where `Refused` is `{ ok: false; code; reason }`), re-exported by `@/domain/access-types`. The browser runs actions with `useActionRun` (`src/components/primitives/use-action-run.ts`).
 
 Variations today:
-- The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true } & T) | Refused`, where `Refused` is `{ ok: false; code; reason }`), re-exported by `@/domain/access-types`.
-- `RefusalError`, `refuse`, `check`, and `transact` are private copies in [actions/review.ts](actions/review.ts), [actions/access.ts](actions/access.ts), and [actions/platform.ts](actions/platform.ts) (where `check` is `checkManage`). [actions/comments.ts](actions/comments.ts) has none of them: its permission check is the domain's (`canComment`, `canActOnThread` in `@/domain/comments`), and it calls `inTransaction` directly, returning a refusal from inside the transaction before anything is written.
-- [actions/access.ts](actions/access.ts) reports bad input and a missing record before the permission check. Its `transact` runs `runAccessSweep()` and `runSunsetSweep()` first, each in its own transaction, so a refusal doesn't roll a sweep back. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
-- `startDraft` and `createTemplate` throw (`PermissionError` from `assertCan`, or `Error`) and end in `redirect()`. `advanceClockAction` and `switchPersona` also throw on bad input. A client sees these as a rejected promise, not a `reason`.
-- [actions/notifications.ts](actions/notifications.ts) writes without a transaction; the row's owner is the permission check.
+- [actions/access.ts](actions/access.ts) runs its actions through `accessAction`, the kit plus two things: `runAccessSweep()` and `runSunsetSweep()` run once the check has passed, each in its own transaction, so a refusal doesn't roll a sweep back (and the pages refresh when one changed something, whatever the answer); and a request, membership or review that's gone is refused with its own sentence before the permission check, since a colleague acting first deletes it. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
+- `startDraft` and `createTemplate` answer a refusal (a newer version in review, a viewer who can't edit or create) and redirect on success. `createTemplate` reads the content type and a fresh template id inside its transaction (`disclosureContentType(tx)`, `freshTemplateId(tx)`); Import reads them through `db`.
+- [actions/demo.ts](actions/demo.ts) and [actions/persona.ts](actions/persona.ts) are demo tools: no permission to check, and the modules they call write in their own transactions, so they don't run on the kit. Input they can't use is answered with `invalid_input`.
 
 ## Anatomy of a read
 
@@ -148,7 +157,7 @@ SQLite and libSQL specifics:
 - **Clock** ([clock.ts](clock.ts)): `now()` is the real time plus `settings.clock_offset_days` days. It awaits `connection()` first, which marks the caller as request-time under Cache Components. libSQL resolves in microtasks, so without it a prerender could capture the build's `Date.now()`. `advanceClock(days)` moves the offset. [queries/clock.ts](queries/clock.ts) formats the readout the demo pill shows.
 - **Business time zone** ([business-zone.ts](business-zone.ts)): `settings.business_zone`, the zone a sunset date ends at 00:00 in (decision 0017). No row, or a zone off `BUSINESS_ZONES`, reads as `America/New_York`. Actions read it inside their transaction (`readBusinessZone(tx)`); read models call `getBusinessZone()` after `demoNow()` and hand components a sunset's day (`sunsetDay`, YYYY-MM-DD) and the picker's `SunsetCalendar`, never a zone to compute with. `setBusinessZone` in [actions/platform.ts](actions/platform.ts) changes it; it moves no sunset already set.
 - **Viewer** ([viewer.ts](viewer.ts)): there is no login. `getViewer()` (React `cache`) reads the `ucomp_persona` cookie and loads that user, with memberships and roles, as a `Viewer` (`@/domain/types`). A missing cookie or an unknown user falls back to `DEFAULT_PERSONA`, `"maya"`: today, every request without a valid cookie acts as Maya. `getPersonas()` lists the switchable users.
-- **Access sweep** ([access-sweep.ts](access-sweep.ts)): `runAccessSweep()` applies every access deadline the demo clock has crossed (recertification lapses, the 90-day inactivity flag, the 120-day suspension), backdated, in one transaction. It checks outside a transaction first, so a sweep with nothing to do takes no write lock, and running it twice changes nothing. It runs from `advanceClockAction`, from `switchPersona` (before stamping `last_active_at`), and at the start of every action in [actions/access.ts](actions/access.ts). It doesn't run on a timer or on page reads.
+- **Access sweep** ([access-sweep.ts](access-sweep.ts)): `runAccessSweep()` applies every access deadline the demo clock has crossed (recertification lapses, the 90-day inactivity flag, the 120-day suspension), backdated, in one transaction. It checks outside a transaction first, so a sweep with nothing to do takes no write lock, and running it twice changes nothing. It runs from `advanceClockAction`, from `switchPersona` (before stamping `last_active_at`), and in every action in [actions/access.ts](actions/access.ts), once its permission check has passed and before its transaction. It doesn't run on a timer or on page reads.
 - **Sunset sweep** ([sunset-sweep.ts](sunset-sweep.ts)): `runSunsetSweep()` writes a `version.sunset_passed` audit row, through `writeEffects` with a null actor, for each sunset the demo clock has passed that no row records yet (`sweepSunsets` in `@/domain/lifecycle` decides). Each row is dated at its sunset and names the day in the business time zone. Like the access sweep it checks outside a transaction first, writes in one transaction, changes nothing the second time, and runs from the same three places, after it. It only records: whether a version renders is `sunsetPassed` at render time. The scheduled job that should call both sweeps comes with real sign-in ([handoff review S4](../../docs/handoff-review.md#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep), [decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
 
 ## Render, import, autosave, and route helpers
@@ -160,7 +169,7 @@ SQLite and libSQL specifics:
 
 Body caps, all counted in bytes as the stream is read ([import/read-body.ts](import/read-body.ts)), after a declared `Content-Length` over the cap is refused unread: import allows 10 MiB plus 64 KiB of multipart slack, autosave 2,000,000 (`MAX_BODY_SIZE`), render 1,000,000 (`MAX_BODY_BYTES`). Each answers 413 past it. Server actions cap bodies at 1 MB, which is why import is a route handler.
 
-Each entry point has a fixed error shape: `ActionResult` (`reason`) for actions and the on-demand read routes, `DraftSaveResponse` (`error`, `message`, `rev?`) for autosave, `ImportResponse` (`code`, `reason`) for import, and `{ error: { code, message } }` for `/api/v1`. Use the one your entry point already uses.
+Each entry point has a fixed error shape: `ActionResult` (`code`, `reason`) for every action and the on-demand read routes, `DraftSaveResponse` (`error`, `message`, `rev?`) for autosave, `ImportResponse` (`code`, `reason`) for import, and `{ error: { code, message } }` for `/api/v1`. Use the one your entry point already uses.
 
 ## Demo-only paths
 
@@ -175,8 +184,8 @@ These stand in for things a production deployment would have. None is gated by e
 
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
-| Write a mutation that returns a result | `setSunset`, `approveVersion` in [actions/review.ts](actions/review.ts) | The shape above. Its helpers are private copies (see below). |
-| Give several actions one shape | `memberAction()` in [actions/access.ts](actions/access.ts) | Five member actions share one find, check, and transaction. |
+| Write a mutation | `serverAction` in [actions/kit.ts](actions/kit.ts), as `setSunset` and `approveVersion` in [actions/review.ts](actions/review.ts) use it | The shape above. Test a new kit step in [actions/kit.test.ts](actions/kit.test.ts). |
+| Give several actions one shape | `memberAction()` in [actions/access.ts](actions/access.ts) | Five member actions share one find, check, and transaction, on `accessAction`. |
 | Write a transition's side records | `writeEffects()` in [effects.ts](effects.ts), `writeAccessEffects()` in [access-effects.ts](access-effects.ts) | Always inside the caller's `tx`. |
 | Build a read model with permissions | `getVersions()` and `versionActions()` in [queries/versions.ts](queries/versions.ts) | ISO strings and `can: PermissionResult`. |
 | Gate a page by space or template | `requireSpace()` in [queries/spaces.ts](queries/spaces.ts), `requireTemplate()` in [queries/review-shared.ts](queries/review-shared.ts) | 404 or redirect, cached per request. |
@@ -189,8 +198,6 @@ These stand in for things a production deployment would have. None is gated by e
 
 ## Don't copy
 
-- **Copied helpers.** `RefusalError`, `refuse`, `check`, and `transact` are copied in three action files. Follow their shape. If another file needs them, move them to one shared server module rather than adding a copy.
-- **Throwing actions.** `startDraft` and `createTemplate` throw instead of returning `ActionResult`. New actions return a result.
 - **A second busy retry.** [drafts/apply-patch.ts](drafts/apply-patch.ts) has its own `isBusy` and `retryWhenBusy`, and [import/create.ts](import/create.ts) calls `db.transaction` with no retry. Use `inTransaction()`.
 - **A second `draftRow`.** [actions/review.ts](actions/review.ts) keeps a private copy of `draftRow` from [templates/create.ts](templates/create.ts). Import the shared one.
 - **`submitDraft`** in [actions/templates.ts](actions/templates.ts) is an alias for `submitVersion` that only a test calls. Call `submitVersion`.

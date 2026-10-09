@@ -41,7 +41,7 @@ import {
 import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zone";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
-import { refusal, refuse, type Refused } from "./refusals";
+import { refusal, refuse, type Refusal, type Refused } from "./refusals";
 import { formatLongDate } from "./dates";
 import {
   DOCUMENT_THREAD,
@@ -221,12 +221,13 @@ export function createDraft(input: {
  * say it can't. A Revoked latest version was the Active one until it was withdrawn: the corrected
  * draft starts from its content (decision 0009). A pending revoke leaves the version Active, so it is
  * edited as Active. A newer version in review (or any other newer version) blocks it: editing then
- * would fork the template and drop the newer version's changes.
+ * would fork the template and drop the newer version's changes. Blocked, it carries the refusal
+ * (`REFUSALS.newerInReview`, `REFUSALS.notEditable`) that `startDraft` answers with.
  */
 export type DraftStartPlan =
   | { kind: "open"; versionId: string }
   | { kind: "create"; from: string }
-  | { kind: "blocked"; reason: string };
+  | ({ kind: "blocked" } & Refusal);
 
 export function planDraftStart(
   versions: readonly { id: string; state: VersionState; number: number | null }[],
@@ -239,10 +240,7 @@ export function planDraftStart(
     undefined,
   );
   if (latest?.state === "active" || latest?.state === "revoked") return { kind: "create", from: latest.id };
-  if (latest?.state === "in_review") {
-    return { kind: "blocked", reason: "A newer version is in review." };
-  }
-  return { kind: "blocked", reason: "Only an Active or Revoked template can be edited." };
+  return { kind: "blocked", ...(latest?.state === "in_review" ? REFUSALS.newerInReview : REFUSALS.notEditable) };
 }
 
 /**
@@ -475,6 +473,9 @@ export type Outcome<T> = Ok<T> | Refused;
  * (maker-checker refusals come from `REASONS`).
  */
 export const REFUSALS = {
+  /** Edit (`planDraftStart`): a newer version is in review, so a draft now would fork the template. */
+  newerInReview: refusal("newer_in_review", "A newer version is in review."),
+  notEditable: refusal("not_editable", "Only an Active or Revoked template can be edited."),
   alreadyInReview: refusal("already_in_review", "This version is already in review."),
   notDraft: refusal("not_draft", "Only a draft can be submitted."),
   /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */

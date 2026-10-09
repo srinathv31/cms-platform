@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 15 | 8 | 26 |
-| Partly fixed | 0 | 4 | 2 | 2 | 8 |
-| Fixed | 1 | 19 | 21 | 5 | 46 |
+| Open | 0 | 3 | 13 | 8 | 24 |
+| Partly fixed | 0 | 4 | 3 | 2 | 9 |
+| Fixed | 1 | 19 | 22 | 5 | 47 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -547,7 +547,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A3 · Medium: Six error shapes, and some actions throw
 
-- **Status:** Open
+- **Status:** Partly fixed. Every server action but the demo tools now runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); still to do are the autosave route's `DraftSaveResponse` (`error`, `message`), import's own codes, the audit export's plain-text errors, and `/api/v1` problem details, which wait for the Java API ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)).
 - **Where:** `src/server/actions/templates.ts` line 57
 - **What happens:** `/api/v1` uses `{error: {code, message, details}}`; drafts, imports and palette each have their own; audit export returns text. `startDraft` and `createTemplate` throw, so in production the user sees a generic message instead of the domain's sentence.
 - **Fix:** One result kit for actions and RFC 9457 problem details for routes.
@@ -779,7 +779,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H1 · Medium: Three server-action styles
 
-- **Status:** Open
+- **Status:** Fixed. One server action kit (`serverAction` in `src/server/actions/kit.ts`) runs every action's steps (the demo tools aside) in one order and replaces the private copies of `RefusalError`, `check` and `transact`, and one browser hook (`useActionRun`) replaces the four action runners, with the settings sections sharing one `Strip` ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)).
 - **Where:** `src/server/actions/review.ts` line 60; `src/server/actions/access.ts` line 61; `src/server/actions/platform.ts` line 48
 - **What happens:** Some actions throw, most return `ActionResult`; access parses before authorizing, platform authorizes first, review looks up, checks, then rejects. `Refusal`, `check` and `transact` are copied three times; the client-side `useActionRun` pattern four times.
 - **Fix:** One shared, non-`"use server"` kit and one client hook.

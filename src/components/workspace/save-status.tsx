@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { runAction } from "@/components/versions/action-dialog";
+import { runAction } from "@/components/primitives/use-action-run";
 import { formatAgo } from "@/domain/dates";
 import { isApple } from "@/editor/lib/platform";
 import { readTemplate } from "@/lib/template-reads";

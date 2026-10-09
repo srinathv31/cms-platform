@@ -84,7 +84,8 @@ Next.js API; Next's own note about it is at the end of this file.
 - A server action: `getViewer()`, parse with zod, check permission, `now()` once, then one `inTransaction`. Inside
   it, re-read, ask the domain, write with a compare-and-set, and write the effects (audit rows, notifications,
   consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
-  throw only for bugs. Inside a transaction, read and write through `tx`, never `db`.
+  throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
+  [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
 - A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people
   read), or what to write plus `effects`.
 - Every refusal comes from a table in `src/domain` built with `refusal(code, sentence)`
@@ -112,7 +113,9 @@ Next.js API; Next's own note about it is at the end of this file.
 - Tokens only: no hex, rgb, or oklch values in components. Utilities come from `src/app/globals.css` and
   `src/styles/tokens.css`. Light theme only, so no `dark:` classes.
 - Use the shared primitives in `src/components/primitives/` (`StatusBadge` for any version state, `PageHeader`,
-  `Stream`, `Keycap`, `TemplateId`, `LinkPending`) rather than writing new ones.
+  `Stream`, `Keycap`, `TemplateId`, `LinkPending`) rather than writing new ones. Run a server action with
+  `useActionRun` ([use-action-run.ts](src/components/primitives/use-action-run.ts)): one at a time, in a
+  transition, with the refusal's sentence to show.
 - Animate with `m.*` from `motion/react` (`LazyMotion` is strict), with timings from `@/components/motion/presets`.
 - One black primary button per screen. No hint or instruction text: explain only when an action is blocked, at the
   control. Show an unavailable control disabled, with its reason, rather than hiding it.
@@ -122,7 +125,7 @@ Next.js API; Next's own note about it is at the end of this file.
 
 | To… | Copy |
 | --- | --- |
-| Write a server action | `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) |
+| Write a server action | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it |
 | Write a domain transition | `setSunset`, `startRevoke` in [src/domain/lifecycle.ts](src/domain/lifecycle.ts) |
 | Build a read model with permissions | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts) |
 | Stream a page | [versions/page.tsx](src/app/(product)/[team]/templates/[templateId]/versions/page.tsx) with [versions-content.tsx](src/components/versions/versions-content.tsx) |
@@ -135,10 +138,8 @@ Next.js API; Next's own note about it is at the end of this file.
 | Format a count or a plural | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts) |
 | Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
 
-Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common ones:
-actions that throw instead of returning a result (`startDraft`, `createTemplate`); private copies of `RefusalError`,
-`check`, and `transact` in three action files; and bare `<Suspense>` instead of `<Stream>`. Never copy from
-`src/app/(dev)`: those are design mocks on fixture data.
+Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
+bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
 
 ## Keeping the docs true
 

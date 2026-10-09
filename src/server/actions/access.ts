@@ -21,31 +21,32 @@ import {
   type AccessEffect,
   type ActionResult,
   type MembershipChange,
-  type MembershipFacts,
   type Named,
   type RecertDecision,
   type RequestableRole,
 } from "@/domain/access-types";
-import { PermissionError, REASONS, assertCan } from "@/domain/permissions";
-import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
-import { TEAM_ROLES, type Action, type PermissionResource, type TeamRole, type Viewer } from "@/domain/types";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS, type Refused } from "@/domain/refusals";
+import { TEAM_ROLES, type TeamRole, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { loadMembershipFacts, loadRecertFacts, loadRequestFacts, runAccessSweep } from "@/server/access-sweep";
-import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { accessRequests, memberships, recertifications, recertItems, teams, users } from "@/server/db/schema/ucomp";
-import { inTransaction, type Tx } from "@/server/effects";
+import type { Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { runSunsetSweep } from "@/server/sunset-sweep";
-import { getViewer } from "@/server/viewer";
+import { check, refuse, serverAction, type ActionSteps } from "./kit";
 
 // Team access: requesting and deciding access, members, inactivity and recertification.
 //
-// Every action has the same shape (as actions/review.ts):
-//   1. the permission check on the team, server-side, with the subject (nobody decides their own
-//      request or changes their own access); a refusal is returned, not thrown;
-//   2. ONE transaction that applies the access sweep, re-reads the facts, asks the domain (domain/access.ts), writes the change
-//      and its audit rows and notifications (server/access-effects.ts);
+// Every action runs the server action kit (kit.ts) through `accessAction`:
+//   1. `authorize`: the request, membership or review the input names, read to learn its team and
+//      person. One that's gone is refused with its own sentence (a colleague acting first removes it).
+//      Then the permission check on the team, server-side, with the subject (nobody decides their own
+//      request or changes their own access);
+//   2. the access sweep, on its own, then ONE transaction that re-reads the facts, asks the domain
+//      (domain/access.ts), and writes the change with its audit rows and notifications
+//      (server/access-effects.ts);
 //   3. `revalidatePath("/", "layout")` + `refresh()`: the switcher summaries, the sidebar card and
 //      the settings sections all move.
 // A double click or a colleague acting first is refused with the domain's sentence and writes nothing.
@@ -53,53 +54,47 @@ import { getViewer } from "@/server/viewer";
 
 // ── Helpers ───────────────────────────────────────────────────
 
-/** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class RefusalError extends Error {
-  constructor(readonly refusal: Refusal) {
-    super(refusal.reason);
-    this.name = "RefusalError";
-  }
-}
-
-function refuse(refusal: Refusal): never {
-  throw new RefusalError(refusal);
-}
-
-/** `assertCan`, with the refusal returned as the action's answer instead of thrown. */
-function check(viewer: Viewer, action: Action, resource: PermissionResource): Refused | null {
-  try {
-    assertCan(viewer, action, resource);
-    return null;
-  } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
-    throw error;
-  }
-}
-
-/**
- * The action's transaction. The access sweep runs first, on its own (a refusal mustn't roll it back), so
- * a deadline the demo clock already crossed (a past-due review, day 120) takes effect before the action
- * reads its facts. The sunset sweep runs beside it, in its own transaction too.
- */
-async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-  const swept = await runAccessSweep();
-  const sunsets = await runSunsetSweep();
-  const sweptSomething = swept.membershipChanges.length > 0 || swept.recertsClosed.length > 0 || sunsets.length > 0;
-  try {
-    return await inTransaction(db, run);
-  } catch (error) {
-    if (!(error instanceof RefusalError)) throw error;
-    if (sweptSomething) refreshAfter(); // the refusal changed nothing, but the sweep did
-    return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
-  }
-}
-
 function refreshAfter() {
   revalidatePath("/", "layout");
   refresh();
 }
 
-const invalid = (error: z.ZodError): Refused => ({ ok: false, ...REQUEST_REFUSALS.invalidInput(error.issues[0]?.message) });
+/**
+ * The access sweep, on its own before the action's transaction (a refusal mustn't roll it back), so a
+ * deadline the demo clock already crossed (a past-due review, day 120) takes effect before the action
+ * reads its facts. The sunset sweep runs beside it, in its own transaction too. When either changed
+ * something, the pages refresh whatever the action answers.
+ */
+async function sweep(): Promise<boolean> {
+  const swept = await runAccessSweep();
+  const sunsets = await runSunsetSweep();
+  const changed = swept.membershipChanges.length > 0 || swept.recertsClosed.length > 0 || sunsets.length > 0;
+  if (changed) refreshAfter();
+  return changed;
+}
+
+/**
+ * An access action on the kit: input that doesn't parse is refused with the parser's first problem,
+ * the sweep runs once the permission check has passed, and the pages refresh once.
+ */
+function accessAction<I, F, T extends object = Record<never, never>>(
+  raw: unknown,
+  steps: Pick<ActionSteps<I, F, T>, "input" | "invalid" | "authorize" | "transaction">,
+): Promise<ActionResult<T>> {
+  let swept = false;
+  return serverAction(raw, {
+    invalid: (error) => REQUEST_REFUSALS.invalidInput(error.issues[0]?.message),
+    ...steps,
+    authorize: async (ctx) => {
+      const found = await steps.authorize(ctx);
+      swept = await sweep();
+      return found;
+    },
+    after: () => {
+      if (!swept) refreshAfter();
+    },
+  });
+}
 
 async function teamNamed(tx: Tx, id: string): Promise<Named | null> {
   const rows = await tx.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.id, id)).limit(1);
@@ -153,39 +148,37 @@ async function memberContext(tx: Tx, membershipId: string) {
   return { membership, teamMemberships, member, team };
 }
 
+type MemberContext = Awaited<ReturnType<typeof memberContext>> & { actor: Named; now: Date };
+type MemberOutcome = { ok: true; membership: MembershipChange | null; effects: AccessEffect[] } | Refused;
+
+const MemberInput = z.object({ membershipId: Id });
+
 /**
  * The shared shape of the five member actions: find the membership, check `team.manageMembers` on its
  * team with the member as the subject, then run the domain transition inside one transaction.
  */
-async function memberAction(
-  input: unknown,
-  run: (ctx: {
-    membership: MembershipFacts;
-    teamMemberships: MembershipFacts[];
-    member: Named;
-    team: Named;
-    actor: Named;
-    now: Date;
-  }) => { ok: true; membership: MembershipChange | null; effects: AccessEffect[] } | Refused,
+async function memberAction<I extends { membershipId: string }>(
+  raw: unknown,
+  steps: Pick<ActionSteps<I, void, Record<never, never>>, "input" | "invalid"> & {
+    transition: (ctx: MemberContext, input: I) => MemberOutcome;
+  },
 ): Promise<ActionResult> {
-  const parsed = z.object({ membershipId: Id }).safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  const viewer = await getViewer();
-  const ref = await findMembership(parsed.data.membershipId);
-  if (!ref) return { ok: false, ...ACCESS_REFUSALS.noLongerMember };
-  const denied = check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: ref.userId });
-  if (denied) return denied;
-
-  const at = await now();
-  const result = await transact(async (tx) => {
-    const ctx = await memberContext(tx, parsed.data.membershipId);
-    const outcome = run({ ...ctx, actor: actorOf(viewer), now: at });
-    if (!outcome.ok) refuse(outcome);
-    await commit(tx, outcome.membership, outcome.effects, at, viewer);
-    return { ok: true };
+  return accessAction(raw, {
+    input: steps.input,
+    ...(steps.invalid ? { invalid: steps.invalid } : {}),
+    authorize: async ({ viewer, input }) => {
+      const ref = await findMembership(input.membershipId);
+      if (!ref) refuse(ACCESS_REFUSALS.noLongerMember);
+      check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: ref.userId });
+    },
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const ctx = await memberContext(tx, input.membershipId);
+      const outcome = steps.transition({ ...ctx, actor: actorOf(viewer), now: at }, input);
+      if (!outcome.ok) refuse(outcome);
+      await commit(tx, outcome.membership, outcome.effects, at, viewer);
+      return { ok: true };
+    },
   });
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 // ── Requesting and deciding access ───────────────────────────
@@ -203,41 +196,38 @@ export async function requestAccess(input: {
   role: RequestableRole;
   reason: string;
 }): Promise<ActionResult<{ requestId: string }>> {
-  const parsed = RequestInput.safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  const viewer = await getViewer();
-  // The Auditor is read-only everywhere: no team role for them, so no request either (said plainly).
-  if (viewer.platformRole === "auditor") return { ok: false, ...REASONS.auditorReadOnly };
-  const denied = check(viewer, "access.request", { teamId: parsed.data.teamId });
-  if (denied) return denied;
-
-  const at = await now();
-  const result = await transact<{ requestId: string }>(async (tx) => {
-    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
-    const outcome = requestTransition({
-      requester: actorOf(viewer),
-      team,
-      role: parsed.data.role,
-      reason: parsed.data.reason,
-      now: at,
-      memberships: await loadMembershipFacts(tx, eq(memberships.userId, viewer.userId)),
-      requests: await loadRequestFacts(tx, eq(accessRequests.userId, viewer.userId)),
-    });
-    if (!outcome.ok) refuse(outcome);
-    const requestId = newId("ar");
-    await tx.insert(accessRequests).values({
-      id: requestId,
-      ...outcome.request,
-      status: "pending",
-      decidedBy: null,
-      decidedAt: null,
-      decisionNote: null,
-    });
-    await commit(tx, null, outcome.effects, at, viewer);
-    return { ok: true, requestId };
+  return accessAction(input, {
+    input: RequestInput,
+    authorize: ({ viewer, input }) => {
+      // The Auditor is read-only everywhere: no team role for them, so no request either (said plainly).
+      if (viewer.platformRole === "auditor") refuse(REASONS.auditorReadOnly);
+      check(viewer, "access.request", { teamId: input.teamId });
+    },
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const team = (await teamNamed(tx, input.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const outcome = requestTransition({
+        requester: actorOf(viewer),
+        team,
+        role: input.role,
+        reason: input.reason,
+        now: at,
+        memberships: await loadMembershipFacts(tx, eq(memberships.userId, viewer.userId)),
+        requests: await loadRequestFacts(tx, eq(accessRequests.userId, viewer.userId)),
+      });
+      if (!outcome.ok) refuse(outcome);
+      const requestId = newId("ar");
+      await tx.insert(accessRequests).values({
+        id: requestId,
+        ...outcome.request,
+        status: "pending",
+        decidedBy: null,
+        decidedAt: null,
+        decisionNote: null,
+      });
+      await commit(tx, null, outcome.effects, at, viewer);
+      return { ok: true, requestId };
+    },
   });
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 const DecideInput = z.object({
@@ -252,88 +242,91 @@ export async function decideAccessRequest(input: {
   decision: "approve" | "deny";
   note?: string;
 }): Promise<ActionResult> {
-  const parsed = DecideInput.safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  const viewer = await getViewer();
-  const ref = await db
-    .select({ teamId: accessRequests.teamId, userId: accessRequests.userId })
-    .from(accessRequests)
-    .where(eq(accessRequests.id, parsed.data.requestId))
-    .limit(1)
-    .then((rows) => rows[0]);
-  if (!ref) return { ok: false, ...REQUEST_REFUSALS.requestGone };
-  const denied = check(viewer, "team.decideAccessRequest", { teamId: ref.teamId, requesterId: ref.userId });
-  if (denied) return denied;
-
-  const at = await now();
-  const result = await transact(async (tx) => {
-    const [request] = await loadRequestFacts(tx, eq(accessRequests.id, parsed.data.requestId));
-    if (!request) refuse(REQUEST_REFUSALS.requestGone);
-    const team = (await teamNamed(tx, request.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
-    const requester = await personNamed(tx, request.userId);
-    // A request made before the requester became an Auditor (or written around the request check)
-    // can't be approved: an Auditor holds no team role. Denying it still works.
-    if (parsed.data.decision === "approve" && (await isAuditor(tx, request.userId))) {
-      refuse(ACCESS_REFUSALS.auditorRequester(requester.name));
-    }
-    const [membership] = await loadMembershipFacts(
-      tx,
-      and(eq(memberships.userId, request.userId), eq(memberships.teamId, request.teamId)),
-    );
-    const outcome = decideRequestTransition({
-      request,
-      requester,
-      team,
-      actor: actorOf(viewer),
-      decision: parsed.data.decision,
-      note: parsed.data.note ?? null,
-      now: at,
-      membership: membership ?? null,
-    });
-    if (!outcome.ok) refuse(outcome);
-    // Compare-and-set on the pending status: a colleague deciding first wins.
-    const updated = await tx
-      .update(accessRequests)
-      .set(outcome.request)
-      .where(and(eq(accessRequests.id, request.id), eq(accessRequests.status, "pending")))
-      .returning({ id: accessRequests.id });
-    if (updated.length === 0) refuse(ACCESS_REFUSALS.decided);
-    await commit(tx, outcome.membership, outcome.effects, at, viewer);
-    return { ok: true };
+  return accessAction(input, {
+    input: DecideInput,
+    authorize: async ({ viewer, input }) => {
+      const ref = await db
+        .select({ teamId: accessRequests.teamId, userId: accessRequests.userId })
+        .from(accessRequests)
+        .where(eq(accessRequests.id, input.requestId))
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (!ref) refuse(REQUEST_REFUSALS.requestGone);
+      check(viewer, "team.decideAccessRequest", { teamId: ref.teamId, requesterId: ref.userId });
+    },
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const [request] = await loadRequestFacts(tx, eq(accessRequests.id, input.requestId));
+      if (!request) refuse(REQUEST_REFUSALS.requestGone);
+      const team = (await teamNamed(tx, request.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const requester = await personNamed(tx, request.userId);
+      // A request made before the requester became an Auditor (or written around the request check)
+      // can't be approved: an Auditor holds no team role. Denying it still works.
+      if (input.decision === "approve" && (await isAuditor(tx, request.userId))) {
+        refuse(ACCESS_REFUSALS.auditorRequester(requester.name));
+      }
+      const [membership] = await loadMembershipFacts(
+        tx,
+        and(eq(memberships.userId, request.userId), eq(memberships.teamId, request.teamId)),
+      );
+      const outcome = decideRequestTransition({
+        request,
+        requester,
+        team,
+        actor: actorOf(viewer),
+        decision: input.decision,
+        note: input.note ?? null,
+        now: at,
+        membership: membership ?? null,
+      });
+      if (!outcome.ok) refuse(outcome);
+      // Compare-and-set on the pending status: a colleague deciding first wins.
+      const updated = await tx
+        .update(accessRequests)
+        .set(outcome.request)
+        .where(and(eq(accessRequests.id, request.id), eq(accessRequests.status, "pending")))
+        .returning({ id: accessRequests.id });
+      if (updated.length === 0) refuse(ACCESS_REFUSALS.decided);
+      await commit(tx, outcome.membership, outcome.effects, at, viewer);
+      return { ok: true };
+    },
   });
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 // ── Members and inactivity ───────────────────────────────────
 
-const Roles = z.array(z.enum(TEAM_ROLES)).max(TEAM_ROLES.length);
+const RolesInput = MemberInput.extend({ roles: z.array(z.enum(TEAM_ROLES)).max(TEAM_ROLES.length) });
 
 /** Replace a member's roles. A team keeps at least one active Team Admin. */
 export async function changeMemberRoles(input: { membershipId: string; roles: TeamRole[] }): Promise<ActionResult> {
-  const roles = Roles.safeParse(input?.roles);
-  if (!roles.success) return { ok: false, ...ACCESS_REFUSALS.pickRoles };
-  return memberAction(input, (ctx) => changeRoles({ ...ctx, roles: roles.data }));
+  return memberAction(input, {
+    input: RolesInput,
+    // Roles that don't parse are asked for again, whatever else is wrong.
+    invalid: (error) =>
+      error.issues.some((issue) => issue.path[0] === "roles")
+        ? ACCESS_REFUSALS.pickRoles
+        : REQUEST_REFUSALS.invalidInput(error.issues[0]?.message),
+    transition: (ctx, { roles }) => changeRoles({ ...ctx, roles }),
+  });
 }
 
 /** Remove a member: the membership is deleted. */
 export async function removeMember(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, (ctx) => removeTransition(ctx));
+  return memberAction(input, { input: MemberInput, transition: (ctx) => removeTransition(ctx) });
 }
 
 /** Restore a suspended or lapsed member with their previous roles (their inactivity clock restarts). */
 export async function reinstateMember(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, (ctx) => reinstateTransition(ctx));
+  return memberAction(input, { input: MemberInput, transition: (ctx) => reinstateTransition(ctx) });
 }
 
 /** Suspend a member flagged for inactivity (90 days or more without a sign-in). */
 export async function suspendInactive(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, (ctx) => suspendTransition(ctx));
+  return memberAction(input, { input: MemberInput, transition: (ctx) => suspendTransition(ctx) });
 }
 
 /** Keep a flagged member: their inactivity clock restarts now. */
 export async function keepInactive(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, (ctx) => keepTransition(ctx));
+  return memberAction(input, { input: MemberInput, transition: (ctx) => keepTransition(ctx) });
 }
 
 // ── Recertification ──────────────────────────────────────────
@@ -346,86 +339,77 @@ export async function decideRecertItem(input: {
   userId: string;
   decision: RecertDecision;
 }): Promise<ActionResult> {
-  const parsed = RecertItemInput.safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  const { recertId, userId, decision } = parsed.data;
-  const viewer = await getViewer();
-  const ref = await db
-    .select({ teamId: recertifications.teamId })
-    .from(recertifications)
-    .where(eq(recertifications.id, recertId))
-    .limit(1)
-    .then((rows) => rows[0]);
-  if (!ref) return { ok: false, ...REQUEST_REFUSALS.reviewGone };
-  const denied = check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: userId });
-  if (denied) return denied;
-
-  const at = await now();
-  const result = await transact(async (tx) => {
-    const [recert] = await loadRecertFacts(tx, eq(recertifications.id, recertId));
-    if (!recert) refuse(REQUEST_REFUSALS.reviewGone);
-    const team = (await teamNamed(tx, recert.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
-    const member = await personNamed(tx, userId);
-    const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, recert.teamId));
-    const outcome = decideRecertTransition({
-      recert,
-      userId,
-      member,
-      team,
-      actor: actorOf(viewer),
-      decision,
-      now: at,
-      teamMemberships,
-    });
-    if (!outcome.ok) refuse(outcome);
-    const updated = await tx
-      .update(recertItems)
-      .set(outcome.item)
-      .where(and(eq(recertItems.recertId, recertId), eq(recertItems.userId, userId), isNull(recertItems.decision)))
-      .returning({ userId: recertItems.userId });
-    if (updated.length === 0) refuse(ACCESS_REFUSALS.alreadyReviewed);
-    if (outcome.completedAt) {
-      await tx
-        .update(recertifications)
-        .set({ completedAt: outcome.completedAt })
-        .where(and(eq(recertifications.id, recertId), isNull(recertifications.completedAt)));
-    }
-    await commit(tx, outcome.membership, outcome.effects, at, viewer);
-    return { ok: true };
+  return accessAction(input, {
+    input: RecertItemInput,
+    authorize: async ({ viewer, input }) => {
+      const ref = await db
+        .select({ teamId: recertifications.teamId })
+        .from(recertifications)
+        .where(eq(recertifications.id, input.recertId))
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (!ref) refuse(REQUEST_REFUSALS.reviewGone);
+      check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: input.userId });
+    },
+    transaction: async (tx, { viewer, input: { recertId, userId, decision }, now: at }) => {
+      const [recert] = await loadRecertFacts(tx, eq(recertifications.id, recertId));
+      if (!recert) refuse(REQUEST_REFUSALS.reviewGone);
+      const team = (await teamNamed(tx, recert.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const member = await personNamed(tx, userId);
+      const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, recert.teamId));
+      const outcome = decideRecertTransition({
+        recert,
+        userId,
+        member,
+        team,
+        actor: actorOf(viewer),
+        decision,
+        now: at,
+        teamMemberships,
+      });
+      if (!outcome.ok) refuse(outcome);
+      const updated = await tx
+        .update(recertItems)
+        .set(outcome.item)
+        .where(and(eq(recertItems.recertId, recertId), eq(recertItems.userId, userId), isNull(recertItems.decision)))
+        .returning({ userId: recertItems.userId });
+      if (updated.length === 0) refuse(ACCESS_REFUSALS.alreadyReviewed);
+      if (outcome.completedAt) {
+        await tx
+          .update(recertifications)
+          .set({ completedAt: outcome.completedAt })
+          .where(and(eq(recertifications.id, recertId), isNull(recertifications.completedAt)));
+      }
+      await commit(tx, outcome.membership, outcome.effects, at, viewer);
+      return { ok: true };
+    },
   });
-  if (result.ok) refreshAfter();
-  return result;
 }
 
 /** Start a review now, due in 30 days, covering the team's members (Team Admins aside). */
 export async function startRecertification(input: { teamId: string }): Promise<ActionResult<{ recertId: string }>> {
-  const parsed = z.object({ teamId: Id }).safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  const viewer = await getViewer();
-  const denied = check(viewer, "team.manageMembers", { teamId: parsed.data.teamId });
-  if (denied) return denied;
-
-  const at = await now();
-  const result = await transact<{ recertId: string }>(async (tx) => {
-    const team = (await teamNamed(tx, parsed.data.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
-    const outcome = startRecert({
-      team,
-      actor: actorOf(viewer),
-      now: at,
-      memberships: await loadMembershipFacts(tx, eq(memberships.teamId, team.id)),
-      unfinished: await loadRecertFacts(
-        tx,
-        and(eq(recertifications.teamId, team.id), isNull(recertifications.completedAt)),
-      ),
-    });
-    if (!outcome.ok) refuse(outcome);
-    const recertId = newId("rc");
-    const { items, ...recert } = outcome.recert;
-    await tx.insert(recertifications).values({ id: recertId, ...recert, completedAt: null });
-    await tx.insert(recertItems).values(items.map((item) => ({ recertId, ...item })));
-    await commit(tx, null, outcome.effects, at, viewer);
-    return { ok: true, recertId };
+  return accessAction(input, {
+    input: z.object({ teamId: Id }),
+    authorize: ({ viewer, input }) => check(viewer, "team.manageMembers", { teamId: input.teamId }),
+    transaction: async (tx, { viewer, input, now: at }) => {
+      const team = (await teamNamed(tx, input.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const outcome = startRecert({
+        team,
+        actor: actorOf(viewer),
+        now: at,
+        memberships: await loadMembershipFacts(tx, eq(memberships.teamId, team.id)),
+        unfinished: await loadRecertFacts(
+          tx,
+          and(eq(recertifications.teamId, team.id), isNull(recertifications.completedAt)),
+        ),
+      });
+      if (!outcome.ok) refuse(outcome);
+      const recertId = newId("rc");
+      const { items, ...recert } = outcome.recert;
+      await tx.insert(recertifications).values({ id: recertId, ...recert, completedAt: null });
+      await tx.insert(recertItems).values(items.map((item) => ({ recertId, ...item })));
+      await commit(tx, null, outcome.effects, at, viewer);
+      return { ok: true, recertId };
+    },
   });
-  if (result.ok) refreshAfter();
-  return result;
 }

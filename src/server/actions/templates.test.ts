@@ -5,6 +5,9 @@ import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { redirect } from "next/navigation";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { REFUSALS } from "@/domain/lifecycle";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -39,11 +42,12 @@ const CT = "ct_disclosure";
 let db: Db;
 let libsql: Client;
 let maya: Viewer;
+let ids: Record<string, string>;
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: env.now });
+  ids = (await seedDatabase(db, { base: env.now })).templates;
   maya = await loadPersona(db, "maya");
   vi.mocked(getViewer).mockResolvedValue(maya);
 }, 60_000);
@@ -180,5 +184,46 @@ describe("who wrote a new draft", () => {
       where: and(eq(versions.templateId, active!.templateId), eq(versions.state, "draft")),
     });
     expect(draft).toMatchObject({ basedOnVersionId: active!.id, createdBy: "maya", writers: ["maya"] });
+  });
+});
+
+// Handoff review A3: Edit and New template threw their refusals, so the person saw a generic failure
+// instead of the domain's sentence. They answer them now, write nothing and don't redirect.
+describe("Edit and New template answer a refusal", () => {
+  const draftsOf = (templateId: string) =>
+    db.select({ id: versions.id }).from(versions).where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+
+  it("Edit while a newer version is in review: the domain's sentence, and no draft", async () => {
+    vi.mocked(redirect).mockClear();
+    const cashBack = ids["cash-back"]!;
+    expect(await startDraft({ templateId: cashBack })).toEqual({ ok: false, ...REFUSALS.newerInReview });
+    expect(await draftsOf(cashBack)).toEqual([]);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("Edit by a Viewer, and on a template that doesn't exist, refused the same way", async () => {
+    vi.mocked(redirect).mockClear();
+    vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, "sam"));
+    try {
+      expect(await startDraft({ templateId: ids["cash-back"]! })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await startDraft({ templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, ...REASONS.generic });
+    } finally {
+      vi.mocked(getViewer).mockResolvedValue(maya);
+    }
+    expect(await startDraft({ templateId: "" })).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("New template on a team the author can't create on, an unknown team, or an unknown starter", async () => {
+    vi.mocked(redirect).mockClear();
+    const before = (await db.select({ id: templates.id }).from(templates)).length;
+    expect(await createTemplate({ teamSlug: "deposits", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await createTemplate({ teamSlug: "nowhere", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await createTemplate({ teamSlug: "coral-offers", starterKey: "nope" as never })).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
+    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(before);
+    expect(redirect).not.toHaveBeenCalled();
   });
 });

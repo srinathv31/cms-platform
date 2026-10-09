@@ -4,44 +4,61 @@ import { refresh } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult } from "@/domain/access-types";
-import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
-import { now } from "@/server/clock";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { db } from "@/server/db/client";
 import { notifications } from "@/server/db/schema/ucomp";
-import { getViewer } from "@/server/viewer";
+import { refuse, serverAction } from "./kit";
 
-// The bell's two writes. A notification belongs to one person: only they mark it read (the check is
-// the row's owner, so nobody can mark someone else's). Read times are on the demo clock. Marking an
-// already-read one again is a no-op that succeeds (a double click, two tabs).
+// The bell's two writes, on the server action kit (kit.ts). A notification belongs to one person: only
+// they mark it read (the check is the row's owner, so nobody can mark someone else's). Read times are on
+// the demo clock. Marking an already-read one again is a no-op that succeeds (a double click, two tabs).
 
 const MarkInput = z.object({ id: z.string().min(1).max(64) });
 
 export async function markNotificationRead(input: { id: string }): Promise<ActionResult> {
-  const parsed = MarkInput.safeParse(input);
-  if (!parsed.success) return refuse(REQUEST_REFUSALS.notificationGone);
-  const viewer = await getViewer();
-  const row = await db.query.notifications.findFirst({
-    where: and(eq(notifications.id, parsed.data.id), eq(notifications.userId, viewer.userId)),
+  let wrote = false;
+  return serverAction(input, {
+    input: MarkInput,
+    invalid: REQUEST_REFUSALS.notificationGone,
+    authorize: async ({ viewer, input }) => {
+      const row = await db.query.notifications.findFirst({
+        columns: { id: true, readAt: true },
+        where: and(eq(notifications.id, input.id), eq(notifications.userId, viewer.userId)),
+      });
+      // Someone else's notification reads as missing: it doesn't confirm the id exists.
+      if (!row) refuse(REQUEST_REFUSALS.notificationGone);
+      return row;
+    },
+    transaction: async (tx, { found, now }) => {
+      if (found.readAt !== null) return { ok: true };
+      await tx
+        .update(notifications)
+        .set({ readAt: now })
+        .where(and(eq(notifications.id, found.id), isNull(notifications.readAt)));
+      wrote = true;
+      return { ok: true };
+    },
+    after: () => {
+      if (wrote) refresh();
+    },
   });
-  // Someone else's notification reads as missing: it doesn't confirm the id exists.
-  if (!row) return refuse(REQUEST_REFUSALS.notificationGone);
-  if (row.readAt === null) {
-    await db
-      .update(notifications)
-      .set({ readAt: await now() })
-      .where(and(eq(notifications.id, row.id), isNull(notifications.readAt)));
-    refresh();
-  }
-  return { ok: true };
 }
 
 export async function markAllNotificationsRead(): Promise<ActionResult<{ count: number }>> {
-  const viewer = await getViewer();
-  const marked = await db
-    .update(notifications)
-    .set({ readAt: await now() })
-    .where(and(eq(notifications.userId, viewer.userId), isNull(notifications.readAt)))
-    .returning({ id: notifications.id });
-  if (marked.length > 0) refresh();
-  return { ok: true, count: marked.length };
+  return serverAction(undefined, {
+    input: z.undefined(),
+    // The viewer's own notifications: nothing to check.
+    authorize: () => undefined,
+    transaction: async (tx, { viewer, now }) => {
+      const marked = await tx
+        .update(notifications)
+        .set({ readAt: now })
+        .where(and(eq(notifications.userId, viewer.userId), isNull(notifications.readAt)))
+        .returning({ id: notifications.id });
+      return { ok: true, count: marked.length };
+    },
+    after: ({ count }) => {
+      if (count > 0) refresh();
+    },
+  });
 }
