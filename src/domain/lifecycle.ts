@@ -375,7 +375,8 @@ export interface SubmitInput {
  *     and preheader while Email is on (they are not part of the output otherwise);
  *   - Email is on and the subject is empty.
  *
- * Renamed keys read as "removed" plus "added" here: the rename history lives in the editor session.
+ * A renamed key is one `key_renamed` change: the renamed variable keeps its identity as its id
+ * (`Variable.id`), so `diffVariables` pairs it with the baseline's variable whatever it is keyed now.
  */
 export function submit(input: SubmitInput): SubmitResult {
   const { draft, highestNumber, baseline, now, submittedBy } = input;

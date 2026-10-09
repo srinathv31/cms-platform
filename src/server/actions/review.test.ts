@@ -6,13 +6,16 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
-import { describeChanges } from "@/domain/contract";
+import { describeChanges, diffVariables } from "@/domain/contract";
+import { noticeView } from "@/domain/golive/notices";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Variable, Viewer } from "@/domain/types";
+import { createVariableStore } from "@/editor/state/variable-store";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { parseDraftPatchText } from "@/server/drafts/parse-patch";
 import { saveDraft } from "@/server/drafts/save-draft";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
@@ -1000,6 +1003,113 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({ ok: true, summary: { number: 4, baseline: null } });
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 4 });
     expect((await version(templateId, 4))?.contractChanges).toBeNull();
+  });
+});
+
+// ── A renamed variable is one rename, through submit and to consumers (handoff review D8) ──
+
+describe("a variable renamed in a draft", () => {
+  const NAME = "Rename Contract — Terms";
+  let templateId: string;
+
+  /**
+   * One editing session, as the workspace runs it: the editor's variable store opens on the saved list,
+   * `edit` works on it, and autosave sends the list it reports through the route's own parser.
+   */
+  async function editVariables(userId: string, edit: (store: ReturnType<typeof createVariableStore>) => void) {
+    const draft = (await draftOf(templateId))!;
+    const store = createVariableStore(draft.variables);
+    edit(store);
+    const text = JSON.stringify({ rev: draft.rev, sessionKey: `d8-session-${minute}`, variables: store.getState().variables });
+    const parsed = parseDraftPatchText(text);
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(await saveDraft(people[userId]!, draft.id, parsed.patch)).toMatchObject({ ok: true });
+  }
+
+  // v1 goes live with `first_name`, and Coral renders it, so it hears about the next version.
+  beforeAll(async () => {
+    ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    const at = as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    const v1 = (await version(templateId, 1))!;
+    expect(v1.variables.map((v) => v.key)).toContain("first_name");
+    await db.insert(renderLog).values({
+      id: "rl_test_d8",
+      at,
+      templateId,
+      versionId: v1.id,
+      versionNumber: 1,
+      consumerId: "coral",
+      channel: "web",
+      isPreview: false,
+      correlationId: "test-d8",
+      outcome: "ok",
+    });
+  });
+
+  it("is saved with the draft: renamed in one session and again after a reload, it is one rename against v1", async () => {
+    as("maya");
+    await startDraft({ templateId });
+    await editVariables("maya", (store) => store.getState().update("first_name", { key: "given_name" }));
+    expect((await draftOf(templateId))!.variables.find((v) => v.key === "given_name")).toMatchObject({ id: "first_name" });
+
+    // A new page visit: the store opens on the saved list, and the next rename chains onto the first.
+    await editVariables("maya", (store) => store.getState().update("given_name", { key: "name_on_card" }));
+    const summary = await getSubmitSummary(people.maya!, { templateId });
+    if (!summary.ok) throw new Error(summary.reason);
+    expect(describeChanges(diffVariables(summary.summary.baseline!.variables, summary.summary.variables), 2)).toEqual([
+      "v2 renames `first_name` to `name_on_card`.",
+    ]);
+  });
+
+  it("submit stores one key_renamed with the old and the new key, not a removal and an addition", async () => {
+    const at = as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
+    expect((await version(templateId, 2))!.contractChanges).toEqual([
+      { kind: "key_renamed", key: "name_on_card", breaking: true, from: "first_name", to: "name_on_card" },
+    ]);
+    expect((await auditAt(at)).find((r) => r.action === "version.submitted")?.details).toMatchObject({
+      contractChanges: 1,
+      breaking: true,
+    });
+  });
+
+  it("approved, the consumer notice carries the rename for Coral to map", async () => {
+    const at = as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    const [notice] = (await noticesAt(at)).filter((n) => n.kind === "new_version");
+    expect(notice).toMatchObject({ consumerId: "coral", templateId });
+    expect(notice!.payload).toMatchObject({
+      versionNumber: 2,
+      contractChanges: [{ kind: "key_renamed", key: "name_on_card", breaking: true, from: "first_name", to: "name_on_card" }],
+      contractLines: ["v2 renames `first_name` to `name_on_card`."],
+    });
+    const served = noticeView(notice!);
+    expect(served.changes).toEqual([
+      {
+        kind: "key_renamed",
+        key: "name_on_card",
+        breaking: true,
+        from: "first_name",
+        to: "name_on_card",
+        text: "v2 renames `first_name` to `name_on_card`.",
+      },
+    ]);
+    expect(served.message).toBe(`${NAME} v2 is available. It renames first_name to name_on_card.`);
+  });
+
+  it("in the next version, a new variable under the old key is an addition, not the renamed one", async () => {
+    as("maya");
+    await startDraft({ templateId });
+    await editVariables("maya", (store) =>
+      store.getState().create({ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }),
+    );
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3 });
+    expect((await version(templateId, 3))!.contractChanges).toEqual([
+      { kind: "added", key: "first_name", breaking: true, type: "text", required: true },
+    ]);
   });
 });
 

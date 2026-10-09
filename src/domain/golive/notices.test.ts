@@ -154,8 +154,8 @@ describe("changeSummary", () => {
         { kind: "added", key: "late_fee", breaking: true, type: "currency", required: true },
         END_DATE,
         { kind: "key_renamed", key: "apr", breaking: true, from: "rate", to: "apr" },
-        { kind: "made_optional", key: "promo_code", breaking: false, required: false },
-        { kind: "removed", key: "old_key", breaking: true, type: "text" },
+        { kind: "made_optional", key: "promo_code", breaking: false },
+        { kind: "removed", key: "old_key", breaking: true, type: "text", required: false },
       ]),
     ).toBe(
       "It adds the required variables annual_fee and late_fee, adds the optional variable offer_end_date, renames rate to apr, makes promo_code optional and removes the variable old_key.",

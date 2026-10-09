@@ -201,15 +201,17 @@ export interface ApiVariable {
   example: string;
 }
 
-export interface ApiContractChange {
-  kind: "added" | "removed" | "key_renamed" | "type_changed" | "made_required" | "made_optional" | "label_changed";
-  key: string;
-  breaking: boolean;
-  from?: string;
-  to?: string;
-  /** One plain sentence: "v3 adds required `annual_fee` (Currency)." */
-  text: string;
-}
+/**
+ * One change from a version's variable contract to a later one's. `key` is the variable's key in the later
+ * version (in the earlier one for `removed`). A renamed key is one `key_renamed` change, `from` the key sent
+ * before and `to` the key to send now: map the value across rather than drop one variable and add another.
+ * `text` is one plain sentence: "v3 adds required `annual_fee` (Currency)."
+ */
+export type ApiContractChange =
+  | { kind: "added" | "removed" | "made_required" | "made_optional"; key: string; breaking: boolean; text: string }
+  | { kind: "key_renamed"; key: string; breaking: true; from: string; to: string; text: string }
+  | { kind: "type_changed"; key: string; breaking: true; from: ApiVariableType; to: ApiVariableType; text: string }
+  | { kind: "label_changed"; key: string; breaking: false; from: string; to: string; text: string };
 
 export interface ApiContractDiff {
   since: number;

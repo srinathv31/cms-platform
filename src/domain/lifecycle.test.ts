@@ -515,6 +515,15 @@ describe("submit", () => {
     expect(unchanged.ok && unchanged.changes.contractChanges).toEqual([]);
   });
 
+  it("records a renamed variable as one key_renamed, from the identity it keeps as its id (D8)", () => {
+    const apr: Variable = { ...VARIABLES[1]!, id: "purchase_apr", key: "apr" };
+    const result = run({ variables: [VARIABLES[0]!, apr] }, { baseline: VARIABLES });
+    expect(result.ok && result.changes.contractChanges).toEqual([
+      { kind: "key_renamed", key: "apr", breaking: true, from: "purchase_apr", to: "apr" },
+    ]);
+    expect(result.ok && result.effects[0]).toEqual(submitted(1, { contractChanges: 1, breaking: true }));
+  });
+
   it("refuses a draft that changed after the summary was read, before anything else", () => {
     expect(run({}, { seenRev: 6 })).toEqual({ ok: false, reason: REFUSALS.summaryStale });
     // Even when its content would be refused too: the author sees what changed first.

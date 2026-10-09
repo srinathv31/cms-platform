@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 20 | 10 | 33 |
+| Open | 0 | 3 | 19 | 10 | 32 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 19 | 15 | 4 | 39 |
+| Fixed | 1 | 19 | 16 | 4 | 40 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -293,7 +293,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D8 · Medium: Variable renames are lost between the panel and submit
 
-- **Status:** Open
+- **Status:** Fixed. A variable keeps its identity across key renames as an optional `id` saved with the variable list, so submit stores a rename as one `key_renamed` (old and new key) that the review screen, the submit dialog, consumer notices and the `/api/v1` diffs show, and `ContractChange` and `ApiContractChange` are unions with one member per kind ([decision 0022](decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
 - **Where:** `src/domain/lifecycle.ts` line 297; `src/components/submit/contract-lines.ts` line 34
 - **What happens:** The variables panel diffs with renames; submit, review and notices don't, so a rename is stored as removed plus added and `key_renamed` is never saved. `ContractChange` is one type with optional fields rather than a union per kind, which is why callers need `?? change.key` fallbacks.
 - **Fix:** A discriminated union per change kind, and keep rename information through submit.
@@ -317,7 +317,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D11 · Low: JavaScript-only behavior that won't port cleanly
 
-- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) and `canonicalAction` remain.
+- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) and `canonicalAction` remain. The contract matcher reports a new variable on a renamed variable's old key as an addition beside the rename (D8).
 - **Where:** `src/domain/audit.ts` line 93; `src/domain/golive/api-errors.ts` line 61
 - **What happens:** A plain-object lookup with untrusted keys (`canonicalAction("toString")` returns a function). `parseInstant("2026-02-30")` rolls over to March 2. `localeCompare` orders ids and names (ICU collation, unlike Java's `compareTo`). If a key is renamed and a new variable reuses the old key, the diff reports only the rename.
 - **Fix:** Use `Map` or `Object.hasOwn`; validate dates by round-trip; compare ids by code point; fix the contract matcher.

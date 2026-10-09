@@ -230,7 +230,7 @@ test("after the Active version is revoked, an author corrects it from its conten
 
     const [v3] = await rows(db, "SELECT * FROM versions WHERE template_id = ? AND number = 3", [templateId]);
     expect(v3).toMatchObject({ state: "in_review", submitted_by: "maya", based_on_version_id: spring.v2Id });
-    expect(json(v3.contract_changes)).toEqual([{ kind: "made_optional", key: "offer_end_date", breaking: false, required: false }]);
+    expect(json(v3.contract_changes)).toEqual([{ kind: "made_optional", key: "offer_end_date", breaking: false }]);
   });
 
   // ── 4. Approve and render ──────────────────────────────────────────────────

@@ -36,6 +36,8 @@ export type _DriftChecks = [
   Assert<Fits<VariableType, ApiVariableType>>,
   Assert<Fits<ApiVariableType, VariableType>>,
   Assert<Fits<ConsumerNoticeKind, ApiNotice["kind"]>>,
+  Assert<Fits<ContractChange["kind"], ApiContractChange["kind"]>>,
+  Assert<Fits<ApiContractChange["kind"], ContractChange["kind"]>>,
 ];
 
 /** Status per error code, for every /api/v1 route. The render codes keep RENDER_ERROR_STATUS's. */

@@ -282,7 +282,7 @@ describe("chip insertion", () => {
     expect(root.createVariable(variable)).toEqual({ ok: true });
     picker.props!.command({ kind: "variable", variable });
     expect(line(editor, 0)).toBe("Intro {{offer_end_date}}");
-    expect(root.variables.getState().byKey.get("offer_end_date")).toEqual(variable);
+    expect(root.variables.getState().byKey.get("offer_end_date")).toEqual({ ...variable, id: expect.any(String) });
   });
 
   it("typing {{key}} in full makes a chip for a known key only", () => {
