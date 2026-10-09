@@ -106,8 +106,9 @@ export const HISTORY_DAYS = 90;
  * different payloads; `noticeView` reads either:
  *   new_version       seed { templateName, versionNumber, previousVersionNumber, contractChanges }
  *                     live { templateName, versionNumber, activeVersion, contractChanges, contractLines }
- *   sunset_scheduled  seed { templateName, versionNumber, sunsetAt, replacedByVersionNumber, contractChanges }
- *                     live { templateName, versionNumber, activeVersion, sunsetAt, contractChanges?, contractLines? }
+ *   sunset_scheduled  seed { templateName, versionNumber, sunsetAt, sunsetDay, zone, replacedByVersionNumber, contractChanges }
+ *                     live { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone, contractChanges?, contractLines? }
+ *   sunset_passed     live { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone } (the sunset sweep)
  *   revoked           both { templateName, versionNumber, reason, activeVersion? }
  */
 export interface NoticeRow {

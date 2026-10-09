@@ -12,6 +12,7 @@ import { dayLabel, withKeys } from "./format";
 const KIND: Record<SimNoticeView["kind"], { title: (n: SimNoticeView) => string; tone: Tone }> = {
   new_version: { title: (n) => `New version: v${n.versionNumber}`, tone: "info" },
   sunset_scheduled: { title: (n) => `Sunset scheduled for v${n.versionNumber}`, tone: "warn" },
+  sunset_passed: { title: (n) => `v${n.versionNumber} sunset passed`, tone: "bad" },
   revoked: { title: (n) => `v${n.versionNumber} revoked`, tone: "bad" },
 };
 

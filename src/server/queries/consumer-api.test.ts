@@ -436,7 +436,8 @@ describe("listNotices", () => {
     expect(times).toEqual([...times].sort());
 
     const sunset = notices.find((n) => n.kind === "sunset_scheduled" && n.template.id === id("balance-transfer"))!;
-    expect(sunset).toMatchObject({ versionNumber: 1, activeVersion: 2, reason: null });
+    expect(sunset).toMatchObject({ versionNumber: 1, activeVersion: 2, reason: null, zone: "America/New_York" });
+    expect(sunset.sunsetDay, "the day the seed picked, in the zone").toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(sunset.message).toMatch(/^Balance Transfer Intro — Terms v1 stops rendering on \w+ \d+, \d{4}\. Move to v2\.$/);
 
     const fresh = notices.find((n) => n.kind === "new_version" && n.template.id === id("balance-transfer"))!;
@@ -595,6 +596,8 @@ describe("listNotices", () => {
         versionNumber: 3,
         activeVersion: 3,
         sunsetAt: null,
+        sunsetDay: null,
+        zone: null,
         reason: null,
         changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }],
         message: "Cash Back Welcome Bonus — Terms v3 is available. It adds the required variable annual_fee.",

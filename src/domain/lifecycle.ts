@@ -13,8 +13,9 @@
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
 //   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes.
 //                  A sunset date ends renders at 00:00 on that day in the business time zone (business-zone.ts).
-//   sweepSunsets   the clock passed a sunset → its `version.sunset_passed` audit row, once, dated when renders
-//                  stopped. Not a state change: `sunsetPassed` alone decides whether a version renders.
+//   sweepSunsets   the clock passed a sunset → its `version.sunset_passed` audit row, dated when renders stopped,
+//                  and its `sunset_passed` consumer notice, once. Not a state change: `sunsetPassed` alone
+//                  decides whether a version renders.
 //   startRevoke    Active or Superseded → revoke pending (one approver)
 //   confirmRevoke  revoke pending → Revoked (a different approver)
 //   cancelRevoke   revoke pending → no revoke
@@ -857,6 +858,7 @@ export function approve(input: {
         activeVersion: number,
         sunsetAt: sunset.details.sunsetAt,
         sunsetDay: sunset.details.sunsetDay,
+        zone: sunset.details.zone,
         contractChanges,
         contractLines,
       },
@@ -944,6 +946,7 @@ export function setSunset(input: {
         activeVersion: activeNumber,
         sunsetAt: sunset.details.sunsetAt,
         sunsetDay,
+        zone,
         ...(changes.length > 0 && activeNumber !== null
           ? { contractChanges: changes, contractLines: describeChanges(changes, activeNumber) }
           : {}),
@@ -987,33 +990,44 @@ export interface SunsetFacts {
   revokedAt: Date | null;
   /** Whether a `version.sunset_passed` row already records it. */
   passedRecorded: boolean;
+  /** The template's Active version number at the sweep, the one its consumers move to; null when none is Active. */
+  activeNumber: number | null;
 }
 
-/** One sunset the sweep found passed and unrecorded, with the row to write for it. */
+/** One sunset the sweep found passed and unrecorded, with the row and the notice to write for it. */
 export interface PassedSunset {
   versionId: string;
   templateId: string;
   teamId: string;
-  /** The instant renders stopped: the row is dated then, however late the sweep runs. */
+  /**
+   * The instant renders stopped: the audit row is dated then, however late the sweep runs, and the notice
+   * goes to the consumers that rendered the template from 90 days before it on.
+   */
   at: Date;
   effects: LifecycleEffect[];
 }
 
 /**
  * The sunsets the clock has passed that nothing records yet, each with its `version.sunset_passed` audit
- * row (actor: the system). The row is dated at the sunset and names its day in `zone`, the business time
- * zone at the sweep, which is the day the Versions screen shows for it. Oldest first.
+ * row (actor: the system) and its `sunset_passed` consumer notice. Both name the sunset's instant and its
+ * day in `zone`, the business time zone at the sweep, which is the day the Versions screen shows for it.
+ * The row is dated at the sunset. The notice names the version to move to, the template's Active one (or
+ * none). Oldest first.
  *
  * - **Passed** is `sunsetPassed`, the render rule's own test, so the record says exactly when renders
  *   stopped.
  * - **Still rendering until then.** A version revoked at or before its sunset had already stopped, so its
  *   sunset ends nothing and isn't recorded. One revoked after its sunset (the only change a passed
  *   sunset allows) is.
- * - **Once.** A version with a record is skipped, so a second sweep writes nothing. A passed sunset never
- *   moves (decision 0002), so one record per version is the whole story.
+ * - **Once.** A version with a record is skipped, so a second sweep writes nothing: no second row and no
+ *   second notice. A passed sunset never moves (decision 0002), so one record per version is the whole
+ *   story.
  *
- * No consumer notice and no notification: the `sunset_scheduled` notice, and the author's notification,
- * gave the instant when it was set ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
+ * No notification: the author was told the day when the sunset was set
+ * ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)). Consumers get the
+ * notice so that their notices say a version stopped rendering, as they say when one is revoked
+ * ([decision 0032](../../docs/decisions/0032-consumers-are-told-when-a-sunset-passes.md)). It arrives when
+ * the sweep runs, which can be after the instant; its `sunsetAt` says when renders stopped.
  */
 export function sweepSunsets(input: { versions: readonly SunsetFacts[]; now: Date; zone: string }): PassedSunset[] {
   const { now, zone } = input;
@@ -1026,24 +1040,24 @@ export function sweepSunsets(input: { versions: readonly SunsetFacts[]; now: Dat
     .filter((v) => !v.passedRecorded)
     .filter(endedRenders)
     .sort((a, b) => a.sunsetAt.getTime() - b.sunsetAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((v) => ({
-      versionId: v.id,
-      templateId: v.templateId,
-      teamId: v.teamId,
-      at: v.sunsetAt,
-      effects: [
-        {
-          kind: "audit",
-          action: "version.sunset_passed",
-          details: {
-            number: v.number,
-            sunsetAt: v.sunsetAt.toISOString(),
-            sunsetDay: sunsetDayIn(v.sunsetAt, zone),
-            zone,
+    .map((v) => {
+      const sunset = { sunsetAt: v.sunsetAt.toISOString(), sunsetDay: sunsetDayIn(v.sunsetAt, zone), zone };
+      return {
+        versionId: v.id,
+        templateId: v.templateId,
+        teamId: v.teamId,
+        at: v.sunsetAt,
+        effects: [
+          { kind: "audit", action: "version.sunset_passed", details: { number: v.number, ...sunset } },
+          {
+            kind: "consumer_notice",
+            notice: "sunset_passed",
+            versionId: v.id,
+            payload: { versionNumber: v.number, activeVersion: v.activeNumber, ...sunset },
           },
-        },
-      ],
-    }));
+        ],
+      };
+    });
 }
 
 // ── Revoke (two people) ───────────────────────────────────────

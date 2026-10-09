@@ -31,12 +31,13 @@ decided and why, so it can be revisited without the person who made it.
 | [0023](0023-the-email-preview-sends-from-stencil.md) | The email preview's fallback sender is Stencil's, and the other UCOMP names wait | Accepted |
 | [0024](0024-the-palette-searches-on-the-server.md) | The ⌘K palette searches on the server, and keeps answers per viewer | Accepted |
 | [0025](0025-refusals-carry-stable-codes.md) | Every refusal carries a stable code, and code branches on the code | Accepted |
-| [0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md) | A passed sunset is recorded by a sweep, in the audit log only: no notice, no notification | Accepted |
+| [0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md) | A passed sunset is recorded by a sweep, in the audit log only: no notice, no notification | Accepted; the notice part superseded by [0032](0032-consumers-are-told-when-a-sunset-passes.md) |
 | [0027](0027-focus-targets-register-with-the-session.md) | Focus targets register with the workspace session; nothing finds them by label | Accepted |
 | [0028](0028-today-and-yesterday-are-utc-calendar-days.md) | "Today" and "yesterday" are UTC calendar days, counted one way (a sunset's in the business time zone) | Accepted |
 | [0029](0029-every-action-runs-on-one-kit.md) | Every server action runs on one kit, and the browser runs them with one hook | Accepted |
 | [0030](0030-shared-primitives-have-one-home.md) | Shared UI building blocks have one home in `primitives/`, and a test keeps it so | Accepted |
 | [0031](0031-a-correction-is-redlined-against-the-revoked-version.md) | After a revoke, the review redlines the correction against the revoked version it started from | Accepted |
+| [0032](0032-consumers-are-told-when-a-sunset-passes.md) | Consumers are told when a sunset passes: a `sunset_passed` notice from the sweep, to the template's consumers | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

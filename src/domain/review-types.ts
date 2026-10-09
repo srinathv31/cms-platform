@@ -118,11 +118,11 @@ export interface NotificationEffect {
   link: NotificationLink;
 }
 
-export type ConsumerNoticeKind = "new_version" | "sunset_scheduled" | "revoked";
+export type ConsumerNoticeKind = "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
 
 /**
- * Sent to every consumer that rendered the template (not as a preview) in the last 90 days, resolved
- * by the server from render_log. The payload never holds variable values.
+ * Sent to every consumer that rendered the template (not as a preview) in the 90 days before the event,
+ * resolved by the server from render_log. The payload never holds variable values.
  */
 export interface ConsumerNoticeEffect {
   kind: "consumer_notice";
@@ -131,9 +131,11 @@ export interface ConsumerNoticeEffect {
   payload: {
     versionNumber: number;
     activeVersion?: number | null;
-    sunsetAt?: string; // ISO: the instant renders stop
-    /** YYYY-MM-DD: the sunset day as picked, read in the business time zone (`sunsetAt` is 00:00 on it there). */
+    sunsetAt?: string; // ISO: the instant renders stop (sunset_scheduled) or stopped (sunset_passed)
+    /** YYYY-MM-DD: the sunset day, read in the business time zone (`sunsetAt` is 00:00 on it there). */
     sunsetDay?: string;
+    /** The business time zone `sunsetDay` was read in. */
+    zone?: string;
     reason?: string; // revoke
     contractChanges?: ContractChange[];
     contractLines?: string[];

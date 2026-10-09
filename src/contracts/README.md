@@ -12,12 +12,13 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
   can also be lifted out or turned into an API description without bringing app code along.
 - Only what a consumer can see: `ApiVersionState` is `active | superseded | revoked`, and `ApiRenderRequest` has no
   `"draft"` version or `preview` flag (both CMS-only). Dates are ISO 8601 strings on the demo clock.
-- A sunset is an instant. `sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` notice) is when renders
-  of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in Stencil's business time
-  zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
+- A sunset is an instant. `sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` or `sunset_passed`
+  notice) is when renders of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in
+  Stencil's business time zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
   `2027-03-01T05:00:00.000Z`. Compare it with the time; don't take its UTC date as the day, which is the day
-  before for a zone ahead of UTC. The notice's `message` and the 410's message name the day in that zone.
-  Changing the zone doesn't move a sunset already announced ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
+  before for a zone ahead of UTC. A sunset notice also carries the day and the zone (`sunsetDay`, `zone`), and its
+  `message` and the 410's message name that day. Changing the zone doesn't move a sunset already announced
+  ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
 
 ## Endpoints
 
@@ -30,6 +31,27 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 
 Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
 previews.
+
+## Notices
+
+`GET /api/v1/consumers/{consumerId}/notices` is Stencil's outbox for one consumer. Each `ApiNotice` is about one
+version (`versionNumber`, and `template.name` is that version's name) and names the Active version to move to
+(`activeVersion`, null when none is Active). There are four kinds:
+
+| Kind | Written when | Also carries |
+| --- | --- | --- |
+| `new_version` | A version goes Active. | `changes` from the previous Active version. |
+| `sunset_scheduled` | A sunset is set or moved, on the Versions tab or in the Approve dialog. | `sunsetAt`, `sunsetDay`, `zone`; `changes` moving to the Active version asks. |
+| `sunset_passed` | Stencil's sunset sweep finds the sunset passed. | `sunsetAt`, `sunsetDay`, `zone`. |
+| `revoked` | A revoke is confirmed. | `reason`. |
+
+A notice goes to every consumer that rendered the template (not as a preview) from 90 days before the event on;
+for `sunset_passed` the event is the sunset. Each version gets one `sunset_passed` notice per consumer, ever.
+
+A `sunset_passed` notice can arrive after the sunset. The sweep runs on Stencil's demo triggers (Advance clock, a
+persona switch, an access action) until a scheduled job runs it, so its `createdAt` is when the sweep wrote it,
+which can be days after the instant. Its `sunsetAt` is the instant renders stopped, and renders fail from then on
+whether or not the notice has arrived ([decision 0032](../../docs/decisions/0032-consumers-are-told-when-a-sunset-passes.md)).
 
 A contract change (`ApiContractChange`, in a template's `since` diff and in a `new_version` or `sunset_scheduled`
 notice) is a union on `kind`. `key_renamed`, `type_changed` and `label_changed` carry `from` and `to`; every kind

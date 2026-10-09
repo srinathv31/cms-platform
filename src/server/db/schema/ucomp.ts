@@ -26,7 +26,7 @@ import type {
   VariableValues,
   VersionState,
 } from "@/domain/types";
-import type { VersionStage } from "@/domain/review-types";
+import type { ConsumerNoticeKind, VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
 const json = <T>(name: string) => text(name, { mode: "json" }).$type<T>();
@@ -276,7 +276,7 @@ export const renderLog = sqliteTable(
 );
 
 /**
- * UCOMP's outbox to consumers: new version available, sunset scheduled, revoked.
+ * UCOMP's outbox to consumers: new version available, sunset scheduled, sunset passed, revoked.
  *
  * `seq` is the order notices were committed in, and the notices API pages on it: 1, 2, 3, … across all
  * consumers, assigned inside the writing transaction (`takeNoticeSeqs` in server/effects.ts). Writers
@@ -294,7 +294,7 @@ export const consumerNotices = sqliteTable(
       .references(() => consumers.id),
     templateId: text("template_id").notNull(),
     versionId: text("version_id").notNull(),
-    kind: text("kind").$type<"new_version" | "sunset_scheduled" | "revoked">().notNull(),
+    kind: text("kind").$type<ConsumerNoticeKind>().notNull(),
     payload: json<Record<string, unknown>>("payload").notNull(),
     createdAt: ts("created_at").notNull(),
   },

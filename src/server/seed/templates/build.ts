@@ -306,6 +306,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
             versionNumber: v.number,
             sunsetAt,
             sunsetDay: sunset.day,
+            zone: DEFAULT_BUSINESS_ZONE,
             replacedByVersionNumber: successor?.number ?? null,
             contractChanges: successor?.contractChanges ?? [],
           },

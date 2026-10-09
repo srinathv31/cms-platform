@@ -120,6 +120,10 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   Relinking reopens the link flow with `?template=` set: What changed, Map new value, Confirm.
 - **Notices** (`NoticesPanel`, `markNoticesRead`). Read from `GET /api/v1/consumers/coral/notices`, page after page
   (`allNotices` follows `nextCursor` until `hasMore` is false), and shown newest first; read state is Coral's own.
+  Each kind has a title and a tone ("New version: v3", "Sunset scheduled for v2", "v2 sunset passed", "v1
+  revoked") beside the API's `message`, shown as sent. A `sunset_passed` notice arrives when Stencil's sweep runs,
+  which can be after the sunset; the offer's "A send now fails" comes from the template's `sunsetPassed`, not from
+  the notice.
   Coral keeps no cursor and reads the whole outbox on each page load, at most `MAX_NOTICE_PAGES` (50) pages; an
   empty page that says more follow, or more pages than that, shows as an API error. A consumer that polls would
   keep the last `nextCursor` instead.
@@ -166,10 +170,12 @@ implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCO
   [ucomp-api.test.ts](ucomp-api.test.ts) drives the client through a fake `fetch`, including that a forged `Host`
   never becomes the origin. [actions.test.ts](actions.test.ts) runs the actions and read models against a temporary
   SQLite file migrated from `src/server/db/migrations` and a fake Stencil behind `fetch`; it mocks `@/simulator/db`,
-  `next/cache` and `next/server`.
+  `next/cache` and `next/server`. [ui/notices-panel.test.tsx](ui/notices-panel.test.tsx) renders the inbox in
+  happy-dom with every notice kind.
 - End to end (Playwright): `e2e/scenario-04.spec.ts` (link, send to five customers, customer views, no customer
   values in Stencil's tables), `e2e/scenario-05.spec.ts` ("v3 available", send fails after the sunset, relink),
-  `e2e/scenario-06.spec.ts` (revoke, then Coral's send fails with the API's message), `e2e/demo-script.spec.ts`, and
+  `e2e/scenario-06.spec.ts` (revoke, then Coral's send fails with the API's message), `e2e/sunset-passed.spec.ts` (the
+  sweep's `sunset_passed` notice in Coral's inbox), `e2e/demo-script.spec.ts`, and
   the "Simulator (foreign system)" block in `e2e/principles.spec.ts` (axe and layout shift on each `/sim` page).
   The drivers and the snapshot and restore of `sim_*` rows are in `e2e/helpers/golive.ts`.
   `e2e/api/consumer.spec.ts` calls the GET routes the way Coral does.

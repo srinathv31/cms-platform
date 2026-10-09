@@ -69,7 +69,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Template | A document consumers render, with a stable id like `UC-4F7K2Q`. Belongs to one team and one content type. | `templates` in [ucomp.ts](../server/db/schema/ucomp.ts) |
 | Version | One snapshot of a template: body (TipTap JSON), variables, channels, email fields, sample sets. `number` is null while it is a draft; `submit` sets it to the highest number + 1, and it never changes. | `VersionSnapshot`, `DraftFields` |
 | Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The database allows one open draft and one Active version per template. | [types.ts](types.ts), [status.ts](status.ts) |
-| Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it, and the clock-driven sweep records it (`version.sunset_passed`). Not a state. | `setSunset`, `sunsetPassed`, `sweepSunsets`, `checkVersion` |
+| Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it, and the clock-driven sweep records it (`version.sunset_passed`) and tells consumers (a `sunset_passed` notice). Not a state. | `setSunset`, `sunsetPassed`, `sweepSunsets`, `checkVersion` |
 | Revoke pending | An Active or Superseded version whose `revoke` record has no `confirmedAt`. Not a state: it renders until a different approver confirms. | `revokePending` |
 | Content type | Platform configuration a template follows: required sections, allowed channels, approval chain. | [platform-config.ts](platform-config.ts) |
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
@@ -78,7 +78,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Contract baseline | The version a draft's variable list is compared with: the newest one that still renders. The Active version; with none (it was revoked), the highest-numbered Superseded version whose sunset hasn't passed; null when nothing renders, as for a first version ([decision 0009](../../docs/decisions/0009-correct-a-revoked-version-from-its-content.md)). | `contractBaseline` |
 | Review baseline | The version the review screen's redline, its "vs vN" label and its change count compare with. The Active version; with none (it was revoked), the released version the draft was based on, walking back through versions sent back for changes: the revoked text the correction started from, labelled "vs v3 (revoked)". Without one, the contract baseline; null when nothing renders ([decision 0031](../../docs/decisions/0031-a-correction-is-redlined-against-the-revoked-version.md)). The Approve dialog's previous version is the Active one only. | `reviewBaseline` |
 | Breaking change | A change that breaks consumers of the baseline: a required variable added, a variable removed, a key renamed, a type changed, an optional one made required. `submit` stores the diff as `contractChanges`. A renamed key is one `key_renamed` change (`from`, `to`), paired by the variable's id; `ContractChange` is a union, one member per kind. | `diffVariables`, `isBreaking` |
-| Consumer | A registered system (`consumers` table; the simulator plays `coral`) that calls `/api/v1` with `X-Consumer-Id` and pins a version number. It receives notices: `new_version`, `sunset_scheduled`, `revoked`. | [golive/](golive/) |
+| Consumer | A registered system (`consumers` table; the simulator plays `coral`) that calls `/api/v1` with `X-Consumer-Id` and pins a version number. It receives notices: `new_version`, `sunset_scheduled`, `sunset_passed`, `revoked`. | [golive/](golive/) |
 | Channel | `pdf`, `web`, or `email`. The content type allows it; the version turns it on. New templates start with `DEFAULT_CHANNELS` (`pdf`, `web`). | `CHANNELS` |
 | Approval chain | Ordered `ApprovalStage`s per content type, stored as configuration, each with a stable id. A stage's rule names a team role or one user. | [approval-chain.ts](approval-chain.ts) |
 | A version's stages | The chain's stage ids and names, recorded on the version at submit (`VersionStage[]`). It goes through those whatever the chain becomes; each stage's rule is read from the chain by id when the version reaches it. `currentStage` is a position in them. A stage an in-review version still needs can't be removed ([decision 0015](../../docs/decisions/0015-a-version-keeps-the-stages-it-was-submitted-with.md)). | `recordStages`, `stageOf`, `versionsNeeding` |
@@ -160,9 +160,11 @@ Every other date stays UTC. In [business-zone.ts](business-zone.ts):
 - Passed is an instant comparison, `sunsetPassed` in [lifecycle.ts](lifecycle.ts), and the only one: the render
   rule, the consumer API, the Versions and Usage screens, the count of pending sunsets and the sweep all ask it.
 - `sweepSunsets` records each passed sunset once, as the system: a `version.sunset_passed` audit row dated at the
-  sunset, naming its day in the zone at the sweep (`SunsetPassedDetails`). A version revoked before its sunset isn't
-  recorded: its renders had already stopped. No consumer notice and no notification: both went out when the sunset
-  was set ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
+  sunset, naming its day in the zone at the sweep (`SunsetPassedDetails`), and a `sunset_passed` consumer notice
+  with the instant, that day and zone, and the Active version to move to. A version revoked before its sunset isn't
+  recorded: its renders had already stopped. No notification: the author was told when the sunset was set
+  ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md),
+  [decision 0032](../../docs/decisions/0032-consumers-are-told-when-a-sunset-passes.md)).
 - Changing the zone moves no sunset already set. Audit rows and notices record the day picked and the zone
   (`sunsetDay`, `zone`); `recordedSunsetDay` reads them, and reads a record from before the rule as the UTC date
   of its `sunsetAt`, which is what it meant then.
@@ -195,7 +197,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 | A new template's channels (wanted and allowed, else the first allowed) | `conformToContentType` in [templates/create.ts](../server/templates/create.ts) |
 | A version publishes a channel only if the content type still allows it | [queries/consumer-api.ts](../server/queries/consumer-api.ts), [queries/integration.ts](../server/queries/integration.ts), [render-template.ts](../server/render/render-template.ts) |
 | Which states a consumer can see (`RELEASED`: active, superseded, revoked) | [queries/consumer-api.ts](../server/queries/consumer-api.ts) |
-| Who gets notices: consumers with a non-preview render in the last `CONSUMER_NOTICE_WINDOW_DAYS` (90) | `writeEffects` in [server/effects.ts](../server/effects.ts) |
+| Who gets notices: consumers with a non-preview render of the template from `CONSUMER_NOTICE_WINDOW_DAYS` (90) before the event on (for `sunset_passed`, the sunset) | `writeEffects` in [server/effects.ts](../server/effects.ts) |
 | An Auditor can't be granted a team role through an access request | [actions/access.ts](../server/actions/access.ts) |
 | Autosave: draft state only, rev compare-and-set, allowed channels, name 1–120 characters | [drafts/apply-patch.ts](../server/drafts/apply-patch.ts), [drafts/parse-patch.ts](../server/drafts/parse-patch.ts) |
 | Note and reason limits (2,000), copied in three places | [actions/review.ts](../server/actions/review.ts), [decision-model.ts](../components/review/decision-model.ts), [validation.ts](../components/versions/validation.ts) |
