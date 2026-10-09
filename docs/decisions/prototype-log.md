@@ -1,3 +1,6 @@
+> **History.** Calls made while the prototype was built, in October 2026. Some have been superseded by later code,
+> and this log isn't updated anymore. New decisions are numbered records in this folder: see [README.md](README.md).
+
 # Decisions log (Phases 5–7)
 
 These are the calls the lead agent (Claude) made on its own while finishing Phases 5–7, without Sri in the loop. Sri can overrule any of them at review; each entry says what was picked and why, so it can be reversed on its own.
@@ -6,7 +9,7 @@ How to read this: sections run in build order (Phases 5, 6, 7a, then integration
 
 ## Phase 5: going live
 
-Branch `track/golive`. Report: `tracks/a-report.md`.
+Branch `track/golive`. Report: `archive/tracks/a-report.md`.
 
 ### Contracts (accepted from the Phase 5 brief)
 - **Simulator calls UCOMP server-side** from its own origin (via `headers()`; superseded at integration, see "Integration: adversarial review fixes"), so the browser never logs the intended 4xx/410 failures. Keeps "zero console errors" true during failure scenarios.
@@ -71,7 +74,7 @@ Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (kept as reference).
 
 ## Phase 6: access and admin
 
-Branch `track/access`. Report: `tracks/b-report.md`.
+Branch `track/access`. Report: `archive/tracks/b-report.md`.
 
 
 Mocks: `/design/settings?v=a|b|c`, `/design/audit?v=a|b|c` (kept as references). Media: `decisions/media/track-b/` (walkthrough recordings: `decisions/media/track-b/settings-walkthrough.webm`, `decisions/media/track-b/audit-walkthrough.webm`).
@@ -169,7 +172,7 @@ Mocks: `/design/settings?v=a|b|c`, `/design/audit?v=a|b|c` (kept as references).
 
 ## Phase 7a: import, Copilot, ⌘K
 
-Branch `track/import`, which also carried the rough edges left from Phases 3–4 (PDF keep-with-next, redline markers, typing latency). Report: `tracks/c-report.md`.
+Branch `track/import`, which also carried the rough edges left from Phases 3–4 (PDF keep-with-next, redline markers, typing latency). Report: `archive/tracks/c-report.md`.
 
 ### Compare with original: the rail widens (no separate mock)
 - **Picked:** "Compare with original" works like Preview: the right rail widens and shows the uploaded source (an "Original" tab beside Variables), with the draft in the main pane. Reason: the recorded Rail layout ("main pane is just the document; Preview = rail widens") already answers this; a side-by-side split would introduce a second layout pattern for the same job.

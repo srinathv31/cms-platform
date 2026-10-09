@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../../README.md).
+
 # Parallel tracks for Phases 5–7
 
 The remaining work runs as three tracks in separate git worktrees, then one integration pass. **One lead session runs all of it** (single-lead mode): it creates the worktrees, runs Tracks A and B at the same time through subagents, starts Track C when one of them finishes, then integrates in the main checkout. Nobody clicks anything. Read `docs/handoff-phases-5-7.md` first: it holds the context, the decisions and the way of working. This file says how the tracks split the work and share one laptop.

@@ -2,7 +2,7 @@
 // the read models the review UI consumes. Pure types, written by the lead; every Phase 4 agent codes
 // against this file. Dates in read models are ISO strings (they cross into client components).
 //
-// Who implements what is in docs/phase-4-brief.md.
+// Who implements what is in docs/archive/phase-4-brief.md.
 
 import type {
   ApproverRule,

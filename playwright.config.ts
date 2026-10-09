@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Scenario specs run serially from a fresh reset against the production build (`npm run demo`).
 // The gate port runs the production build (`next start`, after a db:reset). It's 3100 by default; each
-// parallel track (docs/tracks/README.md) sets its own with E2E_GATE_PORT so tracks never share a server.
+// parallel track (docs/archive/tracks/README.md) sets its own with E2E_GATE_PORT so tracks never share a server.
 const GATE_PORT = Number(process.env.E2E_GATE_PORT ?? 3100);
 const PORT = Number(process.env.E2E_PORT ?? GATE_PORT);
 

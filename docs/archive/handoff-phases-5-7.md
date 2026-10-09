@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Handoff: you orchestrate Phases 5, 6 and 7 to the end
 
 You're the lead (orchestrator) for the rest of the UCOMP prototype. Phases 1–4 are done and committed on `prototype`:

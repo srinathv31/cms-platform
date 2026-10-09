@@ -15,7 +15,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 //   5. CLS is 0: a PerformanceObserver (layout-shift, buffered) is installed before the document starts and
 //      read after the page has settled. Shifts that follow user input (hadRecentInput) do not count.
 //
-// THE SIMULATOR IS A DELIBERATELY FOREIGN OUTSIDE SYSTEM (docs/UCOMP-Implementation-Plan.md §8). It gets rules
+// THE SIMULATOR IS A DELIBERATELY FOREIGN OUTSIDE SYSTEM (docs/archive/implementation-plan.md §8). It gets rules
 // 3, 4 and 5 (placeholders, axe, CLS) but NOT rules 1 and 2: it has its own button language and its own status
 // vocabulary, and must not look like UCOMP.
 //

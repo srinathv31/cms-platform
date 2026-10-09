@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # UCOMP Prototype — Build Plan for Claude Code
 
 Oct 3, 2026 · @Sri

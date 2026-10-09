@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Phase 7a brief: import, Copilot prompt, ⌘K (Track C)
 
 Read this instead of the long plans. They're the source if this is silent: `docs/UCOMP-Implementation-Plan.md` §9 "Phase 7", and the build plan's "Starting points", "Experience principles" and "Demo script" scenarios 9 and 10. Track C runs in `$P/ucomp-import` (dev :3003, gate :3103); follow `docs/tracks/README.md` and `docs/agent-brief.md`.

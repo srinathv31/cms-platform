@@ -4,7 +4,7 @@
 // keeps its data in its own sim_* tables (src/server/db/schema/sim.ts) through its own DB handle
 // (src/simulator/db.ts). It may not import @/server (except the sim schema), @/domain or @/editor
 // (ESLint). Nothing here is UCOMP's: customer data never reaches UCOMP's tables or its render log.
-// Dates are ISO strings. Who implements what is in docs/phase-5-brief.md.
+// Dates are ISO strings. Who implements what is in docs/archive/phase-5-brief.md.
 
 import type {
   ApiChannel,

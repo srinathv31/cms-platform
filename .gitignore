@@ -51,7 +51,7 @@ next-env.d.ts
 # local test-runner output
 /.vitest/
 
-# Git worktrees for parallel tracks (docs/tracks/README.md)
+# Git worktrees for parallel tracks (docs/archive/tracks/README.md)
 /.claude/worktrees/
 
 # third-party reference screenshots (kept locally, not published)

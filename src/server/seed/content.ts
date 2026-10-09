@@ -1,4 +1,4 @@
-// Builders for the TipTap JSON the seed writes (contract: docs/agent-brief.md).
+// Builders for the TipTap JSON the seed writes (contract: docs/render-spec.md §2).
 //
 // Block ids are derived from (template scope, block key), so a block that survives from one version
 // to the next keeps its id. That is what lets comment threads anchor across versions and drafts.

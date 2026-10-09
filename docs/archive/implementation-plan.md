@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # UCOMP Prototype — Implementation Plan
 
 Oct 4, 2026 · Revision 2, after Sri's first review · No code has been written yet

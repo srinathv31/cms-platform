@@ -13,6 +13,8 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
   - Chips are `rounded-md`.
 - **One black primary button per screen.** Secondary actions are outline. Tertiary actions are ghost.
 - **Disabled means unusable.** A control that would act on stale or missing data is disabled (e.g. Download while an error shows), not silently acting on old data.
+- **Disabled, not hidden.** A control that's unavailable right now stays in place, visibly greyed, with a tooltip saying why ("Nothing to undo"). Don't hide one of a pair (undo and redo). Base UI's `focusableWhenDisabled` sets `data-disabled`, not the native `disabled` attribute, so style it with `data-disabled:` variants; shadcn's `disabled:` classes won't match. Check the greyed state in a screenshot.
+- **Buttons don't scroll the page.** An action started from a button doesn't scroll to its effect (the undo and redo buttons use `undoNoScroll` and `redoNoScroll`). Keyboard shortcuts may.
 
 ## Layout
 - **Nothing jumps.**

@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../../README.md).
+
 # Tracks progress log
 
 One line per milestone. After a compaction: re-read this, then `git -C <worktree> log --oneline -5` per track.

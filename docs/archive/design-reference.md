@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Design reference — Wispr Flow screenshots, written down
 
 A text version of `reference-images/` for anyone building UI. The images are the source of truth; this file holds the measurements and the rules taken from them. **Take the feel, not the brand**: no Flow logo, names, illustrations or copy.

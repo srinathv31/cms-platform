@@ -2,7 +2,7 @@ import type { PlatformRole } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { HOUR } from "./time";
 
-// The switchable personas use the fixed ids from docs/agent-brief.md: the build plan's eight, plus
+// The switchable personas use the fixed ids from docs/archive/agent-brief.md: the build plan's eight, plus
 // Dana Park (Phase 6), the Legal reviewer a two-stage approval chain names.
 // Everyone else is a non-switchable user who makes the teams, access and inactivity stories real.
 

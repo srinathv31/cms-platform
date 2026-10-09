@@ -17,7 +17,8 @@
     "gate:media": "playwright test --project=demo --project=stills-1280 && node e2e/media/collect.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --conditions=react-server scripts/db-migrate.ts",
-    "db:reset": "tsx --conditions=react-server scripts/db-reset.ts"
+    "db:reset": "tsx --conditions=react-server scripts/db-reset.ts",
+    "docs:check": "tsx scripts/docs-check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

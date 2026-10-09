@@ -27,7 +27,7 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * The widened rail's Original view (Compare with original, docs/decisions/track-c.md): the file the
+ * The widened rail's Original view (Compare with original, docs/decisions/prototype-log.md): the file the
  * template was imported from, beside the draft. A 32px row names it (file name, size, who, when),
  * the import report sits under it (what came across, what was left out), and the source fills a
  * well that scrolls on its own: a .docx as a document, a .pdf as its pages, a .txt as written.

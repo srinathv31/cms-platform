@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # UCOMP prototype: final review for Sri
 
 Phases 5, 6, 7a and 7b are built and integrated on `prototype`. This note says what exists, how to run it, what to look for in each demo-script scenario, which calls were made without you, and what is still rough. It is written to be read once, top to bottom.

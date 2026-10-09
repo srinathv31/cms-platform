@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Phase 4 brief: lifecycle and review
 
 Read this instead of the long plans. They're the source if this is silent: `docs/UCOMP-Implementation-Plan.md` §9 "Phase 4", and the build plan's "Template lifecycle", "Review and approval" and "Demo script" scenarios 3 and 6.

@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Agent brief — shared rules for every UCOMP subagent
 
 Read this file first, then read your task. Any task that builds or changes UI also follows `docs/ui-checklist.md` (lessons from Phase 3's QA): check your screens against it before you report. Source documents:

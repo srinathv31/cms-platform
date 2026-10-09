@@ -1,3 +1,6 @@
+> **Archived.** Written while the prototype was being built; it doesn't describe the current code.
+> See [the current docs](../README.md).
+
 # Phase 6 brief: access and admin (Track B)
 
 Read this instead of the long plans. They're the source if this is silent: `docs/UCOMP-Implementation-Plan.md` §9 "Phase 6" and §12 Q5, and the build plan's "Teams, access and administration" and "Demo script" scenarios 7 and 8. Worktree: `/Users/srinathvenkatesh/Documents/CodeProjects/prototypes/cms-platform/ucomp-access`, dev server http://localhost:3002, gate port 3102.
