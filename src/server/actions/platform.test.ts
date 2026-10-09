@@ -14,7 +14,7 @@ import * as schema from "@/server/db/schema/ucomp";
 import { getApprovalChainsSection, getChannelRulesSection, getContentTypesSection, getTeamsSection } from "@/server/queries/platform";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "@/server/queries/review";
 import { seedDatabase } from "@/server/seed";
-import { createTemplateWithDraft, loadPersona } from "@/server/testing/review-fixtures";
+import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
 import { createTeam, saveApprovalChain, setChannelRule, updateContentType } from "./platform";
@@ -99,7 +99,7 @@ async function resetChain() {
 async function submitted(teamId: string, author: string) {
   const { templateId } = await createTemplateWithDraft(db, { teamId, createdBy: author, at: env.now });
   as(author);
-  expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+  expect(await submitVersion({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1 });
   return templateId;
 }
 

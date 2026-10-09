@@ -18,6 +18,13 @@
 //     can put the changes back again.
 //   - an edit generation that moves with every edit, so that Undo is refused once anything else
 //     has changed since the revert it undoes.
+//   - whether the page is inert: held still while something reads or freezes the saved draft. Submit
+//     holds it from its click until its dialog closes without submitting, so what the dialog lists is
+//     what gets frozen. The parts of the page that edit the draft read it and go read-only (the
+//     document, the variables, the email fields, the channels, the sample sets, the name, undo and
+//     redo, the revert menu), and revert, replace and restore refuse. Autosave keeps running: what
+//     was typed before the click still goes out. Anything that stops editing for a while (a save
+//     that can't go through, say) holds it the same way (decision 0012).
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -123,6 +130,8 @@ export interface WorkspaceSession {
   getEditGeneration: () => number;
   /** The fields some part of the page on screen can show other values of, sorted and comma-joined (a stable snapshot). */
   getOwnedFields: () => string;
+  /** Something holds the page still (`makeInert`): nothing on it may change the draft. */
+  getInert: () => boolean;
 
   /** The Content page says which draft is editable, or null when the page is read-only. Idempotent per version. */
   bind: (binding: DraftBinding | null) => void;
@@ -153,13 +162,13 @@ export interface WorkspaceSession {
   /**
    * Puts every field changed since the page opened back to its opening value, on screen and in
    * autosave. Returns the values it replaced (hand them to `restore` to undo it), or null when it
-   * can't (see `getCanRevert`).
+   * can't (see `getCanRevert`) or the page is inert.
    */
   revert: () => SaveFields | null;
   /**
    * Undo for a revert can still run: nothing was edited since (the edit generation is still
-   * `since`, read just after the revert), a draft is bound, and every one of `fields` has a part
-   * of the page on screen to show it.
+   * `since`, read just after the revert), a draft is bound, the page isn't inert, and every one of
+   * `fields` has a part of the page on screen to show it.
    */
   canRestore: (fields: SaveFields, since: number) => boolean;
   /**
@@ -170,9 +179,18 @@ export interface WorkspaceSession {
   restore: (fields: SaveFields, since: number) => boolean;
   /**
    * Shows and saves `fields` as an edit like any other ("Revert to v3"). Returns the values they
-   * replaced (hand them to `restore` to undo it), or null when a field has no part on screen to show it.
+   * replaced (hand them to `restore` to undo it), or null when a field has no part on screen to show
+   * it or the page is inert.
    */
   replace: (fields: SaveFields) => SaveFields | null;
+
+  /**
+   * Holds the page still until the returned function is called: every part that edits the draft goes
+   * read-only, and revert, replace and restore refuse (a revert's toast loses its Undo). Holds stack:
+   * the page is editable again once every one is let go. Letting go twice does nothing. What was
+   * typed before keeps saving, and `flush` still sends it.
+   */
+  makeInert: () => () => void;
 
   /** Ref callback for the document editor. */
   setEditor: (handle: DocumentEditorHandle | null) => void;
@@ -216,6 +234,8 @@ export function createWorkspaceSession(): WorkspaceSession {
   // Set when a draft is bound (an effect): the store itself is made during render, where the clock can't be read.
   let openedAt = 0;
   let editGeneration = 0;
+  // How many holders keep the page inert (`makeInert`).
+  let inertHolds = 0;
   let canRevert = false;
   let ownedFields = "";
   const targets = new Set<RestoreTarget>();
@@ -272,7 +292,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     for (const resolve of release) resolve();
   };
   const canRestore = (fields: SaveFields, since: number) => {
-    if (binding === null || since !== editGeneration) return false;
+    if (binding === null || inertHolds > 0 || since !== editGeneration) return false;
     const mine = owned();
     return Object.keys(fields).every((key) => mine.has(key));
   };
@@ -295,6 +315,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     getOpenedAt: () => openedAt,
     getOwnedFields: () => ownedFields,
     getEditGeneration: () => editGeneration,
+    getInert: () => inertHolds > 0,
 
     bind(next) {
       if (next === null) {
@@ -385,7 +406,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     revert() {
-      if (!canRevert || edited === null) return null;
+      if (!canRevert || edited === null || inertHolds > 0) return null;
       const changed = edited;
       const opening = openingValues();
       // Only what changed goes back: a field nobody touched stays out of the save.
@@ -412,7 +433,7 @@ export function createWorkspaceSession(): WorkspaceSession {
 
     replace(fields) {
       const mine = owned();
-      if (binding === null || !Object.keys(fields).every((key) => mine.has(key))) return null;
+      if (binding === null || inertHolds > 0 || !Object.keys(fields).every((key) => mine.has(key))) return null;
       const current: SaveFields = { ...openingValues(), ...edited };
       const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, current[key as keyof SaveFields]])) as SaveFields;
       apply(fields);
@@ -421,6 +442,18 @@ export function createWorkspaceSession(): WorkspaceSession {
       syncCanRevert();
       emit();
       return previous;
+    },
+
+    makeInert() {
+      inertHolds += 1;
+      if (inertHolds === 1) emit();
+      let holding = true;
+      return () => {
+        if (!holding) return;
+        holding = false;
+        inertHolds -= 1;
+        if (inertHolds === 0) emit();
+      };
     },
 
     setEditor(handle) {

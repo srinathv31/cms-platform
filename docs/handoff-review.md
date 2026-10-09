@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 6 | 28 | 12 | 46 |
+| Open | 0 | 6 | 27 | 12 | 45 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 16 | 7 | 2 | 26 |
+| Fixed | 1 | 16 | 8 | 2 | 27 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -383,7 +383,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I8 · Medium: Submit can freeze content the dialog didn't list
 
-- **Status:** Open
+- **Status:** Fixed. Submit is a compare-and-set on the `rev` its summary read (a stale summary is refused and the dialog offers Refresh summary), and the workspace is read-only from the click until the dialog closes without submitting ([decision 0012](decisions/0012-submit-freezes-only-what-it-showed.md)).
 - **Where:** `src/components/workspace/workspace-actions.tsx` line 110; `src/server/actions/review.ts` line 249
 - **What happens:** The editor stays editable while Submit flushes and fetches the summary, and `submitVersion` sends no rev, so saves that land in between are frozen unseen. Keystrokes still debouncing go out after the host unmounts and fail silently with `not_draft`. Likely, not reproduced.
 - **Fix:** Put `rev` in the summary and make submit a compare-and-set; make the document inert from the moment Submit is clicked.

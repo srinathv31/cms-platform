@@ -17,17 +17,20 @@ const CHIP =
 /**
  * Where this template renders to. Editing: a toggle per channel the content type allows, and a check
  * mark on each one that is on, so it reads as a selector. At least one stays on. Read-only: just the
- * channels that are on.
+ * channels that are on. `disabled` keeps the toggles where they are, greyed out, while the page is
+ * held still (Submit is reading the saved draft).
  */
 export function ChannelSelector({
   channels,
   allowed,
   editable,
+  disabled = false,
   onChange,
 }: {
   channels: Channel[];
   allowed: Channel[];
   editable: boolean;
+  disabled?: boolean;
   onChange: (channels: Channel[]) => void;
 }) {
   if (!editable) {
@@ -52,6 +55,7 @@ export function ChannelSelector({
       aria-label="Channels"
       multiple
       value={on}
+      disabled={disabled}
       onValueChange={(next) => {
         // Keep the content type's order, and never let the last channel go.
         const ordered = CHANNELS.filter((id) => next.includes(id));

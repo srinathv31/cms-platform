@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } fro
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { takeJustCreated } from "./just-created";
-import { useWorkspaceSession } from "./session/workspace-session";
+import { useInert, useWorkspaceSession } from "./session/workspace-session";
 
 /** The most the server accepts (parse-patch.ts: 1 to 120 characters). */
 const MAX_NAME_LENGTH = 120;
@@ -21,6 +21,8 @@ const TYPE = "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[l
  * - Editable: a field that saves through the workspace's autosave session as the author types.
  *   Enter moves into the document, Esc puts the old name back and leaves the field (unless the rail is open:
  *   that Esc closes the rail and focus stays), and clearing it never saves an empty name (it reverts on blur).
+ *   While the session is inert (Submit is reading the saved draft) it is the same field, read-only, and
+ *   its keys change nothing.
  * - Arriving at a template just made from a starter (`createTemplate` leaves a one-shot cookie, see
  *   `just-created.ts`): the name is focused with all of its text selected, so the first thing the
  *   author types replaces it. The address is already the template's own: nothing to drop from it.
@@ -38,6 +40,7 @@ export function NameField({ name, editable }: { name: string; editable: boolean 
 
 function EditableName({ name }: { name: string }) {
   const session = useWorkspaceSession();
+  const inert = useInert();
   const { templateId } = useParams<{ templateId?: string }>();
 
   const field = useRef<HTMLTextAreaElement>(null);
@@ -113,7 +116,8 @@ function EditableName({ name }: { name: string }) {
   }
 
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing) return;
+    // Read-only while inert: Esc would put the old name back, and that is an edit too.
+    if (event.nativeEvent.isComposing || inert) return;
     if (event.key === "Enter") {
       event.preventDefault();
       event.currentTarget.blur();
@@ -148,6 +152,7 @@ function EditableName({ name }: { name: string }) {
           rows={1}
           maxLength={MAX_NAME_LENGTH}
           aria-label="Template name"
+          readOnly={inert}
           spellCheck={false}
           autoComplete="off"
           onChange={change}
@@ -160,6 +165,7 @@ function EditableName({ name }: { name: string }) {
             TYPE,
             "resize-none overflow-hidden rounded-lg bg-transparent text-text outline-none",
             "transition-colors duration-(--dur-fast) hover:bg-hover focus:bg-surface focus:ring-1 focus:ring-hairline",
+            "read-only:hover:bg-transparent read-only:focus:bg-transparent read-only:focus:ring-0",
           )}
         />
       </span>
