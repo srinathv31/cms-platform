@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 6 | 27 | 12 | 45 |
+| Open | 0 | 6 | 26 | 12 | 44 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 16 | 8 | 2 | 27 |
+| Fixed | 1 | 16 | 9 | 2 | 28 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -375,7 +375,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I7 · Medium: No error boundaries anywhere
 
-- **Status:** Open
+- **Status:** Fixed. `(product)/error.tsx`, `templates/[templateId]/error.tsx` and `global-error.tsx` show one plain sentence, Try again (Next's `retry`), Back to library and the error's digest, keeping the app frame, and on a failed tab the workspace header and tab bar ([decision 0013](decisions/0013-errors-are-caught-per-route-not-per-stream.md)).
 - **Where:** `src/app/(product)`
 - **What happens:** There is no `error.tsx` or `global-error.tsx`. Any error thrown inside a streamed section, or a backend outage, replaces the whole app with Next's default error page.
 - **Fix:** Add `(product)/error.tsx`, `templates/[templateId]/error.tsx` and `global-error.tsx`.

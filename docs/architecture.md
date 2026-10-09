@@ -75,7 +75,8 @@ Conventions that nothing enforces yet, and where the code already breaks them:
 5. Client components (`version-actions.tsx`, `sunset-dialog.tsx`) receive it as props.
 
 Request data (cookies, `params`, database reads, the clock) is read only inside `<Stream>`. With Cache Components,
-anything else is a build error.
+anything else is a build error. If `VersionsContent` throws, the template's error boundary shows "This tab didn't
+load." in the tab's place, under the header and the tab bar ([Errors](../src/app/README.md#errors)).
 
 ### A mutation: setting a sunset date
 
