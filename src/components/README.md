@@ -45,7 +45,7 @@ Feature folders:
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
 | `library/` | Library view and browser, New template dialog, starter gallery, file upload. | `/[team]/library`, and under the settings dialog |
-| `palette/` | ⌘K items as pure data (`commands.ts`). | `app-shell/command-palette.tsx` |
+| `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. | `workspace/`, `review/` |
 | `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
 | `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
@@ -243,7 +243,7 @@ header's `SaveStopped` says why and offers Reload. Anything else that has to sto
 ## Testing
 
 - Unit tests sit next to their code as `*.test.ts(x)`. `npx vitest run src/components src/lib` runs this
-  layer's 62 files in a few seconds; `npm test` runs everything.
+  layer's 66 files in a few seconds; `npm test` runs everything.
 - The default environment is `node` ([vitest.config.mts](../../vitest.config.mts)). A test that needs a DOM
   opts in with `// @vitest-environment happy-dom` on its first line.
 - No Testing Library. Markup tests use `renderToStaticMarkup` (`primitives/status-badge.test.tsx`); interaction

@@ -5,7 +5,6 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { FileUp } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { markPaletteStale } from "@/components/palette/palette-stale";
 import { IMPORT_ACCEPT } from "@/domain/import-types";
 import { cn } from "@/lib/utils";
 import { IMPORT_FAILED, precheckImport, precheckImportBytes, uploadImport } from "./upload-import";
@@ -83,7 +82,6 @@ export function ImportRow({
       return;
     }
     const { href } = result;
-    markPaletteStale();
     // The row stays busy until the template has opened (the transition), then is idle again for when
     // the Library is shown again.
     startNavigation(() => {

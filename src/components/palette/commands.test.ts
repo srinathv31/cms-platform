@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { PaletteContext } from "@/domain/import-types";
-import type { PaletteTemplate } from "@/server/queries/palette";
+import type { PaletteResults, PaletteTemplateRow } from "@/domain/import-types";
 import { paletteGroups, templateIdFromPath, type PaletteInput } from "./commands";
 
-// The palette as the personas see it. Spaces mirror what `getShell` builds for them.
+// The palette as the personas see it. Spaces mirror what `getShell` builds for them; `results` is what
+// GET /api/palette/{space} answers (which templates it lists is pinned in src/domain/palette.test.ts).
 
 const coral = { slug: "coral-offers", name: "Coral Offers" };
 const deposits = { slug: "deposits", name: "Deposits" };
@@ -12,47 +12,41 @@ const all = { slug: "all", name: "All teams" };
 
 const NONE = { team: false, platform: false };
 
-const templates: PaletteTemplate[] = [
-  { id: "UC-AAAAAA", name: "Cash Back", teamSlug: "coral-offers", teamName: "Coral Offers", status: "in_review" },
-  { id: "UC-BBBBBB", name: "Balance Transfer", teamSlug: "coral-offers", teamName: "Coral Offers", status: "active" },
-  { id: "UC-CCCCCC", name: "Holiday Points", teamSlug: "coral-offers", teamName: "Coral Offers", status: "revoked" },
-  { id: "UC-DDDDDD", name: "Savings Rate", teamSlug: "deposits", teamName: "Deposits", status: "draft" },
-];
+const cashBack: PaletteTemplateRow = { id: "UC-AAAAAA", name: "Cash Back", teamSlug: "coral-offers", teamName: "Coral Offers", status: "in_review" };
+const balance: PaletteTemplateRow = { id: "UC-BBBBBB", name: "Balance Transfer", teamSlug: "coral-offers", teamName: "Coral Offers", status: "active" };
+const holiday: PaletteTemplateRow = { id: "UC-CCCCCC", name: "Holiday Points", teamSlug: "coral-offers", teamName: "Coral Offers", status: "revoked" };
+const savings: PaletteTemplateRow = { id: "UC-DDDDDD", name: "Savings Rate", teamSlug: "deposits", teamName: "Deposits", status: "draft" };
 
-function ctx(space: string, over: Partial<PaletteContext> = {}): PaletteContext {
-  return { space, canCreate: false, recent: [], ...over };
+function answer(space: string, over: Partial<PaletteResults> = {}): PaletteResults {
+  return { viewerId: "maya", space, query: "", canCreate: false, current: false, recent: [], templates: [], ...over };
 }
 
-// Maya: Author in Coral Offers.
+// Maya: Author in Coral Offers. Balance Transfer and Cash Back are her latest.
 const maya: PaletteInput = {
   space: { ...coral, kind: "team", showAudit: false, settings: NONE },
   spaces: [coral],
-  templates: templates.filter((t) => t.teamSlug === "coral-offers"),
-  context: ctx("coral-offers", { canCreate: true, recent: ["UC-BBBBBB", "UC-AAAAAA"] }),
+  results: answer("coral-offers", { canCreate: true, recent: [balance, cashBack], templates: [holiday] }),
   pathname: "/coral-offers/library",
 };
 // Riley: Platform Admin, in All teams.
 const riley: PaletteInput = {
   space: { ...all, kind: "all", showAudit: true, settings: { team: false, platform: true } },
   spaces: [all, coral, deposits, statements],
-  templates,
-  context: ctx("all", { recent: ["UC-DDDDDD"] }),
+  results: answer("all", { viewerId: "riley", recent: [savings], templates: [balance, cashBack, holiday] }),
   pathname: "/all/library",
 };
 // Taylor: Auditor, in All teams. Reads everything, changes nothing.
 const taylor: PaletteInput = {
   space: { ...all, kind: "all", showAudit: true, settings: NONE },
   spaces: [all, coral, deposits, statements],
-  templates,
-  context: ctx("all"),
+  results: answer("all", { viewerId: "taylor", templates: [balance, cashBack, holiday, savings] }),
   pathname: "/all/audit",
 };
 // Morgan: a viewer in one team.
 const morgan: PaletteInput = {
   space: { ...coral, kind: "team", showAudit: false, settings: NONE },
   spaces: [coral],
-  templates: templates.filter((t) => t.teamSlug === "coral-offers"),
-  context: ctx("coral-offers"),
+  results: answer("coral-offers", { viewerId: "morgan", templates: [balance, cashBack, holiday] }),
   pathname: "/coral-offers/library",
 };
 
@@ -61,6 +55,10 @@ const labels = (input: PaletteInput, group: string) =>
   paletteGroups(input)
     .find((g) => g.key === group)
     ?.items.map((i) => ("label" in i ? i.label : i.name));
+const templateNames = (input: PaletteInput) =>
+  paletteGroups(input)
+    .find((g) => g.key === "templates")
+    ?.items.map((i) => (i.kind === "template" ? i.name : ""));
 
 describe("paletteGroups", () => {
   it("Maya: Recent, Actions, Templates, Pages; no Settings, Audit or Teams", () => {
@@ -69,7 +67,7 @@ describe("paletteGroups", () => {
     expect(labels(maya, "actions")).toEqual(["New template", "Import a file"]);
   });
 
-  it("Recent keeps the audit order, shows status and links to the template", () => {
+  it("Recent keeps the server's order, shows status and links to the template in this space", () => {
     const recent = paletteGroups(maya)[0]!;
     expect(recent.heading).toBe("Recent");
     expect(recent.items).toEqual([
@@ -78,30 +76,25 @@ describe("paletteGroups", () => {
     ]);
   });
 
-  it("Recent leaves out the template being viewed, and Templates doesn't repeat what Recent shows", () => {
-    const onBalance = { ...maya, pathname: "/coral-offers/templates/UC-BBBBBB" };
-    const groups = paletteGroups(onBalance);
-    const ids = (key: string) => groups.find((g) => g.key === key)!.items.map((i) => (i.kind === "template" ? i.id : ""));
-    expect(ids("recent")).toEqual(["UC-AAAAAA"]);
-    expect(ids("templates")).toEqual(["UC-BBBBBB", "UC-CCCCCC"]);
-    // Nothing recent but the current template: no Recent group.
-    expect(keys({ ...onBalance, context: ctx("coral-offers", { recent: ["UC-BBBBBB"] }) })).not.toContain("recent");
-  });
-
   it("Actions go to the space's Library, and only when the viewer can create", () => {
     const actions = paletteGroups(maya).find((g) => g.key === "actions")!;
     expect(actions.items.map((i) => i.href)).toEqual(["/coral-offers/library", "/coral-offers/library"]);
     expect(keys(morgan)).not.toContain("actions");
     expect(keys(riley)).not.toContain("actions");
-    // Until the context has loaded, nothing is offered that it would decide.
-    expect(keys({ ...maya, context: null })).toEqual(["templates", "pages"]);
-    // A context fetched for another space is not trusted.
-    expect(keys({ ...maya, context: ctx("deposits", { canCreate: true, recent: ["UC-DDDDDD"] }) })).toEqual(["templates", "pages"]);
   });
 
-  it("Riley: every team's templates, the platform settings, Audit and the other spaces", () => {
+  it("until an answer has come, only the palette's own rows are listed", () => {
+    expect(keys({ ...maya, results: null })).toEqual(["pages"]);
+    expect(keys({ ...riley, results: null })).toEqual(["pages", "settings", "teams"]);
+  });
+
+  it("an answer for another space is not trusted", () => {
+    expect(keys({ ...maya, results: answer("deposits", { canCreate: true, recent: [savings], templates: [savings] }) })).toEqual(["pages"]);
+  });
+
+  it("Riley: the answer's templates, the platform settings, Audit and the other spaces", () => {
     expect(keys(riley)).toEqual(["recent", "templates", "pages", "settings", "teams"]);
-    expect(paletteGroups(riley).find((g) => g.key === "templates")!.items).toHaveLength(3); // the fourth is in Recent
+    expect(templateNames(riley)).toEqual(["Balance Transfer", "Cash Back", "Holiday Points"]);
     expect(labels(riley, "pages")).toEqual(["Library", "Review", "Usage", "Audit"]);
     expect(labels(riley, "settings")).toEqual(["Teams", "Content types", "Channel rules", "Approval chains", "Time zone"]);
     expect(labels(riley, "teams")).toEqual(["Coral Offers", "Deposits", "Card Statements"]);
@@ -133,15 +126,8 @@ describe("paletteGroups", () => {
     ]);
   });
 
-  it("a team space lists only its own templates", () => {
-    const group = paletteGroups({ ...maya, templates })[0]!;
-    expect(group.items.every((i) => i.kind === "template")).toBe(true);
-    const names = paletteGroups({ ...maya, templates }).find((g) => g.key === "templates")!.items.map((i) => (i.kind === "template" ? i.name : ""));
-    expect(names).not.toContain("Savings Rate");
-  });
-
-  it("This template appears on a template's pages, linking its tabs", () => {
-    const onTemplate = { ...maya, pathname: "/coral-offers/templates/UC-AAAAAA/versions" };
+  it("This template appears on a template's pages the server says the viewer can see, linking its tabs", () => {
+    const onTemplate = { ...maya, pathname: "/coral-offers/templates/UC-AAAAAA/versions", results: { ...maya.results!, current: true } };
     expect(keys(onTemplate)).toEqual(["recent", "actions", "this_template", "templates", "pages"]);
     const group = paletteGroups(onTemplate).find((g) => g.key === "this_template")!;
     expect(group.heading).toBe("This template");
@@ -151,50 +137,34 @@ describe("paletteGroups", () => {
       ["usage", "/coral-offers/templates/UC-AAAAAA/usage"],
       ["activity", "/coral-offers/templates/UC-AAAAAA/activity"],
     ]);
-    // A template the viewer can't see gets no tabs.
+    // A template the viewer can't see here gets no tabs.
     expect(keys({ ...maya, pathname: "/coral-offers/templates/UC-ZZZZZZ" })).not.toContain("this_template");
   });
 
   describe("with a query", () => {
-    it("hides Recent and ranks recent templates first in Templates", () => {
-      const groups = paletteGroups({ ...maya, query: "a" });
-      expect(groups.map((g) => g.key)).not.toContain("recent");
-      const names = groups.find((g) => g.key === "templates")!.items.map((i) => (i.kind === "template" ? i.name : ""));
-      // Balance Transfer and Cash Back are recent, in that order; both start with a letter other than "a",
-      // so they rank by where "a" falls in the name, then by recency.
-      expect(names[0]).toBe("Balance Transfer");
+    it("lists the answer to it as the server ranked it, without Recent", () => {
+      const searching = { ...maya, query: "A", results: answer("coral-offers", { query: "a", canCreate: true, templates: [cashBack, balance, holiday] }) };
+      expect(keys(searching)).toEqual(["actions", "templates", "pages"]);
+      expect(templateNames(searching)).toEqual(["Cash Back", "Balance Transfer", "Holiday Points"]);
     });
 
-    it("matches every word, in the label or the team and id", () => {
-      const names = (query: string, input = riley) =>
-        paletteGroups({ ...input, query })
-          .find((g) => g.key === "templates")
-          ?.items.map((i) => (i.kind === "template" ? i.name : ""));
-      expect(names("cash back")).toEqual(["Cash Back"]);
-      expect(names("deposits")).toEqual(["Savings Rate"]);
-      expect(names("uc-cc")).toEqual(["Holiday Points"]);
-      expect(names("cash zzz")).toBeUndefined();
-    });
-
-    it("matches a template's status label too", () => {
-      const names = (query: string) =>
-        paletteGroups({ ...riley, query })
-          .find((g) => g.key === "templates")
-          ?.items.map((i) => (i.kind === "template" ? i.name : ""));
-      expect(names("draft")).toEqual(["Savings Rate"]);
-      expect(names("active")).toEqual(["Balance Transfer"]);
-      expect(names("in review")).toEqual(["Cash Back"]);
+    it("narrows an earlier answer to what was typed while the next is on its way, recent templates first", () => {
+      // The resting answer is in; "a" has been typed and its answer hasn't come yet.
+      expect(templateNames({ ...maya, query: "a" })).toEqual(["Balance Transfer", "Cash Back", "Holiday Points"]);
+      expect(templateNames({ ...maya, query: "cash back" })).toEqual(["Cash Back"]);
+      expect(templateNames({ ...maya, query: "revoked" })).toEqual(["Holiday Points"]);
+      expect(keys({ ...maya, query: "zzz" })).toEqual([]);
     });
 
     it("finds pages, settings by group, and spaces", () => {
-      expect(keys({ ...riley, query: "audit" })).toEqual(["pages"]);
+      expect(keys({ ...riley, query: "audit", results: answer("all", { viewerId: "riley", query: "audit" }) })).toEqual(["pages"]);
       expect(labels({ ...riley, query: "platform" }, "settings")).toHaveLength(5);
-      expect(keys({ ...riley, query: "deposits" })).toEqual(["templates", "teams"]);
+      expect(labels({ ...riley, query: "deposits" }, "teams")).toEqual(["Deposits"]);
       expect(keys({ ...maya, query: "import" })).toEqual(["actions"]);
     });
 
     it("an unmatched query leaves no groups", () => {
-      expect(paletteGroups({ ...riley, query: "qqqq" })).toEqual([]);
+      expect(paletteGroups({ ...riley, query: "qqqq", results: answer("all", { viewerId: "riley", query: "qqqq" }) })).toEqual([]);
     });
   });
 });

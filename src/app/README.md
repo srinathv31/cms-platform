@@ -94,7 +94,7 @@ persona; the mocks read their deep-link search params.
 | `PUT /api/drafts/[versionId]` | [route.ts](./api/drafts/[versionId]/route.ts) | Browser: autosave ([save-transport.ts](../components/workspace/autosave/save-transport.ts)). |
 | `POST /api/imports?team=` | [route.ts](./api/imports/route.ts) | Browser: Library import ([upload-import.ts](../components/library/upload-import.ts)). |
 | `GET /api/imports/[uploadId]/file`, `…/view` | [file](./api/imports/[uploadId]/file/route.ts), [view](./api/imports/[uploadId]/view/route.ts) | Browser: the rail's Original tab ([original-view.tsx](../components/import/original-view.tsx)). |
-| `GET /api/palette/[space]` | [route.ts](./api/palette/[space]/route.ts) | Browser: the command palette, once per space. |
+| `GET /api/palette/[space]?q=&template=` | [route.ts](./api/palette/[space]/route.ts) | Browser: the command palette, when it opens and as the viewer types ([use-palette-results.ts](../components/palette/use-palette-results.ts)). |
 | `GET /api/templates/[templateId]/compare?from=&to=` | [route.ts](./api/templates/[templateId]/compare/route.ts) | Browser: the Compare dialog, per pair ([compare-panel.tsx](../components/versions/compare-panel.tsx)). |
 | `GET /api/templates/[templateId]/base-version?draft=` | [route.ts](./api/templates/[templateId]/base-version/route.ts) | Browser: "Revert to v3" ([save-status.tsx](../components/workspace/save-status.tsx)). |
 | `GET /api/templates/[templateId]/submit-summary` | [route.ts](./api/templates/[templateId]/submit-summary/route.ts) | Browser: the submit dialog and its Refresh summary ([workspace-actions.tsx](../components/workspace/workspace-actions.tsx)). |
@@ -191,10 +191,10 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   and a strict CSP on web HTML.
 
 **Internal routes** answer errors in five shapes: `DraftSaveResponse` (status from `statusOf`), `ImportResponse`
-(status from `importStatus`), `{ ok: false, reason }` (the `ActionResult` the template reads answer, with the status
-their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads, palette), and plain text (audit
-export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read and on
-every template read).
+(status from `importStatus`), `{ ok: false, reason }` (the `ActionResult` the template reads and the palette answer,
+with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and plain text
+(audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read,
+on every template read and on the palette).
 
 **Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
 opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs
@@ -206,6 +206,12 @@ refuses, 404 for an unknown template or version, 409 when there is nothing to re
 The browser calls them through `readTemplate()` in [lib/template-reads.ts](../lib/template-reads.ts). A request
 without a persona cookie acts as the default persona, as every page does, until real sign-in
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
+
+**The palette's search** (`/api/palette/[space]?q=&template=`) is a read of the same kind: the route passes the
+viewer and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
+`readResponse()`, 400 for a `q` or `template` that doesn't parse and 404 for a space the viewer can't see. No page
+carries templates; the palette asks this route when it opens and as the viewer types
+([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)).
 
 **Body caps.** Drafts: 2,000,000 bytes (`MAX_BODY_SIZE` in `src/server/drafts/parse-patch.ts`), 413 with the
 route's `invalid` body. Render: 1,000,000 bytes (`MAX_BODY_BYTES` in `src/domain/render/types.ts`), 413
@@ -265,8 +271,9 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
   database (`tempDatabase` in `src/server/testing/review-fixtures.ts`) and mock `@/server/clock`. The template
   reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
-  with `getViewer` mocked to each persona. The drafts and imports tests mock `getViewer` and the server function
-  and test only the HTTP mapping. The palette, audit export and delivery file routes have no unit test.
+  with `getViewer` mocked to each persona, and so is the palette's search
+  ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
+  server function and test only the HTTP mapping. The audit export and delivery file routes have no unit test.
 - **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
   3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
   `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server
@@ -277,6 +284,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/principles.spec.ts` | Every product screen as each persona that can see it, the settings modal sections, every `/sim` page, and the tabs and filters inside pages. Checks: one primary button per canvas or dialog, status words only in `StatusBadge`, no placeholders, no serious axe violations, CLS 0. The simulator gets only the last three. |
 | `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, `/design`, `/editor-lab`, router prefetch. |
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
+| `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |
 | `e2e/revoke-recovery.spec.ts` | After the Active version is revoked: Edit from the revoked content, contract changes against the version that still renders, approve, render. |
 | `e2e/demo-script.spec.ts` | The whole demo script on one database state. |

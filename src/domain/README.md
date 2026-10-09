@@ -55,6 +55,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Consumer API and usage | [golive/](golive/) | `/api/v1` query parsing and errors (`api-errors.ts`), the paging cursors of search and notices and the search order (`cursor.ts`), published contract diffs (`contract-diff.ts`), the JSON Schema for `values` (`json-schema.ts`), notices as served (`notices.ts`), the integration panel's samples (`samples.ts`), and the Usage numbers (`usage.ts`). |
 | Render rules | [render/](render/) | Which versions render (`version-rules.ts`), value checks (`validate.ts`), TipTap JSON to `RenderDoc` (`resolve.ts`), JSON numbers kept as their exact source text (`json-number-text.ts`), and the exact error sentences (`errors.ts`). Specified in [docs/render-spec.md](../../docs/render-spec.md). [render/index.ts](render/index.ts) is the only barrel here. |
 | Import and Copilot | [import.ts](import.ts), [copilot.ts](copilot.ts) | What an imported file becomes as a draft; the prompt an author copies into Copilot. |
+| ⌘K palette | [palette.ts](palette.ts) | The palette's one matching rule (`rankByQuery`: every word, name first), and which templates a space lists for a search (`paletteTemplates`: Recent and a first page at rest, the best matches while searching). The server searches with it; the browser ranks the palette's own rows with it ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)). Its types are in [import-types.ts](import-types.ts). |
 | Dates | [dates.ts](dates.ts) | The one way to write a date or time: always UTC; short forms add the year only outside the demo clock's year. A calendar day (`YYYY-MM-DD`) formats as itself. |
 | | [business-zone.ts](business-zone.ts) | The business time zone and what a sunset date means in it: `sunsetInstant`, `sunsetDay`, `todayIn`, `daysUntilSunset`, the zones on offer (`BUSINESS_ZONES`, `DEFAULT_BUSINESS_ZONE`). Only `Intl`. See [The sunset rule](#the-sunset-rule). |
 
@@ -210,7 +211,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Testing
 
-- Every rule file has a colocated `*.test.ts` (25 files). `dates.ts`, `status.ts`, the types files, and
+- Every rule file has a colocated `*.test.ts` (27 files). `dates.ts`, `status.ts`, the types files, and
   `render/index.ts` have none.
   Run `npx vitest run src/domain`; it takes under a second in the `node` environment.
 - Tests pin time by passing `now`, never with fake timers: `const NOW = new Date("2026-10-04T12:00:00.000Z")`

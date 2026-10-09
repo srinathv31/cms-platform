@@ -32,7 +32,7 @@ Convention only (no lint rule):
 | Path | What it holds |
 | --- | --- |
 | [actions/](actions/) | `"use server"` mutations, one file per area: [review.ts](actions/review.ts) (submit, approve, request changes, sunset, revoke), [comments.ts](actions/comments.ts), [access.ts](actions/access.ts), [platform.ts](actions/platform.ts), [templates.ts](actions/templates.ts) (`startDraft`), [create-template.ts](actions/create-template.ts), [notifications.ts](actions/notifications.ts), [persona.ts](actions/persona.ts), [demo.ts](actions/demo.ts). No reads: those are GET routes (see [Anatomy of a read](#anatomy-of-a-read)). |
-| [queries/](queries/) | Read models, mostly `cache()`d `get…` functions for server components. [spaces.ts](queries/spaces.ts) (`requireSpace`, the shell) and [review-shared.ts](queries/review-shared.ts) (`requireTemplate`, people, chain and date helpers) are shared. [template-name.ts](queries/template-name.ts) (`currentName`) is the name a CMS list shows. [consumer-api.ts](queries/consumer-api.ts) serves `/api/v1`. Five reads serve the GET routes a screen calls on demand (see below). |
+| [queries/](queries/) | Read models, mostly `cache()`d `get…` functions for server components. [spaces.ts](queries/spaces.ts) (`requireSpace`, the shell) and [review-shared.ts](queries/review-shared.ts) (`requireTemplate`, people, chain and date helpers) are shared. [template-name.ts](queries/template-name.ts) (`currentName`) is the name a CMS list shows. [consumer-api.ts](queries/consumer-api.ts) serves `/api/v1`. Five reads serve the GET routes a screen calls on demand, and [palette.ts](queries/palette.ts) (`searchPalette`) the ⌘K palette's search (see below). |
 | [db/](db/) | [client.ts](db/client.ts), [schema/ucomp.ts](db/schema/ucomp.ts) (app tables), [schema/sim.ts](db/schema/sim.ts) (simulator tables), [migrations/](db/migrations/). |
 | [effects.ts](effects.ts) | `inTransaction` (the busy retry), `writeEffects` (audit rows, notifications, consumer notices), `takeNoticeSeqs`, `Tx`. |
 | [access-effects.ts](access-effects.ts) | `applyMembershipChange` and `writeAccessEffects`: the same job for access and platform changes. |
@@ -115,6 +115,8 @@ Reads a screen makes on demand, when a dialog or a menu opens, are GET route han
 | `submit-summary` | `getSubmitSummary` ([queries/submit-summary.ts](queries/submit-summary.ts)) | The submit dialog, and its Refresh summary (`version.submit`). |
 | `copilot-prompt` | `getCopilotPrompt` ([queries/copilot.ts](queries/copilot.ts)) | The Copilot prompt dialog (`draft.edit`). |
 | `integration` | `loadIntegrationPanel` ([queries/integration.ts](queries/integration.ts)) | The SHARE panel, prefetched on hover or focus of the ring (`integration.view`). |
+
+The ⌘K palette's search is the same kind of read: `GET /api/palette/[space]?q=&template=` calls `searchPalette` ([queries/palette.ts](queries/palette.ts)), which parses the values (a `q` longer than `PALETTE_QUERY_MAX` is a 400), refuses a space the viewer can't see with 404, and lists that space's templates for what was typed, ranked by `paletteTemplates` in [src/domain/palette.ts](../domain/palette.ts), with Recent, `canCreate`, and whether the template being viewed is theirs to see. The palette asks it when it opens and as the viewer types; no page carries templates ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)).
 
 The consumer API's reads in [queries/consumer-api.ts](queries/consumer-api.ts) have no viewer: `requireConsumer()` checks the `X-Consumer-Id` header.
 

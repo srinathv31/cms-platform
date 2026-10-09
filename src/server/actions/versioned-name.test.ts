@@ -12,7 +12,7 @@ import { getTemplateDetail, listNotices, searchActiveTemplates } from "@/server/
 import { getIntegrationPanel } from "@/server/queries/integration";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { getLibraryRows } from "@/server/queries/library";
-import { getPaletteTemplates } from "@/server/queries/palette";
+import { searchPalette } from "@/server/queries/palette";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { runRender } from "@/server/render/render-template";
 import { seedDatabase } from "@/server/seed";
@@ -68,6 +68,12 @@ function as(userId: string) {
   env.now = new Date(BASE.getTime() + minute * 60_000);
   vi.mocked(getViewer).mockResolvedValue(people[userId]!);
   return env.now;
+}
+
+/** The name the ⌘K palette lists a template by, searched for by its id as Maya in Coral Offers. */
+async function paletteName(id: string) {
+  const result = await searchPalette(people.maya!, { space: "coral-offers", q: id, template: null });
+  return result.ok ? result.templates.find((t) => t.id === id)?.name : undefined;
 }
 
 const version = (number: number) =>
@@ -144,7 +150,7 @@ describe("a rename in a draft goes live only with its version", () => {
   it("the CMS's lists show the draft's name", async () => {
     as("maya");
     expect((await getLibraryRows("coral-offers")).find((r) => r.id === templateId)?.name).toBe(RENAMED);
-    expect((await getPaletteTemplates()).find((t) => t.id === templateId)?.name).toBe(RENAMED);
+    expect(await paletteName(templateId)).toBe(RENAMED);
   });
 
   it("the submit summary lists the rename against the Active version", async () => {
@@ -218,7 +224,7 @@ describe("a template with no version at all", () => {
     const id = "UC-NOVERS";
     await db.insert(templates).values({ id, teamId: "coral-offers", contentTypeId: "ct_disclosure", createdBy: "maya", createdAt: env.now });
     try {
-      expect((await getPaletteTemplates()).find((t) => t.id === id)?.name).toBe(id);
+      expect(await paletteName(id)).toBe(id);
       expect((await getLibraryRows("coral-offers")).find((r) => r.id === id)?.name).toBe(id);
     } finally {
       await db.delete(templates).where(eq(templates.id, id));
