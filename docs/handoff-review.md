@@ -21,7 +21,7 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
 
-Of the 71 findings not fixed, 36 are logic and UI fixes in [Fix first](#fix-first), 13 are tooling and hygiene to take [alongside them](#alongside-tooling-and-hygiene), and 22 [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
+The findings not yet fixed fall into three groups: logic and UI fixes in [Fix first](#fix-first), tooling and hygiene to take [alongside them](#alongside-tooling-and-hygiene), and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
 **Deferred** findings are demo and login stand-ins the owner will replace with real login and by removing the demo tools; don't fix them in place.
 
