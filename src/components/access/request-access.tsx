@@ -16,6 +16,7 @@ import {
 } from "@/domain/access-types";
 import { requestAccess } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";
+import { pluralWord } from "@/domain/plural";
 import { orList } from "./format";
 import { RolePicker } from "./role-picker";
 
@@ -187,7 +188,7 @@ function RequestForm({
       <p className="text-[14px] leading-5 text-text">
         {noAdmin
           ? `${team.name} has no Team Admin to decide yet.`
-          : `${adminNames.length === 1 ? adminNames[0] : orList(adminNames)}, Team Admin${adminNames.length === 1 ? "" : "s"} of ${team.name}, will decide.`}
+          : `${adminNames.length === 1 ? adminNames[0] : orList(adminNames)}, ${pluralWord(adminNames.length, "Team Admin")} of ${team.name}, will decide.`}
       </p>
       <div className="flex items-center justify-end gap-2">
         {shown ? (
@@ -258,7 +259,7 @@ function TeamCard({
           <p className="mt-2 text-[13px] leading-5 text-text-muted">
             {team.admins.length === 0
               ? "No Team Admin yet"
-              : `Team Admin${team.admins.length === 1 ? "" : "s"}: ${team.admins.map((a) => a.name).join(", ")}`}
+              : `${pluralWord(team.admins.length, "Team Admin")}: ${team.admins.map((a) => a.name).join(", ")}`}
           </p>
           {team.myRoles.length > 0 ? (
             <p className="text-[13px] leading-5 text-text">Your access: {rolesLabel(team.myRoles)}</p>

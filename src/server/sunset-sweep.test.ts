@@ -6,6 +6,7 @@ import { refresh } from "next/cache";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { describeActivity } from "@/domain/activity";
 import { sunsetDay } from "@/domain/business-zone";
+import { formatLongDate } from "@/domain/dates";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
@@ -84,11 +85,8 @@ describe("runSunsetSweep across the seed's sunset", () => {
       details: { number: 1, sunsetAt: v1.sunsetAt!.toISOString(), sunsetDay: day21, zone: "America/New_York" },
     });
     // What the Activity tab and the Audit page say for it.
-    const long = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(
-      new Date(`${day21}T00:00:00Z`),
-    );
     expect(describeActivity({ action: rows[0]!.action, details: rows[0]!.details, versionNumber: 1 }, null)).toBe(
-      `v1 stopped rendering: its sunset passed on ${long}.`,
+      `v1 stopped rendering: its sunset passed on ${formatLongDate(day21)}.`,
     );
   });
 

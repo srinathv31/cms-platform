@@ -32,6 +32,8 @@ import type {
 } from "./access-types";
 import { ROLE_LABEL } from "./access";
 import { isBusinessZone, zoneLabel, type BusinessZone } from "./business-zone";
+import { formatCount } from "./numbers";
+import { plural, pluralWord } from "./plural";
 import { refusal, refuse, type Refusal } from "./refusals";
 import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
 import { versionsNeeding } from "./approval-chain";
@@ -121,7 +123,7 @@ export const PLATFORM_REFUSALS = {
   stageWaiting: refusal(
     "stage_in_use",
     (count: number, name: string) =>
-      `${count} ${count === 1 ? "version" : "versions"} in review still ${count === 1 ? "needs" : "need"} ${name}.`,
+      `${plural(count, "version")} in review still ${pluralWord(count, "needs", "need")} ${name}.`,
   ),
   pickZone: refusal("pick_zone", "Pick a time zone from the list."),
 } as const;
@@ -419,7 +421,7 @@ export function channelOffConsequences(contentTypeName: string, channel: Channel
   const lines =
     activeUsing > 0
       ? [
-          `${activeUsing} Active ${contentTypeName} ${activeUsing === 1 ? "version stops" : "versions stop"} rendering to ${label}.`,
+          `${formatCount(activeUsing)} Active ${contentTypeName} ${pluralWord(activeUsing, "version stops", "versions stop")} rendering to ${label}.`,
         ]
       : [`No Active ${contentTypeName} version renders to ${label}.`];
   lines.push(`New ${contentTypeName} templates can't turn ${label} on.`);
@@ -461,7 +463,7 @@ export function setChannelRule(input: {
     ? `Turned on ${label} for ${contentType.name}`
     : `Turned off ${label} for ${contentType.name}` +
       (input.activeUsing > 0
-        ? `: ${input.activeUsing} Active ${input.activeUsing === 1 ? "version stopped" : "versions stopped"} rendering to ${label}`
+        ? `: ${formatCount(input.activeUsing)} Active ${pluralWord(input.activeUsing, "version stopped", "versions stopped")} rendering to ${label}`
         : "");
   return {
     ok: true,

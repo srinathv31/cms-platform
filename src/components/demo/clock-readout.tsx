@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { plural } from "@/domain/plural";
 import { getClockReadout } from "@/server/queries/clock";
 
 /** Current demo date/time and how far it has been advanced. Streams (reads the clock from the DB). */
@@ -8,7 +9,7 @@ export async function ClockReadout() {
     <div>
       <div className="text-[15px] leading-6 font-medium">{label}</div>
       <div className="text-sm leading-5 text-text-muted">
-        {offsetDays === 0 ? "Real time" : `+${offsetDays} ${offsetDays === 1 ? "day" : "days"} from today`}
+        {offsetDays === 0 ? "Real time" : `+${plural(offsetDays, "day")} from today`}
       </div>
     </div>
   );

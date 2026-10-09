@@ -2,6 +2,7 @@
 // they are cheap to test and safe on the server and the client.
 
 import type { JSONContent } from "@/editor/model/types";
+import { plural } from "@/domain/plural";
 import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
 
 /**
@@ -134,7 +135,7 @@ export function collapsedHosts(items: readonly RedlineItem[]): Map<string, strin
 
 /** "1 unchanged block", "4 unchanged blocks". */
 export function gapLabel(count: number): string {
-  return `${count} unchanged ${count === 1 ? "block" : "blocks"}`;
+  return plural(count, "unchanged block");
 }
 
 /** What assistive technology hears for a block that isn't unchanged. */
