@@ -74,14 +74,13 @@ export function useEditorRoot(who: string): EditorRootRuntime {
 export function useContractState(): ContractState {
   const root = useEditorRoot("useContractState");
   const variables = useStore(root.variables, (s) => s.variables);
-  const renames = useStore(root.variables, (s) => s.renames);
   const baseline = useStore(root.config, (s) => s.baseline);
   return useMemo(
     () => ({
       variables: [...variables],
-      changes: baseline ? diffVariables(baseline, variables, { renames }) : [],
+      changes: baseline ? diffVariables(baseline, variables) : [],
     }),
-    [variables, renames, baseline],
+    [variables, baseline],
   );
 }
 

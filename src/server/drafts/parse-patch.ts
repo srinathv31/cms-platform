@@ -6,6 +6,7 @@ import { z } from "zod";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
+import { identityOf } from "@/editor/model/contract";
 import { isValidKey } from "@/editor/model/variables";
 import { changedFields } from "./audit-merge";
 
@@ -81,6 +82,8 @@ export function docProblem(value: unknown): string | null {
 const doc = z.custom<JSONContent>((value) => docProblem(value) === null, { message: "is not a valid document" });
 
 const variable = z.strictObject({
+  // A fresh UUID, or the key the variable had before its first rename (`Variable.id`).
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, { message: "is not a valid variable id" }).optional(),
   key: z.string().refine(isValidKey, { message: "is not a valid snake_case key" }),
   label: z.string().max(200),
   type: z.enum(VARIABLE_TYPES),
@@ -97,7 +100,9 @@ const sampleSet = z.strictObject({
 const variables = z
   .array(variable)
   .max(MAX_VARIABLES)
-  .refine((list) => new Set(list.map((v) => v.key)).size === list.length, { message: "has a repeated key" });
+  .refine((list) => new Set(list.map((v) => v.key)).size === list.length, { message: "has a repeated key" })
+  // Two variables that are one to the contract diff would make a later diff guess which was renamed.
+  .refine((list) => new Set(list.map(identityOf)).size === list.length, { message: "has a repeated variable id" });
 
 const sampleSets = z
   .array(sampleSet)

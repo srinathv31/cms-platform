@@ -2,8 +2,9 @@
 // version that still renders, `contractBaseline` in domain/lifecycle.ts), as the plain-English lines from
 // domain/contract.ts, each flagged breaking or not. Pure, so it is tested alone.
 //
-// The diff is the one the server freezes at submit (`diffVariables` with no rename history), so what the
-// author reads here is what the reviewer reads on the review screen.
+// The diff is the one the server freezes at submit (`diffVariables` on the saved lists, where a renamed
+// variable keeps its identity as its id), so what the author reads here, a rename included, is what the
+// reviewer reads on the review screen.
 
 import { describeChanges } from "@/domain/contract";
 import type { Variable } from "@/domain/types";

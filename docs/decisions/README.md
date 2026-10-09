@@ -27,6 +27,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0019](0019-on-demand-reads-are-get-routes.md) | Reads a screen loads on demand are GET routes; only mutations are server actions | Accepted |
 | [0020](0020-autosave-never-drops-edits-silently.md) | Autosave never drops an edit without saying so: the header binds it, a stopped save holds the page, leaving unsaved asks | Accepted |
 | [0021](0021-the-sidebar-has-no-keyboard-shortcut.md) | The sidebar has no keyboard shortcut, an edit to a generated file | Accepted |
+| [0022](0022-a-variable-keeps-its-identity-across-renames.md) | A variable keeps its identity across renames, so a renamed key is one contract change | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

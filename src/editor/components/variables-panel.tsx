@@ -69,11 +69,7 @@ function flagFor(change: ContractChange): RowFlag {
     case "key_renamed":
       return { text: "Key changed", breaking: true, detail: `Was ${change.from}` };
     case "type_changed":
-      return {
-        text: "Type changed",
-        breaking: true,
-        detail: change.from ? `Was ${TYPE_META[change.from as Variable["type"]]?.label ?? change.from}` : undefined,
-      };
+      return { text: "Type changed", breaking: true, detail: `Was ${TYPE_META[change.from]?.label ?? change.from}` };
     case "made_required":
       return { text: "Now required", breaking: true };
     case "made_optional":
@@ -91,12 +87,11 @@ function usesText(count: number): string {
 export function VariablesPanel({ className }: VariablesPanelProps) {
   const root = useEditorRoot("VariablesPanel");
   const variables = useStore(root.variables, (s) => s.variables);
-  const renames = useStore(root.variables, (s) => s.renames);
   const readOnly = useStore(root.config, (s) => s.readOnly);
   const baseline = useStore(root.config, (s) => s.baseline);
   const headingId = useId();
 
-  const changes = useMemo(() => (baseline ? diffVariables(baseline, variables, { renames }) : []), [baseline, variables, renames]);
+  const changes = useMemo(() => (baseline ? diffVariables(baseline, variables) : []), [baseline, variables]);
   const flags = useMemo(() => rowFlags(changes), [changes]);
   const removed = useMemo(() => changes.filter((c) => c.kind === "removed"), [changes]);
 

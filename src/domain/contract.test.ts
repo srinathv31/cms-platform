@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeChange, describeChanges, diffVariables, isBreaking, typeLabel } from "./contract";
+import { describeChange, describeChanges, diffVariables, isBreaking, isContractChange, typeLabel } from "./contract";
 import type { ContractChange, Variable } from "./types";
 
 describe("describeChange: one plain sentence per kind", () => {
@@ -26,17 +26,17 @@ describe("describeChange: one plain sentence per kind", () => {
     ],
     [
       "a type changed",
-      { kind: "type_changed", key: "home_state", breaking: true, from: "text", to: "us_state", type: "us_state" },
+      { kind: "type_changed", key: "home_state", breaking: true, from: "text", to: "us_state" },
       "v2 changes `home_state` from Text to US state.",
     ],
     [
       "optional made required",
-      { kind: "made_required", key: "promo_code", breaking: true, required: true },
+      { kind: "made_required", key: "promo_code", breaking: true },
       "v2 makes `promo_code` required.",
     ],
     [
       "required made optional",
-      { kind: "made_optional", key: "promo_code", breaking: false, required: false },
+      { kind: "made_optional", key: "promo_code", breaking: false },
       "v2 makes `promo_code` optional.",
     ],
     [
@@ -46,13 +46,6 @@ describe("describeChange: one plain sentence per kind", () => {
     ],
   ])("%s", (_, change, line) => {
     expect(describeChange(change, 2)).toBe(line);
-  });
-
-  it("reads an added variable with no `required` flag by whether it breaks", () => {
-    expect(describeChange({ kind: "added", key: "apr", breaking: true, type: "percent" }, 3)).toBe(
-      "v3 adds required `apr` (Percent).",
-    );
-    expect(describeChange({ kind: "added", key: "apr", breaking: false }, 3)).toBe("v3 adds optional `apr`.");
   });
 
   it("uses every type's label", () => {
@@ -95,14 +88,40 @@ describe("describeChanges", () => {
     ]);
   });
 
-  it("words a rename the panel tracked", () => {
-    const renamed = after.map((v) => (v.key === "annual_fee" ? { ...v, key: "yearly_fee" } : v));
-    const changes = diffVariables(after, renamed, { renames: { yearly_fee: "annual_fee" } });
+  it("words a rename: the renamed variable keeps its identity as its id", () => {
+    const renamed = after.map((v) => (v.key === "annual_fee" ? { ...v, id: "annual_fee", key: "yearly_fee" } : v));
+    const changes = diffVariables(after, renamed);
     expect(describeChanges(changes, 4)).toEqual(["v4 renames `annual_fee` to `yearly_fee`."]);
   });
 
   it("has no lines when nothing changed", () => {
     expect(describeChanges([], 2)).toEqual([]);
+  });
+});
+
+describe("isContractChange: a stored change has every field of its kind", () => {
+  it.each<[string, unknown]>([
+    ["added", { kind: "added", key: "fee", breaking: true, type: "currency", required: true }],
+    ["removed", { kind: "removed", key: "fee", breaking: true, type: "currency", required: false }],
+    ["key_renamed", { kind: "key_renamed", key: "apr", breaking: true, from: "rate", to: "apr" }],
+    ["type_changed", { kind: "type_changed", key: "apr", breaking: true, from: "text", to: "percent" }],
+    ["made_required", { kind: "made_required", key: "apr", breaking: true }],
+    ["made_optional", { kind: "made_optional", key: "apr", breaking: false }],
+    ["label_changed", { kind: "label_changed", key: "apr", breaking: false, from: "Rate", to: "APR" }],
+  ])("takes a whole %s", (_, change) => {
+    expect(isContractChange(change)).toBe(true);
+  });
+
+  it.each<[string, unknown]>([
+    ["a rename without its old key", { kind: "key_renamed", key: "apr", breaking: true, to: "apr" }],
+    ["an addition without its type", { kind: "added", key: "fee", breaking: true, required: true }],
+    ["an addition without `required`", { kind: "added", key: "fee", breaking: true, type: "currency" }],
+    ["a type change without the new type", { kind: "type_changed", key: "apr", breaking: true, from: "text" }],
+    ["a change without a key", { kind: "made_required", breaking: true }],
+    ["an unknown kind", { kind: "renamed", key: "apr", breaking: true, from: "rate", to: "apr" }],
+    ["not an object", "key_renamed"],
+  ])("leaves out %s", (_, change) => {
+    expect(isContractChange(change)).toBe(false);
   });
 });
 

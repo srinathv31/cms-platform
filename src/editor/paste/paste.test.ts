@@ -271,8 +271,9 @@ describe("paste from Word for Mac", () => {
     await flush();
     const created = root.variables.getState().variables.slice(KNOWN.length);
     expect(created).toEqual([
-      { key: "new_apr", label: "New APR", type: "text", required: false, sample: "" },
-      { key: "effective_date", label: "Effective date", type: "text", required: false, sample: "" },
+      // Each with a fresh id of its own (variable-store.ts).
+      { id: expect.any(String), key: "new_apr", label: "New APR", type: "text", required: false, sample: "" },
+      { id: expect.any(String), key: "effective_date", label: "Effective date", type: "text", required: false, sample: "" },
     ]);
 
     // Undo takes the paste out; the created variables stay (like an inline Create).
@@ -307,6 +308,7 @@ describe("{{key}} in pasted text", () => {
     expect(json).toContain('"text":", not {{Promo Code}} or {{9lives}}."');
     await flush();
     expect(root.variables.getState().byKey.get("promo_code")).toEqual({
+      id: expect.any(String),
       key: "promo_code",
       label: "Promo code",
       type: "text",

@@ -119,7 +119,7 @@ describe("approveLines", () => {
     ]);
     // Nothing breaks: nothing to map. Removing a variable asks nothing of a consumer either.
     expect(lines({ contractChanges: [changes[1]] })).toEqual(lines());
-    expect(lines({ contractChanges: [{ kind: "removed", key: "old", breaking: true }] })).toEqual(lines());
+    expect(lines({ contractChanges: [{ kind: "removed", key: "old", breaking: true, type: "text", required: false }] })).toEqual(lines());
   });
 
   it("is one line when nothing is Active yet, and a sunset date has nothing to apply to", () => {

@@ -63,6 +63,16 @@ describe("contractSection", () => {
     expect(section?.lines).toHaveLength(1);
   });
 
+  it("words a renamed variable as one rename, not a removal and an addition", () => {
+    const section = contractSection({
+      baseline: BASELINE,
+      // As the draft saves it: the variable keeps the key it had as its id.
+      variables: [v("given_name", { id: "first_name", label: "first_name" }), BASELINE.variables[1]!],
+      versionNumber: 3,
+    });
+    expect(section?.lines).toEqual([{ text: "v3 renames `first_name` to `given_name`.", breaking: true }]);
+  });
+
   it("reads a removed variable as breaking", () => {
     const section = contractSection({ baseline: BASELINE, variables: [BASELINE.variables[0]!], versionNumber: 3 });
     expect(section?.breaking).toBe(true);

@@ -1,4 +1,4 @@
-// The consumer contract: how a variable list differs from the Active version's list.
+// The consumer contract: how a variable list differs from its baseline's (the list consumers render now).
 // Pure TypeScript. The variables panel flags these live; the submit and review dialogs list them.
 // Rules (build plan, "Template lifecycle"):
 //   breaking      a required variable added · a variable removed · a key renamed · a type changed ·
@@ -7,45 +7,52 @@
 
 import type { ContractChange, Variable } from "./types";
 
-export interface DiffOptions {
-  /**
-   * Keys renamed since the baseline, as { newKey: oldKey }. Without it a renamed key reads as
-   * "removed" plus "added". The editor's variable store tracks renames made in the panel.
-   */
-  renames?: Readonly<Record<string, string>>;
+/** What a variable is across renames: its id, or its key when it has none (`Variable.id`). */
+export function identityOf(variable: Pick<Variable, "id" | "key">): string {
+  return variable.id ?? variable.key;
 }
 
-/** Changes from `baseline` (the Active version's list) to `current`, in `current` order, removals last. */
-export function diffVariables(
-  baseline: readonly Variable[],
-  current: readonly Variable[],
-  { renames = {} }: DiffOptions = {},
-): ContractChange[] {
-  const before = new Map(baseline.map((v) => [v.key, v]));
-  const matched = new Set<string>();
+/**
+ * Changes from `baseline` to `current`, in `current` order, removals last.
+ *
+ * Variables are paired in two passes. A variable with an id pairs with the baseline variable of that
+ * identity, whatever either is keyed now: that is a rename, so `a` → `b` → `c` is one rename `a` → `c`,
+ * and renaming back to `a` is no change. Then every variable still unpaired pairs by key with a baseline
+ * variable still unpaired. So a new variable that takes a renamed variable's old key is an addition
+ * beside the rename, and one deleted and made again under the same key is the same variable.
+ */
+export function diffVariables(baseline: readonly Variable[], current: readonly Variable[]): ContractChange[] {
+  const byIdentity = new Map(baseline.map((v) => [identityOf(v), v]));
+  const byKey = new Map(baseline.map((v) => [v.key, v]));
+  const paired = new Map<Variable, Variable>();
+  const taken = new Set<Variable>();
+  const pair = (v: Variable, old: Variable | undefined) => {
+    if (!old || taken.has(old)) return;
+    paired.set(v, old);
+    taken.add(old);
+  };
+
+  for (const v of current) if (v.id !== undefined) pair(v, byIdentity.get(v.id));
+  for (const v of current) if (!paired.has(v)) pair(v, byKey.get(v.key));
+
   const changes: ContractChange[] = [];
-
   for (const v of current) {
-    const renamedFrom = renames[v.key];
-    const old = before.get(v.key) ?? (renamedFrom ? before.get(renamedFrom) : undefined);
-
+    const old = paired.get(v);
     if (!old) {
       changes.push({ kind: "added", key: v.key, breaking: v.required, type: v.type, required: v.required });
       continue;
     }
-    matched.add(old.key);
-
     if (old.key !== v.key) {
       changes.push({ kind: "key_renamed", key: v.key, breaking: true, from: old.key, to: v.key });
     }
     if (old.type !== v.type) {
-      changes.push({ kind: "type_changed", key: v.key, breaking: true, from: old.type, to: v.type, type: v.type });
+      changes.push({ kind: "type_changed", key: v.key, breaking: true, from: old.type, to: v.type });
     }
     if (old.required !== v.required) {
       changes.push(
         v.required
-          ? { kind: "made_required", key: v.key, breaking: true, required: true }
-          : { kind: "made_optional", key: v.key, breaking: false, required: false },
+          ? { kind: "made_required", key: v.key, breaking: true }
+          : { kind: "made_optional", key: v.key, breaking: false },
       );
     }
     if (old.label !== v.label) {
@@ -54,14 +61,14 @@ export function diffVariables(
   }
 
   for (const old of baseline) {
-    if (matched.has(old.key)) continue;
+    if (taken.has(old)) continue;
     changes.push({ kind: "removed", key: old.key, breaking: true, type: old.type, required: old.required });
   }
 
   return changes;
 }
 
-/** True when any change would break a consumer that renders the Active version's contract. */
+/** True when any change would break a consumer that renders the baseline's contract. */
 export function isBreaking(changes: readonly ContractChange[]): boolean {
   return changes.some((c) => c.breaking);
 }

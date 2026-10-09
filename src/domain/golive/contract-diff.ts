@@ -5,18 +5,23 @@
 import { describeChange, diffVariables } from "../contract";
 import type { ApiContractChange, ApiContractDiff, ContractChange, Variable } from "../golive-types";
 
-/** Each change with its sentence, worded for `versionNumber`: "v3 adds required `annual_fee` (Currency)." */
+/**
+ * Each change with its sentence, worded for `versionNumber`: "v3 adds required `annual_fee` (Currency)."
+ * A rename, a type change and a label change carry `from` and `to`; the other kinds say it in `text`.
+ */
 export function apiChanges(changes: readonly ContractChange[], versionNumber: number): ApiContractChange[] {
-  return changes.map((change) => {
-    const item: ApiContractChange = {
-      kind: change.kind,
-      key: change.key,
-      breaking: change.breaking,
-      text: describeChange(change, versionNumber),
-    };
-    if (change.from !== undefined) item.from = change.from;
-    if (change.to !== undefined) item.to = change.to;
-    return item;
+  return changes.map((change): ApiContractChange => {
+    const text = describeChange(change, versionNumber);
+    switch (change.kind) {
+      case "key_renamed":
+        return { kind: change.kind, key: change.key, breaking: change.breaking, from: change.from, to: change.to, text };
+      case "type_changed":
+        return { kind: change.kind, key: change.key, breaking: change.breaking, from: change.from, to: change.to, text };
+      case "label_changed":
+        return { kind: change.kind, key: change.key, breaking: change.breaking, from: change.from, to: change.to, text };
+      default:
+        return { kind: change.kind, key: change.key, breaking: change.breaking, text };
+    }
   });
 }
 

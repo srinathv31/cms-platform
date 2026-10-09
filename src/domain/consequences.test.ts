@@ -130,20 +130,15 @@ describe("consequences: approve a breaking version", () => {
 });
 
 describe("breakingKeysOf", () => {
-  const change = (kind: ContractChange["kind"], key: string, breaking: boolean, extra: Partial<ContractChange> = {}): ContractChange => ({
-    kind,
-    key,
-    breaking,
-    ...extra,
-  });
+  const added = (key: string, required: boolean): ContractChange => ({ kind: "added", key, breaking: required, type: "text", required });
 
   it("takes the keys of what a consumer has to map: a required variable added, a rename, a type change, made required", () => {
     expect(
       breakingKeysOf([
-        change("added", "annual_fee", true, { required: true, type: "currency" }),
-        change("key_renamed", "state", true, { from: "home_state", to: "state" }),
-        change("type_changed", "apr", true, { from: "text", to: "percent" }),
-        change("made_required", "promo_code", true),
+        { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+        { kind: "key_renamed", key: "state", breaking: true, from: "home_state", to: "state" },
+        { kind: "type_changed", key: "apr", breaking: true, from: "text", to: "percent" },
+        { kind: "made_required", key: "promo_code", breaking: true },
       ]),
     ).toEqual(["annual_fee", "state", "apr", "promo_code"]);
   });
@@ -151,17 +146,21 @@ describe("breakingKeysOf", () => {
   it("leaves out what doesn't break, and removals (the consumer just stops sending them)", () => {
     expect(
       breakingKeysOf([
-        change("added", "bonus_points", false, { required: false }),
-        change("made_optional", "a", false),
-        change("label_changed", "b", false),
-        change("removed", "old_key", true),
+        added("bonus_points", false),
+        { kind: "made_optional", key: "a", breaking: false },
+        { kind: "label_changed", key: "b", breaking: false, from: "B", to: "Bee" },
+        { kind: "removed", key: "old_key", breaking: true, type: "text", required: true },
       ]),
     ).toEqual([]);
   });
 
   it("lists a key once when several changes hit it", () => {
     expect(
-      breakingKeysOf([change("type_changed", "fee", true), change("made_required", "fee", true), change("added", "other", true)]),
+      breakingKeysOf([
+        { kind: "type_changed", key: "fee", breaking: true, from: "text", to: "currency" },
+        { kind: "made_required", key: "fee", breaking: true },
+        added("other", true),
+      ]),
     ).toEqual(["fee", "other"]);
   });
 });

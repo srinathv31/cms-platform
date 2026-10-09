@@ -31,6 +31,13 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
 previews.
 
+A contract change (`ApiContractChange`, in a template's `since` diff and in a `new_version` or `sunset_scheduled`
+notice) is a union on `kind`. `key_renamed`, `type_changed` and `label_changed` carry `from` and `to`; every kind
+carries `key` (the later version's, the earlier one's for `removed`), `breaking` and the sentence `text`. A variable
+whose key was renamed is one `key_renamed`, so a consumer can move its value from `from` to `to` instead of reading
+a removal and a new required variable
+([decision 0022](../../docs/decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
+
 A render body is at most 1,000,000 bytes (`MAX_BODY_BYTES`), else 413 `body_too_large`; the route counts the bytes as
 it reads, so a chunked body is held to the limit too. Each value is at most 1,000 characters, counted in Unicode code
 points (`MAX_VALUE_LENGTH`), else 422 `invalid_values` with `maxLength` on that key's `details.invalid` entry. A value
@@ -80,7 +87,8 @@ repeats their statuses and is read only by `src/domain/render/errors.test.ts`; t
 `_DriftChecks` in `golive-types.ts` is a tuple of `Assert<Fits<A, B>>` types (`Fits`: A is assignable to B), so `tsc`
 fails when the domain's types stop fitting the wire shapes: `RenderErrorCode` into `ApiErrorCode`, `RenderErrorBody`
 into `ApiErrorBody`, `EmailResponseBody` into `ApiEmailResponse`, `Base64ResponseBody` into `ApiBase64Response`,
-`VariableType` and `ApiVariableType` both ways, and `ConsumerNoticeKind` into `ApiNotice["kind"]`. `ApiChannel`,
+`VariableType` and `ApiVariableType` both ways, `ConsumerNoticeKind` into `ApiNotice["kind"]`, and the contract
+change kinds (`ContractChange["kind"]` and `ApiContractChange["kind"]`) both ways. `ApiChannel`,
 `ApiVersionState` and `ApiRenderRequest` have no explicit check. Only `npm run typecheck` and `next build` run them.
 
 To change the contract: edit `api-v1.ts`, then the Stencil side that builds the shape (`consumer-api.ts`,

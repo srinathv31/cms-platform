@@ -33,7 +33,7 @@ route compiles only the parts of the editor it uses. The entry modules:
 | `@/editor/components/variable-chip` | `VariableChipView`, `VariableChipViewProps` |
 | `@/editor/types` | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`, `EditorHistory`. |
 | `@/editor/model/types` | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`. |
-| `@/editor/model/contract` | `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` |
+| `@/editor/model/contract` | `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking` |
 | `@/editor/model/variables` | `formatValue`, `validateValue`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types |
 | `@/editor/model/sample-sets` | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `DefaultSampleSetId` |
 | `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
@@ -134,7 +134,7 @@ interface DocumentEditorHandle {
 | Export | Use |
 | --- | --- |
 | `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE` | The model. |
-| `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `flaggedKeys`, `isBreaking`, `DiffOptions` | The consumer contract (Submit and review dialogs). |
+| `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking` | The consumer contract (Submit and review dialogs). `ContractChange` is a union with one member per kind, each with exactly its fields. `diffVariables(baseline, current)` pairs variables by id first (`identityOf`: the id, else the key), then by key, so a renamed variable is one `key_renamed`. |
 | `formatValue`, `validateValue`, `ValidationResult`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). `labelFromKey` keeps whole-word acronyms in capitals ("purchase_apr" → "Purchase APR"). |
 | `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)` | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day. |
 | `baseExtensions(opts)`, `BaseExtensionOptions` | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render. |
@@ -222,6 +222,14 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   warning style), and removed variables are listed once under the rows.
 - **The form**: label, key (follows the label as snake_case until edited; unique), type, required
   (on by default), sample (optional; validated for its type). Messages only once a save is blocked.
+- **Ids carry renames** ([decision 0022](../../docs/decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
+  The root's variable store gives each variable it creates a fresh id (a UUID, never a valid key).
+  A variable that arrives without one (a starter's, an import's) is identified by its key until its
+  key is first renamed; it then keeps that key as its id, and renamed back it needs none. Nothing
+  changes an id, and `onVariablesChange` reports the list with them, so a host that saves it keeps
+  the rename: after a reload, at submit and in later versions, `diffVariables` reads it as one
+  `key_renamed` (`a` → `b` → `c` is one rename `a` → `c`), and a new variable on a renamed one's old
+  key is an addition beside it.
 
 ### Required sections
 
@@ -529,8 +537,8 @@ nothing above changed or went away).
 ## Changes since Phase 7a
 
 Undo and redo a host can show as buttons, undo history that survives a hidden route, and inline
-fields a host can hide without taking them out of the root (additive only; nothing above changed or
-went away).
+fields a host can hide without taking them out of the root, all additive; and variable ids that carry
+a rename into the contract diff, which change the contract types (the last item).
 
 - **New exports**: `useEditorHistory()` (`components/editor-root.tsx`) and its `EditorHistory` type
   (`types.ts`). The root runtime gains `history` (a store of `{ canUndo, canRedo }`), `undo()`,
@@ -548,6 +556,12 @@ went away).
   `setFieldHidden(fieldId, hidden)`. A hidden field still counts and follows renames and deletes;
   insert, undo and redo pass it by (see Composition).
 - No new handle methods or dependencies.
+- **Renames reach the contract**: `Variable` gains an optional `id` (see Behavior, Variables), and
+  `onVariablesChange` reports it. `ContractChange` is a union with one member per kind, each with
+  exactly its fields: `type_changed` no longer repeats its new type as `type`, and `made_required` and
+  `made_optional` no longer carry `required`. `diffVariables(baseline, current)` takes no options:
+  `DiffOptions` and its `renames` map are gone, and so are the variable store's `renames` and a
+  tombstone's `renamedFrom`. `identityOf` is new in `model/contract`.
 
 ## How it's built
 
@@ -580,7 +594,7 @@ schema.ts                 the one extension list (+ the one-line field list, ens
 styles.css                document typography and editor states (tokens only)
 model/                    pure TS: Variable types, values and keys, contract diff, usage, form rules,
                           default sample sets
-state/                    zustand stores: variable list (renames, tombstones), root runtime, chip popover
+state/                    zustand stores: variable list (ids, rename forwards, tombstones), root runtime, chip popover
 extensions/               TipTap extensions (server-safe, except variable-view.ts)
 components/               React: EditorRoot, DocumentEditor, VariablesPanel, InlineVariableField,
                           StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus

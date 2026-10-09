@@ -15,7 +15,7 @@ const v2: Since[number] = {
     breaking: true,
     items: [
       { kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." },
-      { kind: "label_changed", key: "purchase_apr", breaking: false, text: "v3 changes the label of `purchase_apr`." },
+      { kind: "label_changed", key: "purchase_apr", breaking: false, from: "APR", to: "Purchase APR", text: "v3 changes the label of `purchase_apr` to “Purchase APR”." },
     ],
   },
 };

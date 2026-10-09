@@ -122,6 +122,22 @@ describe("parseDraftPatch", () => {
     expect(message({ ...base, variables: "x" })).toMatch(/^variables /);
   });
 
+  it("keeps a variable's id: a fresh one, or the key it had before a rename", () => {
+    const created = { ...variable, key: "promo_code", id: "0b6f4c1e-5a7d-4e8b-9c2f-3d1a6e7b8c90" };
+    const renamed = { ...variable, key: "given_name", id: "first_name" };
+    expect(ok({ ...base, variables: [renamed, created] }).variables).toEqual([renamed, created]);
+    expect(message({ ...base, variables: [{ ...variable, id: "" }] })).toMatch(/^variables\.0\.id /);
+    expect(message({ ...base, variables: [{ ...variable, id: "a b" }] })).toMatch(/^variables\.0\.id /);
+    expect(message({ ...base, variables: [{ ...variable, id: 7 }] })).toMatch(/^variables\.0\.id /);
+  });
+
+  it("refuses two variables that are one to the contract diff", () => {
+    // `first_name` with no id is the variable `first_name`, and so is the renamed one.
+    const renamed = { ...variable, key: "given_name", id: variable.key };
+    expect(message({ ...base, variables: [variable, renamed] })).toMatch(/repeated variable id/);
+    expect(message({ ...base, variables: [{ ...renamed, key: "a" }, renamed] })).toMatch(/repeated variable id/);
+  });
+
   it("refuses repeated variable keys and sample set ids", () => {
     expect(message({ ...base, variables: [variable, variable] })).toMatch(/repeated key/);
     const set = { id: "s1", name: "A", values: {} };
