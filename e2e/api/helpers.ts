@@ -1,11 +1,12 @@
 import { createClient, type Client, type InValue } from "@libsql/client";
 import { expect, type APIRequestContext, type APIResponse, type PlaywrightWorkerArgs } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { request as httpRequest } from "node:http";
 import path from "node:path";
 
 // Shared by the API specs: the database (read for what the seed holds and for render_log; written
-// only through `withTemporarily`, which always puts the row back), the render call, and the
-// assertions every error response has to pass.
+// only through `withTemporarily`, which always puts the row back), the render call, a chunked upload
+// with no Content-Length, and the assertions every error response has to pass.
 
 // ── The database ─────────────────────────────────────────────────────────────
 
@@ -226,6 +227,57 @@ export async function asPersona<T>(
   } finally {
     await context.dispose();
   }
+}
+
+export interface ChunkedAnswer {
+  status: number;
+  body: string;
+  /** Megabytes written before the answer came. */
+  sentMb: number;
+}
+
+/**
+ * POSTs up to `megabytes` of `fill` bytes in 1 MB chunks with `Transfer-Encoding: chunked` (no
+ * Content-Length), after `head` and before `tail`, and stops sending once the server answers.
+ *
+ * The answer is read to its end before the request is torn down. Tearing it down as soon as the
+ * status arrives can drop a body still on its way, and then the answer never ends and the test hangs
+ * until its timeout. An answer that closes before its end fails the call straight away.
+ */
+export function postChunked(
+  url: URL,
+  { headers, megabytes, fill, head = "", tail = "" }: { headers: Record<string, string>; megabytes: number; fill: number; head?: string; tail?: string },
+): Promise<ChunkedAnswer> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, { method: "POST", headers: { ...headers, "Transfer-Encoding": "chunked" } });
+    let sentMb = 0;
+    let answered = false;
+    req.on("response", (res) => {
+      answered = true;
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (text: string) => (body += text));
+      res.on("end", () => {
+        resolve({ status: res.statusCode ?? 0, body, sentMb });
+        req.destroy(); // the rest of the body is never sent
+      });
+      res.on("close", () => {
+        if (!res.complete) reject(new Error(`The ${res.statusCode} answer closed before its body ended.`));
+      });
+    });
+    // Once there is an answer, the request's own errors (the server closing its side) don't matter.
+    req.on("error", (error) => (answered ? undefined : reject(error)));
+    if (head) req.write(head);
+    const chunk = Buffer.alloc(1024 * 1024, fill);
+    const pump = () => {
+      if (answered) return; // stop sending; the request goes once the answer has been read
+      if (sentMb >= megabytes) return void req.end(tail);
+      sentMb += 1;
+      if (req.write(chunk)) setImmediate(pump);
+      else req.once("drain", pump);
+    };
+    pump();
+  });
 }
 
 // ── Assertions ───────────────────────────────────────────────────────────────

@@ -1,4 +1,3 @@
-import { request as httpRequest } from "node:http";
 import type { Client } from "@libsql/client";
 import { expect, test } from "@playwright/test";
 import { sunsetDay, sunsetInstant } from "@/domain/business-zone";
@@ -17,6 +16,7 @@ import {
   longDate,
   openDb,
   pick,
+  postChunked,
   render,
   validValues,
   withTemporarily,
@@ -593,30 +593,11 @@ test.describe("a body over 1,000,000 bytes is a 413 body_too_large", () => {
 
   test("sent chunked, with no Content-Length: refused once the count passes the limit, and the rest is never read", async ({ baseURL }) => {
     const v = await activeEverywhere();
-    /** POSTs up to 64 MB of spaces in 1 MB chunks (Transfer-Encoding: chunked); stops when the answer comes. */
-    const sent = await new Promise<{ status: number; body: string; sentMb: number }>((resolve, reject) => {
-      const req = httpRequest(new URL(`/api/v1/templates/${v.templateId}/render`, baseURL), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Consumer-Id": "coral", "Transfer-Encoding": "chunked" },
-      });
-      let sentMb = 0;
-      let answered = false;
-      req.on("response", (res) => {
-        answered = true;
-        let body = "";
-        res.on("data", (d: Buffer) => (body += d.toString()));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, body, sentMb }));
-      });
-      req.on("error", (error) => (answered ? undefined : reject(error)));
-      const chunk = Buffer.alloc(1024 * 1024, 0x20);
-      const pump = () => {
-        if (answered) return req.destroy();
-        if (sentMb >= 64) return req.end();
-        sentMb += 1;
-        if (req.write(chunk)) setImmediate(pump);
-        else req.once("drain", pump);
-      };
-      pump();
+    // Up to 64 MB of spaces in 1 MB chunks; sending stops when the answer comes.
+    const sent = await postChunked(new URL(`/api/v1/templates/${v.templateId}/render`, baseURL), {
+      headers: { "Content-Type": "application/json", "X-Consumer-Id": "coral" },
+      megabytes: 64,
+      fill: 0x20,
     });
     expect(sent.status).toBe(413);
     expect(JSON.parse(sent.body)).toEqual({ error: { code: "body_too_large", message: TOO_LARGE } });
