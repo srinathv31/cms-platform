@@ -35,6 +35,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0027](0027-focus-targets-register-with-the-session.md) | Focus targets register with the workspace session; nothing finds them by label | Accepted |
 | [0028](0028-today-and-yesterday-are-utc-calendar-days.md) | "Today" and "yesterday" are UTC calendar days, counted one way (a sunset's in the business time zone) | Accepted |
 | [0029](0029-every-action-runs-on-one-kit.md) | Every server action runs on one kit, and the browser runs them with one hook | Accepted |
+| [0030](0030-shared-primitives-have-one-home.md) | Shared UI building blocks have one home in `primitives/`, and a test keeps it so | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

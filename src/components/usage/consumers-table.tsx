@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { Segmented } from "@/components/primitives/segmented";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { UsageRow, UsageTag } from "@/domain/golive-types";
 import { formatCount } from "@/domain/numbers";
 import { cn } from "@/lib/utils";
@@ -47,31 +47,9 @@ const FILTER_EMPTY: Record<Filter, string> = {
   failing: "No renders have failed in the last 30 days.",
 };
 
-// The segmented style of the preview controls: a white 32px track, a tan segment under the chosen one.
-const TRACK = "h-8 rounded-lg border border-hairline bg-surface p-0.5";
-const SEGMENT =
-  "h-6 min-w-0 rounded-md border-0 px-2.5 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text aria-pressed:hover:bg-selected";
-
 /** All / On superseded / Failing. Controlled by the table's card, which puts it in its heading row. */
 export function ConsumerFilter({ value, onChange }: { value: Filter; onChange: (value: Filter) => void }) {
-  return (
-    <ToggleGroup
-      aria-label="Show"
-      value={[value]}
-      onValueChange={(next) => {
-        const picked = next[0] as Filter | undefined;
-        if (picked) onChange(picked);
-      }}
-      spacing={0.5}
-      className={TRACK}
-    >
-      {FILTERS.map((f) => (
-        <ToggleGroupItem key={f.value} value={f.value} className={SEGMENT}>
-          {f.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
+  return <Segmented label="Show" value={value} options={FILTERS} onChange={onChange} />;
 }
 
 function matches(row: UsageRow, filter: Filter): boolean {

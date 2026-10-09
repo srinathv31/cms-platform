@@ -1,3 +1,4 @@
+import { TAB, TAB_ACTIVE, TAB_LABEL, TAB_UNDERLINE } from "@/components/primitives/tab-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { heatmapBox } from "./charts";
@@ -8,17 +9,15 @@ import { HEATMAP_WEEKS } from "@/domain/golive-types";
 // The Usage dashboard while it streams: the tab labels, and the Overview's cards with the real
 // geometry (same cards, same chart heights, the heatmap at its real aspect ratio).
 
-const TAB = "relative -mb-px flex h-11 items-center text-[15px]";
-
 export function UsageTabsSkeleton() {
   return (
     <div aria-hidden className="flex gap-7 border-b border-hairline">
-      <span className={cn(TAB, "font-medium text-text")}>
-        <span className="-mx-1.5 px-1.5 py-0.5">Overview</span>
-        <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text" />
+      <span className={cn(TAB, TAB_ACTIVE)}>
+        <span className={TAB_LABEL}>Overview</span>
+        <span className={TAB_UNDERLINE} />
       </span>
       <span className={cn(TAB, "text-text-muted")}>
-        <span className="-mx-1.5 px-1.5 py-0.5">Consumers</span>
+        <span className={TAB_LABEL}>Consumers</span>
       </span>
     </div>
   );

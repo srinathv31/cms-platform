@@ -1,18 +1,12 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { Segmented } from "@/components/primitives/segmented";
 import { StatusBadge } from "@/components/primitives/status-badge";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
 
 type Since = IntegrationPanelData["since"][number];
-
-// Same segmented style as the preview rail's channel switch (src/components/preview/controls.tsx keeps
-// its Segmented private): white 32px track, hairline, tan fill under the chosen segment.
-const TRACK = "h-8 rounded-lg border border-hairline bg-surface p-0.5";
-const SEGMENT =
-  "h-6 min-w-0 rounded-md border-0 px-2.5 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text aria-pressed:hover:bg-selected";
 
 /** `annual_fee` in a sentence from the API: keys go in Geist Mono. */
 function Sentence({ text }: { text: string }) {
@@ -45,22 +39,12 @@ export function ContractChanges({ since, activeNumber }: { since: readonly Since
           What changed since v{current.number}
         </h3>
         {since.length > 1 ? (
-          <ToggleGroup
-            aria-label="Compare with version"
-            value={[String(current.number)]}
-            onValueChange={(next) => {
-              const n = Number(next[0]);
-              if (n) setPicked(n);
-            }}
-            spacing={0.5}
-            className={TRACK}
-          >
-            {since.map((s) => (
-              <ToggleGroupItem key={s.number} value={String(s.number)} className={SEGMENT}>
-                v{s.number}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <Segmented
+            label="Compare with version"
+            value={String(current.number)}
+            options={since.map((s) => ({ value: String(s.number), label: `v${s.number}` }))}
+            onChange={(number) => setPicked(Number(number))}
+          />
         ) : null}
       </div>
       <div className="flex items-center gap-2 text-[13px] text-text-muted">

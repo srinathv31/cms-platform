@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 13 | 8 | 24 |
+| Open | 0 | 3 | 12 | 8 | 23 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 22 | 5 | 47 |
+| Fixed | 1 | 19 | 23 | 5 | 48 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -795,7 +795,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H3 · Medium: Forked primitives
 
-- **Status:** Open
+- **Status:** Fixed. The segmented control (`Segmented`, `SegmentedRadio`), the tabs (`Tabs` on Base UI), the stat card's parts, the clipboard (`copyText`, `useCopy`) and `TeamIcon` each have one home in `src/components/primitives/`, channel names come from the domain's `CHANNEL_LABELS`, and `primitives/one-copy.test.ts` fails on a second copy of any of them ([decision 0030](decisions/0030-shared-primitives-have-one-home.md)).
 - **Where:** `src/components/preview/controls.tsx` line 20
 - **What happens:** The segmented control is copied four times, a stat card three times, tablists hand-rolled twice beside Base UI tabs, clipboard-with-fallback three times, channel label maps three times, team icon maps three times.
 - **Fix:** Promote each to `components/primitives` and delete the copies.

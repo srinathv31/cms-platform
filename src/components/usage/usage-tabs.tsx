@@ -1,11 +1,11 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Tab, TabList, TabPanel, Tabs } from "@/components/primitives/tabs";
 
-// Overview | Consumers. The tab idiom: text with the 2px dark underline on a hairline, like the
-// workspace tab bar. Both panels are rendered by the server and handed in; the inactive one is hidden,
-// so the consumers filter keeps its state while you look at the overview.
+// Overview | Consumers, the app's tabs (`Tabs`). Both panels are rendered by the server and handed in;
+// the inactive one is hidden, not unmounted, so the consumers filter keeps its state while you look at
+// the overview.
 
 type TabId = "overview" | "consumers";
 
@@ -36,57 +36,21 @@ export function UsageTabs({
     const query = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
   };
-  const base = useId();
-  const refs = useRef<Record<TabId, HTMLButtonElement | null>>({ overview: null, consumers: null });
-
-  function onKeyDown(event: React.KeyboardEvent, index: number) {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
-    const next = TABS[(index + step + TABS.length) % TABS.length];
-    choose(next.id);
-    refs.current[next.id]?.focus();
-  }
 
   return (
-    <>
-      <div role="tablist" aria-label="Usage" className="flex gap-7 border-b border-hairline">
-        {TABS.map((tab, i) => {
-          const active = tab.id === value;
-          return (
-            <button
-              key={tab.id}
-              ref={(el) => {
-                refs.current[tab.id] = el;
-              }}
-              id={`${base}-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls={`${base}-panel-${tab.id}`}
-              tabIndex={active ? 0 : -1}
-              onClick={() => choose(tab.id)}
-              onKeyDown={(e) => onKeyDown(e, i)}
-              className={cn("group/tab relative -mb-px flex h-11 cursor-pointer items-center text-[15px] outline-none", active ? "font-medium text-text" : "text-text-muted hover:text-text")}
-            >
-              <span className="-mx-1.5 rounded-md px-1.5 py-0.5 group-focus-visible/tab:ring-2 group-focus-visible/tab:ring-ring">{tab.label}</span>
-              {active ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text" /> : null}
-            </button>
-          );
-        })}
-      </div>
+    <Tabs value={value} onValueChange={choose}>
+      <TabList label="Usage" className="border-b border-hairline">
+        {TABS.map((tab) => (
+          <Tab key={tab.id} value={tab.id}>
+            {tab.label}
+          </Tab>
+        ))}
+      </TabList>
       {TABS.map((tab) => (
-        <div
-          key={tab.id}
-          role="tabpanel"
-          id={`${base}-panel-${tab.id}`}
-          aria-labelledby={`${base}-tab-${tab.id}`}
-          hidden={tab.id !== value}
-          className="mt-9"
-        >
+        <TabPanel key={tab.id} value={tab.id} keepMounted className="mt-9">
           {tab.id === "overview" ? overview : consumers}
-        </div>
+        </TabPanel>
       ))}
-    </>
+    </Tabs>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { TeamIcon } from "@/components/app-shell/team-icon";
+import { TeamIcon } from "@/components/primitives/team-icon";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { ACCESS_REFUSALS, ROLE_LABEL, rolesLabel } from "@/domain/access";
 import {

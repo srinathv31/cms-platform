@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Check } from "lucide-react";
 import { PageHeader } from "@/components/primitives/page-header";
-import { StatCard } from "@/components/primitives/stat-card";
+import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/components/primitives/stat-card";
 import { TemplateId } from "@/components/primitives/template-id";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { ShareRing } from "@/components/signature/share-ring";
@@ -102,22 +102,25 @@ export default function DesignPage() {
             </Group>
           </Section>
 
-          <Section id="stat-card" label="Stat cards" note="A tracked label over a regular-weight numeral.">
+          <Section id="stat-card" label="Stat cards" note="A regular-weight numeral over a tracked label.">
             <div className="grid gap-4 md:grid-cols-3">
-              <StatCard
-                label="Renders this month"
-                value={12480}
-                trend="12% this month"
-                footnote="Up from 11,140 in August"
-              />
-              <StatCard label="Templates" value={42} footnote="Across 3 teams" />
-              <StatCard
-                label="Revocations"
-                value={1}
-                trend="1 this quarter"
-                trendTone="negative"
-                footnote="Coral Offers"
-              />
+              <StatCard>
+                <StatValue value="12,480" trend={<StatTrend pct={12} />} />
+                <StatLabel tip="Live renders only." className="mt-3">
+                  Renders this month
+                </StatLabel>
+                <StatLines rows={[["August", "11,140"]]} />
+              </StatCard>
+              <StatCard>
+                <StatValue value="42" />
+                <StatLabel className="mt-3">Templates</StatLabel>
+                <StatLines rows={[["Teams", "3"]]} />
+              </StatCard>
+              <StatCard>
+                <StatValue value="1" trend={<StatTrend pct={-4.5} />} />
+                <StatLabel className="mt-3">Revocations</StatLabel>
+                <StatLines rows={[["Coral Offers", "1"]]} />
+              </StatCard>
             </div>
           </Section>
 

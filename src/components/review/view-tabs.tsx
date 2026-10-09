@@ -1,17 +1,13 @@
 "use client";
 
-import { m } from "motion/react";
-import { spring } from "@/components/motion/presets";
+import { Tab, TabList, Tabs } from "@/components/primitives/tabs";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 
-// The view tabs over the main pane, in the workspace tab bar's idiom (workspace-tabs.tsx): text only,
-// muted until chosen, then dark and medium with a 2px underline on the hairline that slides to the
-// next tab. Whatever sits at the right of the bar belongs to the view (the change switches on the
-// document, the sample sets on the output), 32px tall like every control.
-
-const TAB = "group/tab relative -mb-px flex h-11 items-center text-[15px] outline-none";
-const LABEL = "-mx-1.5 rounded-md px-1.5 py-0.5 group-focus-visible/tab:ring-2 group-focus-visible/tab:ring-ring";
+// The view tabs over the main pane: the app's tabs (`Tabs`), with the underline sliding to the next
+// tab. The panels aren't beside the bar (the document and the output are cells of the review grid, and
+// the output is built the first time it is looked at), so each tab names its panel itself. Whatever sits
+// at the right of the bar belongs to the view (the change switches on the document, the sample sets on
+// the output), 32px tall like every control.
 
 export type ReviewView = "document" | "preview";
 
@@ -31,41 +27,21 @@ export function ViewTabs({
   previewMounted: boolean;
 }) {
   return (
-    <div role="tablist" aria-label="View" className="flex gap-7">
-      {TABS.map((tab) => {
-        const active = tab.id === value;
-        return (
-          <button
+    <Tabs value={value} onValueChange={onChange}>
+      <TabList label="View">
+        {TABS.map((tab) => (
+          <Tab
             key={tab.id}
-            type="button"
-            role="tab"
+            value={tab.id}
+            // The panels (document-view.tsx, preview-view.tsx) are labelled by these ids.
             id={`review-tab-${tab.id}`}
-            aria-selected={active}
             aria-controls={tab.id === "preview" && !previewMounted ? undefined : `review-panel-${tab.id}`}
-            tabIndex={active ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            onKeyDown={(event) => {
-              // Arrow keys move between the two tabs (a tablist's own keyboard model).
-              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-              event.preventDefault();
-              const next = TABS[(TABS.findIndex((t) => t.id === tab.id) + 1) % TABS.length].id;
-              onChange(next);
-              requestAnimationFrame(() => document.getElementById(`review-tab-${next}`)?.focus());
-            }}
-            className={cn(TAB, active ? "font-medium text-text" : "text-text-muted hover:text-text")}
           >
-            <span className={LABEL}>{tab.label}</span>
-            {active ? (
-              <m.span
-                layoutId="review-tab-underline"
-                transition={spring.soft}
-                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text"
-              />
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
+            {tab.label}
+          </Tab>
+        ))}
+      </TabList>
+    </Tabs>
   );
 }
 

@@ -90,7 +90,16 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
 | `useActionRun`, `runAction` | [use-action-run.ts](primitives/use-action-run.ts) | Running a server action: one at a time, in a transition, with the refusal's sentence (`error`) and `onOk` / `onRefused`. A call that throws becomes the code `failed` with the screen's sentence; Next's redirect is handed back to Next (client). |
 | `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, the Versions tab's passed sunset (client). |
-| `StatCard` | [stat-card.tsx](primitives/stat-card.tsx) | Caps label over a big numeral. Only `/design` uses it today (see [Don't copy](#dont-copy)). |
+| `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon); `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
+| `Tabs`, `TabList`, `Tab`, `TabPanel`, `TabUnderline` | [tabs.tsx](primitives/tabs.tsx), [tab-styles.ts](primitives/tab-styles.ts) | View switches in the page: Base UI Tabs in the workspace tab bar's look (15px text, the 2px underline sliding on a hairline, the ring round the label). Usage, the review's Document and Preview, the review queue. Links that look like tabs (`workspace/workspace-tabs.tsx`) and skeletons take the classes from `tab-styles.ts`, which a server component can import. Client. |
+| `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |
+| `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
+| `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
+
+A channel's name ("PDF", "Web", "Email") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere.
+[primitives/one-copy.test.ts](primitives/one-copy.test.ts) fails when a component pastes a second copy of one of
+these (the segmented track, a hand-rolled tablist, the clipboard, the stat numeral, the team icons, a channel label
+map).
 
 The `/design` gallery (`src/app/(dev)/design`) imports these, so a change shows there too. It also holds mock
 forks of real components on fixtures (its own `AuditTable`, `ThreadCard`, `GoLive`, preview controls, and usage
@@ -216,18 +225,18 @@ focuses registers the same way.
 | Update optimistically | [comments/use-review-threads.ts](comments/use-review-threads.ts) with [thread-list.tsx](comments/thread-list.tsx) | Pure reducer in `thread-state.ts`, tested. |
 | Stream a section | [versions/page.tsx](../app/(product)/[team]/templates/[templateId]/versions/page.tsx) with [versions-content.tsx](versions/versions-content.tsx) | Skeleton and content share `TOOLBAR`. |
 | Stream viewer-dependent parts into a static frame | [app-shell/app-frame.tsx](app-shell/app-frame.tsx) with [sidebar-holes.tsx](app-shell/sidebar-holes.tsx) | |
-| Animate a tab underline | [workspace/workspace-tabs.tsx](workspace/workspace-tabs.tsx) | `m.span` with `layoutId`, `spring.soft`, `LinkPendingLabel`, matching skeleton. |
+| Switch views with tabs | `UsageTabs` in [usage/usage-tabs.tsx](usage/usage-tabs.tsx) | `Tabs` from `primitives/tabs.tsx`, panels kept mounted, the tab in `?tab=` by `replaceState`; the skeleton uses `tab-styles.ts`. |
+| Make links look like tabs | [workspace/workspace-tabs.tsx](workspace/workspace-tabs.tsx) | Routes in a `nav`: the `tab-styles.ts` classes, `TabUnderline` with a `layoutId`, `LinkPendingLabel`, matching skeleton. |
 | Load heavy code on demand | [versions/compare-dialog.tsx](versions/compare-dialog.tsx), [preview/pdf/load-pdfjs.ts](preview/pdf/load-pdfjs.ts) | `React.lazy` for a panel; dynamic `import()` for a library. |
 | Load data when a dialog opens | [versions/compare-panel.tsx](versions/compare-panel.tsx) | `readTemplate()` in an effect, a key per request so a late answer is dropped, Try again on failure. |
 
 ## Don't copy
 
-- **Segmented controls.** `preview/controls.tsx` keeps `Segmented` private, so its class strings are pasted into
-  `usage/consumers-table.tsx` and `integration/contract-changes.tsx`, and restyled as a radio group in
-  `access/role-picker.tsx`. Export the one in `preview/controls.tsx` (or move it to `primitives/`) instead of a fifth copy.
-- **Copied helpers.** `andList` in `access/format.ts` repeats `joinWithAnd`; a clipboard fallback is in both
-  `primitives/template-id.tsx` and `integration/copy-button.tsx`. Dates, "3 days ago", counts and plurals have one
-  home each: `formatShortDate`, `formatAgo` and the rest in `src/domain/dates.ts`, `formatCount` in
+- **Tabs styled by hand.** `preview/rail-header.tsx` (14px, in the rail) and `integration/sample-request.tsx` (13px,
+  curl | fetch) use Base UI Tabs with their own classes at their own sizes. Build a new view switch with `Tabs` from
+  `primitives/tabs.tsx`.
+- **Copied helpers.** `andList` in `access/format.ts` repeats `joinWithAnd`. Dates, "3 days ago", counts and plurals
+  have one home each: `formatShortDate`, `formatAgo` and the rest in `src/domain/dates.ts`, `formatCount` in
   `src/domain/numbers.ts`, `plural` in `src/domain/plural.ts`. A screen picks `formatAgo`'s options (or names them
   once, as `formatLastRender` in `usage/format.ts` does for a render's time); it never counts days itself.
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`. Have the
@@ -235,8 +244,6 @@ focuses registers the same way.
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
   and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
   `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.
-- **Stat cards.** `primitives/stat-card.tsx` is used only by `/design`. The Usage screens build theirs from
-  `usage/stat.tsx`, and `settings/team/recertification-view.tsx` has a private `StatCard`.
 - **Dead or off-contract.** `app-shell/page-placeholder.tsx` has no importers. `workspace/save-status.tsx` imports
   `@/editor/lib/platform`, which is not in the editor's public API.
 

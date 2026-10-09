@@ -5,7 +5,7 @@ import { Bell, CircleHelp, Clapperboard, Download, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { NAV_ICON_STROKE, NAV_ITEMS, NAV_ROW } from "@/components/app-shell/nav";
-import { TeamIcon } from "@/components/app-shell/team-icon";
+import { TeamIcon } from "@/components/primitives/team-icon";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { Shortcut } from "@/components/primitives/keycap";
 import { PageHeader } from "@/components/primitives/page-header";

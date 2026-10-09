@@ -3,13 +3,10 @@
 import { Check, FileText, Globe, Mail, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CHANNEL_LABELS } from "@/domain/render/errors";
 import { CHANNELS, type Channel } from "@/domain/types";
 
-const META: Record<Channel, { label: string; Icon: LucideIcon }> = {
-  pdf: { label: "PDF", Icon: FileText },
-  web: { label: "Web", Icon: Globe },
-  email: { label: "Email", Icon: Mail },
-};
+const ICON: Readonly<Record<Channel, LucideIcon>> = { pdf: FileText, web: Globe, email: Mail };
 
 const CHIP =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium [&_svg]:size-3.5";
@@ -37,7 +34,8 @@ export function ChannelSelector({
     return (
       <ul aria-label="Channels" className="flex items-center gap-1">
         {CHANNELS.filter((id) => channels.includes(id)).map((id) => {
-          const { label, Icon } = META[id];
+          const label = CHANNEL_LABELS[id];
+          const Icon = ICON[id];
           return (
             <li key={id} className={cn(CHIP, "border-transparent bg-selected text-text")}>
               <Icon aria-hidden strokeWidth={1.75} />
@@ -64,7 +62,8 @@ export function ChannelSelector({
       spacing={1}
     >
       {CHANNELS.filter((id) => allowed.includes(id)).map((id) => {
-        const { label, Icon } = META[id];
+        const label = CHANNEL_LABELS[id];
+        const Icon = ICON[id];
         const pressed = on.includes(id);
         return (
           <ToggleGroupItem

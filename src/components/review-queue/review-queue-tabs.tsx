@@ -3,13 +3,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { Tabs } from "@base-ui/react/tabs";
-import { m } from "motion/react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { spring } from "@/components/motion/presets";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { StatusBadge } from "@/components/primitives/status-badge";
+import { Tab, TabList, TabPanel, Tabs } from "@/components/primitives/tabs";
 import { BreakingBadge } from "./breaking-badge";
 import {
   COLUMNS,
@@ -22,7 +20,7 @@ import {
   ROW_HEIGHT,
 } from "./columns";
 import { defaultTab, parseTab, type QueueRowView, type QueueTab, type QueueTabKey } from "./format-row";
-import { TAB, TAB_BAR, TAB_CONTENT } from "./tab-styles";
+import { TAB_BAR } from "./tab-styles";
 
 function ListHeader({ decided }: { decided: boolean }) {
   return (
@@ -124,33 +122,17 @@ export function ReviewQueueTabs({ tabs, showTeam }: { tabs: QueueTab[]; showTeam
   }
 
   return (
-    <Tabs.Root value={value} onValueChange={(next) => select(next as QueueTabKey)}>
-      <Tabs.List aria-label="Review queue" activateOnFocus className={TAB_BAR}>
-        {tabs.map((tab) => {
-          const active = tab.key === value;
-          return (
-            <Tabs.Tab
-              key={tab.key}
-              value={tab.key}
-              className={cn(TAB, active ? "font-medium text-text" : "text-text-muted hover:text-text")}
-            >
-              <span className={TAB_CONTENT}>
-                {tab.label}
-                <span className="text-text-muted tabular-nums">{tab.rows.length}</span>
-              </span>
-              {active ? (
-                <m.span
-                  layoutId="review-tab-underline"
-                  transition={spring.soft}
-                  className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text"
-                />
-              ) : null}
-            </Tabs.Tab>
-          );
-        })}
-      </Tabs.List>
+    <Tabs value={value} onValueChange={select}>
+      <TabList label="Review queue" className={TAB_BAR}>
+        {tabs.map((tab) => (
+          <Tab key={tab.key} value={tab.key}>
+            {tab.label}
+            <span className="text-text-muted tabular-nums">{tab.rows.length}</span>
+          </Tab>
+        ))}
+      </TabList>
       {tabs.map((tab) => (
-        <Tabs.Panel key={tab.key} value={tab.key} tabIndex={-1} className="outline-none">
+        <TabPanel key={tab.key} value={tab.key}>
           {tab.rows.length > 0 ? (
             <>
               <ListHeader decided={tab.key === "decided"} />
@@ -163,8 +145,8 @@ export function ReviewQueueTabs({ tabs, showTeam }: { tabs: QueueTab[]; showTeam
           ) : (
             <p className="py-10 text-[14px] text-text-muted">{tab.empty}</p>
           )}
-        </Tabs.Panel>
+        </TabPanel>
       ))}
-    </Tabs.Root>
+    </Tabs>
   );
 }

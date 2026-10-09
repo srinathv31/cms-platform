@@ -1,8 +1,9 @@
 import type { IntegrationPanelData } from "@/domain/golive-types";
+import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { CodeBlock } from "./code-block";
 
-const NAME: Record<Channel | "base64", string> = { pdf: "PDF", web: "Web", email: "Email", base64: "Base64" };
+const NAME: Readonly<Record<Channel | "base64", string>> = { ...CHANNEL_LABELS, base64: "Base64" };
 
 /** What comes back on a 200 for each enabled channel (and the base64 opt-in), then the errors worth handling. */
 export function Responses({

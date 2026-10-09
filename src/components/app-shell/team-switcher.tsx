@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { SpaceNav } from "@/server/queries/spaces";
-import { TeamIcon } from "./team-icon";
+import { TeamIcon } from "@/components/primitives/team-icon";
 
 /** Top of the sidebar: the current team (or "All teams") with a dropdown of every space the viewer has. */
 export function TeamSwitcher({ spaces }: { spaces: SpaceNav[] }) {
