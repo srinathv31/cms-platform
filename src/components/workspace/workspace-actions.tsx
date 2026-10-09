@@ -17,9 +17,9 @@ import type { SubmitSummary } from "@/components/submit/types";
 import { usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
 
 /**
- * "Edit" on an Active template: the one black button. It opens the template's draft (creating it
- * from the Active version if there isn't one), and the page then shows that draft, editable. The
- * action redirects, so the transition stays pending until the new page is up.
+ * "Edit" on a template whose latest version is Active or Revoked: the one black button. It opens the
+ * template's draft (creating it from that version if there isn't one), and the page then shows that
+ * draft, editable. The action redirects, so the transition stays pending until the new page is up.
  */
 export function EditButton({ templateId }: { templateId: string }) {
   const [pending, startTransition] = useTransition();

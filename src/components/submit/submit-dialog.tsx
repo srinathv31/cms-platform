@@ -77,10 +77,10 @@ export interface SubmitDialogProps {
 
 /**
  * "Submit v{N} for review": what is about to be frozen (channels, sample data sets, and the contract
- * changes against the Active version), an optional note to the reviewers, and the screen's one black
- * button. A refusal shows its reason at the button and the dialog stays; success closes it, and the
- * page behind re-renders in place as In review. Focus starts in the note; Enter there is a new line and
- * ⌘Enter (Ctrl+Enter) submits.
+ * changes against the newest version that still renders), an optional note to the reviewers, and the
+ * screen's one black button. A refusal shows its reason at the button and the dialog stays; success
+ * closes it, and the page behind re-renders in place as In review. Focus starts in the note; Enter there
+ * is a new line and ⌘Enter (Ctrl+Enter) submits.
  *
  * The shell is the one every action dialog has: 512px wide, 32px padding, the title, a one-line
  * description, the body, and a footer with an outline Cancel and the primary. No Close X (Esc and Cancel

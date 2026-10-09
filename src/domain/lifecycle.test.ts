@@ -8,8 +8,9 @@ import {
   approve,
   cancelRevoke,
   confirmRevoke,
+  contractBaseline,
   createDraft,
-  editActive,
+  editLatest,
   initialTemplateName,
   isAfterToday,
   planDraftStart,
@@ -202,7 +203,26 @@ describe("planDraftStart", () => {
     ).toEqual({ kind: "blocked", reason: "A newer version is in review." });
   });
 
-  it.each(["in_review", "changes_requested", "revoked", "superseded"] as const)(
+  // Handoff review D1: revoking the Active version used to leave nothing anyone could edit.
+  it("copies the revoked version when the Active one was revoked and nothing newer exists", () => {
+    expect(planDraftStart([v("v1", "superseded", 1), v("v2", "revoked", 2)])).toEqual({ kind: "create", from: "v2" });
+    expect(planDraftStart([v("v1", "revoked", 1)])).toEqual({ kind: "create", from: "v1" });
+    expect(planDraftStart([v("v1", "revoked", 1), v("v2", "revoked", 2)])).toEqual({ kind: "create", from: "v2" });
+  });
+
+  it("still goes to the open draft after a revoke, and copies the Active version over an older revoked one", () => {
+    expect(planDraftStart([v("v1", "revoked", 1), v("d1", "draft", null)])).toEqual({ kind: "open", versionId: "d1" });
+    expect(planDraftStart([v("v1", "revoked", 1), v("v2", "active", 2)])).toEqual({ kind: "create", from: "v2" });
+  });
+
+  it("refuses a revoked version while a newer one is in review", () => {
+    expect(planDraftStart([v("v1", "revoked", 1), v("v2", "in_review", 2)])).toEqual({
+      kind: "blocked",
+      reason: "A newer version is in review.",
+    });
+  });
+
+  it.each(["in_review", "changes_requested", "superseded"] as const)(
     "refuses when the only version is %s",
     (state) => {
       expect(planDraftStart([v("v1", state, 1)]).kind).toBe("blocked");
@@ -214,7 +234,7 @@ describe("planDraftStart", () => {
   });
 });
 
-describe("editActive", () => {
+describe("editLatest", () => {
   const active: VersionSnapshot = {
     id: "v_active",
     number: 3,
@@ -228,7 +248,7 @@ describe("editActive", () => {
   };
 
   it("copies body, variables, channels, email fields and sample sets into a draft", () => {
-    const { changes } = editActive({ active, createdBy: "priya", now: NOW });
+    const { changes } = editLatest({ from: active, createdBy: "priya", now: NOW });
     expect(changes.draft).toEqual({
       state: "draft",
       number: null,
@@ -251,18 +271,18 @@ describe("editActive", () => {
   });
 
   it("keeps every block id, so comment threads and the redline stay anchored", () => {
-    const { changes } = editActive({ active, createdBy: "priya", now: NOW });
+    const { changes } = editLatest({ from: active, createdBy: "priya", now: NOW });
     const ids = (changes.draft.body.content ?? []).map((b) => b.attrs?.id);
     expect(ids).toEqual(["b_one", "b_two", "b_three", "b_four"]);
   });
 
   it("records which version number the draft is based on", () => {
-    const { effects } = editActive({ active, createdBy: "priya", now: NOW });
+    const { effects } = editLatest({ from: active, createdBy: "priya", now: NOW });
     expect(effects).toEqual([{ kind: "audit", action: "draft.started", details: { basedOn: 3 } }]);
   });
 
   it("copies, so editing the draft never changes the Active version", () => {
-    const { changes } = editActive({ active, createdBy: "priya", now: NOW });
+    const { changes } = editLatest({ from: active, createdBy: "priya", now: NOW });
     changes.draft.channels.push("pdf");
     changes.draft.variables[1]!.required = false;
     changes.draft.sampleSets[2]!.values.purchase_apr = "0.01";
@@ -273,14 +293,71 @@ describe("editActive", () => {
     expect(BODY.content![1]!.content![0]!.text).toBe("Hi ");
   });
 
-  it.each(["draft", "in_review", "changes_requested", "superseded", "revoked"] as const)(
+  it("copies a revoked version the same way: the corrected draft is based on it, with its block ids", () => {
+    const revoked: VersionSnapshot = { ...active, id: "v_revoked", state: "revoked" };
+    const { changes, effects } = editLatest({ from: revoked, createdBy: "maya", now: NOW });
+    expect(changes.draft).toMatchObject({
+      state: "draft",
+      number: null,
+      basedOnVersionId: "v_revoked",
+      body: BODY,
+      emailSubject: active.emailSubject,
+      channels: ["pdf", "web", "email"],
+      variables: VARIABLES,
+      sampleSets: SAMPLE_SETS,
+      contractChanges: null,
+      createdBy: "maya",
+    });
+    expect((changes.draft.body.content ?? []).map((b) => b.attrs?.id)).toEqual(["b_one", "b_two", "b_three", "b_four"]);
+    expect(effects).toEqual([{ kind: "audit", action: "draft.started", details: { basedOn: 3 } }]);
+  });
+
+  it.each(["draft", "in_review", "changes_requested", "superseded"] as const)(
     "refuses to copy a %s version",
     (state) => {
-      expect(() => editActive({ active: { ...active, state }, createdBy: "priya", now: NOW })).toThrow(
+      expect(() => editLatest({ from: { ...active, state }, createdBy: "priya", now: NOW })).toThrow(
         LifecycleError,
       );
     },
   );
+});
+
+describe("contractBaseline", () => {
+  const DAY = 86_400_000;
+  const v = (id: string, state: VersionState, number: number | null, sunsetAt: Date | null = null) => ({
+    id,
+    state,
+    number,
+    sunsetAt,
+  });
+  const later = new Date(NOW.getTime() + 30 * DAY);
+  const passed = new Date(NOW.getTime() - DAY);
+
+  it("is the Active version when there is one, whatever is newer or older", () => {
+    expect(
+      contractBaseline([v("v1", "superseded", 1, later), v("v2", "active", 2), v("v3", "in_review", 3), v("d", "draft", null)], NOW)?.id,
+    ).toBe("v2");
+    expect(contractBaseline([v("v1", "revoked", 1), v("v2", "active", 2)], NOW)?.id).toBe("v2");
+  });
+
+  it("after the Active version is revoked, is the newest Superseded version that still renders", () => {
+    const list = [v("v1", "superseded", 1, later), v("v2", "superseded", 2), v("v3", "revoked", 3), v("d", "draft", null)];
+    expect(contractBaseline(list, NOW)?.id).toBe("v2");
+  });
+
+  it("skips a Superseded version whose sunset has passed, to the next newest that still renders", () => {
+    const list = [v("v1", "superseded", 1, later), v("v2", "superseded", 2, passed), v("v3", "revoked", 3)];
+    expect(contractBaseline(list, NOW)?.id).toBe("v1");
+    // At the sunset's own instant it has passed, as the render rule says.
+    expect(contractBaseline([v("v1", "superseded", 1, NOW), v("v2", "revoked", 2)], NOW)).toBeNull();
+  });
+
+  it("is null when nothing renders: no versions, only drafts, or everything revoked or past its sunset", () => {
+    expect(contractBaseline([], NOW)).toBeNull();
+    expect(contractBaseline([v("d", "draft", null)], NOW)).toBeNull();
+    expect(contractBaseline([v("v1", "superseded", 1, passed), v("v2", "revoked", 2), v("d", "draft", null)], NOW)).toBeNull();
+    expect(contractBaseline([v("v1", "changes_requested", 1), v("v2", "in_review", 2)], NOW)).toBeNull();
+  });
 });
 
 describe("submit", () => {
@@ -1508,7 +1585,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("Priya started the draft and someone else submitted it: she can't decide it", () => {
     const active = { ...reviewVersion({ state: "active" }), writers: ["eli"] };
-    const { draft } = editActive({ active, createdBy: "priya", now: NOW }).changes;
+    const { draft } = editLatest({ from: active, createdBy: "priya", now: NOW }).changes;
     const v2 = submitAs({ ...draft, writers: withWriter(draft.writers, "maya") }, "maya", 1);
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
   });
@@ -1551,7 +1628,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("a draft from the Active version starts afresh: writing v1 doesn't keep anyone from deciding v2", () => {
     const active = { ...reviewVersion({ state: "active" }), writers: ["maya", "priya"] };
-    const { draft } = editActive({ active, createdBy: "maya", now: NOW }).changes;
+    const { draft } = editLatest({ from: active, createdBy: "maya", now: NOW }).changes;
     const v2 = submitAs(draft, "maya", 1);
     expect(v2.writers).toEqual(["maya"]);
     expect(decide(v2, "priya").approve.ok).toBe(true);

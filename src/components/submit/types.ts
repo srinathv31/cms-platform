@@ -14,6 +14,6 @@ export interface SubmitSummary {
   /** Names of every sample data set, defaults first. */
   sampleSetNames: string[];
   variables: Variable[];
-  /** The Active version the contract is compared with; null when nothing is Active yet. */
+  /** The version the contract is compared with (`contractBaseline`: the newest that still renders); null when none does. */
   baseline: { number: number; variables: Variable[] } | null;
 }

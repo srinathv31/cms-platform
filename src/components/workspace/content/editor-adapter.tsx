@@ -26,7 +26,7 @@ import type { CommentRequest, DocumentEditorHandle, EditorHistory, ThreadAnchor 
 export interface EditorScopeProps {
   /** The template's variable list (the consumer contract); the root owns it from the first render. */
   variables: Variable[];
-  /** The Active version's variables, for contract flags on a draft of a live template. */
+  /** The variables of the newest version that still renders, for contract flags on a draft; null when none does. */
   baseline: Variable[] | null;
   requiredSections: RequiredSection[];
   readOnly: boolean;

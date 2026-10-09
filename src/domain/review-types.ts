@@ -275,7 +275,10 @@ export interface ReviewScreenData {
     /** Plain-English lines from domain/contract.ts: "v2 adds required `annual_fee` (Currency)." */
     contractLines: string[];
   };
-  /** The Active version, for the redline and the contract. Null when nothing is Active yet. */
+  /**
+   * The Active version, for the redline and the sunset the Approve dialog offers. Null when nothing is
+   * Active (a first version, or after a revoke). The contract changes come from submit (`contractBaseline`).
+   */
   baseline: { id: string; number: number; body: JSONContent; variables: Variable[] } | null;
   steps: StepView[];
   threads: ThreadView[];

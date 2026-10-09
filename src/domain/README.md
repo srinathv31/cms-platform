@@ -42,7 +42,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Vocabulary | [types.ts](types.ts) | `VersionState`, `Channel`, roles, `Viewer`, the permission `Action` list, `DraftPatch`. Re-exports the editor model's `Variable` and `ContractChange`. |
 | | [status.ts](status.ts) | Label, tone, and icon for each version state. |
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
-| Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editActive`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. |
+| Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with. |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, for the review screen. |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
@@ -69,23 +69,24 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
 | Variable | `{ key, label, type, required, sample }`, shown as a chip. Keys are snake_case and unique per template. | `Variable` |
 | Consumer contract | A version's variable list: what a consumer sends to render it. | [contract.ts](contract.ts), [golive/json-schema.ts](golive/json-schema.ts) |
-| Breaking change | A change that breaks consumers of the Active version: a required variable added, a variable removed, a key renamed, a type changed, an optional one made required. `submit` stores the diff as `contractChanges`. | `diffVariables`, `isBreaking` |
+| Contract baseline | The version a draft's variable list is compared with: the newest one that still renders. The Active version; with none (it was revoked), the highest-numbered Superseded version whose sunset hasn't passed; null when nothing renders, as for a first version ([decision 0007](../../docs/decisions/0009-correct-a-revoked-version-from-its-content.md)). | `contractBaseline` |
+| Breaking change | A change that breaks consumers of the baseline: a required variable added, a variable removed, a key renamed, a type changed, an optional one made required. `submit` stores the diff as `contractChanges`. | `diffVariables`, `isBreaking` |
 | Consumer | A registered system (`consumers` table; the simulator plays `coral`) that calls `/api/v1` with `X-Consumer-Id` and pins a version number. It receives notices: `new_version`, `sunset_scheduled`, `revoked`. | [golive/](golive/) |
 | Channel | `pdf`, `web`, or `email`. The content type allows it; the version turns it on. New templates start with `DEFAULT_CHANNELS` (`pdf`, `web`). | `CHANNELS` |
 | Approval chain | Ordered `ApprovalStage`s per content type, stored as configuration. A stage's rule names a team role or one user. A version's `currentStage` indexes it. | [approval-chain.ts](approval-chain.ts) |
 | Viewer, persona | `Viewer` is who is acting, built per request from the `ucomp_persona` cookie ([viewer.ts](../server/viewer.ts)). Personas are seeded people ([people.ts](../server/seed/people.ts)). | `Viewer` |
 | Roles | Team roles `viewer`, `author`, `approver`, `team_admin`, held through a membership that is `active`, `suspended`, or `lapsed`. Platform roles `platform_admin` and `auditor` (read-only everywhere). | [types.ts](types.ts) |
 | `can()` | The one permission check: role grants, then guards (maker-checker, two-person revoke, your own access request, your own access). | [permissions.ts](permissions.ts) |
-| Writers | Everyone who wrote a version: whoever started its draft, everyone whose autosave landed, the submitter, and for a draft a change request opened, the writers of the version sent back. A draft from the Active version starts afresh. Maker-checker bars all of them from deciding it, and a team-role stage doesn't ask them to review it ([decision 0007](../../docs/decisions/0007-maker-checker-covers-every-writer.md)). | `DraftFields.writers`, `withWriter`, `makerCheckerRefusal`, `stageRecipients` |
+| Writers | Everyone who wrote a version: whoever started its draft, everyone whose autosave landed, the submitter, and for a draft a change request opened, the writers of the version sent back. A draft that Edit starts (from the Active or Revoked version) starts afresh. Maker-checker bars all of them from deciding it, and a team-role stage doesn't ask them to review it ([decision 0007](../../docs/decisions/0007-maker-checker-covers-every-writer.md)). | `DraftFields.writers`, `withWriter`, `makerCheckerRefusal`, `stageRecipients` |
 | Effects | Side records a rule asks for: audit events, notifications, and consumer notices (`LifecycleEffect`), or audit events and notifications (`AccessEffect`). | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts) |
 
 The lifecycle, as [lifecycle.ts](lifecycle.ts) implements it:
 
 ```text
-createDraft | editActive (from Active) | requestChanges   → draft
+createDraft | editLatest (latest Active or Revoked) | requestChanges   → draft
 draft        submit                                       → in_review (numbered)
 in_review    approve, earlier stage                       → in_review, currentStage + 1
-in_review    approve, last stage                          → active; the previous active → superseded
+in_review    approve, last stage                          → active; the previous active, if any → superseded
 in_review    requestChanges                               → changes_requested, plus a new draft
 superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
@@ -160,9 +161,9 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Don't copy
 
-- **Throwing for an expected outcome.** `editActive` throws `LifecycleError` for a version that isn't Active, and
-  the `startDraft` and `createTemplate` actions throw `Error`. Return `Outcome<T>` with a sentence instead; throw
-  only for bugs.
+- **Throwing for an expected outcome.** `editLatest` throws `LifecycleError` for a version that isn't Active or
+  Revoked, and the `startDraft` and `createTemplate` actions throw `Error`. Return `Outcome<T>` with a sentence
+  instead; throw only for bugs.
 - **A third `Ok` / `Refused`.** Identical pairs exist in [lifecycle.ts](lifecycle.ts) and
   [access-types.ts](access-types.ts). Import one of them.
 - **Dates through `render/errors`.** `lifecycle.ts`, `access.ts`, `activity.ts`, `audit.ts`, `consequences.ts`,

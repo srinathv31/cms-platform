@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { Channel, JSONContent, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
 import { now } from "@/server/clock";
@@ -37,7 +38,10 @@ export interface WorkspaceHeaderData {
   canEdit: boolean;
   /** The shown version is an open draft and the viewer can edit it (the name is a field, autosave runs). */
   editable: boolean;
-  /** "Edit" is offered: the latest version is Active, there's no open draft, and the viewer can edit. */
+  /**
+   * "Edit" is offered: there's no open draft, the latest version is Active or Revoked (`planDraftStart`),
+   * and the viewer can edit.
+   */
   canStartDraft: boolean;
   /** "Submit for review" is offered: the shown version is an open draft and the viewer may submit it. */
   canSubmit: boolean;
@@ -101,7 +105,7 @@ export const getWorkspaceHeader = cache(
       versionNumber,
       canEdit,
       editable: canEdit && latest?.state === "draft",
-      canStartDraft: canEdit && latest?.state === "active",
+      canStartDraft: canEdit && planDraftStart(list).kind === "create",
       canSubmit: latest?.state === "draft" && can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
     };
   },
@@ -119,7 +123,10 @@ export interface WorkspaceDocumentData {
   rev: number;
   body: JSONContent;
   variables: Variable[];
-  /** The Active version's variables when the shown version is a draft of a live template (contract flags). */
+  /**
+   * When the shown version is a draft: the variables of the newest version that still renders
+   * (`contractBaseline`), for the contract flags. Null when none does.
+   */
   baseline: Variable[] | null;
   channels: Channel[];
   /** The channels the content type allows: what the Channels selector offers. */
@@ -177,8 +184,8 @@ export const getWorkspaceDocument = cache(
 
     const shown = pickLatest(list);
     if (!shown) notFound();
-    const active = list.find((v) => v.state === "active");
-    const today = (await now()).toISOString().slice(0, 10);
+    const at = await now();
+    const today = at.toISOString().slice(0, 10);
     const threads = await loadThreads(header.id, shown.body);
     const importOriginal = await getImportOriginalRef(header.id);
 
@@ -190,7 +197,7 @@ export const getWorkspaceDocument = cache(
       rev: shown.rev,
       body: shown.body,
       variables: shown.variables,
-      baseline: shown.state === "draft" && active ? active.variables : null,
+      baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
       emailSubject: shown.emailSubject,

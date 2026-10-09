@@ -107,8 +107,8 @@ const handle = (code: ApiErrorCode, when: string) => ({ status: API_ERROR_STATUS
 
 /** The errors worth handling, for the panel's short table. */
 export const CONSUMER_ERRORS: readonly { status: number; code: ApiErrorCode; when: string }[] = [
-  handle("version_sunset", "The version's sunset date has passed. Move to the Active version."),
-  handle("version_revoked", "The version was revoked. Move to the Active version."),
+  handle("version_sunset", "The version's sunset date has passed. Move to the Active version, or wait for a new one if none is Active."),
+  handle("version_revoked", "The version was revoked. Move to the Active version, or wait for a new one if none is Active."),
   handle("missing_variables", "A required variable has no value."),
   handle("invalid_values", "A value doesn't fit its variable's type."),
   handle("channel_not_enabled", "The version doesn't render to that channel."),

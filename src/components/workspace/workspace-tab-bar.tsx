@@ -37,9 +37,9 @@ export function WorkspaceTabBar({ params }: { params: Params }) {
 /**
  * The outline Preview toggle (any version the viewer can see; it shows on the Content tab only), then
  * the one black button the state calls for: Submit for review on a draft the viewer can submit, Edit
- * on an Active template the viewer can edit. Anyone else, and every other state, shows no black
- * button rather than a dead one. They stream in together, so Preview doesn't shift when the black
- * button arrives.
+ * on a template whose latest version is Active or Revoked, for a viewer who can edit. Anyone else, and
+ * every other state, shows no black button rather than a dead one. They stream in together, so
+ * Preview doesn't shift when the black button arrives.
  */
 async function TemplateActions({ params }: { params: Params }) {
   const { team, templateId } = await params;

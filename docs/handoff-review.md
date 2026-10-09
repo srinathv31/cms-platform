@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 8 | 30 | 13 | 51 |
+| Open | 0 | 7 | 30 | 13 | 50 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 14 | 5 | 1 | 21 |
+| Fixed | 1 | 15 | 5 | 1 | 22 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -237,7 +237,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D1 · High: Revoking the live version freezes the template for good
 
-- **Status:** Open
+- **Status:** Fixed. When the latest version is Revoked, Edit starts the corrected draft from its content, and contract changes compare with the newest version that still renders (`contractBaseline`), or none when nothing does ([decision 0007](decisions/0009-correct-a-revoked-version-from-its-content.md)).
 - **Where:** `src/domain/lifecycle.ts` line 198; `src/domain/lifecycle.test.ts` line 203
 - **What happens:** Revoke is allowed on the Active version, the emergency case for wrong legal text. Afterwards `planDraftStart` finds the latest version revoked and refuses with "Only an Active template can be edited." Nobody can make the corrected draft. A test asserts this behavior; the demo only revokes Superseded versions, so it never shows.
 - **Fix:** Product call needed: allow a new draft from the revoked or latest released content, using the newest version that still renders as the contract baseline. Update the test.
@@ -335,7 +335,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I2 · High: The revert toast's Undo overwrites edits made after the revert
 
-- **Status:** Fixed. The session counts edits, `restore` refuses once anything was edited since the revert or a field it would put back is off screen, and the toast goes at that moment ([decision 0005](decisions/0005-revert-undo-goes-when-anything-changes.md)).
+- **Status:** Fixed. The session counts edits, `restore` refuses once anything was edited since the revert or a field it would put back is off screen, and the toast goes at that moment ([decision 0007](decisions/0005-revert-undo-goes-when-anything-changes.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 171; `src/components/workspace/session/session-store.ts` line 369
 - **What happens:** Undo stays live for the toast's lifetime and `restore(previous)` applies the pre-revert values unconditionally. Revert, type a paragraph, click Undo: the paragraph is gone, and the remount already wiped the editor's history. If the author switched tabs first, `restore` sends content the hidden editor doesn't show, and the next keystroke saves the reverted content over it. New in the undo/redo merge.
 - **Fix:** Track a save generation and make `restore` refuse (and dismiss the toast) when anything was edited since, or when not every field is on screen.
@@ -343,7 +343,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I3 · High: Renaming a variable with Email off orphans its chips in the subject
 
-- **Status:** Fixed. With Email off the Email details fields stay mounted, hidden (`InlineVariableField` takes `hidden`; the root still counts them and sends renames and deletes to them, but insert, undo and redo pass them by), so the subject follows a rename and saves it ([decision 0004](decisions/0004-email-fields-hidden-not-unmounted.md)).
+- **Status:** Fixed. With Email off the Email details fields stay mounted, hidden (`InlineVariableField` takes `hidden`; the root still counts them and sends renames and deletes to them, but insert, undo and redo pass them by), so the subject follows a rename and saves it ([decision 0007](decisions/0004-email-fields-hidden-not-unmounted.md)).
 - **Where:** `src/editor/state/editor-root.ts` line 317; `src/components/workspace/content/email-details.tsx` line 48
 - **What happens:** With Email off, the subject and preheader fields unmount, so a rename doesn't reach them. Turn Email back on: the subject shows an unknown chip, the saved subject keeps the old key, and Submit fails with "Define or remove {{first_name}}". The hidden chips aren't counted either, so the variable can be deleted as unused without the confirm dialog.
 - **Fix:** Keep the fields mounted but hidden, or apply the root's rename forwards and tombstones when a field mounts.
@@ -539,7 +539,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
-- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
+- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0007](decisions/0006-page-notices-by-commit-order.md)).
 - **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.
@@ -655,7 +655,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T1 · High: main fails e2e: the undo/redo merge added a layout shift
 
-- **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
+- **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0007](decisions/0003-undo-redo-always-shown.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 51; `e2e/principles.spec.ts` line 271
 - **What happens:** 4 of 241 Playwright tests fail on the project's own zero-layout-shift check, all on the template workspace and its dialogs. Each reports a 0.000004 shift at about 400 ms from the `span.inline-flex.items-center.gap-1.5` that wraps the save status and the new undo/redo buttons.
 - **Fix:** Reserve the undo/redo buttons' space from the first paint, or render them disabled until history is ready (the "disabled, not hidden" rule).

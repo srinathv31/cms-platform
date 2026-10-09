@@ -8,6 +8,7 @@ import {
   approve,
   cancelRevoke as cancelRevokeTransition,
   confirmRevoke as confirmRevokeTransition,
+  contractBaseline,
   requestChanges as requestChangesTransition,
   setSunset as setSunsetTransition,
   startRevoke as startRevokeTransition,
@@ -242,10 +243,12 @@ const SubmitInput = TemplateRef.extend({ note: z.string().nullish() });
 
 /**
  * "Submit v2": the template's open draft becomes its next version, In review, with the optional note
- * to reviewers. The first stage's approvers are notified. The draft, the highest number and the Active
- * version's variables are read in the transaction that writes, so the number and the contract changes
- * can't go stale; the rev and state in the update make it a compare-and-set, and the rev bump makes an
- * autosave still in flight fail rather than land on a frozen version.
+ * to reviewers. The first stage's approvers are notified. The draft, the highest number and the
+ * variables of the newest version that still renders (`contractBaseline`: the Active one, or after a
+ * revoke the newest Superseded one before its sunset) are read in the transaction that writes, so the
+ * number and the contract changes can't go stale; the rev and state in the update make it a
+ * compare-and-set, and the rev bump makes an autosave still in flight fail rather than land on a
+ * frozen version.
  *
  * Stays on the page (the workspace re-renders in place). A refusal (an undefined chip, no email subject,
  * already in review) writes nothing and comes back as the sentence to show. The client flushes the
@@ -266,7 +269,7 @@ export async function submitVersion(input: {
   const at = await now();
   const result = await transact<{ number: number }>(async (tx) => {
     const list = await tx
-      .select({ id: versions.id, number: versions.number, state: versions.state })
+      .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt })
       .from(versions)
       .where(eq(versions.templateId, found.id));
 
@@ -275,12 +278,12 @@ export async function submitVersion(input: {
     const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
     if (!draft) refuse(REASONS.noDraft);
 
-    const activeId = list.find((v) => v.state === "active")?.id;
-    const baseline = activeId
+    const baselineId = contractBaseline(list, at)?.id;
+    const baseline = baselineId
       ? await tx
           .select({ variables: versions.variables })
           .from(versions)
-          .where(eq(versions.id, activeId))
+          .where(eq(versions.id, baselineId))
           .then((rows) => rows[0]?.variables ?? null)
       : null;
 
@@ -451,8 +454,10 @@ const ApproveInput = VersionRef.extend({
 /**
  * Approves the stage the version waits on (the content type's chain, from approval_stages). At an
  * earlier stage the version moves on to the next; at the last it goes live: the previous Active
- * version becomes Superseded first (one Active per template), optionally with a sunset date, and the
- * version becomes Active. Consumers that render the template are sent a notice.
+ * version, if there is one, becomes Superseded first (one Active per template), optionally with a
+ * sunset date, and the version becomes Active. With none (a first version, or the correction after the
+ * Active version was revoked) nothing is superseded and a sunset date is ignored. Consumers that render
+ * the template are sent a notice.
  */
 export async function approveVersion(input: {
   templateId: string;

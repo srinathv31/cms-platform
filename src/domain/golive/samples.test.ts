@@ -98,4 +98,10 @@ describe("RESPONSE_FORMATS and CONSUMER_ERRORS", () => {
     expect(new Set(CONSUMER_ERRORS.map((e) => e.status))).toEqual(new Set([410, 422, 404]));
     expect(CONSUMER_ERRORS.map((e) => e.code)).toEqual(expect.arrayContaining(["version_sunset", "version_revoked", "missing_variables", "invalid_values", "template_not_found"]));
   });
+
+  it("says what to do when no version is Active, as after the Active version is revoked", () => {
+    for (const code of ["version_sunset", "version_revoked"]) {
+      expect(CONSUMER_ERRORS.find((e) => e.code === code)?.when).toMatch(/Move to the Active version, or wait for a new one if none is Active\.$/);
+    }
+  });
 });
