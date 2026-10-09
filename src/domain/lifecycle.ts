@@ -23,7 +23,7 @@ import { diffVariables, isBreaking } from "@/editor/model/contract";
 import { usageFromJSON } from "@/editor/model/usage";
 import { orderedStages, stageAt, stageRecipients } from "./approval-chain";
 import { describeChanges } from "./contract";
-import { REASONS } from "./permissions";
+import { REASONS, makerCheckerRefusal } from "./permissions";
 import { formatLongDate } from "./render/errors";
 import {
   DOCUMENT_THREAD,
@@ -112,6 +112,12 @@ export interface DraftFields {
   /** Autosave ordering starts at zero. */
   rev: 0;
   createdBy: string;
+  /**
+   * Who has written the draft so far (maker-checker, `makerCheckerRefusal`): whoever started it, and for
+   * the draft a change request opens, everyone who wrote the version that was sent back. Autosave adds
+   * each person who saves an edit and submit adds the submitter (`withWriter`).
+   */
+  writers: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -168,6 +174,7 @@ export function createDraft(input: {
         currentStage: 0,
         rev: 0,
         createdBy,
+        writers: [createdBy],
         createdAt: now,
         updatedAt: now,
       },
@@ -216,6 +223,8 @@ export function planDraftStart(
  * A new draft copied from the Active version: body (block ids included, so comments and the redline
  * keep their anchors), variables, channels, email fields and sample sets. Contract changes are
  * worked out against the Active version when the draft is submitted, so none are recorded here.
+ * Its writers start afresh with the person who pressed Edit: who wrote a released version doesn't
+ * keep anyone from deciding the next one.
  */
 export function editActive(input: {
   active: VersionSnapshot;
@@ -228,9 +237,19 @@ export function editActive(input: {
   }
 
   return {
-    changes: { draft: copyToDraft(active, createdBy, now) },
+    changes: { draft: copyToDraft(active, createdBy, now, [createdBy]) },
     effects: [{ kind: "audit", action: "draft.started", details: { basedOn: active.number } }],
   };
+}
+
+// ── Writers (maker-checker) ───────────────────────────────────
+
+/**
+ * The version's writers with `userId` among them: unchanged when they already are, otherwise added at
+ * the end. Autosave calls it for each person whose save lands; submit for the submitter.
+ */
+export function withWriter(writers: readonly string[], userId: string): string[] {
+  return writers.includes(userId) ? [...writers] : [...writers, userId];
 }
 
 // ── Submit for review ─────────────────────────────────────────
@@ -243,6 +262,8 @@ export interface SubmitDraft {
   emailSubject: JSONContent | null;
   emailPreheader: JSONContent | null;
   channels: readonly Channel[];
+  /** Who has written the draft (`DraftFields.writers`). */
+  writers: readonly string[];
 }
 
 export interface SubmitChanges {
@@ -251,6 +272,8 @@ export interface SubmitChanges {
   number: number;
   submittedBy: string;
   submittedAt: Date;
+  /** The draft's writers with the submitter among them: whoever submits can't decide it either. */
+  writers: string[];
   /** The author's note to reviewers, trimmed; null when there is none. */
   submitNote: string | null;
   /** The approval chain starts at its first stage. */
@@ -285,8 +308,8 @@ export interface SubmitInput {
 
 /**
  * Draft → In review, as the template's next version: a version number, the contract changes, the note,
- * an audit event, and a `review_requested` notification to the first stage's approvers (never the
- * submitter).
+ * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone
+ * who wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
@@ -319,6 +342,7 @@ export function submit(input: SubmitInput): SubmitResult {
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
   const submitNote = trimmed(input.note);
   const firstStage = input.chain ? stageAt(input.chain, 0) : null;
+  const writers = withWriter(draft.writers, submittedBy);
 
   return {
     ok: true,
@@ -327,6 +351,7 @@ export function submit(input: SubmitInput): SubmitResult {
       number,
       submittedBy,
       submittedAt: now,
+      writers,
       submitNote,
       currentStage: 0,
       contractChanges,
@@ -344,7 +369,7 @@ export function submit(input: SubmitInput): SubmitResult {
       },
       notify({
         notification: "review_requested",
-        to: firstStage ? stageRecipients(firstStage, submittedBy) : teamApproversExcept(submittedBy),
+        to: firstStage ? stageRecipients(firstStage, writers) : teamApproversExcept(...writers),
         title: `${input.submitterName} submitted ${input.templateName} v${number} for review.`,
         body: submitNote,
         link: { to: "review", templateId: input.templateId, versionNumber: number },
@@ -404,6 +429,8 @@ export const REFUSALS = {
 export interface ReviewVersion extends VersionSnapshot {
   templateId: string;
   submittedBy: string | null;
+  /** Everyone who wrote it, the submitter included (`DraftFields.writers`): none of them may decide it. */
+  writers: readonly string[];
   /** Index into the approval chain (in position order). */
   currentStage: number;
   contractChanges: readonly ContractChange[] | null;
@@ -443,8 +470,10 @@ export type RequestChangesResult = Outcome<{
 
 /**
  * In review → Changes requested (kept read-only as a record), with a new Draft copied from it for the
- * author. Approver, never the submitter; the reason is required and becomes a comment. Resubmitting
- * the draft gets the next number.
+ * author. Approver, never someone who wrote it (`makerCheckerRefusal`); the reason is required and
+ * becomes a comment. The new draft keeps the version's writers, so they stay barred from deciding the
+ * next round; the approver who sent it back joins them only by editing it. Resubmitting the draft gets
+ * the next number.
  */
 export function requestChanges(input: {
   version: ReviewVersion;
@@ -458,7 +487,8 @@ export function requestChanges(input: {
   const { version, actorId, now } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
-  if (version.submittedBy === actorId) return refuse(REASONS.ownVersion);
+  const wrote = makerCheckerRefusal(actorId, version);
+  if (wrote) return refuse(wrote);
   const stage = stageAt(input.chain, version.currentStage);
   if (!stage) return refuse(REFUSALS.stageMissing);
   const reason = trimmed(input.reason);
@@ -497,8 +527,8 @@ export function requestChanges(input: {
       sampleSetsSeen: null,
       decidedAt: now,
     },
-    // The draft is the author's to fix, so it is theirs, not the approver's.
-    newDraft: copyToDraft(version, version.submittedBy ?? actorId, now),
+    // The draft is the author's to fix, so it is theirs, not the approver's. Its writers are the version's.
+    newDraft: copyToDraft(version, version.submittedBy ?? actorId, now, version.writers),
     reasonComment: { blockId: DOCUMENT_THREAD, body: reason, kind: "change_request" },
     effects,
   };
@@ -538,10 +568,11 @@ export type ApproveResult = Outcome<Approved>;
  * at the last stage it goes live: Active, and the previous Active becomes Superseded (pinned consumers
  * keep rendering it), with an optional sunset date for it in the same step.
  *
- * The caller checks who may act on the stage (`canActOnStage`); this refuses the submitter
- * (maker-checker), a version no longer in review, a missing stage, someone who already approved an
- * earlier stage of this round (`approvedBy`: two stages need two people), and a sunset date that
- * isn't after today. `sampleSetsSeen` records which sample sets the approver previewed.
+ * The caller checks who may act on the stage (`canActOnStage`); this refuses anyone who wrote the
+ * version (maker-checker: its `writers` and submitter), a version no longer in review, a missing stage,
+ * someone who already approved an earlier stage of this round (`approvedBy`: two stages need two
+ * people), and a sunset date that isn't after today. `sampleSetsSeen` records which sample sets the
+ * approver previewed.
  */
 export function approve(input: {
   version: ReviewVersion;
@@ -563,7 +594,8 @@ export function approve(input: {
   const { version, chain, actorId, actorName, now, active, sunsetPrevious, templateName } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
-  if (version.submittedBy === actorId) return refuse(REASONS.ownVersion);
+  const wrote = makerCheckerRefusal(actorId, version);
+  if (wrote) return refuse(wrote);
   if (input.approvedBy?.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
   const stages = orderedStages(chain);
   const index = version.currentStage;
@@ -595,7 +627,7 @@ export function approve(input: {
       },
       notify({
         notification: "review_requested",
-        to: stageRecipients(next, version.submittedBy),
+        to: stageRecipients(next, version.writers),
         title: `${templateName} v${number} is waiting on ${next.name}.`,
         link: review,
       }),
@@ -958,8 +990,8 @@ function utcDay(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
-function teamApproversExcept(userId: string): Recipients {
-  return { kind: "team_role", role: "approver", exceptUserIds: [userId] };
+function teamApproversExcept(...userIds: string[]): Recipients {
+  return { kind: "team_role", role: "approver", exceptUserIds: userIds };
 }
 
 /** A notification effect; `body` is left out when there is none. */
@@ -973,7 +1005,7 @@ function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string |
  * block id (so comment threads and the redline keep their anchors), variables, channels, email fields
  * and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */
-function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date): DraftFields {
+function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, writers: readonly string[]): DraftFields {
   return {
     state: "draft",
     number: null,
@@ -988,6 +1020,7 @@ function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date): Dr
     currentStage: 0,
     rev: 0,
     createdBy,
+    writers: [...writers],
     createdAt: now,
     updatedAt: now,
   };

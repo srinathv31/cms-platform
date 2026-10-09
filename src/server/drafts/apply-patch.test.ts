@@ -92,6 +92,7 @@ async function seed() {
     emailPreheader: null,
     rev: 5,
     createdBy: "maya",
+    writers: ["maya"],
     createdAt: T0,
     updatedAt: T0,
   });
@@ -477,6 +478,31 @@ describe("applyDraftPatch: the audit row", () => {
       at: T1,
       details: { saves: 16, fields: ["body"], since: T0.toISOString() },
     });
+  });
+});
+
+// Maker-checker: whoever saves an edit to a draft wrote it, so they can't approve it later.
+describe("applyDraftPatch: the writers", () => {
+  const dee = viewer("dee", ["author", "approver"]);
+
+  it("adds each person whose save lands, once, in the order they first wrote", async () => {
+    await save({ body: doc(para("Maya's", "p1")) });
+    expect((await draft()).writers).toEqual(["maya"]);
+    await save({ rev: 6, sessionKey: OTHER_SESSION, body: doc(para("Dee's", "p1")) }, { by: dee, at: T2 });
+    expect((await draft()).writers).toEqual(["maya", "dee"]);
+    await save({ rev: 7, body: doc(para("Maya's again", "p1")) }, { at: T2 });
+    expect((await draft()).writers).toEqual(["maya", "dee"]);
+  });
+
+  it("counts a save of any field, a rename included", async () => {
+    await save({ name: "Renamed" }, { by: dee });
+    expect((await draft()).writers).toEqual(["maya", "dee"]);
+  });
+
+  it("leaves them alone when the save is refused", async () => {
+    expect(failure(await save({ rev: 4, body: doc(para("x")) }, { by: dee })).error).toBe("conflict");
+    expect(failure(await save({ body: doc(para("x")) }, { by: viewer("jordan", ["approver"]) })).error).toBe("forbidden");
+    expect((await draft()).writers).toEqual(["maya"]);
   });
 });
 

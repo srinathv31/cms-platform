@@ -13,6 +13,7 @@ import {
   startRevoke as startRevokeTransition,
   submit,
   sunsetPassed,
+  withWriter,
   REFUSALS,
   type DraftFields,
   type ReviewVersion,
@@ -118,6 +119,7 @@ async function findVersion(templateId: string, number: number) {
       teamId: templates.teamId,
       contentTypeId: templates.contentTypeId,
       submittedBy: versions.submittedBy,
+      writers: versions.writers,
       revoke: versions.revoke,
       state: versions.state,
       currentStage: versions.currentStage,
@@ -130,14 +132,15 @@ async function findVersion(templateId: string, number: number) {
 }
 
 /**
- * The decide check's resource: the team, the submitter (maker-checker) and the users the stage the
- * version waits on names (they decide it on any team). The stage is read again in the transaction.
+ * The decide check's resource: the team, who submitted and wrote the version (maker-checker), and the
+ * users the stage the version waits on names (they decide it on any team). The stage is read again in the
+ * transaction.
  */
 async function decideResource(found: FoundVersion | undefined): Promise<PermissionResource> {
   if (!found) return { teamId: null };
   const named =
     found.state === "in_review" ? stageApproverIds(waitingStage(await loadChain(db, found.contentTypeId), found.currentStage)) : [];
-  return { teamId: found.teamId, submittedBy: found.submittedBy, stageApproverIds: named };
+  return { teamId: found.teamId, submittedBy: found.submittedBy, writers: found.writers, stageApproverIds: named };
 }
 
 type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
@@ -216,6 +219,7 @@ function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
     currentStage: draft.currentStage,
     rev: draft.rev,
     createdBy: draft.createdBy,
+    writers: draft.writers,
     createdAt: draft.createdAt,
     updatedAt: draft.updatedAt,
   };
@@ -303,6 +307,7 @@ export async function submitVersion(input: {
         number: changes.number,
         submittedBy: changes.submittedBy,
         submittedAt: changes.submittedAt,
+        writers: changes.writers,
         submitNote: changes.submitNote,
         currentStage: changes.currentStage,
         contractChanges: changes.contractChanges,
@@ -392,13 +397,21 @@ export async function requestChanges(input: {
     await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
 
     // A template has at most one open draft. There is none while a version is in review, but if one
-    // exists the author keeps working in it rather than the request failing.
+    // exists the author keeps working in it rather than the request failing. It takes on the returned
+    // version's writers, so none of them can decide what it becomes (maker-checker). Content isn't
+    // touched, so `rev` stays and an autosave in flight still lands.
     const openDraft = await tx.query.versions.findFirst({
-      columns: { id: true },
+      columns: { id: true, writers: true },
       where: and(eq(versions.templateId, found.templateId), eq(versions.state, "draft")),
     });
     if (!openDraft) {
       await tx.insert(versions).values(draftRow(outcome.newDraft, { id: newId("v"), templateId: found.templateId }));
+    } else {
+      const writers = outcome.newDraft.writers.reduce((all, userId) => withWriter(all, userId), openDraft.writers);
+      await tx
+        .update(versions)
+        .set({ writers })
+        .where(and(eq(versions.id, openDraft.id), eq(versions.state, "draft")));
     }
 
     const threadId = newId("th");

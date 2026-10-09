@@ -103,8 +103,8 @@ variations to avoid.
    [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against the document limits and the editor
    schema, block ids added. Import stores documents through the same function. Then, in one transaction, it checks
    permission, the `draft` state, and `rev` (tolerating a lost response from the same session), writes with a
-   compare-and-set, and keeps one `draft.edited` audit row per editing session. Nothing is refreshed; the client
-   already has the content.
+   compare-and-set, adds the saver to the version's `writers` (nobody decides a version they wrote), and keeps one
+   `draft.edited` audit row per editing session. Nothing is refreshed; the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
@@ -141,8 +141,8 @@ at Turso instead. Two schema files:
   - **Settings:** `settings` (demo clock offset, seed version).
   - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
-  - **Templates:** `templates`; `versions` (body as TipTap JSON, variables, channels, state, `rev`, sunset and
-    revoke fields); `approvals`.
+  - **Templates:** `templates`; `versions` (body as TipTap JSON, variables, channels, state, `rev`, `writers`,
+    sunset and revoke fields); `approvals`.
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
   - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it

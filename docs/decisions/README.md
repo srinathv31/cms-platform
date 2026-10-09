@@ -12,6 +12,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0004](0004-email-fields-hidden-not-unmounted.md) | Email fields are hidden while Email is off, not unmounted | Accepted |
 | [0005](0005-revert-undo-goes-when-anything-changes.md) | A revert's Undo goes as soon as anything else changes | Accepted |
 | [0006](0006-page-notices-by-commit-order.md) | Page notices and search with an opaque cursor, notices in commit order | Accepted |
+| [0007](0007-maker-checker-covers-every-writer.md) | Maker-checker covers everyone who wrote a version | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

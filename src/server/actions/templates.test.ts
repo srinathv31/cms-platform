@@ -155,3 +155,30 @@ describe("startDraft while another write holds the file", () => {
     expect(vi.mocked(redirect)).toHaveBeenCalledWith(`/coral-offers/templates/${templateId}`, "replace");
   });
 });
+
+// Maker-checker: whoever starts a draft wrote it. A draft from the Active version starts a fresh set of
+// writers, so having written an earlier released version keeps nobody from deciding the next one.
+describe("who wrote a new draft", () => {
+  it("New template: the person who made it", async () => {
+    const draft = await create("card_offer_terms");
+    expect(draft.writers).toEqual(["maya"]);
+  });
+
+  it("Edit on an Active template: the person who pressed it, not the Active version's writers", async () => {
+    const rows = await db
+      .select({ templateId: versions.templateId, id: versions.id, state: versions.state })
+      .from(versions)
+      .innerJoin(templates, eq(templates.id, versions.templateId))
+      .where(eq(templates.teamId, "coral-offers"));
+    const open = new Set(rows.filter((r) => r.state === "draft" || r.state === "in_review").map((r) => r.templateId));
+    const active = rows.find((r) => r.state === "active" && !open.has(r.templateId));
+    expect(active, "the seed has an Active Coral template with nothing newer").toBeTruthy();
+    await db.update(versions).set({ writers: ["priya", "eli"] }).where(eq(versions.id, active!.id));
+
+    await startDraft({ templateId: active!.templateId });
+    const draft = await db.query.versions.findFirst({
+      where: and(eq(versions.templateId, active!.templateId), eq(versions.state, "draft")),
+    });
+    expect(draft).toMatchObject({ basedOnVersionId: active!.id, createdBy: "maya", writers: ["maya"] });
+  });
+});

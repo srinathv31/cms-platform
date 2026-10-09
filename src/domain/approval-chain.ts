@@ -37,12 +37,16 @@ function ruleMatches(viewer: Viewer, rule: ApproverRule, teamId: string): boolea
   return rule.kind === "user" ? viewer.userId === rule.userId : rolesOn(viewer, teamId).includes(rule.role);
 }
 
-/** Who a stage's notifications go to. The submitter never reviews their own version, so they're left out. */
-export function stageRecipients(stage: ApprovalStage, submittedBy: string | null): Recipients {
-  const except = submittedBy ? [submittedBy] : [];
+/**
+ * Who a stage's notifications go to. Nobody decides a version they wrote (maker-checker), so a team role's
+ * members are asked minus the version's `writers` (the submitter is one). A stage that names one person
+ * asks them even when they wrote it: the version waits until the stage's rule changes, and they're the
+ * one who knows.
+ */
+export function stageRecipients(stage: ApprovalStage, writers: readonly string[]): Recipients {
   return stage.rule.kind === "user"
     ? { kind: "user", userId: stage.rule.userId }
-    : { kind: "team_role", role: stage.rule.role, exceptUserIds: except };
+    : { kind: "team_role", role: stage.rule.role, exceptUserIds: [...writers] };
 }
 
 // ── The stepper ──────────────────────────────────────────────────────────────

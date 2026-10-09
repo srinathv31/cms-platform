@@ -179,6 +179,40 @@ describe("getReviewScreen", () => {
     ]);
   });
 
+  it("blocks Approve and Request changes, with why, for someone who wrote the version, and leaves it out of their queue", async () => {
+    // Priya holds Author and Approver on Coral Offers (an access request can add the role) and edited
+    // Maya's Cash Back v3 before Maya submitted it.
+    const priya = await loadPersona(db, "priya");
+    people.priya = {
+      ...priya,
+      memberships: priya.memberships.map((m) => (m.teamId === "coral-offers" ? { ...m, roles: ["author", "approver"] } : m)),
+    };
+    as("priya");
+    const v3 = (await db.query.versions.findFirst({
+      where: and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, 3)),
+    }))!;
+    expect((await getReviewQueue("coral-offers")).waiting.map((r) => r.versionNumber), "an approver who wrote none of it").toEqual([3]);
+
+    await db.update(versions).set({ writers: ["maya", "priya"] }).where(eq(versions.id, v3.id));
+    try {
+      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+      expect(screen.can).toEqual({
+        approve: { ok: false, reason: REASONS.wroteVersion },
+        requestChanges: { ok: false, reason: REASONS.wroteVersion },
+        comment: { ok: true },
+      });
+      const queue = await getReviewQueue("coral-offers");
+      expect(queue.waiting).toEqual([]);
+      expect(queue.submitted).toEqual([]);
+      expect(await getReviewBadgeCount("coral-offers")).toBe(0);
+
+      as("jordan");
+      expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3)).can.approve).toEqual({ ok: true });
+    } finally {
+      await db.update(versions).set({ writers: v3.writers }).where(eq(versions.id, v3.id));
+    }
+  });
+
   it("is a 404 from another team's space, for a missing version, or for someone who can't see the team", async () => {
     as("jordan");
     await expect(getReviewScreen("deposits", ids["cash-back"]!, 3)).rejects.toThrow();

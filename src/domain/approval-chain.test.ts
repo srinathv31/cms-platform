@@ -90,13 +90,19 @@ describe("canActOnStage", () => {
 });
 
 describe("stageRecipients", () => {
-  it("asks a team role's members, never the submitter", () => {
-    expect(stageRecipients(TEAM_STAGE, "maya")).toEqual({ kind: "team_role", role: "approver", exceptUserIds: ["maya"] });
-    expect(stageRecipients(TEAM_STAGE, null)).toEqual({ kind: "team_role", role: "approver", exceptUserIds: [] });
+  it("asks a team role's members, never anyone who wrote the version", () => {
+    expect(stageRecipients(TEAM_STAGE, ["maya"])).toEqual({ kind: "team_role", role: "approver", exceptUserIds: ["maya"] });
+    expect(stageRecipients(TEAM_STAGE, ["maya", "priya"])).toEqual({
+      kind: "team_role",
+      role: "approver",
+      exceptUserIds: ["maya", "priya"],
+    });
+    expect(stageRecipients(TEAM_STAGE, [])).toEqual({ kind: "team_role", role: "approver", exceptUserIds: [] });
   });
 
-  it("asks a named user directly", () => {
-    expect(stageRecipients(LEGAL_STAGE, "maya")).toEqual({ kind: "user", userId: "dana" });
+  it("asks a named user directly, even one who wrote it: only a new rule moves the version on", () => {
+    expect(stageRecipients(LEGAL_STAGE, ["maya"])).toEqual({ kind: "user", userId: "dana" });
+    expect(stageRecipients(LEGAL_STAGE, ["maya", "dana"])).toEqual({ kind: "user", userId: "dana" });
   });
 });
 

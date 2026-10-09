@@ -93,6 +93,14 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   };
   const specOf = (r: string) => spec.versions.find((v) => v.ref === r)!;
 
+  // Who wrote each version (maker-checker), as the app records it: the creator (who also makes every
+  // seeded edit), the submitter, and for the draft a change request opened, the returned version's writers.
+  const writersOf = (v: SeedVersion): string[] => {
+    const base = v.basedOn ? specOf(v.basedOn) : undefined;
+    const inherited = base?.state === "changes_requested" ? writersOf(base) : [];
+    return [...new Set([...inherited, v.createdBy, ...(v.submittedBy ? [v.submittedBy] : [])])];
+  };
+
   const audit = (e: {
     at: number;
     actor: string | null;
@@ -151,6 +159,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       currentStage: 0,
       rev: v.rev ?? (isDraft ? int(ctx.rng, 12, 40) : int(ctx.rng, 40, 190)),
       createdBy: v.createdBy,
+      writers: writersOf(v),
       createdAt: ctx.at(v.createdAt),
       updatedAt: ctx.at(lastTouched(v)),
       submittedBy: v.submittedBy ?? null,

@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
@@ -11,6 +11,7 @@ import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
+import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { createTemplateWithDraft, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
@@ -40,8 +41,18 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
-const { approvals, approvalStages, auditEvents, commentThreads, comments, consumerNotices, notifications, versions } =
-  schema;
+const {
+  approvals,
+  approvalStages,
+  auditEvents,
+  commentThreads,
+  comments,
+  consumerNotices,
+  membershipRoles,
+  memberships,
+  notifications,
+  versions,
+} = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 
@@ -458,6 +469,164 @@ describe("a two-stage chain", () => {
   });
 });
 
+// ── Maker-checker covers everyone who wrote the version ───────
+
+// Holding Author and Approver on one team is normal (approving an access request can add the role).
+// The seed gives nobody both, so Priya gets Approver on Coral Offers here, beside her Author role.
+describe("maker-checker: nobody decides a version they wrote", () => {
+  let priyaMembership: string;
+
+  beforeAll(async () => {
+    const [m] = await db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(and(eq(memberships.userId, "priya"), eq(memberships.teamId, "coral-offers")));
+    priyaMembership = m!.id;
+    await db.insert(membershipRoles).values({ membershipId: priyaMembership, role: "approver" });
+    people.priya = await loadPersona(db, "priya");
+  });
+  afterAll(async () => {
+    await db
+      .delete(membershipRoles)
+      .where(and(eq(membershipRoles.membershipId, priyaMembership), eq(membershipRoles.role, "approver")));
+    people.priya = await loadPersona(db, "priya");
+  });
+
+  /** An autosave by this person, as the workspace sends it. */
+  async function edit(userId: string, templateId: string, text: string) {
+    const at = as(userId);
+    const draft = (await draftOf(templateId))!;
+    const body = { ...draft.body, content: [...(draft.body.content ?? []), { type: "paragraph", content: [{ type: "text", text }] }] };
+    const saved = await applyDraftPatch(db, {
+      viewer: people[userId]!,
+      versionId: draft.id,
+      patch: { rev: draft.rev, sessionKey: `session-${userId}-${minute}`, body },
+      at,
+    });
+    expect(saved.ok, `${userId}'s save lands`).toBe(true);
+  }
+
+  const wrote = { ok: false, reason: REASONS.wroteVersion };
+  const decisionsOn = async (templateId: string, number: number) =>
+    db.select().from(approvals).where(eq(approvals.versionId, (await version(templateId, number))!.id));
+
+  it("Priya edits Maya's draft and Maya submits it: Priya can neither approve nor send it back", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await edit("priya", templateId, "Priya's sentence.");
+    expect((await draftOf(templateId))?.writers).toEqual(["maya", "priya"]);
+
+    const submittedAt = as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
+    // Priya holds Approver, but she isn't asked to review what she wrote.
+    expect((await notificationsAt(submittedAt)).map((n) => [n.userId, n.kind])).toEqual([
+      ["alex", "review_requested"],
+      ["jordan", "review_requested"],
+    ]);
+
+    const at = as("priya");
+    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Mine to fix." })).toEqual(wrote);
+    expect(await version(templateId, 1)).toMatchObject({ state: "in_review" });
+    expect(await decisionsOn(templateId, 1)).toEqual([]);
+    expect(await auditAt(at)).toEqual([]);
+
+    // Jordan wrote none of it.
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
+      ok: true,
+      wentLive: true,
+      number: 1,
+    });
+  });
+
+  it("writers carry across a change request; the approver who asked can approve the next round", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await edit("priya", templateId, "Priya's sentence.");
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+
+    as("jordan");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(await draftOf(templateId)).toMatchObject({ createdBy: "maya", writers: ["maya", "priya"] });
+
+    // Maya fixes it alone and resubmits: Priya wrote round one, so round two isn't hers to decide either.
+    await edit("maya", templateId, "The APR is 21.99%.");
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 2 });
+    expect((await version(templateId, 2))?.writers).toEqual(["maya", "priya"]);
+
+    as("priya");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 2, reason: "x" })).toEqual(wrote);
+
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+  });
+
+  it("whoever submitted round one stays barred from round two, even without editing it", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    as("priya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
+
+    as("jordan");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    await edit("maya", templateId, "The APR is 21.99%.");
+    const resubmitted = as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 2 });
+    expect(await version(templateId, 2)).toMatchObject({ submittedBy: "maya", writers: ["maya", "priya"] });
+    expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual(["alex", "jordan"]);
+
+    as("priya");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 2, reason: "x" })).toEqual(wrote);
+  });
+
+  it("a change request that finds a draft already open merges the version's writers into it", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await edit("priya", templateId, "Priya's sentence.");
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    // Nothing in the app opens a draft while a version is in review; put one there to check the guard.
+    const v1 = (await version(templateId, 1))!;
+    await db.insert(versions).values({
+      ...v1,
+      id: `v_open_${templateId}`,
+      number: null,
+      state: "draft",
+      basedOnVersionId: v1.id,
+      submittedBy: null,
+      submittedAt: null,
+      submitNote: null,
+      writers: ["maya"],
+    });
+
+    as("jordan");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    const drafts = await db
+      .select({ id: versions.id, writers: versions.writers })
+      .from(versions)
+      .where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+    expect(drafts).toEqual([{ id: `v_open_${templateId}`, writers: ["maya", "priya"] }]);
+  });
+
+  it("an approver who only sent it back becomes a writer once they edit the next round", async () => {
+    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 1 });
+    as("priya");
+    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Too vague." })).toEqual({ ok: true });
+    expect((await draftOf(templateId))?.writers).toEqual(["maya"]);
+
+    await edit("priya", templateId, "Priya's fix.");
+    as("maya");
+    expect(await submitVersion({ templateId })).toEqual({ ok: true, number: 2 });
+    as("priya");
+    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
+  });
+});
+
 // ── Sunset ────────────────────────────────────────────────────
 
 describe("setSunset", () => {
@@ -621,5 +790,27 @@ describe("permission checks come first", () => {
       ok: false,
       reason: REASONS.generic,
     });
+  });
+});
+
+// ── The migration's backfill ──────────────────────────────────
+
+// Last, once every test above has written versions through the actions: the SQL that filled `writers`
+// for rows that existed before the column did must reach the same writers the app records.
+describe("the writers backfill in the migration", () => {
+  it("rebuilds every version's writers from its creator, submitter, edits and returned rounds", async () => {
+    const folder = "./src/server/db/migrations";
+    const file = readdirSync(folder).find((name) => name.endsWith("_version_writers.sql"))!;
+    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split("--> statement-breakpoint");
+    const writersById = async () =>
+      Object.fromEntries(
+        (await db.select({ id: versions.id, writers: versions.writers }).from(versions)).map((v) => [v.id, [...v.writers].sort()]),
+      );
+
+    const recorded = await writersById();
+    expect(Object.values(recorded).some((w) => w.length > 1), "some version has two writers").toBe(true);
+    await libsql.execute("UPDATE versions SET writers = '[]'");
+    await libsql.execute(backfill!);
+    expect(await writersById()).toEqual(recorded);
   });
 });

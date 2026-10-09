@@ -106,9 +106,10 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
 /**
  * The decision row, under the stepper: 32px for everyone.
  * - Open: Approve and Request changes.
- * - Blocked (the viewer is an approver, but this is their own version): the same two, dim. The reason is
- *   the current stage's own line above them (the stepper), so the row has nothing to add.
- * - Hidden (the viewer isn't an approver on the team): the row stays, empty, so the head keeps its height.
+ * - Blocked (the viewer wrote this version, or is an approver the stage doesn't wait on): the same two,
+ *   dim. The reason is the current stage's own line above them (the stepper), so the row has nothing to add.
+ * - Hidden (the viewer isn't an approver on the team and wrote none of it): the row stays, empty, so the
+ *   head keeps its height.
  * - Decided, or not in review: a line (what was decided, or the version's state) stands where the buttons
  *   were. It is a status, and it takes focus when the decision was made here, since the button that
  *   opened the dialog is gone.
