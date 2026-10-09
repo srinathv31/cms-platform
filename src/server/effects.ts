@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, max } from "drizzle-orm";
 import type { LifecycleEffect, NotificationLink, Recipients } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import {
@@ -53,7 +53,8 @@ export interface EffectsWritten {
  *   action. The link becomes an href under the team's slug.
  * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, in the
  *   last 90 days (from the render log). The payload carries version numbers, dates and contract
- *   changes, never variable values.
+ *   changes, never variable values. Each row takes the next `seq` (`nextNoticeSeq`), the order the
+ *   notices API pages in.
  */
 export async function writeEffects(
   tx: Tx,
@@ -123,9 +124,11 @@ export async function writeEffects(
         const consumerIds = await consumerAudience();
         if (consumerIds.length === 0) break;
         const { name } = await templateInfo();
+        const first = await nextNoticeSeq(tx);
         await tx.insert(consumerNotices).values(
-          consumerIds.map((consumerId) => ({
+          consumerIds.map((consumerId, i) => ({
             id: newId("cn"),
+            seq: first + i,
             consumerId,
             templateId: ctx.templateId,
             versionId: effect.versionId,
@@ -202,6 +205,17 @@ export function notificationHref(teamSlug: string, link: NotificationLink): stri
     case "versions":
       return `/${teamSlug}/templates/${link.templateId}/versions`;
   }
+}
+
+/**
+ * The next `consumer_notices.seq`: one past the highest written. It is read inside the writing
+ * transaction, which holds SQLite's write lock (`BEGIN IMMEDIATE`) until it commits, so notices are
+ * numbered in the order they become visible and a consumer paging by `seq` never skips one. The
+ * unique index on `seq` refuses a duplicate rather than store one.
+ */
+export async function nextNoticeSeq(tx: Tx): Promise<number> {
+  const [row] = await tx.select({ last: max(consumerNotices.seq) }).from(consumerNotices);
+  return (row?.last ?? 0) + 1;
 }
 
 /** Registered consumers with a non-preview render of the template in the notice window. */

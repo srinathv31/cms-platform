@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -9,7 +9,16 @@ import type { VariableType } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
-import { getTemplateDetail, listNotices, requireConsumer, searchActiveTemplates, templateIdFromQuery } from "./consumer-api";
+import { readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
+import {
+  getTemplateDetail,
+  listNotices,
+  requireConsumer,
+  searchActiveTemplates,
+  templateIdFromQuery,
+  type NoticePage,
+  type SearchPage,
+} from "./consumer-api";
 
 // The consumer API's reads against a temporary database filled by the real seed:
 //   - Balance Transfer v1 Superseded (sunset in 21 days), v2 Active (adds optional offer_end_date);
@@ -77,9 +86,26 @@ describe("requireConsumer", () => {
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
+/** One page's results. */
+const search = async (q: string, limit = 20) => (await searchActiveTemplates(q, limit)).results;
+
+/** Every page of a search, `limit` at a time, following each nextCursor until hasMore is false. */
+async function searchPages(q: string, limit: number): Promise<SearchPage[]> {
+  const pages: SearchPage[] = [];
+  let after: SearchKey | null = null;
+  for (;;) {
+    const page = await searchActiveTemplates(q, limit, after);
+    pages.push(page);
+    if (!page.hasMore) return pages;
+    const next = readSearchCursor(page.nextCursor, q);
+    if (!next.ok) throw new Error(next.error.message);
+    after = next.value;
+  }
+}
+
 describe("searchActiveTemplates", () => {
   it("an empty query lists every template with an Active version, by name", async () => {
-    const results = await searchActiveTemplates("", 50);
+    const results = await search("", 50);
     const active = await db
       .select({ id: templates.id, name: templates.name })
       .from(versions)
@@ -91,7 +117,7 @@ describe("searchActiveTemplates", () => {
   });
 
   it("summarizes the Active version", async () => {
-    const [balance] = await searchActiveTemplates(id("balance-transfer"), 20);
+    const [balance] = await search(id("balance-transfer"));
     expect(balance).toEqual({
       id: id("balance-transfer"),
       name: "Balance Transfer Intro — Terms",
@@ -109,7 +135,7 @@ describe("searchActiveTemplates", () => {
     const full = id("cash-back");
     const code = full.slice(3);
     for (const q of [full, full.toLowerCase(), code, code.toLowerCase(), ` ${full} `]) {
-      expect((await searchActiveTemplates(q, 20)).map((r) => r.id), q).toEqual([full]);
+      expect((await search(q)).map((r) => r.id), q).toEqual([full]);
     }
     expect(templateIdFromQuery("uc-4f7k2q")).toBe("UC-4F7K2Q");
     expect(templateIdFromQuery("4f7k2q")).toBe("UC-4F7K2Q");
@@ -117,20 +143,57 @@ describe("searchActiveTemplates", () => {
   });
 
   it("an id with nothing Active isn't found", async () => {
-    expect(await searchActiveTemplates(id("annual-fee-waiver"), 20)).toEqual([]);
+    expect(await search(id("annual-fee-waiver"))).toEqual([]);
   });
 
   it("matches every word of the name, any case", async () => {
-    expect((await searchActiveTemplates("TERMS balance", 20)).map((r) => r.id)).toEqual([id("balance-transfer")]);
-    expect(await searchActiveTemplates("balance savings", 20)).toEqual([]);
+    expect((await search("TERMS balance")).map((r) => r.id)).toEqual([id("balance-transfer")]);
+    expect(await search("balance savings")).toEqual([]);
   });
 
   it("names that start with the query come first, then the rest by name; limit cuts the list", async () => {
-    const names = (await searchActiveTemplates("rate", 20)).map((r) => r.name);
+    const names = (await search("rate")).map((r) => r.name);
     expect(names[0]).toBe("Rate Change Notice");
     expect(names.slice(1)).toEqual([...names.slice(1)].sort((a, b) => a.localeCompare(b)));
     expect(names).toEqual(expect.arrayContaining(["High-Yield Savings — Rate Disclosure", "Statement Insert — Rate Change"]));
-    expect(await searchActiveTemplates("rate", 1)).toHaveLength(1);
+    expect(await search("rate", 1)).toHaveLength(1);
+  });
+
+  it("pages through every result in order, each page at most limit long, no overlap", async () => {
+    for (const q of ["", "rate", "terms"]) {
+      const all = await search(q, 50);
+      expect(all.length, q).toBeGreaterThan(1);
+      for (const limit of [1, 2, 3]) {
+        const pages = await searchPages(q, limit);
+        expect(pages.flatMap((p) => p.results.map((r) => r.id)), `${q} by ${limit}`).toEqual(all.map((r) => r.id));
+        expect(pages.slice(0, -1).every((p) => p.hasMore && p.results.length === limit)).toBe(true);
+        expect(pages.at(-1)!.hasMore).toBe(false);
+      }
+    }
+  });
+
+  it("a cursor marks a place, not a count: a template leaving the list before it moves nothing after it", async () => {
+    const [first, second] = await searchPages("", 3);
+    const gone = first!.results[0]!.id;
+    const [active] = await db
+      .select({ id: versions.id })
+      .from(versions)
+      .where(and(eq(versions.templateId, gone), eq(versions.state, "active")));
+    await db.update(versions).set({ state: "superseded" }).where(eq(versions.id, active!.id));
+    try {
+      const after = readSearchCursor(first!.nextCursor, "");
+      expect(after.ok).toBe(true);
+      const again = await searchActiveTemplates("", 3, after.ok ? after.value : null);
+      expect(again.results.map((r) => r.id)).toEqual(second!.results.map((r) => r.id));
+    } finally {
+      await db.update(versions).set({ state: "active" }).where(eq(versions.id, active!.id));
+    }
+  });
+
+  it("an empty answer still has a cursor: no more results, and it reads back as the start", async () => {
+    const empty = await searchActiveTemplates("balance savings", 20);
+    expect(empty).toEqual({ results: [], hasMore: false, nextCursor: expect.any(String) });
+    expect(readSearchCursor(empty.nextCursor, "balance savings")).toEqual({ ok: true, value: null });
   });
 });
 
@@ -239,7 +302,7 @@ describe("Channel rules", () => {
     const before = disclosure!.allowedChannels;
     await db.update(schema.contentTypes).set({ allowedChannels: ["pdf", "email"] }).where(eq(schema.contentTypes.id, disclosure!.id));
     try {
-      const [balance] = await searchActiveTemplates(id("balance-transfer"), 20);
+      const [balance] = await search(id("balance-transfer"));
       expect(balance!.channels).toEqual(["pdf"]);
       const d = await detail("balance-transfer");
       expect(d.contract!.channels).toEqual(["pdf"]);
@@ -275,13 +338,51 @@ describe("JSON Schema against the seed", () => {
 
 // ── Notices ──────────────────────────────────────────────────────────────────
 
+/** The seq a notice cursor continues after (the test's own cursors always read). */
+function seqOf(page: NoticePage, list: { consumerId: string; templateId: string | null }): number {
+  const read = readNoticeCursor(page.nextCursor, list);
+  if (!read.ok) throw new Error(read.error.message);
+  return read.value;
+}
+
+/** A consumer polling: every page from `after`, `limit` at a time, until hasMore is false. */
+async function pollAll(consumerId: string, limit: number, after = 0, templateId?: string) {
+  const list = { consumerId, templateId: templateId ?? null };
+  const pages: NoticePage[] = [];
+  for (;;) {
+    const page = await listNotices(consumerId, { after, templateId, limit });
+    pages.push(page);
+    after = seqOf(page, list);
+    if (!page.hasMore) return { pages, notices: pages.flatMap((p) => p.notices), after };
+  }
+}
+
+/** Coral's notice rows in the order they were written. */
+const coralRows = () =>
+  db.select().from(consumerNotices).where(eq(consumerNotices.consumerId, "coral")).orderBy(asc(consumerNotices.seq));
+
+const highestSeq = async () => (await db.select({ seq: consumerNotices.seq }).from(consumerNotices)).reduce((m, r) => Math.max(m, r.seq), 0);
+
+/** A live-shaped revoke notice for Coral, written at `at` with number `seq`. */
+const revokeRow = (noticeId: string, seq: number, at: Date) => ({
+  id: noticeId,
+  seq,
+  consumerId: "coral",
+  templateId: id("cash-back"),
+  versionId: "v_test",
+  kind: "revoked" as const,
+  payload: { templateName: "Cash Back Welcome Bonus — Terms", versionNumber: 2, reason: "Test", activeVersion: null },
+  createdAt: at,
+});
+
 describe("listNotices", () => {
-  it("Coral's notices, newest first, normalized from the seeded payloads", async () => {
-    const notices = await listNotices("coral", { limit: 200 });
-    const rows = await db.select().from(consumerNotices).where(eq(consumerNotices.consumerId, "coral"));
-    expect(notices).toHaveLength(rows.length);
+  it("Coral's notices, oldest first in the order they were written, normalized from the seeded payloads", async () => {
+    const { notices } = await listNotices("coral", { limit: 200 });
+    const rows = await coralRows();
+    expect(notices.map((n) => n.id)).toEqual(rows.map((r) => r.id));
+    // The seed numbers its notices by time, so for seeded rows the order is also by time.
     const times = notices.map((n) => n.createdAt);
-    expect(times).toEqual([...times].sort().reverse());
+    expect(times).toEqual([...times].sort());
 
     const sunset = notices.find((n) => n.kind === "sunset_scheduled" && n.template.id === id("balance-transfer"))!;
     expect(sunset).toMatchObject({ versionNumber: 1, activeVersion: 2, reason: null });
@@ -292,28 +393,108 @@ describe("listNotices", () => {
   });
 
   it("a seeded revoke gets the version that was Active then", async () => {
-    const [revoked] = await listNotices("coral", { templateId: id("holiday-points"), limit: 1 });
-    expect(revoked).toMatchObject({ kind: "revoked", versionNumber: 1, activeVersion: 2, reason: "Wrong bonus amount", message: "Holiday Points Promo — Terms v1 was revoked: Wrong bonus amount." });
+    const { notices } = await listNotices("coral", { templateId: id("holiday-points"), limit: 50 });
+    expect(notices.map((n) => n.kind)).toEqual(["new_version", "revoked"]);
+    expect(notices[1]).toMatchObject({ kind: "revoked", versionNumber: 1, activeVersion: 2, reason: "Wrong bonus amount", message: "Holiday Points Promo — Terms v1 was revoked: Wrong bonus amount." });
   });
 
-  it("filters by template, by time and by count; other consumers' notices never show", async () => {
+  it("filters by template and by count; other consumers' notices never show", async () => {
     const forBalance = await listNotices("coral", { templateId: id("balance-transfer"), limit: 50 });
-    expect(forBalance.map((n) => n.kind).sort()).toEqual(["new_version", "sunset_scheduled"]);
-    expect(await listNotices("coral", { limit: 2 })).toHaveLength(2);
+    expect(forBalance.notices.map((n) => n.kind)).toEqual(["new_version", "sunset_scheduled"]);
 
-    const all = await listNotices("coral", { limit: 50 });
-    const cut = new Date(all[1]!.createdAt);
-    expect((await listNotices("coral", { since: cut, limit: 50 })).map((n) => n.id)).toEqual([all[0]!.id]);
+    const all = (await listNotices("coral", { limit: 50 })).notices;
+    const two = await listNotices("coral", { limit: 2 });
+    expect(two.notices.map((n) => n.id)).toEqual(all.slice(0, 2).map((n) => n.id));
+    expect(two.hasMore).toBe(true);
 
-    const deposits = await listNotices("deposits-online", { limit: 50 });
+    const deposits = (await listNotices("deposits-online", { limit: 50 })).notices;
     expect(deposits.length).toBeGreaterThan(0);
     expect(deposits.every((n) => !all.some((c) => c.id === n.id))).toBe(true);
   });
 
+  it("pages forward: every notice once, in order, whatever the page size; the last page says no more", async () => {
+    const ids = (await coralRows()).map((r) => r.id);
+    expect(ids.length).toBeGreaterThan(2);
+    for (const limit of [1, 2, 3, 200]) {
+      const { pages, notices } = await pollAll("coral", limit);
+      expect(notices.map((n) => n.id), `by ${limit}`).toEqual(ids);
+      expect(pages.slice(0, -1).every((p) => p.hasMore && p.notices.length === limit)).toBe(true);
+      expect(pages.at(-1)!.hasMore).toBe(false);
+    }
+  });
+
+  it("the last page's cursor is where the next poll starts: an empty page keeps it, new notices arrive once", async () => {
+    const { after: end } = await pollAll("coral", 50);
+    const empty = await listNotices("coral", { after: end, limit: 50 });
+    expect(empty).toMatchObject({ notices: [], hasMore: false });
+    expect(seqOf(empty, { consumerId: "coral", templateId: null })).toBe(end);
+
+    const at = new Date(BASE.getTime() + 90_000);
+    const first = (await highestSeq()) + 1;
+    await db.insert(consumerNotices).values([revokeRow("cn_poll_a", first, at), revokeRow("cn_poll_b", first + 1, at)]);
+    try {
+      const next = await pollAll("coral", 50, end);
+      expect(next.notices.map((n) => n.id)).toEqual(["cn_poll_a", "cn_poll_b"]);
+      expect((await pollAll("coral", 50, next.after)).notices).toEqual([]);
+    } finally {
+      await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_poll_a", "cn_poll_b"]));
+    }
+  });
+
+  it("a page boundary inside a batch of same-instant notices skips nothing and repeats nothing", async () => {
+    // One action writes all its notices at one instant, under random ids: neither time nor id can
+    // order them, `seq` does.
+    const { after: end } = await pollAll("coral", 50);
+    const at = new Date(BASE.getTime() + 120_000);
+    const first = (await highestSeq()) + 1;
+    const batch = ["cn_same_z", "cn_same_a", "cn_same_m", "cn_same_b", "cn_same_y"];
+    await db.insert(consumerNotices).values(batch.map((noticeId, i) => revokeRow(noticeId, first + i, at)));
+    try {
+      for (const limit of [1, 2, 3, 4]) {
+        const { notices } = await pollAll("coral", limit, end);
+        expect(notices.map((n) => n.id), `by ${limit}`).toEqual(batch);
+      }
+      // From the start too: the whole outbox once, in order.
+      const all = (await pollAll("coral", 2)).notices.map((n) => n.id);
+      expect(all).toEqual((await coralRows()).map((r) => r.id));
+      expect(new Set(all).size).toBe(all.length);
+    } finally {
+      await db.delete(consumerNotices).where(inArray(consumerNotices.id, batch));
+    }
+  });
+
+  it("a notice committed after a poll arrives even when its clock reads earlier than notices already seen", async () => {
+    // Two actions read the clock, then commit in the other order. A cursor on time would skip the
+    // second commit; seq is the commit order.
+    const { after: end } = await pollAll("coral", 50);
+    const first = (await highestSeq()) + 1;
+    await db.insert(consumerNotices).values(revokeRow("cn_clock_late", first, new Date(BASE.getTime() + 150_000)));
+    try {
+      const seen = await pollAll("coral", 50, end);
+      expect(seen.notices.map((n) => n.id)).toEqual(["cn_clock_late"]);
+      await db.insert(consumerNotices).values(revokeRow("cn_clock_early", first + 1, new Date(BASE.getTime() + 149_000)));
+      expect((await pollAll("coral", 50, seen.after)).notices.map((n) => n.id)).toEqual(["cn_clock_early"]);
+    } finally {
+      await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_clock_late", "cn_clock_early"]));
+    }
+  });
+
+  it("a filtered list pages the same way and its cursor names the filter", async () => {
+    const templateId = id("holiday-points");
+    const { pages, notices } = await pollAll("coral", 1, 0, templateId);
+    expect(notices.map((n) => n.kind)).toEqual(["new_version", "revoked"]);
+    expect(pages).toHaveLength(2);
+    const list = { consumerId: "coral", templateId };
+    expect(readNoticeCursor(pages[0]!.nextCursor, list).ok).toBe(true);
+    expect(readNoticeCursor(pages[0]!.nextCursor, { consumerId: "coral", templateId: null }).ok).toBe(false);
+  });
+
   it("a live-shaped row reads the same way", async () => {
     const at = new Date(BASE.getTime() + 60_000);
+    const { after: end } = await pollAll("coral", 50);
     await db.insert(consumerNotices).values({
       id: "cn_live_test",
+      seq: (await highestSeq()) + 1,
       consumerId: "coral",
       templateId: id("cash-back"),
       versionId: "v_test",
@@ -328,7 +509,7 @@ describe("listNotices", () => {
       createdAt: at,
     });
     try {
-      const [latest] = await listNotices("coral", { limit: 1 });
+      const { notices: [latest] } = await listNotices("coral", { after: end, limit: 1 });
       expect(latest).toEqual({
         id: "cn_live_test",
         kind: "new_version",

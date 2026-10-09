@@ -101,10 +101,33 @@ test.describe("GET /api/v1/templates", () => {
     for (const r of body.results) for (const w of q.toLowerCase().split(" ")) expect(r.name.toLowerCase()).toContain(w);
   });
 
-  test("limit", async ({ request }) => {
+  test("limit and after: pages by cursor, in order, never overlapping", async ({ request }) => {
     const body = (await (await get(request, "/api/v1/templates?limit=1")).json()) as ApiTemplateSearch;
     expect(body.results).toHaveLength(1);
+    expect(body.hasMore).toBe(true);
     await expectError(await get(request, "/api/v1/templates?limit=51"), 400, "bad_request", "limit must be a number from 1 to 50.");
+
+    // Walk the whole list two at a time. Other specs may activate or revoke templates meanwhile, so
+    // check the walk's own shape, and that every template Active throughout shows up.
+    const activeBefore = new Set((await versions()).filter((v) => v.state === "active").map((v) => v.templateId));
+    const walk: ApiTemplateSearch["results"] = [];
+    let after = "";
+    for (let page = 0; ; page++) {
+      expect(page, "the walk ends").toBeLessThan(100);
+      const next = (await (await get(request, `/api/v1/templates?limit=2${after ? `&after=${after}` : ""}`)).json()) as ApiTemplateSearch;
+      expect(next.results.length).toBeLessThanOrEqual(2);
+      walk.push(...next.results);
+      if (!next.hasMore) break;
+      after = next.nextCursor;
+    }
+    const ids = walk.map((r) => r.id);
+    expect(new Set(ids).size, "no template twice").toBe(ids.length);
+    const names = walk.map((r) => r.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    const activeAfter = new Set((await versions()).filter((v) => v.state === "active").map((v) => v.templateId));
+    for (const id of activeBefore) if (activeAfter.has(id)) expect(ids, id).toContain(id);
+
+    await expectError(await get(request, `/api/v1/templates?q=rate&after=${body.nextCursor}`), 400, "bad_request", "after must be the nextCursor of an earlier page of this list.");
   });
 
   test("X-Consumer-Id is required and must be registered", async ({ request }) => {
@@ -180,13 +203,38 @@ test.describe("GET /api/v1/templates/{id}", () => {
 
 // ── 3. Notices ───────────────────────────────────────────────────────────────
 
+/** Every page of Coral's notices from `after` (none: the start), following nextCursor until hasMore is false. */
+async function walkNotices(request: APIRequestContext, query: string, after = ""): Promise<{ pages: ApiNoticeList[]; end: string }> {
+  const pages: ApiNoticeList[] = [];
+  for (;;) {
+    expect(pages.length, "the walk ends").toBeLessThan(200);
+    const res = await get(request, `/api/v1/consumers/coral/notices?${query}${after ? `&after=${after}` : ""}`);
+    expect(res.status()).toBe(200);
+    const page = (await res.json()) as ApiNoticeList;
+    pages.push(page);
+    after = page.nextCursor;
+    if (!page.hasMore) return { pages, end: after };
+  }
+}
+
+/** Each notice's place in the outbox (consumer_notices.seq), in the order given; ids no longer stored are left out. */
+async function seqs(ids: string[]): Promise<number[]> {
+  const { rows } = await db.execute({ sql: `SELECT id, seq FROM consumer_notices WHERE id IN (${ids.map(() => "?").join(",")})`, args: ids });
+  const byId = new Map(rows.map((r) => [String(r.id), Number(r.seq)]));
+  return ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+}
+
+const increasing = (values: number[]) => values.every((v, i) => i === 0 || v > values[i - 1]!);
+
 test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
-  test("Coral's notices, newest first, each one Coral's and worded", async ({ request }) => {
+  test("Coral's notices, oldest first in the order written, each one Coral's and worded", async ({ request }) => {
     const res = await get(request, "/api/v1/consumers/coral/notices?limit=200");
     expect(res.status()).toBe(200);
     expect(res.headers()["cache-control"]).toBe("no-store");
     const body = (await res.json()) as ApiNoticeList;
     expect(body.consumerId).toBe("coral");
+    expect(body.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(typeof body.hasMore).toBe("boolean");
     const { rows } = await db.execute("SELECT id FROM consumer_notices WHERE consumer_id = 'coral'");
     const coral = new Set(rows.map((r) => String(r.id)));
     expect(body.notices.length).toBeGreaterThan(0);
@@ -194,8 +242,7 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
       expect(coral.has(n.id), n.id).toBe(true);
       expect(n.message).toMatch(new RegExp(`^${n.template.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} v${n.versionNumber} `));
     }
-    const times = body.notices.map((n) => n.createdAt);
-    expect(times).toEqual([...times].sort().reverse());
+    expect(increasing(await seqs(body.notices.map((n) => n.id))), "in seq order").toBe(true);
 
     // The seeded sunset (both payload shapes normalize to the same fields).
     const sunset = body.notices.find((n) => n.kind === "sunset_scheduled");
@@ -205,17 +252,27 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
     expect(revoked?.reason).toBeTruthy();
   });
 
-  test("templateId, since and limit filter", async ({ request }) => {
-    const all = ((await (await get(request, "/api/v1/consumers/coral/notices")).json()) as ApiNoticeList).notices;
+  test("templateId filters; limit and after page through every notice once, in order", async ({ request }) => {
+    const all = ((await (await get(request, "/api/v1/consumers/coral/notices?limit=200")).json()) as ApiNoticeList).notices;
     const templateId = all[0]!.template.id;
-    const one = ((await (await get(request, `/api/v1/consumers/coral/notices?templateId=${templateId}`)).json()) as ApiNoticeList).notices;
-    expect(one.every((n) => n.template.id === templateId)).toBe(true);
-    const limited = ((await (await get(request, "/api/v1/consumers/coral/notices?limit=1")).json()) as ApiNoticeList).notices;
-    expect(limited).toHaveLength(1);
-    const since = encodeURIComponent(all[1]!.createdAt);
-    const newer = ((await (await get(request, `/api/v1/consumers/coral/notices?since=${since}`)).json()) as ApiNoticeList).notices;
-    expect(newer.every((n) => n.createdAt > all[1]!.createdAt)).toBe(true);
-    expect(newer.map((n) => n.id)).toContain(all[0]!.id);
+    const one = await walkNotices(request, `templateId=${templateId}&limit=1`);
+    expect(one.pages.flatMap((p) => p.notices).every((n) => n.template.id === templateId)).toBe(true);
+
+    // One at a time from the start. Other specs may write (or clean up) notices meanwhile: the walk
+    // finds every earlier notice still stored, in the same order, never one twice or out of order.
+    const { pages, end } = await walkNotices(request, "limit=1");
+    expect(pages.slice(0, -1).every((p) => p.notices.length === 1 && p.hasMore)).toBe(true);
+    const walked = pages.flatMap((p) => p.notices.map((n) => n.id));
+    expect(new Set(walked).size, "no notice twice").toBe(walked.length);
+    const { rows } = await db.execute("SELECT id FROM consumer_notices WHERE consumer_id = 'coral'");
+    const stored = new Set(rows.map((r) => String(r.id)));
+    const earlier = all.map((n) => n.id);
+    expect(walked.filter((id) => earlier.includes(id))).toEqual(earlier.filter((id) => stored.has(id)));
+    expect(increasing(await seqs(walked)), "in seq order").toBe(true);
+
+    // The last cursor is where a poll resumes: nothing older comes back.
+    const resumed = await walkNotices(request, "limit=50", end);
+    expect(resumed.pages.flatMap((p) => p.notices).filter((n) => walked.includes(n.id))).toEqual([]);
   });
 
   test("errors: consumer, path consumer, mismatch, bad parameters", async ({ request }) => {
@@ -224,7 +281,11 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
     await expectError(await get(request, path, { "X-Consumer-Id": "acme" }), 403, "unknown_consumer", 'Consumer "acme" isn\'t registered.');
     await expectError(await get(request, "/api/v1/consumers/acme/notices"), 404, "consumer_not_found", "Consumer acme doesn't exist.");
     await expectError(await get(request, "/api/v1/consumers/deposits-online/notices"), 403, "consumer_mismatch", "X-Consumer-Id doesn't match consumer deposits-online.");
-    await expectError(await get(request, `${path}?since=soon`), 400, "bad_request", "since must be a date and time, like 2026-10-05T12:00:00Z.");
     await expectError(await get(request, `${path}?limit=500`), 400, "bad_request", "limit must be a number from 1 to 200.");
+    const badAfter = "after must be the nextCursor of an earlier page of this list.";
+    await expectError(await get(request, `${path}?after=soon`), 400, "bad_request", badAfter);
+    await expectError(await get(request, `${path}?after=${encodeURIComponent("2026-10-05T12:00:00Z")}`), 400, "bad_request", badAfter);
+    const search = (await (await get(request, "/api/v1/templates?limit=1")).json()) as ApiTemplateSearch;
+    await expectError(await get(request, `${path}?after=${search.nextCursor}`), 400, "bad_request", badAfter);
   });
 });

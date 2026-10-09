@@ -118,8 +118,10 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   version, and when a newer version is Active, reads `?since={pinned}` for the diff. The offer page shows
   "vN available" with the `newRequired` keys, or "A send now fails" when the pin is revoked or past its sunset.
   Relinking reopens the link flow with `?template=` set: What changed, Map new value, Confirm.
-- **Notices** (`NoticesPanel`, `markNoticesRead`). Read from `GET /api/v1/consumers/coral/notices`; read state is
-  Coral's own.
+- **Notices** (`NoticesPanel`, `markNoticesRead`). Read from `GET /api/v1/consumers/coral/notices`, page after page
+  (`allNotices` follows `nextCursor` until `hasMore` is false), and shown newest first; read state is Coral's own.
+  Coral keeps no cursor and reads the whole outbox on each page load. A consumer that polls would keep the last
+  `nextCursor` instead.
 
 **Against a different backend.** The simulator knows only the HTTP contract, so pointing it at another
 implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCOMP_API_ORIGIN`. In a real consumer,

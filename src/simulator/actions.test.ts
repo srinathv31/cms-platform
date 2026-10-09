@@ -96,10 +96,13 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
   };
 }
 
+/** Oldest first, as the API serves them. */
 const NOTICES = [
-  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
   { id: "ntc_1", kind: "new_version", createdAt: "2026-09-01T00:00:00.000Z", template: { id: "UC-OTHER1", name: "Other" }, versionNumber: 2, activeVersion: 2, sunsetAt: null, reason: null, changes: [], message: "Other v2 is available. No contract changes." },
+  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
 ];
+/** The fake serves one notice per page whatever the limit, so Coral has to follow nextCursor. */
+const noticeCalls: URLSearchParams[] = [];
 
 const apiError = (status: number, code: string, message: string) => Response.json({ error: { code, message } }, { status });
 
@@ -112,8 +115,13 @@ async function fakeUcomp(input: RequestInfo | URL, init: RequestInit = {}): Prom
     return Response.json({ query: url.searchParams.get("q") ?? "", asOf: "", results: [{ id: TPL, name: NAME, activeVersion: ucomp.active }] });
   }
   if (path === "/api/v1/consumers/coral/notices") {
+    noticeCalls.push(url.searchParams);
     const t = url.searchParams.get("templateId");
-    return Response.json({ consumerId: "coral", asOf: "", notices: NOTICES.filter((n) => !t || n.template.id === t) });
+    const mine = NOTICES.filter((n) => !t || n.template.id === t);
+    // The fake's cursor is the count already served, prefixed so it can't be mistaken for a number.
+    const from = Number(url.searchParams.get("after")?.replace(/^c/, "") ?? 0);
+    const notices = mine.slice(from, from + 1);
+    return Response.json({ consumerId: "coral", asOf: "", notices, hasMore: from + 1 < mine.length, nextCursor: `c${from + notices.length}` });
   }
   if (path === `/api/v1/templates/${TPL}`) {
     const version = url.searchParams.get("version");
@@ -338,7 +346,11 @@ describe("upgrade, sunset and relink", () => {
 
 describe("notices", () => {
   it("lists Coral's notices with read state and linked offers, and marks them read", async () => {
+    noticeCalls.length = 0;
     const before = await queries.getSimHome();
+    // Every page, followed by nextCursor until hasMore is false; shown newest first.
+    expect(noticeCalls.map((p) => p.get("after"))).toEqual([null, "c1"]);
+    expect(before.notices.map((n) => n.id)).toEqual(["ntc_2", "ntc_1"]);
     expect(before.unread).toBe(2);
     expect(before.notices[0]).toMatchObject({ id: "ntc_2", templateName: NAME, versionNumber: 3, read: false, offerIds: ["offer_spring_travel"], lines: ["v3 adds required `annual_fee` (Currency)."] });
 

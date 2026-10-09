@@ -258,18 +258,30 @@ export const renderLog = sqliteTable(
   ],
 );
 
-/** UCOMP's outbox to consumers: new version available, sunset scheduled, revoked. */
-export const consumerNotices = sqliteTable("consumer_notices", {
-  id: text("id").primaryKey(),
-  consumerId: text("consumer_id")
-    .notNull()
-    .references(() => consumers.id),
-  templateId: text("template_id").notNull(),
-  versionId: text("version_id").notNull(),
-  kind: text("kind").$type<"new_version" | "sunset_scheduled" | "revoked">().notNull(),
-  payload: json<Record<string, unknown>>("payload").notNull(),
-  createdAt: ts("created_at").notNull(),
-});
+/**
+ * UCOMP's outbox to consumers: new version available, sunset scheduled, revoked.
+ *
+ * `seq` is the order notices were committed in, and the notices API pages on it: 1, 2, 3, … across all
+ * consumers, assigned inside the writing transaction (`nextNoticeSeq` in server/effects.ts). Writers
+ * take turns, so a notice that becomes visible later always has a higher `seq`. `created_at` is the
+ * action's clock, read before its transaction, so it can't order the outbox; ids are random.
+ */
+export const consumerNotices = sqliteTable(
+  "consumer_notices",
+  {
+    id: text("id").primaryKey(),
+    seq: integer("seq").notNull(),
+    consumerId: text("consumer_id")
+      .notNull()
+      .references(() => consumers.id),
+    templateId: text("template_id").notNull(),
+    versionId: text("version_id").notNull(),
+    kind: text("kind").$type<"new_version" | "sunset_scheduled" | "revoked">().notNull(),
+    payload: json<Record<string, unknown>>("payload").notNull(),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("consumer_notices_seq").on(t.seq), index("consumer_notices_consumer_seq").on(t.consumerId, t.seq)],
+);
 
 // ── Audit, notifications, access ──────────────────────────────
 export const auditEvents = sqliteTable(

@@ -75,9 +75,40 @@ describe("GET /api/v1/templates", () => {
     expect(body.results.length).toBeLessThanOrEqual(20);
   });
 
-  it("limit cuts the list", async () => {
-    const body = (await (await get("?limit=2")).json()) as ApiTemplateSearch;
-    expect(body.results).toHaveLength(2);
+  it("limit cuts the list into pages; following nextCursor reads every result once, in order", async () => {
+    const all = ((await (await get("?limit=50")).json()) as ApiTemplateSearch).results.map((r) => r.id);
+    expect(all.length).toBeGreaterThan(2);
+    const first = (await (await get("?limit=2")).json()) as ApiTemplateSearch;
+    expect(first.results).toHaveLength(2);
+    expect(first.hasMore).toBe(true);
+
+    const seen: string[] = [];
+    let after = "";
+    for (;;) {
+      const page = (await (await get(`?limit=2${after ? `&after=${after}` : ""}`)).json()) as ApiTemplateSearch;
+      expect(page.results.length).toBeLessThanOrEqual(2);
+      seen.push(...page.results.map((r) => r.id));
+      if (!page.hasMore) break;
+      after = page.nextCursor;
+    }
+    expect(seen).toEqual(all);
+  });
+
+  it("a query's cursor pages that query: q matches in any case, and the last page says no more", async () => {
+    const page1 = (await (await get("?q=rate&limit=1")).json()) as ApiTemplateSearch;
+    const page2 = (await (await get(`?q=RATE&limit=50&after=${page1.nextCursor}`)).json()) as ApiTemplateSearch;
+    const all = ((await (await get("?q=rate&limit=50")).json()) as ApiTemplateSearch).results.map((r) => r.id);
+    expect([...page1.results, ...page2.results].map((r) => r.id)).toEqual(all);
+    expect(page2.hasMore).toBe(false);
+    expect(page2.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("400 bad_request for an after that isn't a cursor of this search", async () => {
+    const message = "after must be the nextCursor of an earlier page of this list.";
+    const rate = ((await (await get("?q=rate&limit=1")).json()) as ApiTemplateSearch).nextCursor;
+    await expectError(await get(`?q=balance&after=${rate}`), 400, "bad_request", message);
+    await expectError(await get("?after=not-a-cursor!"), 400, "bad_request", message);
+    await expectError(await get("?after=e30"), 400, "bad_request", message);
   });
 
   it("400 consumer_required without X-Consumer-Id", async () => {

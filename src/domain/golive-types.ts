@@ -129,10 +129,11 @@ export interface ResponseFormat {
 // ── Consumer API queries (slice S1, src/server/queries/consumer-api.ts; no viewer, consumer-scoped) ──
 //
 //   requireConsumer(header: string | null): Promise<{ ok: true; consumer: { id: string; name: string } } | { ok: false; error: ApiError }>
-//   searchActiveTemplates(q: string, limit: number, now: Date): Promise<ApiTemplateSummary[]>
+//   searchActiveTemplates(q: string, limit: number, after: SearchKey | null): Promise<SearchPage>
 //   getTemplateDetail(templateId: string, opts: { version?: number; since?: number }, now: Date):
 //     Promise<{ ok: true; detail: ApiTemplateDetail } | { ok: false; error: ApiError }>
-//   listNotices(consumerId: string, opts: { since?: Date; templateId?: string; limit: number }): Promise<ApiNotice[]>
+//   listNotices(consumerId: string, opts: { after?: number; templateId?: string; limit: number }): Promise<NoticePage>
+//     Both lists page with the opaque cursors in golive/cursor.ts (ApiPage in the contract).
 //
 // Routes (slice S1), GET handlers. Read `request.headers` FIRST (it makes the handler dynamic under
 // Cache Components; a DB read before it would try to prerender). Same header helpers as the render route

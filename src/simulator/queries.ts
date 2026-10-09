@@ -1,7 +1,7 @@
 import "server-only";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { connection } from "next/server";
-import type { ApiChannel, ApiContract, ApiTemplateDetail } from "@/contracts/api-v1";
+import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
 import { simDb } from "./db";
 import { SIM_FIELDS, simField } from "./fields";
@@ -102,20 +102,39 @@ export async function loadLinkState(api: UcompApi, link: LinkRow): Promise<LinkS
   return { summary: linkSummaryOf(link, detail.data), contract: detail.data.contract, upgrade, error };
 }
 
-/** Coral's notices (newest first, as the API orders them) with Coral's read state and linked offers. */
+/**
+ * Every Coral notice (one template's with `templateId`), oldest first as the API serves them: reads
+ * page after page until `hasMore` is false. Coral keeps no cursor and reads the whole outbox on each
+ * page load, which is fine at a simulator's size; a consumer that polls keeps the last `nextCursor`.
+ */
+async function allNotices(api: UcompApi, templateId?: string): Promise<{ ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }> {
+  const notices: ApiNotice[] = [];
+  let after: string | undefined;
+  for (;;) {
+    const page = await api.listNotices({ templateId, limit: 200, after });
+    if (!page.ok) return page;
+    notices.push(...page.data.notices);
+    // A cursor that didn't move would ask for the same page forever.
+    if (!page.data.hasMore || page.data.nextCursor === after) return { ok: true, notices };
+    after = page.data.nextCursor;
+  }
+}
+
+/** Coral's notices, newest first, with Coral's read state and linked offers. */
 async function loadNotices(
   api: UcompApi,
   links: readonly LinkRow[],
   templateId?: string,
 ): Promise<{ notices: SimNoticeView[]; error: SimApiError | null }> {
-  const list = await api.listNotices({ templateId, limit: 200 });
+  const list = await allNotices(api, templateId);
   if (!list.ok) return { notices: [], error: list.error };
-  const ids = list.data.notices.map((n) => n.id);
+  const newestFirst = [...list.notices].reverse();
+  const ids = newestFirst.map((n) => n.id);
   const reads = ids.length
     ? await simDb.select({ id: simNoticeReads.noticeId }).from(simNoticeReads).where(inArray(simNoticeReads.noticeId, ids))
     : [];
   const read = new Set(reads.map((r) => r.id));
-  const notices = list.data.notices.map(
+  const notices = newestFirst.map(
     (n): SimNoticeView => ({
       id: n.id,
       kind: n.kind,

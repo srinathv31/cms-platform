@@ -55,7 +55,7 @@ Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (kept as reference).
 
 ### Consumer API (S1)
 - **The JSON Schema describes only canonical forms**: decimals as strings matching `^(?!-0(?:\.0+)?$)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$` (no leading zeros, no negative zero, no exponent; strings only, since a pattern can't constrain a JSON number), dates as `format: date` + a YYYY-MM-DD pattern that checks the calendar, states as an enum of 51 codes. The route still accepts the friendly forms and JSON numbers (read from their source text, same grammar). Tests check that whatever the schema accepts, render accepts too.
-- **Notices route check order**: header missing (400) → header unregistered (403) → path consumer unregistered (404) → mismatch (403). A notices `since` with no zone is read as UTC.
+- **Notices route check order**: header missing (400) → header unregistered (403) → path consumer unregistered (404) → mismatch (403). A notices `since` with no zone is read as UTC (superseded by [0006](0006-page-notices-by-commit-order.md): `since` was removed; notices page oldest first with an `after` cursor).
 - **Seeded revoke notices get `activeVersion` filled in** from the versions' dates.
 - **Sample snippets name the template's most recent real consumer**, falling back to the first registered one ("coral").
 

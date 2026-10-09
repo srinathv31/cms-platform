@@ -145,7 +145,8 @@ at Turso instead. Two schema files:
     revoke fields); `approvals`.
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
-  - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it).
+  - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it
+    and numbered in commit order by `seq`, which the notices API pages on).
   - **Audit and access:** `audit_events`, `notifications`, `access_requests`, `recertifications`, `recert_items`.
 - [schema/sim.ts](../src/server/db/schema/sim.ts), Coral's `sim_*` tables. Only the simulator, the seed, and the
   reset may import it.

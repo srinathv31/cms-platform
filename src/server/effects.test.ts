@@ -273,6 +273,25 @@ describe("writeEffects: consumer notices", () => {
     expect(JSON.stringify(rows[0]!.payload)).not.toContain("first_name");
   });
 
+  it("numbers notices in the order they are written, past the highest seq, whatever their clock says", async () => {
+    const highest = async () => (await db.select({ seq: consumerNotices.seq }).from(consumerNotices)).reduce((m, r) => Math.max(m, r.seq), 0);
+    const v1 = await versionId("balance-transfer", 1);
+    const before = await highest();
+
+    // One action, two notices at the same instant: consecutive numbers.
+    const first = context("balance-transfer", { versionId: v1 });
+    await write([sunsetNotice(v1), sunsetNotice(v1)], first);
+    const firstRows = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, first.at));
+    expect(firstRows.map((r) => r.seq).sort((a, b) => a - b)).toEqual([before + 1, before + 2]);
+
+    // An action whose clock was read earlier but that commits later still numbers after: the
+    // notices API pages on seq, so a consumer already past `before + 2` still gets it.
+    const earlier = context("balance-transfer", { versionId: v1, at: new Date(first.at.getTime() - 500) });
+    await write([sunsetNotice(v1)], earlier);
+    const [late] = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, earlier.at));
+    expect(late!.seq).toBe(before + 3);
+  });
+
   it("ignores preview renders and renders older than 90 days", async () => {
     // Annual Fee Waiver has only previews.
     const previewOnly = context("annual-fee-waiver");

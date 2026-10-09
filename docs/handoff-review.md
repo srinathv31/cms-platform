@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 11 | 30 | 13 | 54 |
+| Open | 0 | 10 | 30 | 13 | 53 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 11 | 5 | 1 | 18 |
+| Fixed | 1 | 12 | 5 | 1 | 19 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -539,7 +539,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
-- **Status:** Open
+- **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
 - **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.
