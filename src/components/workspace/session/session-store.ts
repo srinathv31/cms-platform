@@ -27,6 +27,8 @@
 //     redo, the revert menu), and revert, replace and restore refuse. Autosave keeps running: what
 //     was typed before the click still goes out. A save the server refuses for good (a conflict)
 //     holds it the same way, for as long as that draft stays bound (decision 0012).
+//   - the controls that code sends focus to (the name field, the status row, the Preview toggle, the
+//     rail's Original tab), registered by the components that own them (focus-targets.ts, decision 0027).
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -34,6 +36,7 @@
 import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
 import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
+import { createFocusTargets, type FocusTargets } from "./focus-targets";
 
 /** The draft the workspace is editing. `rev` is where autosave starts; it is read once per version. */
 export interface DraftBinding {
@@ -230,6 +233,12 @@ export interface WorkspaceSession {
   closePreview: () => void;
   /** Changes any of the preview's fields; a change that changes nothing notifies nobody. */
   setPreview: (patch: Partial<PreviewState>) => void;
+
+  /**
+   * The controls that code sends focus to, registered by the components that own them while they are mounted.
+   * Callers find a control here by name, never through the DOM. Registering notifies no subscriber.
+   */
+  focusTargets: FocusTargets;
 }
 
 const SAVED: SessionStatus = { status: "saved" };
@@ -515,5 +524,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     openOriginal: () => setPreview({ open: true, view: "original" }),
     closePreview: () => setPreview({ open: false }),
     setPreview,
+
+    focusTargets: createFocusTargets(),
   };
 }

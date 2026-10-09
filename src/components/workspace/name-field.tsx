@@ -74,6 +74,13 @@ function EditableName({ name }: { name: string }) {
     [session, openingName],
   );
 
+  // The rail asks the session for this field, to tell an Esc here from one elsewhere (content/rail.tsx).
+  // Registered before it can be focused below, so whoever asks finds it.
+  useEffect(() => {
+    const el = field.current;
+    return el ? session.focusTargets.register("name", el) : undefined;
+  }, [session]);
+
   // A new template: focus the name with all of it selected. The flag is taken as it is read, so this
   // happens once, on arrival; a re-run of the effect (Strict Mode, the page shown again after Back and
   // Forward) finds nothing to take. Nothing here touches the address or the router.

@@ -9,6 +9,7 @@ import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { NameField } from "./name-field";
 import { SaveStatus, SaveStopped } from "./save-status";
 import { BindDraft } from "./session/workspace-session";
+import { StatusRow } from "./status-row";
 import { WS } from "./workspace-grid";
 import { WorkspaceShare } from "./workspace-share";
 
@@ -48,12 +49,9 @@ export async function WorkspaceHeader({
       <div className="col-span-2 col-start-1 row-start-1 min-w-0">
         <NameField name={t.name} editable={t.editable} />
       </div>
-      {/* tabIndex -1: after a submit, focus lands here (workspace-actions.tsx), where the new state reads. */}
-      <div
-        data-slot="status-row"
-        role="group"
-        aria-label="Status"
-        tabIndex={-1}
+      {/* After a submit or a revert, focus lands here (workspace-actions.tsx, save-status.tsx), where the outcome reads. */}
+      <StatusRow
+        state={t.status}
         className="col-start-1 row-start-2 -mx-1.5 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end justify-self-start rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <StatusBadge state={t.status} sunsetDay={t.sunsetDay} now={nowDate} />
@@ -74,7 +72,7 @@ export async function WorkspaceHeader({
             View only
           </Badge>
         ) : null}
-      </div>
+      </StatusRow>
       {/* The value row sits on the status row's line. */}
       <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
       {/* Saving stopped for good: a line of its own, the header's full width. */}

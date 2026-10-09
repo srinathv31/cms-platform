@@ -212,7 +212,7 @@ function offerUndo(session: WorkspaceSession, message: string, previous: SaveFie
   requestAnimationFrame(() => {
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    document.querySelector<HTMLElement>('[data-slot="status-row"]')?.focus({ preventScroll: true });
+    session.focusTargets.get("statusRow")?.focus({ preventScroll: true });
   });
 }
 

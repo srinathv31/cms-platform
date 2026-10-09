@@ -334,6 +334,25 @@ describe("Revert to v1", () => {
     expect(content).not.toHaveBeenCalled();
   });
 
+  it("puts focus on the header's status row, found through the session, when the menu went away with the changes", async () => {
+    // Nothing to revert to but the opening: once that is put back, the status is no menu, and its trigger goes.
+    await act(async () => root.render(page(<SaveStatus templateId="UC-ABC123" basedOn={null} activeNumber={null} />)));
+    await act(async () => session!.save({ body: doc("Typed") }));
+    // The status row as `StatusRow` registers it: by name, whatever its label or markup.
+    const row = document.createElement("div");
+    row.tabIndex = -1;
+    document.body.append(row);
+    session!.focusTargets.register("statusRow", row, "draft");
+
+    await openMenu();
+    const opening = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) =>
+      el.textContent?.includes("Revert to when you opened it"),
+    )!;
+    await click(opening);
+    await until(() => document.activeElement === row);
+    expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull();
+  });
+
   // The name is a version field: reverting to v1 brings v1's name back too, and Undo the draft's.
   it("puts v1's name in the name field and saves it, and Undo puts the draft's name back", async () => {
     baseRoute.mockResolvedValue({ ok: true, base: V1 });

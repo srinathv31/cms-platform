@@ -162,6 +162,58 @@ describe("submitting", () => {
     expect(session.getInert()).toBe(false);
   });
 
+  describe("focus after the submit", () => {
+    /** The header's status row as `StatusRow` registers it: by name and state, under any label or markup. */
+    function statusRow(state: string) {
+      const row = document.createElement("div");
+      row.tabIndex = -1;
+      row.setAttribute("aria-label", "Anything at all");
+      document.body.append(row);
+      session.focusTargets.register("statusRow", row, state);
+      return row;
+    }
+
+    /** Submits from the dialog, then the refreshed page drops the draft and this button with it (after `before`). */
+    async function submitAndGo(before?: () => void) {
+      await click(submitButton());
+      await tick();
+      await click(button(/^Submit v3$/)!);
+      await tick();
+      before?.();
+      await act(async () => root.render(null));
+    }
+
+    it("lands on the status row once the header registers it as In review", async () => {
+      const draftRow = statusRow("draft");
+      await submitAndGo();
+      await tick();
+      expect(document.activeElement, "not while the row still reads Draft").not.toBe(draftRow);
+
+      const inReview = statusRow("in_review");
+      await tick();
+      expect(document.activeElement).toBe(inReview);
+    });
+
+    it("lands on it straight away when the header already reads In review as the button goes", async () => {
+      let inReview: HTMLElement | null = null;
+      // The same refresh re-rendered the header first: its row is In review before the button's cleanup runs.
+      await submitAndGo(() => (inReview = statusRow("in_review")));
+      await tick();
+      expect(inReview).not.toBeNull();
+      expect(document.activeElement).toBe(inReview);
+    });
+
+    it("leaves focus alone when the person has moved it somewhere else", async () => {
+      await submitAndGo();
+      const elsewhere = document.createElement("button");
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      statusRow("in_review");
+      await tick();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+  });
+
   it("refuses inside the dialog, without submitting, when the last flush fails", async () => {
     await click(submitButton());
     await tick();

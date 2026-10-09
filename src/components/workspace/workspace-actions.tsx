@@ -16,7 +16,7 @@ import type { SubmitSummary } from "@/components/submit/types";
 import type { ActionResult } from "@/domain/review-types";
 import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";
-import { usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
+import { useFocusTarget, usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
 
 /**
  * "Edit" on a template whose latest version is Active or Revoked: the one black button. It opens the
@@ -63,28 +63,24 @@ async function saveFirst(session: WorkspaceSession): Promise<ActionResult> {
   return saved.status === "error" ? { ok: false, code: "failed", reason: saved.error ?? NOT_SAVED } : { ok: true };
 }
 
+/** How long focus waits for the header to read In review after a submit (`focusStatusRow`) before it gives up. */
+const STATUS_ROW_WAIT_MS = 3000;
+
 /**
  * Puts focus on the header's status row once the page behind a submit has re-rendered as In review.
  * The Submit button unmounts with the draft, and focus would fall to the page; the row is where the
  * outcome is ("In review v2"), and its `tabIndex={-1}` lets a script land there without adding a Tab
- * stop. It waits a few frames for the new header, and does nothing if the person has already moved
- * focus somewhere else.
+ * stop. It waits for the header to register its row as In review (`StatusRow`, a focus target on the
+ * session), and does nothing if the person has already moved focus somewhere else.
  */
-function focusStatusRow() {
-  const started = performance.now();
-  const attempt = () => {
-    const row = document.querySelector<HTMLElement>('[data-slot="status-row"]');
-    const done = row?.querySelector('[data-status="in_review"]') != null;
-    const active = document.activeElement;
-    const free = active === null || active === document.body;
-    if (!free) return;
-    if (row && done) {
-      row.focus({ preventScroll: true });
-      return;
-    }
-    if (performance.now() - started < 3000) requestAnimationFrame(attempt);
-  };
-  requestAnimationFrame(attempt);
+function focusStatusRow(session: WorkspaceSession) {
+  void session.focusTargets
+    .waitFor("statusRow", { accept: (_, state) => state === "in_review", timeout: STATUS_ROW_WAIT_MS })
+    .then((row) => {
+      const active = document.activeElement;
+      const free = active === null || active === document.body;
+      if (row && free) row.focus({ preventScroll: true });
+    });
 }
 
 /**
@@ -124,9 +120,9 @@ export function SubmitButton({ templateId }: { templateId: string }) {
     () => () => {
       letGoRef.current?.();
       letGoRef.current = null;
-      if (submittedAt.current !== null && performance.now() - submittedAt.current < 10_000) focusStatusRow();
+      if (submittedAt.current !== null && performance.now() - submittedAt.current < 10_000) focusStatusRow(session);
     },
-    [],
+    [session],
   );
 
   function hold() {
@@ -261,6 +257,8 @@ export function PreviewToggle({ className }: { className?: string }) {
   const segment = useSelectedLayoutSegment();
   const session = useWorkspaceSession();
   const { open: widened, view } = usePreviewState();
+  // Focus comes back here when the preview closes and would otherwise lose it (`closePreview`).
+  const focusTarget = useFocusTarget("previewToggle");
   // Pressed only while the Preview view itself is on screen: the widened rail on Original (or Comments) isn't "Preview".
   const open = widened && view === "preview";
   const onContent = segment === null;
@@ -277,11 +275,11 @@ export function PreviewToggle({ className }: { className?: string }) {
       <TooltipTrigger
         render={
           <Button
+            ref={focusTarget}
             variant="outline"
             size="lg"
             aria-label="Preview"
             aria-pressed={open}
-            data-preview-toggle=""
             onClick={() => (open ? session.closePreview() : session.openPreview())}
             className={cn(
               "px-3.5 aria-pressed:bg-selected @max-[34rem]/bar:w-9 @max-[34rem]/bar:px-0 @max-[53rem]/ws:@max-[39rem]/bar:w-9 @max-[53rem]/ws:@max-[39rem]/bar:px-0",

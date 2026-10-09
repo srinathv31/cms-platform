@@ -10,8 +10,9 @@ import { duration, ease } from "@/components/motion/presets";
 import { closePreview } from "@/components/preview/close-preview";
 import { RailHeader, railHeaderViews } from "@/components/preview/rail-header";
 import { cn } from "@/lib/utils";
+import type { FocusTargets } from "../session/focus-targets";
 import { useRailView } from "../session/rail-view";
-import { usePreviewState, useRailOpen, useWorkspaceSession } from "../session/workspace-session";
+import { useFocusTarget, usePreviewState, useRailOpen, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 
 /**
@@ -20,37 +21,44 @@ import { WS } from "../workspace-grid";
  */
 const OPEN_POPUP = '[role="menu"], [role="listbox"], [role="dialog"]';
 
+/** How long focus waits for the other header row's Original tab to mount (`focusOriginalTab`) before it gives up. */
+const ORIGINAL_TAB_WAIT_MS = 1000;
+
 /**
- * The template name in the header (name-field.tsx). Its own Escape puts the old name back and leaves
- * the field, so an Escape there is spoken for only while the name is mid-edit; with nothing to put
- * back it is just a way out of the field, and the preview closes.
+ * Whether `target` is the template name in the header (name-field.tsx), which registers itself as a
+ * focus target. Its own Escape puts the old name back and leaves the field, so an Escape there is
+ * spoken for only while the name is mid-edit; with nothing to put back it is just a way out of the
+ * field, and the preview closes.
  */
-const NAME_FIELD = 'textarea[aria-label="Template name"]';
+function inNameField(targets: FocusTargets, target: Element | null): boolean {
+  const name = targets.get("name");
+  return name !== null && target !== null && name.contains(target);
+}
+
+/**
+ * The rail's header row is swapping (the plain rail's widens, or the widened rail is put away), and
+ * `replaced` is the Original tab going with it: focus goes to the Original tab of the row that comes,
+ * once it has mounted, when that is on screen. Widened from the plain rail's Original tab, that is the
+ * widened rail's. Put away from the Original view, it is the plain rail's (what opened it); below the
+ * breakpoint the rail goes away with it, and the Preview toggle, where `closePreview` put focus, keeps it.
+ */
+function focusOriginalTab(targets: FocusTargets, replaced: HTMLElement | null) {
+  void targets.waitFor("originalTab", { accept: (tab) => tab !== replaced, timeout: ORIGINAL_TAB_WAIT_MS }).then((tab) => {
+    if (tab?.isConnected && tab.getClientRects().length > 0) tab.focus({ preventScroll: true });
+  });
+}
 
 /**
  * Whether an Escape is already spoken for by something that is open when it is pressed: a menu or
- * popover, or the editor's `/` menu or `{{` picker (they point the editor at their list with
- * `aria-controls` while they are open). Asked in the capture phase, before they handle the key and
- * close, because the editor closes its menu inside its own handler and React has unmounted it by
- * the time a bubbling listener runs.
+ * popover, the editor's `/` menu or `{{` picker (they point the editor at their list with
+ * `aria-controls` while they are open), or a name that is mid-edit. Asked in the capture phase, before
+ * they handle the key and close, because the editor closes its menu inside its own handler and React
+ * has unmounted it by the time a bubbling listener runs.
  */
-/**
- * After the widened rail is put away from its Original view, focus goes back to the plain rail's
- * Original tab (what opened it) when that is on screen; below the breakpoint the rail goes away with
- * it and the Preview toggle, where `closePreview` put focus, keeps it.
- */
-function focusOriginalTab(rail: HTMLElement | null) {
-  const tab = [...(rail?.querySelectorAll<HTMLElement>('[data-slot="rail-header"] [role="tab"]') ?? [])].find(
-    (el) => el.textContent?.trim().startsWith("Original") && el.getClientRects().length > 0,
-  );
-  tab?.focus({ preventScroll: true });
-}
-
-function escapeIsSpokenFor(event: KeyboardEvent, nameAtFocus: string | null): boolean {
+function escapeIsSpokenFor(event: KeyboardEvent, targets: FocusTargets, nameAtFocus: string | null): boolean {
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest(".ProseMirror")?.hasAttribute("aria-controls")) return true;
-  const name = target?.closest(NAME_FIELD);
-  if (name instanceof HTMLTextAreaElement && name.value.trim() !== nameAtFocus) return true;
+  if (inNameField(targets, target) && targets.get("name")?.value.trim() !== nameAtFocus) return true;
   // Only one on screen: a route kept mounted but hidden (`<Activity>`) can still hold an open dialog, such as
   // the Library's New template, left open by the import or starter that navigated away from it.
   return [...document.querySelectorAll(OPEN_POPUP)].some((el) => el.getClientRects().length > 0);
@@ -136,6 +144,8 @@ export function Rail({
   const plainHeader = (hasComments || original) && !previewOpen;
 
   const aside = useRef<HTMLElement>(null);
+  // The plain rail's Original tab, for focus to come back to when the widened Original view is put away.
+  const originalTab = useFocusTarget("originalTab");
   // What the name field said when it last got focus: an Esc there with the same text has no edit to put back.
   const nameAtFocus = useRef<string | null>(null);
 
@@ -168,19 +178,20 @@ export function Rail({
 
   useEffect(() => {
     const note = (el: Element | null) => {
-      if (el instanceof HTMLTextAreaElement && el.matches(NAME_FIELD)) nameAtFocus.current = el.value.trim();
+      const name = session.focusTargets.get("name");
+      if (name !== null && el === name) nameAtFocus.current = name.value.trim();
     };
     note(document.activeElement);
     const onFocusIn = (event: FocusEvent) => note(event.target instanceof Element ? event.target : null);
     document.addEventListener("focusin", onFocusIn);
     return () => document.removeEventListener("focusin", onFocusIn);
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (!open) return;
     let spokenFor = false;
     const onCapture = (event: KeyboardEvent) => {
-      if (event.key === "Escape") spokenFor = escapeIsSpokenFor(event, nameAtFocus.current);
+      if (event.key === "Escape") spokenFor = escapeIsSpokenFor(event, session.focusTargets, nameAtFocus.current);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || spokenFor) return;
@@ -189,7 +200,7 @@ export function Rail({
       // prevents it, to leave the field, which is why it was asked about in the capture phase.)
       const target = event.target instanceof Element ? event.target : null;
       const inDocument = target?.closest(".ProseMirror") != null;
-      const inName = target?.closest(NAME_FIELD) != null;
+      const inName = inNameField(session.focusTargets, target);
       if (event.defaultPrevented && !inDocument && !inName) return;
       // Focus goes back to the Preview toggle unless it is somewhere the author is working (the document).
       const active = document.activeElement;
@@ -200,9 +211,10 @@ export function Rail({
       const from = opener.current;
       const backToOpener = lost && from !== null && from.isConnected && from.getClientRects().length > 0;
       if (backToOpener) from.focus({ preventScroll: true });
+      const widenedOriginalTab = session.focusTargets.get("originalTab");
       closePreview(session, { restoreFocus: !backToOpener && previewOpen && lost });
       if (!backToOpener && previewOpen && lost && view === "original") {
-        requestAnimationFrame(() => focusOriginalTab(aside.current));
+        focusOriginalTab(session.focusTargets, widenedOriginalTab);
       }
     };
     document.addEventListener("keydown", onCapture, true);
@@ -242,11 +254,13 @@ export function Rail({
             <RailHeader
               value={showComments ? "comments" : "variables"}
               views={railHeaderViews({ preview: false, comments: comments ? comments.count : null, original })}
+              originalTabRef={originalTab}
               onChange={(next) => {
                 if (next !== "original") return session.selectRailView(next);
+                const plainOriginalTab = session.focusTargets.get("originalTab");
                 session.openOriginal();
                 // This header goes away as the rail widens (the widened rail has its own): focus follows to its Original tab.
-                requestAnimationFrame(() => requestAnimationFrame(() => focusOriginalTab(aside.current)));
+                focusOriginalTab(session.focusTargets, plainOriginalTab);
               }}
               onClose={close}
             />
