@@ -8,8 +8,10 @@ describe("senderOf", () => {
     expect(senderOf("Deposits & Savings").address).toBe("no-reply@depositssavings.example");
   });
 
-  it("still has an address for a name with nothing in it to use", () => {
-    expect(senderOf("—").address).toBe("no-reply@ucomp.example");
+  it("still has an address for a name with nothing in it to use: Stencil's, on a reserved example domain", () => {
+    expect(senderOf("—")).toEqual({ name: "—", address: "no-reply@stencil.example" });
+    expect(senderOf("").address).toBe("no-reply@stencil.example");
+    expect(senderOf("日本").address).toBe("no-reply@stencil.example");
   });
 });
 
