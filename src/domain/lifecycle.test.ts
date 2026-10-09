@@ -18,6 +18,7 @@ import {
   setSunset,
   startRevoke,
   submit,
+  sunsetPassed,
   type ReviewVersion,
   type StarterContent,
   type SubmitDraft,
@@ -1123,6 +1124,33 @@ describe("setSunset", () => {
     const result = run({ actorId: "priya" });
     expect(result.ok && result.effects.map((e) => e.kind)).toEqual(["audit", "consumer_notice"]);
   });
+
+  it("moves a sunset that is still to come, even one due at the next midnight", () => {
+    const scheduled = { ...v1, sunsetAt: TOMORROW };
+    const result = run({ version: scheduled, sunsetAt: MARCH_1 });
+    expect(result.ok && result.changes).toEqual({ sunsetAt: MARCH_1, sunsetSetBy: "jordan" });
+  });
+
+  // A version past its sunset has stopped rendering and its consumers have moved on: a new date would
+  // make it render again.
+  it.each([
+    ["the day before", new Date("2026-10-03T00:00:00.000Z")],
+    ["earlier today", new Date("2026-10-04T00:00:00.000Z")],
+    ["this very instant", NOW],
+  ])("refuses any new date once the sunset has passed (%s)", (_, passed) => {
+    const sunset = { ...v1, sunsetAt: passed };
+    for (const sunsetAt of [TOMORROW, MARCH_1]) {
+      expect(run({ version: sunset, sunsetAt })).toEqual({
+        ok: false,
+        reason: "This version's sunset has passed. It can't render again.",
+      });
+    }
+  });
+
+  it("says the version isn't Superseded before it says the sunset passed", () => {
+    const revoked = { ...v1, state: "revoked" as const, sunsetAt: new Date("2026-10-03T00:00:00.000Z") };
+    expect(run({ version: revoked })).toEqual({ ok: false, reason: REFUSALS.sunsetNotSuperseded });
+  });
 });
 
 describe("startRevoke", () => {
@@ -1302,6 +1330,14 @@ describe("review helpers", () => {
     expect(revokePending({ revoke: null })).toBe(false);
     expect(revokePending({ revoke: PENDING })).toBe(true);
     expect(revokePending({ revoke: CONFIRMED })).toBe(false);
+  });
+
+  it("sunsetPassed: a sunset at or before now (the instant renders start failing)", () => {
+    expect(sunsetPassed({ sunsetAt: null }, NOW)).toBe(false);
+    expect(sunsetPassed({ sunsetAt: TOMORROW }, NOW)).toBe(false);
+    expect(sunsetPassed({ sunsetAt: new Date(NOW.getTime() + 1) }, NOW)).toBe(false);
+    expect(sunsetPassed({ sunsetAt: NOW }, NOW)).toBe(true);
+    expect(sunsetPassed({ sunsetAt: new Date("2026-10-04T00:00:00.000Z") }, NOW)).toBe(true);
   });
 
   it("isAfterToday: a later UTC day than now", () => {

@@ -503,6 +503,33 @@ describe("setSunset", () => {
       reason: REASONS.generic,
     });
   });
+
+  it("refuses a new date once the sunset has passed, and writes nothing", async () => {
+    const templateId = ids["balance-transfer"]!;
+    const where = and(eq(versions.templateId, templateId), eq(versions.number, 1));
+    const before = (await version(templateId, 1))!;
+    const at = as("jordan");
+    // Yesterday's midnight, as a date picked in the dialog is stored.
+    const passed = new Date(`${new Date(at.getTime() - DAY).toISOString().slice(0, 10)}T00:00:00.000Z`);
+    await db.update(versions).set({ sunsetAt: passed }).where(where);
+    try {
+      const { rev } = (await version(templateId, 1))!;
+      // Any date, the one it already has included (that is no double click: the date is final).
+      for (const day of [1, 40].map((n) => new Date(at.getTime() + n * DAY)).concat(passed)) {
+        expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day.toISOString().slice(0, 10) })).toEqual({
+          ok: false,
+          reason: REFUSALS.sunsetPassed,
+        });
+      }
+      expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: passed, rev });
+      expect(await auditAt(at)).toEqual([]);
+      expect(await noticesAt(at)).toEqual([]);
+      expect(await notificationsAt(at)).toEqual([]);
+      expect(refresh).not.toHaveBeenCalled();
+    } finally {
+      await db.update(versions).set({ sunsetAt: before.sunsetAt }).where(where);
+    }
+  });
 });
 
 // ── Revoke (scenario 6) ───────────────────────────────────────

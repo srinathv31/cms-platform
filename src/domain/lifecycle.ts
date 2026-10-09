@@ -11,7 +11,7 @@
 //   submit         Draft → In review, numbered; the approvers are notified
 //   requestChanges In review → Changes requested, plus a new Draft carrying the block ids (and so the threads)
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
-//   setSunset      Superseded → Superseded with a sunset date (or a moved one)
+//   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes
 //   startRevoke    Active or Superseded → revoke pending (one approver)
 //   confirmRevoke  revoke pending → Revoked (a different approver)
 //   cancelRevoke   revoke pending → no revoke
@@ -389,6 +389,7 @@ export const REFUSALS = {
   giveReason: "Give a reason.",
   sunsetAfterToday: "Pick a date after today.",
   sunsetNotSuperseded: "Only a Superseded version can have a sunset date.",
+  sunsetPassed: "This version's sunset has passed. It can't render again.",
   notRevocable: "Only an Active or Superseded version can be revoked.",
   alreadyRevoked: "This version is already revoked.",
   revokePending: "A revoke is already waiting for confirmation.",
@@ -620,6 +621,8 @@ export function approve(input: {
   }
 
   // ── The last stage: the version goes live ──
+  // The sunset goes on the version that is Active now (the action's compare-and-set checks it still is):
+  // it is still rendering, so this starts a sunset and can't bring back one that has passed.
   const sunsetAt = active && sunsetPrevious ? sunsetPrevious : null;
   const contractChanges = [...(version.contractChanges ?? [])];
   const contractLines = describeChanges(contractChanges, number);
@@ -705,9 +708,21 @@ export type SetSunsetResult = Outcome<{
 }>;
 
 /**
+ * True once a version's sunset has come: from that instant consumer renders of it fail
+ * (`checkVersion` in render/version-rules.ts asks the same question).
+ */
+export function sunsetPassed(version: { sunsetAt: Date | null }, now: Date): boolean {
+  return version.sunsetAt !== null && version.sunsetAt.getTime() <= now.getTime();
+}
+
+/**
  * Set, or move, the date a Superseded version stops rendering. Consumers still rendering it are
  * notified with the date and, when given, the contract changes the Active version brought
  * (`contractChanges`, worded against `activeNumber`).
+ *
+ * Once the sunset has passed it is final: the version has stopped rendering and its consumers have
+ * moved on, so a new date would bring withdrawn content back. There is no clearing a sunset either,
+ * and `approve` sets one only on the version that was Active a moment ago, which was still rendering.
  */
 export function setSunset(input: {
   version: ReviewVersion;
@@ -721,6 +736,7 @@ export function setSunset(input: {
   const { version, actorId, now, sunsetAt, activeNumber, templateName } = input;
 
   if (version.state !== "superseded") return refuse(REFUSALS.sunsetNotSuperseded);
+  if (sunsetPassed(version, now)) return refuse(REFUSALS.sunsetPassed);
   if (!isAfterToday(sunsetAt, now)) return refuse(REFUSALS.sunsetAfterToday);
 
   const number = numberOf(version);

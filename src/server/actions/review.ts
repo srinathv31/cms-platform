@@ -12,6 +12,7 @@ import {
   setSunset as setSunsetTransition,
   startRevoke as startRevokeTransition,
   submit,
+  sunsetPassed,
   REFUSALS,
   type DraftFields,
   type ReviewVersion,
@@ -515,7 +516,9 @@ const SunsetInput = VersionRef.extend({ sunsetAt: z.string() });
 /**
  * Sets, or moves, the date a Superseded version stops rendering (YYYY-MM-DD, after today on the demo
  * clock). Consumers still rendering the template get a notice with the date and the contract changes
- * the Active version brought. Setting the date it already has writes nothing (a double click).
+ * the Active version brought. Setting the date it already has writes nothing (a double click). Once
+ * the sunset has passed, the transition refuses any date: the version is read again in the transaction,
+ * so a sunset that passed while the dialog was open is refused too.
  */
 export async function setSunset(input: {
   templateId: string;
@@ -535,7 +538,8 @@ export async function setSunset(input: {
   let wrote = false;
   const result = await transact(async (tx) => {
     const version = await loadVersion(tx, found, parsed.data.versionNumber);
-    if (version.state === "superseded" && version.sunsetAt?.getTime() === sunsetAt.getTime()) return { ok: true };
+    const unchanged = version.sunsetAt?.getTime() === sunsetAt.getTime();
+    if (version.state === "superseded" && unchanged && !sunsetPassed(version, at)) return { ok: true };
     const active = await activeVersion(tx, found.templateId);
 
     const outcome = setSunsetTransition({

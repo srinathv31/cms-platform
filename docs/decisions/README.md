@@ -7,6 +7,7 @@ decided and why, so it can be revisited without the person who made it.
 | # | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-keep-docs-in-the-repo.md) | Keep the docs in the repo as Markdown | Accepted |
+| [0002](0002-a-passed-sunset-is-final.md) | A passed sunset is final | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

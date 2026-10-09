@@ -63,7 +63,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Template | A document consumers render, with a stable id like `UC-4F7K2Q`. Belongs to one team and one content type. | `templates` in [ucomp.ts](../server/db/schema/ucomp.ts) |
 | Version | One snapshot of a template: body (TipTap JSON), variables, channels, email fields, sample sets. `number` is null while it is a draft; `submit` sets it to the highest number + 1, and it never changes. | `VersionSnapshot`, `DraftFields` |
 | Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The database allows one open draft and one Active version per template. | [types.ts](types.ts), [status.ts](status.ts) |
-| Sunset | A date on a Superseded version. From then on, consumer renders fail with `version_sunset`. Not a state. | `setSunset`, `checkVersion` |
+| Sunset | A date on a Superseded version. From then on, consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it. Not a state. | `setSunset`, `sunsetPassed`, `checkVersion` |
 | Revoke pending | An Active or Superseded version whose `revoke` record has no `confirmedAt`. Not a state: it renders until a different approver confirms. | `revokePending` |
 | Content type | Platform configuration a template follows: required sections, allowed channels, approval chain. | [platform-config.ts](platform-config.ts) |
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
@@ -86,7 +86,7 @@ draft        submit                                       → in_review (numbere
 in_review    approve, earlier stage                       → in_review, currentStage + 1
 in_review    approve, last stage                          → active; the previous active → superseded
 in_review    requestChanges                               → changes_requested, plus a new draft
-superseded   setSunset                                    → superseded with sunsetAt
+superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
 ```
 
