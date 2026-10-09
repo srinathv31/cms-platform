@@ -98,10 +98,25 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
 }
 
 /** Oldest first, as the API serves them. */
-const NOTICES = [
-  { id: "ntc_1", kind: "new_version", createdAt: "2026-09-01T00:00:00.000Z", template: { id: "UC-OTHER1", name: "Other" }, versionNumber: 2, activeVersion: 2, sunsetAt: null, reason: null, changes: [], message: "Other v2 is available. No contract changes." },
-  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
+const NOTICES: ApiNotice[] = [
+  { id: "ntc_1", kind: "new_version", createdAt: "2026-09-01T00:00:00.000Z", template: { id: "UC-OTHER1", name: "Other" }, versionNumber: 2, activeVersion: 2, sunsetAt: null, sunsetDay: null, zone: null, reason: null, changes: [], message: "Other v2 is available. No contract changes." },
+  { id: "ntc_2", kind: "new_version", createdAt: "2026-10-04T00:00:00.000Z", template: { id: TPL, name: NAME }, versionNumber: 3, activeVersion: 3, sunsetAt: null, sunsetDay: null, zone: null, reason: null, changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }], message: `${NAME} v3 is available. It adds the required variable annual_fee.` },
 ];
+/** What the sunset sweep sends once v2's sunset has passed (added to NOTICES by the test that reads it). */
+const SUNSET_PASSED: ApiNotice = {
+  id: "ntc_3",
+  kind: "sunset_passed",
+  createdAt: "2027-03-04T00:00:00.000Z",
+  template: { id: TPL, name: NAME },
+  versionNumber: 2,
+  activeVersion: 3,
+  sunsetAt: "2027-03-01T05:00:00.000Z",
+  sunsetDay: "2027-03-01",
+  zone: "America/New_York",
+  reason: null,
+  changes: [],
+  message: `${NAME} v2 stopped rendering: its sunset passed on March 1, 2027. Move to v3.`,
+};
 /** The fake serves one notice per page whatever the limit, so Coral has to follow nextCursor. */
 const noticeCalls: URLSearchParams[] = [];
 
@@ -367,6 +382,36 @@ describe("notices", () => {
   });
 });
 
+describe("notices: a sunset that passed", () => {
+  it("shows the sunset_passed notice as Stencil sent it, unread, linked to the offer on that template", async () => {
+    NOTICES.push(SUNSET_PASSED);
+    try {
+      const home = await queries.getSimHome();
+      expect(home.notices.map((n) => n.id)).toEqual(["ntc_3", "ntc_2", "ntc_1"]);
+      expect(home.notices[0]).toEqual({
+        id: "ntc_3",
+        kind: "sunset_passed",
+        createdAt: "2027-03-04T00:00:00.000Z",
+        templateId: TPL,
+        templateName: NAME,
+        versionNumber: 2,
+        message: SUNSET_PASSED.message,
+        lines: [],
+        read: false,
+        offerIds: ["offer_spring_travel"],
+      });
+      expect(home.unread).toBe(2);
+      const page = await queries.getSimOfferPage("offer_spring_travel");
+      expect(page?.notices.map((n) => [n.id, n.kind])).toEqual([
+        ["ntc_3", "sunset_passed"],
+        ["ntc_2", "new_version"],
+      ]);
+    } finally {
+      NOTICES.pop();
+    }
+  });
+});
+
 describe("allNotices: an answer that wouldn't end is an error, not a loop", () => {
   /** A client whose notices pages come from `page(n)`, n counting from 1. */
   const pagedApi = (page: (n: number) => Pick<ApiNoticeList, "notices" | "hasMore">) => {
@@ -379,7 +424,7 @@ describe("allNotices: an answer that wouldn't end is an error, not a loop", () =
     } as unknown as UcompApi;
     return { api, calls: () => calls };
   };
-  const notice = NOTICES[0] as ApiNotice;
+  const notice = NOTICES[0]!;
 
   it("an empty page that says more follow", async () => {
     const { api, calls } = pagedApi((n) => (n === 1 ? { notices: [notice], hasMore: true } : { notices: [], hasMore: true }));

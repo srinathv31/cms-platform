@@ -369,6 +369,25 @@ describe("writeEffects: consumer notices", () => {
     expect((await write([sunsetNotice("v_x")], later)).consumerNotices).toBe(0);
   });
 
+  it("writtenAt: the audience is read back from `at`, and the audit row dated then; the notice is created at writtenAt", async () => {
+    // The sunset sweep's case: the sunset came (at), and the sweep runs a hundred days later (writtenAt).
+    const v1 = await versionId("balance-transfer", 1);
+    const ctx = context("balance-transfer", { versionId: v1, actorId: null });
+    const writtenAt = new Date(ctx.at.getTime() + 100 * DAY);
+    const written = await write(
+      [
+        { kind: "audit", action: "version.sunset_passed", details: { number: 1, sunsetAt: ctx.at.toISOString(), sunsetDay: "2026-10-04", zone: "America/New_York" } },
+        { kind: "consumer_notice", notice: "sunset_passed", versionId: v1, payload: { versionNumber: 1, activeVersion: 2, sunsetAt: ctx.at.toISOString() } },
+      ],
+      { ...ctx, writtenAt },
+    );
+    // Coral's last render is within 90 days of `at`, though not of `writtenAt`.
+    expect(written).toEqual({ audit: 1, notifications: 0, consumerNotices: 1 });
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.at, ctx.at))).toHaveLength(1);
+    const rows = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, writtenAt));
+    expect(rows.map((r) => [r.consumerId, r.kind])).toEqual([["coral", "sunset_passed"]]);
+  });
+
   it("rolls back with the transaction that wrote it", async () => {
     const ctx = context("balance-transfer", { actorId: "maya" });
     await expect(

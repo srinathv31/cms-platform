@@ -82,6 +82,12 @@ export function noticeView(row: NoticeRow): ApiNotice {
     template: { id: row.templateId, name },
     versionNumber,
   };
+  const noSunset = { sunsetAt: null, sunsetDay: null, zone: null };
+  // The day as recorded (00:00 on it in the business time zone is `sunsetAt`), and the zone it was read in.
+  const sunsetOf = () => {
+    const sunsetAt = isoOf(p.sunsetAt);
+    return { sunsetAt, sunsetDay: sunsetAt ? recordedSunsetDay(p) : null, zone: sunsetAt ? str(p.zone) : null };
+  };
 
   switch (row.kind) {
     case "new_version": {
@@ -93,7 +99,7 @@ export function noticeView(row: NoticeRow): ApiNotice {
       return {
         ...base,
         activeVersion,
-        sunsetAt: null,
+        ...noSunset,
         reason: null,
         changes,
         message: `${title} is available. ${summary}`,
@@ -103,13 +109,27 @@ export function noticeView(row: NoticeRow): ApiNotice {
     case "sunset_scheduled": {
       // Live rows: activeVersion. Seeded rows: replacedByVersionNumber.
       const activeVersion = has(p, "activeVersion") ? int(p.activeVersion) : int(p.replacedByVersionNumber);
-      const sunsetAt = isoOf(p.sunsetAt);
+      const sunset = sunsetOf();
       const changes = activeVersion === null ? [] : apiChanges(changesOf(p.contractChanges), activeVersion);
-      // The day as picked (00:00 on it in the business time zone is `sunsetAt`).
-      const day = sunsetAt ? recordedSunsetDay(p) : null;
-      const when = day ? `stops rendering on ${formatLongDate(day)}` : "will stop rendering";
+      const when = sunset.sunsetDay ? `stops rendering on ${formatLongDate(sunset.sunsetDay)}` : "will stop rendering";
       const move = activeVersion === null ? "" : ` Move to v${activeVersion}.`;
-      return { ...base, activeVersion, sunsetAt, reason: null, changes, message: `${title} ${when}.${move}` };
+      return { ...base, activeVersion, ...sunset, reason: null, changes, message: `${title} ${when}.${move}` };
+    }
+
+    case "sunset_passed": {
+      // Written by the sunset sweep, after the instant: `sunsetAt` says when renders stopped.
+      const activeVersion = int(p.activeVersion);
+      const sunset = sunsetOf();
+      const when = sunset.sunsetDay ? ` on ${formatLongDate(sunset.sunsetDay)}` : "";
+      const move = activeVersion === null ? "" : ` Move to v${activeVersion}.`;
+      return {
+        ...base,
+        activeVersion,
+        ...sunset,
+        reason: null,
+        changes: [],
+        message: `${title} stopped rendering: its sunset passed${when}.${move}`,
+      };
     }
 
     case "revoked": {
@@ -118,7 +138,7 @@ export function noticeView(row: NoticeRow): ApiNotice {
       return {
         ...base,
         activeVersion,
-        sunsetAt: null,
+        ...noSunset,
         reason,
         changes: [],
         message: reason ? `${title} was revoked: ${sentence(reason)}` : `${title} was revoked.`,

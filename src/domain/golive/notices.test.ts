@@ -38,6 +38,8 @@ describe("noticeView: new_version", () => {
       versionNumber: 3,
       activeVersion: 3,
       sunsetAt: null,
+      sunsetDay: null,
+      zone: null,
       reason: null,
       changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }],
       message: `${NAME} v3 is available. It adds the required variable annual_fee.`,
@@ -100,6 +102,15 @@ describe("noticeView: sunset_scheduled", () => {
     });
   });
 
+  it("carries the day and the zone it was read in; a notice without them gives the UTC day and no zone", () => {
+    const live = noticeView(
+      row("sunset_scheduled", { templateName: NAME, versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" }),
+    );
+    expect(live).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" });
+    const bare = noticeView(row("sunset_scheduled", { templateName: NAME, versionNumber: 1, activeVersion: 2, sunsetAt: "2026-10-26T16:05:07.984Z" }));
+    expect(bare).toMatchObject({ sunsetDay: "2026-10-26", zone: null });
+  });
+
   it("says the sunset's day as picked (sunsetDay), not its instant's UTC date", () => {
     // 00:00 Eastern on March 1 is 05:00 UTC; in a zone ahead of UTC it is still February 28 in UTC.
     const eastern = noticeView(
@@ -118,6 +129,52 @@ describe("noticeView: sunset_scheduled", () => {
   });
 });
 
+describe("noticeView: sunset_passed", () => {
+  const passed = {
+    templateName: NAME,
+    versionNumber: 2,
+    activeVersion: 3,
+    sunsetAt: "2027-03-01T05:00:00.000Z",
+    sunsetDay: "2027-03-01",
+    zone: "America/New_York",
+  };
+
+  it("the sweep's shape: the instant, the day in the zone, and the version to move to", () => {
+    // Written by the sweep after the sunset: createdAt is when it was written, sunsetAt when renders stopped.
+    expect(noticeView(row("sunset_passed", passed))).toEqual({
+      id: "cn_1",
+      kind: "sunset_passed",
+      createdAt: "2026-10-05T12:00:00.000Z",
+      template: { id: "UC-4F7K2Q", name: NAME },
+      versionNumber: 2,
+      activeVersion: 3,
+      sunsetAt: "2027-03-01T05:00:00.000Z",
+      sunsetDay: "2027-03-01",
+      zone: "America/New_York",
+      reason: null,
+      changes: [],
+      message: `${NAME} v2 stopped rendering: its sunset passed on March 1, 2027. Move to v3.`,
+    });
+  });
+
+  it("names the day as recorded in the zone, not the instant's UTC date", () => {
+    const pacific = noticeView(row("sunset_passed", { ...passed, sunsetAt: "2027-03-01T08:00:00.000Z", zone: "America/Los_Angeles" }));
+    expect(pacific).toMatchObject({ sunsetDay: "2027-03-01", zone: "America/Los_Angeles" });
+    const ahead = noticeView(row("sunset_passed", { ...passed, sunsetAt: "2027-02-28T18:30:00.000Z" }));
+    expect(ahead.message).toBe(`${NAME} v2 stopped rendering: its sunset passed on March 1, 2027. Move to v3.`);
+  });
+
+  it("with nothing Active there's nothing to move to", () => {
+    const view = noticeView(row("sunset_passed", { ...passed, activeVersion: null }));
+    expect(view).toMatchObject({ activeVersion: null, message: `${NAME} v2 stopped rendering: its sunset passed on March 1, 2027.` });
+  });
+
+  it("a payload without a sunset still reads as one sentence", () => {
+    const view = noticeView(row("sunset_passed", { templateName: NAME, versionNumber: 2, activeVersion: 3 }));
+    expect(view).toMatchObject({ sunsetAt: null, sunsetDay: null, zone: null, message: `${NAME} v2 stopped rendering: its sunset passed. Move to v3.` });
+  });
+});
+
 describe("noticeView: revoked", () => {
   it("both shapes: the reason, with its period", () => {
     const seeded = noticeView(row("revoked", { templateName: "Holiday Points Promo — Terms", versionNumber: 1, reason: "Wrong bonus amount" }));
@@ -126,6 +183,8 @@ describe("noticeView: revoked", () => {
       reason: "Wrong bonus amount",
       changes: [],
       sunsetAt: null,
+      sunsetDay: null,
+      zone: null,
       message: "Holiday Points Promo — Terms v1 was revoked: Wrong bonus amount.",
     });
     const live = noticeView(row("revoked", { templateName: "Balance Transfer Intro — Terms", versionNumber: 1, activeVersion: 2, reason: "Wrong intro APR in the legal notices." }));

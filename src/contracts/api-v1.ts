@@ -248,10 +248,13 @@ export interface ApiJsonSchemaProperty {
 // ── GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit= ────────
 
 /**
- * UCOMP's outbox for one consumer: new versions, sunsets scheduled, revokes. Oldest first, in the order
- * UCOMP wrote them, paged with a cursor (ApiPage).
+ * UCOMP's outbox for one consumer: new versions, sunsets scheduled and passed, revokes. Oldest first, in
+ * the order UCOMP wrote them, paged with a cursor (ApiPage).
  * Notices go to every consumer that rendered the template (not as a preview) in the 90 days before the
- * event. Read state is the consumer's business (the simulator keeps it in sim_notice_reads).
+ * event; for sunset_passed the event is the sunset. Read state is the consumer's business (the simulator
+ * keeps it in sim_notice_reads).
+ * A sunset_passed notice is written by Stencil's sunset sweep, which runs after the sunset rather than at
+ * it, so it can arrive some time after `sunsetAt`. Renders of the version fail from `sunsetAt` either way.
  * - `X-Consumer-Id` must equal `{consumerId}` → else 403 consumer_mismatch
  *   ("X-Consumer-Id doesn't match consumer coral."). An unregistered `{consumerId}` → 404 consumer_not_found.
  * - `after` (optional): the `nextCursor` of an earlier page. Without it the list starts at the
@@ -268,20 +271,37 @@ export interface ApiNoticeList extends ApiPage {
   notices: ApiNotice[];
 }
 
-export type ApiNoticeKind = "new_version" | "sunset_scheduled" | "revoked";
+export type ApiNoticeKind = "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
 
 export interface ApiNotice {
   id: string;
   kind: ApiNoticeKind;
+  /**
+   * When Stencil wrote the notice. For sunset_passed that's when the sweep found the sunset passed, at or
+   * after `sunsetAt`: read `sunsetAt` for when renders stopped.
+   */
   createdAt: string;
   /** `name` is the name of the version the notice is about, as it was when the notice was written. */
   template: { id: string; name: string };
-  /** The version the notice is about: the new one (new_version), the one being sunset, the revoked one. */
+  /**
+   * The version the notice is about: the new one (new_version), the one being sunset (sunset_scheduled), the
+   * one whose sunset passed (sunset_passed), the revoked one.
+   */
   versionNumber: number;
-  /** The Active version when the notice was written (null when nothing is Active). */
+  /** The Active version when the notice was written, the one to move to (null when nothing is Active). */
   activeVersion: number | null;
-  /** sunset_scheduled only: the instant renders stop, 00:00 on the sunset date in the business time zone. */
+  /**
+   * sunset_scheduled and sunset_passed: the instant renders of the version stop (or stopped), 00:00 on
+   * `sunsetDay` in `zone`.
+   */
   sunsetAt: string | null;
+  /** sunset_scheduled and sunset_passed: the sunset date, YYYY-MM-DD, as people read it in `zone`. */
+  sunsetDay: string | null;
+  /**
+   * sunset_scheduled and sunset_passed: Stencil's business time zone (an IANA id, "America/New_York")
+   * that `sunsetDay` is a day in. Null when the notice didn't record it.
+   */
+  zone: string | null;
   /** revoked only. */
   reason: string | null;
   /** new_version: the contract changes from the previous Active version. sunset_scheduled: what moving to the Active one asks. */
@@ -291,6 +311,7 @@ export interface ApiNotice {
    *   new_version       "Spring Travel Rewards — Terms v3 is available. It adds the required variable annual_fee."
    *                     "Rate Change Notice v2 is available. No contract changes."
    *   sunset_scheduled  "Spring Travel Rewards — Terms v2 stops rendering on March 1, 2027. Move to v3."
+   *   sunset_passed     "Spring Travel Rewards — Terms v2 stopped rendering: its sunset passed on March 1, 2027. Move to v3."
    *   revoked           "Balance Transfer Intro — Terms v1 was revoked: Wrong intro APR in the legal notices."
    */
   message: string;

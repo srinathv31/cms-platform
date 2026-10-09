@@ -1,6 +1,6 @@
 # 0026. A passed sunset is recorded by a sweep, in the audit log only
 
-Status: Accepted
+Status: Accepted. Its "No consumer notice" part is superseded by [0032](0032-consumers-are-told-when-a-sunset-passes.md): consumers get a `sunset_passed` notice.
 Date: 2026-10-09
 
 ## Context

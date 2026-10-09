@@ -1128,6 +1128,7 @@ describe("approve", () => {
           activeVersion: 2,
           sunsetAt: "2027-03-01T05:00:00.000Z",
           sunsetDay: "2027-03-01",
+          zone: ZONE,
           contractChanges: [ANNUAL_FEE_ADDED],
           contractLines: ["v2 adds required `annual_fee` (Currency)."],
         },
@@ -1411,7 +1412,7 @@ describe("setSunset", () => {
           kind: "consumer_notice",
           notice: "sunset_scheduled",
           versionId: "v_1",
-          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" },
+          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE },
         },
         {
           kind: "notification",
@@ -1470,6 +1471,7 @@ describe("setSunset", () => {
         activeVersion: 2,
         sunsetAt: "2027-03-01T05:00:00.000Z",
         sunsetDay: "2027-03-01",
+        zone: ZONE,
         contractChanges: [ANNUAL_FEE_ADDED],
         contractLines: ["v2 adds required `annual_fee` (Currency)."],
       },
@@ -1730,11 +1732,12 @@ describe("sweepSunsets", () => {
     sunsetAt: SUNSET,
     revokedAt: null,
     passedRecorded: false,
+    activeNumber: 2,
     ...over,
   });
   const sweep = (versions: SunsetFacts[], now = NOW, zone = ZONE) => sweepSunsets({ versions, now, zone });
 
-  it("records a passed sunset as the system, dated at the sunset, with its day and the zone", () => {
+  it("records a passed sunset as the system, dated at the sunset, with its day and the zone, and tells consumers", () => {
     expect(sweep([facts()])).toEqual([
       {
         versionId: "v_bt1",
@@ -1747,9 +1750,32 @@ describe("sweepSunsets", () => {
             action: "version.sunset_passed",
             details: { number: 1, sunsetAt: "2026-10-04T04:00:00.000Z", sunsetDay: "2026-10-04", zone: ZONE },
           },
+          {
+            kind: "consumer_notice",
+            notice: "sunset_passed",
+            versionId: "v_bt1",
+            payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2026-10-04T04:00:00.000Z", sunsetDay: "2026-10-04", zone: ZONE },
+          },
         ],
       },
     ]);
+  });
+
+  it("one audit row and one notice per passed sunset, nothing else: no notification", () => {
+    const passed = sweep([facts({ id: "v_a" }), facts({ id: "v_b", templateId: "UC-OTHER1", activeNumber: 5 })]);
+    expect(passed.map((p) => p.effects.map((e) => e.kind))).toEqual([
+      ["audit", "consumer_notice"],
+      ["audit", "consumer_notice"],
+    ]);
+    expect(passed.map((p) => p.effects[1])).toMatchObject([
+      { notice: "sunset_passed", versionId: "v_a", payload: { activeVersion: 2 } },
+      { notice: "sunset_passed", versionId: "v_b", payload: { activeVersion: 5 } },
+    ]);
+  });
+
+  it("the notice names the Active version to move to, or none when nothing is Active", () => {
+    const [passed] = sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() + 1), activeNumber: null })]);
+    expect(passed!.effects[1]).toMatchObject({ kind: "consumer_notice", payload: { versionNumber: 1, activeVersion: null } });
   });
 
   it("passed is sunsetPassed: from the sunset's instant, not a millisecond before", () => {
@@ -1773,16 +1799,17 @@ describe("sweepSunsets", () => {
     expect(sweep(versions).map((p) => p.versionId)).toEqual(["v_earlier", "v_later", "v_same_a", "v_same_b"]);
   });
 
-  it("is idempotent: once its row is written, the next sweep, now or later, finds nothing", () => {
+  it("is idempotent: once its row is written, the next sweep, now or later, finds nothing, so no second notice", () => {
     expect(sweep([facts()]).map((p) => p.versionId)).toEqual(["v_bt1"]);
     const recorded = facts({ passedRecorded: true });
     expect(sweep([recorded])).toEqual([]);
     expect(sweep([recorded], new Date(NOW.getTime() + 30 * MS_PER_DAY))).toEqual([]);
   });
 
-  it("names the day in the business time zone it reads at the sweep", () => {
+  it("names the day in the business time zone it reads at the sweep, in the row and the notice", () => {
     const [passed] = sweep([facts()], NOW, "America/Los_Angeles");
     expect(passed!.effects[0]).toMatchObject({ details: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" } });
+    expect(passed!.effects[1]).toMatchObject({ payload: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" } });
   });
 
   it("skips a version revoked at or before its sunset (its renders had already stopped); records one revoked after", () => {

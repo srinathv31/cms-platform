@@ -31,8 +31,17 @@ export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export const CONSUMER_NOTICE_WINDOW_DAYS = 90;
 
 export interface EffectContext {
-  /** The demo clock, read once by the action. The sunset sweep passes the instant the sunset passed. */
+  /**
+   * When it happened: the demo clock, read once by the action. The sunset sweep passes the instant the
+   * sunset passed. Audit rows are dated then, and consumer notices go to the consumers that rendered the
+   * template from 90 days before it on.
+   */
   at: Date;
+  /**
+   * When the effects are written, if later than `at`: the sunset sweep runs after the sunset. Notifications
+   * and consumer notices are created then, the moment they can first be read. Defaults to `at`.
+   */
+  writtenAt?: Date;
   /** Who acted; null for the system (the sunset sweep). */
   actorId: string | null;
   teamId: string;
@@ -54,10 +63,11 @@ export interface EffectsWritten {
  * - **notification**: one row per recipient. `user` is that user; `team_role` is every active member
  *   holding the role on the template's team, minus `exceptUserIds`. Nobody is notified of their own
  *   action. The link becomes an href under the team's slug.
- * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, in the
- *   last 90 days (from the render log). The payload carries the name of the version the notice is
- *   about (`templateName`), version numbers, dates and contract changes, never variable values. Each
- *   row takes the next `seq` (`takeNoticeSeqs`), the order the notices API pages in.
+ * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, from 90
+ *   days before `at` on (from the render log). The payload carries the name of the version the notice
+ *   is about (`templateName`), version numbers, dates and contract changes, never variable values. Each
+ *   row takes the next `seq` (`takeNoticeSeqs`), the order the notices API pages in, and is created at
+ *   `writtenAt`.
  */
 export async function writeEffects(
   tx: Tx,
@@ -65,6 +75,7 @@ export async function writeEffects(
   ctx: EffectContext,
 ): Promise<EffectsWritten> {
   const written: EffectsWritten = { audit: 0, notifications: 0, consumerNotices: 0 };
+  const createdAt = ctx.writtenAt ?? ctx.at;
   // Read once, and only when a notification or a notice needs it.
   let team: Promise<string> | undefined;
   const teamSlugOf = () => (team ??= teamSlug(tx, ctx));
@@ -121,7 +132,7 @@ export async function writeEffects(
             title: effect.title,
             body: effect.body ?? null,
             href: hrefFor(userId),
-            createdAt: ctx.at,
+            createdAt,
             readAt: null,
           })),
         );
@@ -143,7 +154,7 @@ export async function writeEffects(
             versionId: effect.versionId,
             kind: effect.notice,
             payload: { templateName: name, ...effect.payload },
-            createdAt: ctx.at,
+            createdAt,
           })),
         );
         written.consumerNotices += consumerIds.length;
@@ -249,7 +260,7 @@ export async function takeNoticeSeqs(tx: Tx, count: number): Promise<number> {
   return last + 1;
 }
 
-/** Registered consumers with a non-preview render of the template in the notice window. */
+/** Registered consumers with a non-preview render of the template from the notice window before `ctx.at` on. */
 async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
   const since = new Date(ctx.at.getTime() - CONSUMER_NOTICE_WINDOW_DAYS * DAY_MS);
   const rows = await tx
