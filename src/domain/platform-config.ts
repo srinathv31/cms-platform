@@ -17,6 +17,8 @@
 //     version in review goes through the stages it recorded at submit, so an edit never moves it; a
 //     new rule on one of its stages reaches it. A stage some in-review version still needs (the one it
 //     waits on, or one ahead of it) can't be removed.
+//   - The business time zone is one of `BUSINESS_ZONES` (business-zone.ts). Changing it moves no sunset
+//     already set: only dates picked afterwards end at 00:00 in the new zone.
 
 import type {
   AccessEffect,
@@ -29,6 +31,7 @@ import type {
   Refused,
 } from "./access-types";
 import { ROLE_LABEL } from "./access";
+import { isBusinessZone, zoneLabel, type BusinessZone } from "./business-zone";
 import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
 import { versionsNeeding } from "./approval-chain";
 import type { ApprovalStage, VersionStage } from "./review-types";
@@ -110,6 +113,7 @@ export const PLATFORM_REFUSALS = {
   personTwice: (person: string, stage: number) => `${person} already reviews stage ${stage}.`,
   stageWaiting: (count: number, name: string) =>
     `${count} ${count === 1 ? "version" : "versions"} in review still ${count === 1 ? "needs" : "need"} ${name}.`,
+  pickZone: "Pick a time zone from the list.",
 } as const;
 
 const refuse = (reason: string): Refused => ({ ok: false, reason });
@@ -734,10 +738,72 @@ export function saveApprovalChain(input: {
   };
 }
 
-/** The contract check: these four are `PlatformConfigDomain` (access-types.ts). */
+// ── Business time zone ───────────────────────────────────────────────────────
+
+export interface ZoneChange {
+  /** Why the zone picked can't be saved (one off the list), or null. */
+  problem: string | null;
+  /** The zone picked differs from the one in force. */
+  changed: boolean;
+  /** "New sunset dates end at 00:00 Pacific (America/Los_Angeles).", once a different zone is picked. */
+  lines: string[];
+}
+
+/**
+ * What picking `next` does, as the admin picks it (the settings screen calls this; `setBusinessZone`
+ * refuses with the same `problem`).
+ */
+export function describeZoneChange(input: { current: string; next: string }): ZoneChange {
+  const problem = isBusinessZone(input.next) ? null : PLATFORM_REFUSALS.pickZone;
+  const changed = input.next !== input.current;
+  return { problem, changed, lines: changed && !problem ? [`New sunset dates end at 00:00 ${zoneLabel(input.next)}.`] : [] };
+}
+
+/**
+ * What any change of zone leaves in place, from the stored facts (the read model returns it as
+ * `consequences`): "2 sunsets already set don't move: their consumers have been told when they end."
+ * Nothing with none set. A sunset already set keeps its instant (decision 0017).
+ */
+export function zoneChangeConsequences(pendingSunsets: number): string[] {
+  if (pendingSunsets === 1) return ["1 sunset already set doesn't move: its consumers have been told when it ends."];
+  if (pendingSunsets > 1) return [`${pendingSunsets} sunsets already set don't move: their consumers have been told when they end.`];
+  return [];
+}
+
+/**
+ * Sets the business time zone sunset dates are read in. One of `BUSINESS_ZONES` (`describeZoneChange`);
+ * the same zone again changes nothing and records nothing. Nothing else is written: sunsets already set
+ * keep their instants.
+ */
+export function setBusinessZone(input: {
+  current: string;
+  next: string;
+  pendingSunsets: number;
+  actor: Named;
+  now: Date;
+}): Ok<{ zone: BusinessZone; effects: AccessEffect[] }> | Refused {
+  const { current, next, pendingSunsets } = input;
+  const change = describeZoneChange({ current, next });
+  if (change.problem || !isBusinessZone(next)) return refuse(change.problem ?? PLATFORM_REFUSALS.pickZone);
+  if (!change.changed) return { ok: true, zone: next, effects: [] };
+  return {
+    ok: true,
+    zone: next,
+    effects: [
+      configChanged("business_zone", null, `Set the business time zone to ${zoneLabel(next)}`, {
+        from: current,
+        to: next,
+        pendingSunsets,
+      }),
+    ],
+  };
+}
+
+/** The contract check: these are `PlatformConfigDomain` (access-types.ts). */
 export const platformConfig = {
   createTeam,
   updateRequiredSections,
   setChannelRule,
   saveApprovalChain,
+  setBusinessZone,
 } satisfies PlatformConfigDomain;

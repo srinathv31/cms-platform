@@ -3,6 +3,7 @@
 // Messages are plain sentences for the people integrating; the simulator shows them as is. They
 // name keys, types, versions, channels and ids, and NEVER echo a submitted variable value.
 
+import { sunsetDay } from "../business-zone";
 import { formatLongDate } from "../dates";
 import { CHANNELS, type Channel, type VariableType, type VersionState } from "../types";
 import {
@@ -118,11 +119,14 @@ export function versionNotReleased(
   );
 }
 
-/** "Version 1 was sunset on March 1, 2027. Version 2 is active." / "… No version is active." */
-export function versionSunset(version: number, sunsetAt: Date, activeVersion: number | null): RenderError {
+/**
+ * "Version 1 was sunset on March 1, 2027. Version 2 is active." / "… No version is active." The date is the
+ * sunset's day in the business time zone (`zone`); `details.at` is the instant renders stopped.
+ */
+export function versionSunset(version: number, sunsetAt: Date, activeVersion: number | null, zone: string): RenderError {
   return renderError(
     "version_sunset",
-    `Version ${version} was sunset on ${formatLongDate(sunsetAt)}. ${activeSentence(activeVersion, "No version is active.")}`,
+    `Version ${version} was sunset on ${formatLongDate(sunsetDay(sunsetAt, zone))}. ${activeSentence(activeVersion, "No version is active.")}`,
     versionDetails(version, activeVersion, sunsetAt),
   );
 }

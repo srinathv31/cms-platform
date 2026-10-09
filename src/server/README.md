@@ -38,6 +38,7 @@ Convention only (no lint rule):
 | [access-effects.ts](access-effects.ts) | `applyMembershipChange` and `writeAccessEffects`: the same job for access and platform changes. |
 | [access-sweep.ts](access-sweep.ts) | `runAccessSweep()` and the membership, request, and recertification fact loaders. |
 | [viewer.ts](viewer.ts), [clock.ts](clock.ts), [ids.ts](ids.ts) | The persona, the demo clock, and id generation (`newId`, `newTemplateId`, seeded variants). |
+| [business-zone.ts](business-zone.ts) | The business time zone sunset dates are read in: `readBusinessZone(reader)` (inside a transaction), `getBusinessZone()` (read models), `countPendingSunsets`. |
 | [reset.ts](reset.ts), [seed/](seed/) | `resetDemo()` and the deterministic demo dataset, simulator rows included. |
 | [templates/create.ts](templates/create.ts) | The write side of "new template plus first draft", shared by New template and Import. |
 | [starters/](starters/) | Starter bodies. [catalog.ts](starters/catalog.ts) has no imports, so the client gallery can read it. |
@@ -64,7 +65,8 @@ export async function setSunset(input: { templateId: string; versionNumber: numb
   const at = await now();                                              // 4. the clock, once
   const result = await transact(async (tx) => {                        // 5. one transaction
     const version = await loadVersion(tx, found, parsed.data.versionNumber); // re-read inside it
-    const outcome = setSunsetTransition({ version, now: at, … });      // 6. the domain decides
+    const zone = await readBusinessZone(tx);                           //    and the settings it needs
+    const outcome = setSunsetTransition({ version, sunsetDay, zone, now: at, … }); // 6. the domain decides
     if (!outcome.ok) refuse(outcome.reason);
     await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded); // 7. compare-and-set
     await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at)); // 8. effects
@@ -141,6 +143,7 @@ SQLite and libSQL specifics:
 ## Clock, viewer, and the access sweep
 
 - **Clock** ([clock.ts](clock.ts)): `now()` is the real time plus `settings.clock_offset_days` days. It awaits `connection()` first, which marks the caller as request-time under Cache Components. libSQL resolves in microtasks, so without it a prerender could capture the build's `Date.now()`. `advanceClock(days)` moves the offset. [queries/clock.ts](queries/clock.ts) formats the readout the demo pill shows.
+- **Business time zone** ([business-zone.ts](business-zone.ts)): `settings.business_zone`, the zone a sunset date ends at 00:00 in (decision 0017). No row, or a zone off `BUSINESS_ZONES`, reads as `America/New_York`. Actions read it inside their transaction (`readBusinessZone(tx)`); read models call `getBusinessZone()` after `demoNow()` and hand components a sunset's day (`sunsetDay`, YYYY-MM-DD) and the picker's `SunsetCalendar`, never a zone to compute with. `setBusinessZone` in [actions/platform.ts](actions/platform.ts) changes it; it moves no sunset already set.
 - **Viewer** ([viewer.ts](viewer.ts)): there is no login. `getViewer()` (React `cache`) reads the `ucomp_persona` cookie and loads that user, with memberships and roles, as a `Viewer` (`@/domain/types`). A missing cookie or an unknown user falls back to `DEFAULT_PERSONA`, `"maya"`: today, every request without a valid cookie acts as Maya. `getPersonas()` lists the switchable users.
 - **Access sweep** ([access-sweep.ts](access-sweep.ts)): `runAccessSweep()` applies every access deadline the demo clock has crossed (recertification lapses, the 90-day inactivity flag, the 120-day suspension), backdated, in one transaction. It checks outside a transaction first, so a sweep with nothing to do takes no write lock, and running it twice changes nothing. It runs from `advanceClockAction`, from `switchPersona` (before stamping `last_active_at`), and at the start of every action in [actions/access.ts](actions/access.ts). It doesn't run on a timer or on page reads.
 

@@ -26,9 +26,11 @@ export function formatLastRender(iso: string, now: Date): string {
   return formatShortDate(new Date(iso), now);
 }
 
-/** "sunsets in 21 days", "sunsets tomorrow", "sunsets today". */
-export function sunsetPhrase(sunsetAt: string, now: Date): string {
-  const days = calendarDaysUntil(new Date(sunsetAt), now);
+/**
+ * "sunsets in 21 days", "sunsets tomorrow", "sunsets today". `days` is whole days from today to the
+ * sunset's day, both in the business time zone (`daysUntilSunset`, counted by the read model).
+ */
+export function sunsetPhrase(days: number): string {
   if (days <= 0) return "sunsets today";
   if (days === 1) return "sunsets tomorrow";
   return `sunsets in ${days} days`;

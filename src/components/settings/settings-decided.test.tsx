@@ -5,6 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  BusinessZoneSection,
   ChannelRuleRow,
   InactivityRow,
   InactivitySection,
@@ -34,6 +35,7 @@ vi.mock("@/server/actions/access", () => ({
 vi.mock("@/server/actions/platform", () => ({
   createTeam: vi.fn(),
   saveApprovalChain: vi.fn(),
+  setBusinessZone: vi.fn(),
   setChannelRule: vi.fn(),
   updateContentType: vi.fn(),
 }));
@@ -42,6 +44,7 @@ const { ChannelRulesSectionView } = await import("./platform/channel-rules");
 const { InactivityView } = await import("./team/inactivity-view");
 const { MembersTable } = await import("./team/members-table");
 const { RecertificationView } = await import("./team/recertification-view");
+const { TimeZoneSectionView } = await import("./platform/time-zone");
 
 const OK = { ok: true } as const;
 const TEAM = { id: "coral-offers", slug: "coral-offers", name: "Coral Offers" };
@@ -85,6 +88,7 @@ describe("no settings screen decides a rule", () => {
     "updateRequiredSections",
     "setChannelRule",
     "saveApprovalChain",
+    "setBusinessZone",
     "requestAccess",
     "decideAccessRequest",
     "changeRoles",
@@ -144,6 +148,40 @@ describe("Channel rules", () => {
     expect(sw("Disclosure on Web").hasAttribute("data-disabled")).toBe(true);
     expect(sw("Disclosure on PDF").hasAttribute("data-disabled")).toBe(false);
     expect(sw("Disclosure on Email").hasAttribute("data-disabled")).toBe(false);
+  });
+});
+
+describe("Time zone", () => {
+  const section = (over: Partial<BusinessZoneSection> = {}): BusinessZoneSection => ({
+    zone: "America/New_York",
+    zones: [
+      { id: "America/New_York", label: "Eastern (America/New_York)" },
+      { id: "America/Los_Angeles", label: "Pacific (America/Los_Angeles)" },
+    ],
+    can: { change: OK },
+    consequences: ["What stays put, as the server says."],
+    ...over,
+  });
+
+  it("words the zone picked with the domain, then says what stays put as the read model sent it", async () => {
+    await show(<TimeZoneSectionView section={section()} />);
+    await click(buttonNamed("Change time zone"));
+    expect(strip()?.textContent).not.toContain("What stays put");
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Business time zone"]')!;
+    await act(async () => {
+      select.value = "America/Los_Angeles";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(strip()?.textContent).toContain("New sunset dates end at 00:00 Pacific (America/Los_Angeles).");
+    expect(strip()?.textContent).toContain("What stays put, as the server says.");
+  });
+
+  it("disables the change the read model refuses", async () => {
+    await show(<TimeZoneSectionView section={section({ can: { change: { ok: false, reason: "Decided by the server." } } })} />);
+    const opener = buttonNamed("Change time zone");
+    expect(opener?.getAttribute("aria-disabled")).toBe("true");
+    await click(opener);
+    expect(strip()).toBeNull();
   });
 });
 

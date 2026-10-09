@@ -76,7 +76,7 @@ Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` 
 
 | Export | File | Purpose |
 | --- | --- | --- |
-| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). Server-safe. |
+| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). A Superseded version's `sunsetDay` (the read model's YYYY-MM-DD, in the business time zone) shows as "Sunset Mar 1". Server-safe. |
 | `PageHeader` | [page-header.tsx](primitives/page-header.tsx) | Serif page title, optional caps eyebrow, a slot for the screen's one primary action. |
 | `Stream` | [stream.tsx](primitives/stream.tsx) | The streaming boundary: `Suspense` plus `ViewTransition`, skeleton out, content in. It catches no errors; the route's `error.tsx` does ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). |
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
@@ -143,7 +143,7 @@ or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.appr
 refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`). What an action does comes the
 same way: the settings read models send each strip's line as `consequences` beside `can` (`m.consequences.remove`).
 A form checked as someone types calls the domain's own check with the read model's facts (`validateChain`,
-`validateNewTeam`, `describeSectionsChange`, `describeRoleChange`), never a copy of a refusal ladder, a refusal
+`validateNewTeam`, `describeSectionsChange`, `describeRoleChange`, `describeZoneChange`), never a copy of a refusal ladder, a refusal
 constant, a stand-in actor or the clock; `settings/settings-decided.test.tsx` fails on any of those under
 `settings/` ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)).
 

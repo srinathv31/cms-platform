@@ -653,8 +653,15 @@ const CHAIN_2: ApprovalStage[] = [
 /** What a version submitted under each chain recorded. */
 const STAGES_1: VersionStage[] = [{ id: "st_team", name: "Team approver" }];
 const STAGES_2: VersionStage[] = [...STAGES_1, { id: "st_legal", name: "Legal reviewer" }];
-const TOMORROW = new Date("2026-10-05T00:00:00.000Z");
-const MARCH_1 = new Date("2027-03-01T00:00:00.000Z");
+// A sunset date is a calendar day that ends at 00:00 in the business time zone (decision 0017): the
+// days as the picker sends them, and the instants they end at in New York.
+const ZONE = "America/New_York";
+const TOMORROW_DAY = "2026-10-05";
+const TOMORROW = new Date("2026-10-05T04:00:00.000Z"); // 00:00 EDT
+const MARCH_1_DAY = "2027-03-01";
+const MARCH_1 = new Date("2027-03-01T05:00:00.000Z"); // 00:00 EST
+/** 23:30 Eastern on October 4, when it is already October 5 in UTC. */
+const LATE_EVENING = new Date("2026-10-05T03:30:00.000Z");
 const REASON = "The APR in Rates and fees doesn't match the offer sheet.";
 const REVOKE_REASON = "Wrong APR in legal notices";
 const EMAIL_SUBJECT: JSONContent = {
@@ -727,11 +734,12 @@ const tryApprove = (version: ReviewVersion) =>
     now: NOW,
     active: null,
     sunsetPrevious: null,
+    zone: ZONE,
     sampleSetsSeen: ["typical"],
     templateName: TEMPLATE.name,
   });
 const trySetSunset = (version: ReviewVersion) =>
-  setSunset({ version, actorId: "jordan", now: NOW, sunsetAt: MARCH_1, activeNumber: 2, templateName: TEMPLATE.name });
+  setSunset({ version, actorId: "jordan", now: NOW, sunsetDay: MARCH_1_DAY, zone: ZONE, activeNumber: 2, templateName: TEMPLATE.name });
 const tryStartRevoke = (version: ReviewVersion) =>
   startRevoke({
     version,
@@ -967,6 +975,7 @@ describe("approve", () => {
       now: NOW,
       active: { id: "v_1", number: 1 },
       sunsetPrevious: null,
+      zone: ZONE,
       sampleSetsSeen: ["typical", "long"],
       templateName: TEMPLATE.name,
       ...over,
@@ -1019,8 +1028,8 @@ describe("approve", () => {
     });
   });
 
-  it("sets the previous version's sunset in the same step, and tells its consumers", () => {
-    const result = run({ sunsetPrevious: MARCH_1 });
+  it("sets the previous version's sunset in the same step, at 00:00 Eastern that day, and tells its consumers", () => {
+    const result = run({ sunsetPrevious: MARCH_1_DAY });
     expect(result.ok && result.previous).toEqual({
       id: "v_1",
       changes: { state: "superseded", supersededAt: NOW, sunsetAt: MARCH_1, sunsetSetBy: "jordan" },
@@ -1032,7 +1041,7 @@ describe("approve", () => {
         kind: "audit",
         action: "version.sunset_set",
         versionId: "v_1",
-        details: { number: 1, sunsetAt: "2027-03-01T00:00:00.000Z", previousSunsetAt: null },
+        details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE, previousSunsetAt: null },
       },
       live,
       newVersion,
@@ -1043,7 +1052,8 @@ describe("approve", () => {
         payload: {
           versionNumber: 1,
           activeVersion: 2,
-          sunsetAt: "2027-03-01T00:00:00.000Z",
+          sunsetAt: "2027-03-01T05:00:00.000Z",
+          sunsetDay: "2027-03-01",
           contractChanges: [ANNUAL_FEE_ADDED],
           contractLines: ["v2 adds required `annual_fee` (Currency)."],
         },
@@ -1058,7 +1068,7 @@ describe("approve", () => {
   });
 
   it("has nothing to sunset when no version is Active", () => {
-    const result = run({ active: null, sunsetPrevious: MARCH_1 });
+    const result = run({ active: null, sunsetPrevious: MARCH_1_DAY });
     expect(result.ok && "previous" in result).toBe(false);
     expect(result.ok && result.effects.map((e) => (e.kind === "audit" ? e.action : e.kind))).toEqual([
       "version.activated",
@@ -1068,15 +1078,24 @@ describe("approve", () => {
   });
 
   it.each([
-    ["later today", new Date("2026-10-04T23:00:00.000Z")],
-    ["earlier today", new Date("2026-10-04T00:00:00.000Z")],
-    ["in the past", new Date("2026-09-01T00:00:00.000Z")],
-  ])("refuses a sunset date %s", (_, date) => {
-    expect(run({ sunsetPrevious: date })).toEqual({ ok: false, reason: "Pick a date after today." });
+    ["today", "2026-10-04"],
+    ["in the past", "2026-09-01"],
+  ])("refuses a sunset date %s", (_, day) => {
+    expect(run({ sunsetPrevious: day })).toEqual({ ok: false, reason: "Pick a date after today." });
   });
 
   it("accepts a sunset date of tomorrow", () => {
-    expect(run({ sunsetPrevious: TOMORROW }).ok).toBe(true);
+    expect(run({ sunsetPrevious: TOMORROW_DAY }).ok).toBe(true);
+  });
+
+  it("reads today in the business time zone: at 23:30 Eastern, tomorrow is still tomorrow", () => {
+    expect(run({ now: LATE_EVENING, sunsetPrevious: TOMORROW_DAY }).ok).toBe(true);
+    expect(run({ now: LATE_EVENING, sunsetPrevious: "2026-10-04" })).toEqual({ ok: false, reason: "Pick a date after today." });
+    // In UTC it is already the 5th there, so the 5th isn't after today.
+    expect(run({ now: LATE_EVENING, sunsetPrevious: TOMORROW_DAY, zone: "UTC" })).toEqual({
+      ok: false,
+      reason: "Pick a date after today.",
+    });
   });
 
   it("refuses the submitter: nobody approves their own version", () => {
@@ -1145,7 +1164,7 @@ describe("approve", () => {
     });
 
     it("doesn't supersede or sunset anything before the last stage", () => {
-      const result = run({ chain: CHAIN_2, sunsetPrevious: MARCH_1 });
+      const result = run({ chain: CHAIN_2, sunsetPrevious: MARCH_1_DAY });
       expect(result.ok && result.wentLive).toBe(false);
       expect(result.ok && "previous" in result).toBe(false);
       expect(result.ok && result.effects.some((e) => e.kind === "consumer_notice")).toBe(false);
@@ -1293,13 +1312,14 @@ describe("setSunset", () => {
       version: v1,
       actorId: "jordan",
       now: NOW,
-      sunsetAt: MARCH_1,
+      sunsetDay: MARCH_1_DAY,
+      zone: ZONE,
       activeNumber: 2,
       templateName: "Balance Transfer Intro",
       ...over,
     });
 
-  it("schedules the sunset and tells the consumers and the version's author", () => {
+  it("schedules the sunset at 00:00 Eastern on the day, and tells the consumers and the version's author", () => {
     expect(run()).toEqual({
       ok: true,
       changes: { sunsetAt: MARCH_1, sunsetSetBy: "jordan" },
@@ -1307,13 +1327,13 @@ describe("setSunset", () => {
         {
           kind: "audit",
           action: "version.sunset_set",
-          details: { number: 1, sunsetAt: "2027-03-01T00:00:00.000Z", previousSunsetAt: null },
+          details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE, previousSunsetAt: null },
         },
         {
           kind: "consumer_notice",
           notice: "sunset_scheduled",
           versionId: "v_1",
-          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T00:00:00.000Z" },
+          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" },
         },
         {
           kind: "notification",
@@ -1327,24 +1347,38 @@ describe("setSunset", () => {
   });
 
   it("moves an existing sunset, earlier or later, and records the old date", () => {
-    const scheduled = { ...v1, sunsetAt: new Date("2026-10-25T00:00:00.000Z") };
-    for (const sunsetAt of [TOMORROW, MARCH_1]) {
-      const result = run({ version: scheduled, sunsetAt });
+    const scheduled = { ...v1, sunsetAt: new Date("2026-10-25T04:00:00.000Z") };
+    for (const [sunsetDay, sunsetAt] of [
+      [TOMORROW_DAY, TOMORROW],
+      [MARCH_1_DAY, MARCH_1],
+    ] as const) {
+      const result = run({ version: scheduled, sunsetDay });
       expect(result.ok && result.changes.sunsetAt).toEqual(sunsetAt);
       expect(result.ok && result.effects[0]).toEqual({
         kind: "audit",
         action: "version.sunset_set",
-        details: { number: 1, sunsetAt: sunsetAt.toISOString(), previousSunsetAt: "2026-10-25T00:00:00.000Z" },
+        details: { number: 1, sunsetAt: sunsetAt.toISOString(), sunsetDay, zone: ZONE, previousSunsetAt: "2026-10-25T04:00:00.000Z" },
       });
     }
   });
 
+  it("ends the day at 00:00 in the zone, across a DST change", () => {
+    // 2026-11-01: clocks go back at 02:00, so its midnight is still EDT; the next day's is EST.
+    expect(run({ sunsetDay: "2026-11-01" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-01T04:00:00.000Z") } });
+    expect(run({ sunsetDay: "2026-11-02" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-02T05:00:00.000Z") } });
+    expect(run({ sunsetDay: "2026-11-02", zone: "UTC" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-02T00:00:00.000Z") } });
+  });
+
   it.each([
-    ["today", new Date("2026-10-04T00:00:00.000Z")],
-    ["later today", new Date("2026-10-04T18:00:00.000Z")],
-    ["in the past", new Date("2026-01-01T00:00:00.000Z")],
-  ])("refuses a date %s", (_, sunsetAt) => {
-    expect(run({ sunsetAt })).toEqual({ ok: false, reason: "Pick a date after today." });
+    ["today", "2026-10-04"],
+    ["in the past", "2026-01-01"],
+  ])("refuses a date %s", (_, sunsetDay) => {
+    expect(run({ sunsetDay })).toEqual({ ok: false, reason: "Pick a date after today." });
+  });
+
+  it("reads today in the business time zone: at 23:30 Eastern, tomorrow is still tomorrow", () => {
+    expect(run({ now: LATE_EVENING, sunsetDay: TOMORROW_DAY })).toMatchObject({ ok: true, changes: { sunsetAt: TOMORROW } });
+    expect(run({ now: LATE_EVENING, sunsetDay: "2026-10-04" })).toEqual({ ok: false, reason: "Pick a date after today." });
   });
 
   it("sends the contract changes consumers will meet on the Active version, when given", () => {
@@ -1356,7 +1390,8 @@ describe("setSunset", () => {
       payload: {
         versionNumber: 1,
         activeVersion: 2,
-        sunsetAt: "2027-03-01T00:00:00.000Z",
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-03-01",
         contractChanges: [ANNUAL_FEE_ADDED],
         contractLines: ["v2 adds required `annual_fee` (Currency)."],
       },
@@ -1370,7 +1405,7 @@ describe("setSunset", () => {
 
   it("moves a sunset that is still to come, even one due at the next midnight", () => {
     const scheduled = { ...v1, sunsetAt: TOMORROW };
-    const result = run({ version: scheduled, sunsetAt: MARCH_1 });
+    const result = run({ version: scheduled, sunsetDay: MARCH_1_DAY });
     expect(result.ok && result.changes).toEqual({ sunsetAt: MARCH_1, sunsetSetBy: "jordan" });
   });
 
@@ -1382,8 +1417,8 @@ describe("setSunset", () => {
     ["this very instant", NOW],
   ])("refuses any new date once the sunset has passed (%s)", (_, passed) => {
     const sunset = { ...v1, sunsetAt: passed };
-    for (const sunsetAt of [TOMORROW, MARCH_1]) {
-      expect(run({ version: sunset, sunsetAt })).toEqual({
+    for (const sunsetDay of [TOMORROW_DAY, MARCH_1_DAY]) {
+      expect(run({ version: sunset, sunsetDay })).toEqual({
         ok: false,
         reason: "This version's sunset has passed. It can't render again.",
       });
@@ -1583,10 +1618,13 @@ describe("review helpers", () => {
     expect(sunsetPassed({ sunsetAt: new Date("2026-10-04T00:00:00.000Z") }, NOW)).toBe(true);
   });
 
-  it("isAfterToday: a later UTC day than now", () => {
-    expect(isAfterToday(TOMORROW, NOW)).toBe(true);
-    expect(isAfterToday(new Date("2026-10-04T23:59:59.000Z"), NOW)).toBe(false);
-    expect(isAfterToday(new Date("2026-10-03T00:00:00.000Z"), NOW)).toBe(false);
+  it("isAfterToday: a later day than today in the business time zone", () => {
+    expect(isAfterToday(TOMORROW_DAY, NOW, ZONE)).toBe(true);
+    expect(isAfterToday("2026-10-04", NOW, ZONE)).toBe(false);
+    expect(isAfterToday("2026-10-03", NOW, ZONE)).toBe(false);
+    // 23:30 Eastern on October 4 (03:30 UTC on the 5th): the 5th is after today in New York, not in UTC.
+    expect(isAfterToday(TOMORROW_DAY, LATE_EVENING, ZONE)).toBe(true);
+    expect(isAfterToday(TOMORROW_DAY, LATE_EVENING, "UTC")).toBe(false);
   });
 
   it("throws, rather than refuses, on a reviewed version with no number (a data bug)", () => {
@@ -1637,6 +1675,7 @@ describe("scenario 3: the review loop", () => {
       now: NOW,
       active: null,
       sunsetPrevious: null,
+      zone: ZONE,
       sampleSetsSeen: ["typical"],
       templateName: TEMPLATE.name,
     };
@@ -1671,6 +1710,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       now: NOW,
       active: null,
       sunsetPrevious: null,
+      zone: ZONE,
       sampleSetsSeen: [],
       templateName: TEMPLATE.name,
     }),

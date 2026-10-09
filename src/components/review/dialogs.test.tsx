@@ -203,7 +203,7 @@ describe("ApproveDialog", () => {
         contractChanges={over.contractChanges ?? []}
         stage={over.stage ?? ONE}
         usage={USAGE}
-        today="2026-10-05"
+        sunsetCalendar={{ zone: "America/New_York", today: "2026-10-05" }}
         nowIso={NOW}
         sampleSetsSeen={over.sampleSetsSeen ?? []}
         onBegin={onBegin}
@@ -253,7 +253,12 @@ describe("ApproveDialog", () => {
       "Coral still renders v1 (last render today). It will keep working until November 4, 2026.",
     ]);
     expect(dialog().textContent).toContain("Set a sunset date for v1");
-    expect(dialog().querySelector<HTMLButtonElement>('button[aria-label^="Sunset date"]')?.textContent).toContain("November 4, 2026");
+    const picker = dialog().querySelector<HTMLButtonElement>('button[aria-label^="Sunset date"]');
+    expect(picker?.textContent).toContain("November 4, 2026");
+    // The picker names the zone the day ends in.
+    const zone = dialog().querySelector('[data-slot="sunset-zone"]');
+    expect(zone?.textContent).toBe("Ends at 00:00 Eastern (America/New_York)");
+    expect(picker?.getAttribute("aria-describedby")).toBe(zone?.id);
 
     // Switched off again: back to the first answer.
     await click(sunsetLabel()!);

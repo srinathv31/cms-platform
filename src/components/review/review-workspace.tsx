@@ -305,7 +305,7 @@ export function ReviewWorkspace({
         templateName={version.name}
         versionNumber={version.number}
         state={shownState}
-        sunsetAt={version.sunsetAt ?? null}
+        sunsetDay={version.sunsetDay ?? null}
         author={version.submittedBy}
         submittedAt={version.submittedAt}
         nowIso={nowIso}
@@ -423,7 +423,7 @@ export function ReviewWorkspace({
         contractChanges={version.contractChanges}
         stage={stage}
         usage={consumerUsage}
-        today={today}
+        sunsetCalendar={data.sunsetCalendar}
         nowIso={nowIso}
         sampleSetsSeen={seen}
         // The server's data moves to Active the moment the approval lands; the header holds until the moment plays.

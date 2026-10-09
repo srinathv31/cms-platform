@@ -43,7 +43,7 @@ export function ReviewHeader({
   templateName,
   versionNumber,
   state,
-  sunsetAt,
+  sunsetDay,
   author,
   submittedAt,
   nowIso,
@@ -56,8 +56,8 @@ export function ReviewHeader({
   versionNumber: number;
   /** The state to show: it can lag the server's while the go-live moment plays. */
   state: VersionState;
-  /** ISO: the day a Superseded version stops rendering (its badge says "Sunset Mar 1"). */
-  sunsetAt?: string | null;
+  /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (its badge says "Sunset Mar 1"). */
+  sunsetDay?: string | null;
   author: Person;
   submittedAt: string;
   nowIso: string;
@@ -84,7 +84,7 @@ export function ReviewHeader({
           animate={{ opacity: 1 }}
           transition={{ duration: duration.slow, ease: ease.outSoft }}
         >
-          <StatusBadge state={state} sunsetAt={sunsetAt ? new Date(sunsetAt) : null} now={nowIso} />
+          <StatusBadge state={state} sunsetDay={sunsetDay} now={nowIso} />
         </m.span>
         <span className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
           v{versionNumber} by {author.name} · {formatRelative(submittedAt, new Date(nowIso))}

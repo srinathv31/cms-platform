@@ -103,7 +103,7 @@ describe("paletteGroups", () => {
     expect(keys(riley)).toEqual(["recent", "templates", "pages", "settings", "teams"]);
     expect(paletteGroups(riley).find((g) => g.key === "templates")!.items).toHaveLength(3); // the fourth is in Recent
     expect(labels(riley, "pages")).toEqual(["Library", "Review", "Usage", "Audit"]);
-    expect(labels(riley, "settings")).toEqual(["Teams", "Content types", "Channel rules", "Approval chains"]);
+    expect(labels(riley, "settings")).toEqual(["Teams", "Content types", "Channel rules", "Approval chains", "Time zone"]);
     expect(labels(riley, "teams")).toEqual(["Coral Offers", "Deposits", "Card Statements"]);
     expect(paletteGroups(riley).find((g) => g.key === "teams")!.items.map((i) => i.href)).toEqual([
       "/coral-offers/library",
@@ -188,7 +188,7 @@ describe("paletteGroups", () => {
 
     it("finds pages, settings by group, and spaces", () => {
       expect(keys({ ...riley, query: "audit" })).toEqual(["pages"]);
-      expect(labels({ ...riley, query: "platform" }, "settings")).toHaveLength(4);
+      expect(labels({ ...riley, query: "platform" }, "settings")).toHaveLength(5);
       expect(keys({ ...riley, query: "deposits" })).toEqual(["templates", "teams"]);
       expect(keys({ ...maya, query: "import" })).toEqual(["actions"]);
     });

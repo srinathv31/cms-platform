@@ -141,9 +141,9 @@ export type AccessAuditAction =
   | "recert.kept" // one member confirmed
   | "recert.removed" // one member removed during the review (their access ends at once)
   | "recert.closed" // the deadline passed, or every member was decided
-  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains"; details.summary
+  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone"; details.summary
 
-export type PlatformArea = "teams" | "content_types" | "channel_rules" | "approval_chains";
+export type PlatformArea = "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone";
 
 export interface AccessAuditEffect {
   kind: "audit";
@@ -181,7 +181,7 @@ export type AccessRecipients =
 
 /** Team ids are their slugs (seed contract), so links build from the id. */
 export type TeamSettingsSection = "members" | "access-requests" | "recertification" | "inactivity";
-export type PlatformSettingsSection = "teams" | "content-types" | "channel-rules" | "approval-chains";
+export type PlatformSettingsSection = "teams" | "content-types" | "channel-rules" | "approval-chains" | "time-zone";
 
 export type AccessLink =
   | { to: "settings"; teamId: string; section: TeamSettingsSection }
@@ -481,6 +481,21 @@ export interface ApprovalChainsSection {
   viewerId: string;
 }
 
+/** Settings > Platform > Time zone: the business time zone sunset dates are read in (decision 0017). */
+export interface BusinessZoneSection {
+  /** The IANA id in force (`DEFAULT_BUSINESS_ZONE` until someone changes it). */
+  zone: string;
+  /** The zones on offer (`BUSINESS_ZONES`), each with its label: "Eastern (America/New_York)". */
+  zones: { id: string; label: string }[];
+  can: { change: PermissionResult };
+  /**
+   * What any change of zone leaves in place, worded by the domain from the sunsets still to come
+   * (`zoneChangeConsequences`): "2 sunsets already set don't move: …". The line for the zone picked comes
+   * from `describeZoneChange`, which the screen calls as the admin picks.
+   */
+  consequences: string[];
+}
+
 // ── Audit page — /{team}/audit ───────────────────────────────────────────────
 
 export type AuditCategory = "templates" | "access" | "platform";
@@ -627,6 +642,8 @@ export interface PlatformActions {
     contentTypeId: string;
     stages: { id?: string; name: string; rule: ApproverRule }[];
   }): Promise<ActionResult>;
+  /** One of `BUSINESS_ZONES`. Sunsets already set keep their instants. */
+  setBusinessZone(input: { zone: string }): Promise<ActionResult>;
 }
 
 export interface NotificationActions {
@@ -688,6 +705,15 @@ export interface PlatformConfigDomain {
     stages: (Omit<ApprovalStage, "id"> & { id: string | null })[];
     effects: AccessEffect[];
   }> | Refused;
+
+  /** One of `BUSINESS_ZONES`; the same zone again records nothing. Sunsets already set keep their instants. */
+  setBusinessZone(input: {
+    current: string;
+    next: string;
+    pendingSunsets: number;
+    actor: Named;
+    now: Date;
+  }): Ok<{ zone: string; effects: AccessEffect[] }> | Refused;
 }
 
 // ── domain/audit.ts signatures (implemented by slice S3) ────────────────────
@@ -729,6 +755,7 @@ export interface AccessQueries {
   getContentTypesSection(): Promise<ContentTypesSection>;
   getChannelRulesSection(): Promise<ChannelRulesSection>;
   getApprovalChainsSection(): Promise<ApprovalChainsSection>;
+  getBusinessZoneSection(): Promise<BusinessZoneSection>;
   // src/server/queries/audit.ts (slice S3)
   getAuditPage(spaceSlug: string, filters: AuditFilters): Promise<AuditPageData>;
   // src/server/queries/notifications.ts (slice S3; replaces getNotifications' shape additively)

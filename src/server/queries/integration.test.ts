@@ -94,7 +94,8 @@ describe("getIntegrationPanel", () => {
       {
         number: 1,
         state: "superseded",
-        sunsetAt: expect.any(String),
+        // Its sunset's day in the business time zone (Eastern until changed).
+        sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         diff: { breaking: false, items: [{ kind: "added", key: "offer_end_date", breaking: false, text: "v2 adds optional `offer_end_date` (Date)." }] },
       },
     ]);

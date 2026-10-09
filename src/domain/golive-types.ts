@@ -93,7 +93,7 @@ export const HISTORY_DAYS = 90;
 //   heatmap(counts: ReadonlyMap<string /*YYYY-MM-DD*/, number>, today: string, weeks?: number): UsageHeatmap
 //     Levels: 0 = no renders (taupe); 1–4 by quartiles of the non-zero days in range.
 //   usageTags(row: { versionNumber: number; state: VersionState; sunsetAt: Date | null; revokedAt: Date | null;
-//                    errors30d: number }, now: Date): UsageTag[]
+//                    errors30d: number }, now: Date, zone: string): UsageTag[]   // days to a sunset in the business zone
 //     "On superseded v1 · sunset in 6 days" (warning) · "… sunset tomorrow" / "… sunset today" ·
 //     "On superseded v1" (neutral, no sunset set) · "v1 sunset Mar 1 · renders fail" (danger, passed) ·
 //     "v1 revoked · renders fail" (danger) · "3 failed renders" (danger, errors30d > 0). Active rows get none.
@@ -188,8 +188,8 @@ export interface UsageRow {
   errors30d: number;
   lastRenderAt: string; // any outcome
   tags: UsageTag[];
-  /** Added by S2: the version's sunset (ISO) for `<StatusBadge sunsetAt>`; null when none is set. */
-  sunsetAt: string | null;
+  /** The version's sunset day (YYYY-MM-DD, business time zone) for `<StatusBadge sunsetDay>`; null when none is set. */
+  sunsetDay: string | null;
   /** Added by S2: successful renders per UTC day for the sparkline, USAGE_WINDOW_DAYS values, oldest first, today last. */
   spark: number[];
 }
@@ -205,7 +205,10 @@ export interface UsageDashboard {
     /** Distinct consumers with a render in the last 30 days. */
     consumers: UsageStatCard;
     /** Superseded versions whose sunset is within NEARING_SUNSET_DAYS (not passed). */
-    nearingSunset: UsageStatCard & { soonest: { templateName: string; versionNumber: number; sunsetAt: string } | null };
+    nearingSunset: UsageStatCard & {
+      /** `daysAway`: whole days from today to the sunset's day, in the business time zone (1 = tomorrow). */
+      soonest: { templateName: string; versionNumber: number; daysAway: number } | null;
+    };
   };
   /** ok / (ok + error), last 30 days; for a gauge if the composition has one. */
   success: { ok: number; errors: number; pct: number | null };
@@ -310,7 +313,13 @@ export interface IntegrationPanelData {
    * "What changed since vN": one entry per OLDER released version (Superseded or Revoked), newest
    * first; the picker defaults to the first. Empty for a v1.
    */
-  since: { number: number; state: VersionState; sunsetAt: string | null; diff: { breaking: boolean; items: ApiContractChange[] } }[];
+  since: {
+    number: number;
+    state: VersionState;
+    /** YYYY-MM-DD in the business time zone; null when no sunset is set. */
+    sunsetDay: string | null;
+    diff: { breaking: boolean; items: ApiContractChange[] };
+  }[];
 }
 
 // Signatures:

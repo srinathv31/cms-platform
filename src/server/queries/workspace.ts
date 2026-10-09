@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { sunsetDay } from "@/domain/business-zone";
 import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { Channel, JSONContent, PermissionResult, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
+import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
@@ -25,7 +27,8 @@ export interface WorkspaceHeaderData {
   teamSlug: string;
   teamName: string;
   status: VersionState;
-  sunsetAt: Date | null;
+  /** YYYY-MM-DD: the latest version's sunset day in the business time zone, for the badge. */
+  sunsetDay: string | null;
   /**
    * What sits beside the status badge. The badge already says the state, so the label never
    * repeats it: "v2" on a version with a number, "Based on v2" on a draft of an earlier version,
@@ -94,6 +97,7 @@ export const getWorkspaceHeader = cache(
     const latest = pickLatest(list);
     const active = list.find((v) => v.state === "active");
     const highest = list.reduce((max, v) => Math.max(max, v.number ?? 0), 0);
+    const zone = await getBusinessZone();
 
     const isDraft = !latest || latest.state === "draft";
     const versionNumber = isDraft ? highest + 1 : (latest.number ?? highest);
@@ -110,7 +114,7 @@ export const getWorkspaceHeader = cache(
       teamSlug: tpl.teamSlug,
       teamName: tpl.teamName,
       status: latest?.state ?? "draft",
-      sunsetAt: latest?.sunsetAt ?? null,
+      sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
       versionLabel,
       basedOnNumber,
       activeNumber: active?.number ?? null,

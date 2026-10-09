@@ -4,6 +4,7 @@
 // (see `NoticeRow` in golive-types.ts); `noticeView` reads either and words the one-line `message`.
 // Payloads never hold variable values, and neither does anything here.
 
+import { recordedSunsetDay } from "../business-zone";
 import { formatLongDate, joinWithAnd } from "../render/errors";
 import type { ApiNotice, ContractChange, NoticeRow } from "../golive-types";
 import { apiChanges } from "./contract-diff";
@@ -107,7 +108,9 @@ export function noticeView(row: NoticeRow): ApiNotice {
       const activeVersion = has(p, "activeVersion") ? int(p.activeVersion) : int(p.replacedByVersionNumber);
       const sunsetAt = isoOf(p.sunsetAt);
       const changes = activeVersion === null ? [] : apiChanges(changesOf(p.contractChanges), activeVersion);
-      const when = sunsetAt ? `stops rendering on ${formatLongDate(new Date(sunsetAt))}` : "will stop rendering";
+      // The day as picked (00:00 on it in the business time zone is `sunsetAt`).
+      const day = sunsetAt ? recordedSunsetDay(p) : null;
+      const when = day ? `stops rendering on ${formatLongDate(day)}` : "will stop rendering";
       const move = activeVersion === null ? "" : ` Move to v${activeVersion}.`;
       return { ...base, activeVersion, sunsetAt, reason: null, changes, message: `${title} ${when}.${move}` };
     }

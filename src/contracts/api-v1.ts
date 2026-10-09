@@ -168,7 +168,11 @@ export interface ApiVersionSummary {
   state: ApiVersionState;
   activatedAt: string;
   supersededAt: string | null;
-  /** The day a Superseded version stops rendering; null when none is set. */
+  /**
+   * The instant a Superseded version stops rendering: 00:00 on its sunset date in Stencil's business time
+   * zone (America/New_York unless an admin changed it), so "March 1" is 2027-03-01T05:00:00.000Z. Null when
+   * none is set.
+   */
   sunsetAt: string | null;
   /** True once `sunsetAt` has passed on the demo clock: renders now fail with version_sunset. */
   sunsetPassed: boolean;
@@ -274,7 +278,7 @@ export interface ApiNotice {
   versionNumber: number;
   /** The Active version when the notice was written (null when nothing is Active). */
   activeVersion: number | null;
-  /** sunset_scheduled only. */
+  /** sunset_scheduled only: the instant renders stop, 00:00 on the sunset date in the business time zone. */
   sunsetAt: string | null;
   /** revoked only. */
   reason: string | null;

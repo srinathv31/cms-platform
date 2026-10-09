@@ -125,40 +125,47 @@ describe("usageTags", () => {
   const base = { versionNumber: 1, sunsetAt: null, revokedAt: null, errors30d: 0 };
 
   it("active rows get none", () => {
-    expect(usageTags({ ...base, state: "active" }, NOW)).toEqual([]);
+    expect(usageTags({ ...base, state: "active" }, NOW, "UTC")).toEqual([]);
   });
   it("superseded with a sunset ahead: warning, counted in calendar days", () => {
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-25T12:00:00Z") }, NOW)).toEqual([
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-25T12:00:00Z") }, NOW, "UTC")).toEqual([
       { tone: "warning", text: "sunset in 21 days" },
     ]);
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-05T00:00:00Z") }, NOW)[0]!.text).toBe(
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-05T00:00:00Z") }, NOW, "UTC")[0]!.text).toBe(
       "sunset tomorrow",
     );
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-04T20:00:00Z") }, NOW)[0]!.text).toBe(
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-04T20:00:00Z") }, NOW, "UTC")[0]!.text).toBe(
       "sunset today",
     );
   });
+  it("counts the days in the business time zone, where the sunset's day is", () => {
+    // 21:00 Eastern on October 4 is already October 5 in UTC; the sunset is 00:00 Eastern on October 6.
+    const evening = new Date("2026-10-05T01:00:00Z");
+    const sunsetAt = new Date("2026-10-06T04:00:00Z");
+    expect(usageTags({ ...base, state: "superseded", sunsetAt }, evening, "America/New_York")[0]!.text).toBe("sunset in 2 days");
+    expect(usageTags({ ...base, state: "superseded", sunsetAt }, evening, "UTC")[0]!.text).toBe("sunset tomorrow");
+  });
   it("a sunset beyond the nearing window stays neutral", () => {
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2027-03-01T00:00:00Z") }, NOW)).toEqual([
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2027-03-01T00:00:00Z") }, NOW, "UTC")).toEqual([
       { tone: "neutral", text: "sunset in 148 days" },
     ]);
   });
   it("superseded with no sunset: no note (the Version badge says it)", () => {
-    expect(usageTags({ ...base, versionNumber: 2, state: "superseded" }, NOW)).toEqual([]);
+    expect(usageTags({ ...base, versionNumber: 2, state: "superseded" }, NOW, "UTC")).toEqual([]);
   });
   it("a passed sunset or a revoke fails renders: danger, and no separate failure count", () => {
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-01T00:00:00Z"), errors30d: 4 }, NOW)).toEqual([
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-01T00:00:00Z"), errors30d: 4 }, NOW, "UTC")).toEqual([
       { tone: "danger", text: "renders fail" },
     ]);
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: NOW }, NOW)[0]!.tone).toBe("danger");
-    expect(usageTags({ ...base, state: "revoked", revokedAt: at(3), errors30d: 2 }, NOW)).toEqual([
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: NOW }, NOW, "UTC")[0]!.tone).toBe("danger");
+    expect(usageTags({ ...base, state: "revoked", revokedAt: at(3), errors30d: 2 }, NOW, "UTC")).toEqual([
       { tone: "danger", text: "renders fail" },
     ]);
   });
   it("failed renders tag any version that still renders", () => {
-    expect(usageTags({ ...base, versionNumber: 2, state: "active", errors30d: 3 }, NOW)).toEqual([{ tone: "danger", text: "3 failed renders" }]);
-    expect(usageTags({ ...base, state: "active", errors30d: 1 }, NOW)).toEqual([{ tone: "danger", text: "1 failed render" }]);
-    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-25T12:00:00Z"), errors30d: 2 }, NOW)).toEqual([
+    expect(usageTags({ ...base, versionNumber: 2, state: "active", errors30d: 3 }, NOW, "UTC")).toEqual([{ tone: "danger", text: "3 failed renders" }]);
+    expect(usageTags({ ...base, state: "active", errors30d: 1 }, NOW, "UTC")).toEqual([{ tone: "danger", text: "1 failed render" }]);
+    expect(usageTags({ ...base, state: "superseded", sunsetAt: new Date("2026-10-25T12:00:00Z"), errors30d: 2 }, NOW, "UTC")).toEqual([
       { tone: "warning", text: "sunset in 21 days" },
       { tone: "danger", text: "2 failed renders" },
     ]);
@@ -175,7 +182,7 @@ describe("compareUsageRows", () => {
     errors30d: 0,
     lastRenderAt: NOW.toISOString(),
     tags: tones.map((tone) => ({ tone, text: tone })),
-    sunsetAt: null,
+    sunsetDay: null,
     spark: [],
   });
   it("danger first, then warning, then other tags, then renders desc", () => {

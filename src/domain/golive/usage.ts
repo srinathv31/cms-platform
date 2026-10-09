@@ -6,6 +6,7 @@
 // "Renders" are attempts, succeeded or failed (one denominator: succeeded = renders - failed); the failed
 // ones are counted apart as errors.
 
+import { daysUntilSunset } from "../business-zone";
 import type { RenderErrorCode } from "../render/types";
 import type { VersionState } from "../types";
 import {
@@ -221,9 +222,10 @@ export interface UsageTagInput {
  *   revoked                   "renders fail"            danger
  *   superseded, no sunset     none
  * then "3 failed renders" (danger) when errors30d > 0 and the version still renders (a failing
- * lifecycle note already says so). Active rows get no lifecycle note.
+ * lifecycle note already says so). Active rows get no lifecycle note. The days to a sunset are counted
+ * in the business time zone (`zone`), where its day is ("sunset tomorrow": renders stop at midnight).
  */
-export function usageTags(row: UsageTagInput, now: Date): UsageTag[] {
+export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag[] {
   const tags: UsageTag[] = [];
   let failing = false;
 
@@ -235,7 +237,7 @@ export function usageTags(row: UsageTagInput, now: Date): UsageTag[] {
       tags.push({ tone: "danger", text: "renders fail" });
       failing = true;
     } else {
-      const days = calendarDaysUntil(row.sunsetAt, now);
+      const days = daysUntilSunset(row.sunsetAt, now, zone);
       const when = days <= 0 ? "sunset today" : days === 1 ? "sunset tomorrow" : `sunset in ${days} days`;
       tags.push({ tone: days <= NEARING_SUNSET_DAYS ? "warning" : "neutral", text: when });
     }

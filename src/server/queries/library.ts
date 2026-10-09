@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { desc, eq } from "drizzle-orm";
+import { sunsetDay } from "@/domain/business-zone";
+import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
@@ -16,7 +18,8 @@ export interface LibraryRow {
   teamName: string;
   /** State of the template's latest version (a draft counts as latest). */
   status: VersionState;
-  sunsetAt: Date | null;
+  /** YYYY-MM-DD: the latest version's sunset day in the business time zone, for the badge. */
+  sunsetDay: string | null;
   /** Number of the Active version, if any. */
   activeNumber: number | null;
   lastEdited: string;
@@ -41,6 +44,7 @@ export function pickLatest<T extends { number: number | null; state: VersionStat
 /** Templates in a space ("all" = every team), newest edit first. Caller has already passed requireSpace. */
 export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRow[]> => {
   const nowDate = await demoNow();
+  const zone = await getBusinessZone();
 
   const templateRows = await db
     .select({
@@ -93,7 +97,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
         teamSlug: t.teamSlug,
         teamName: t.teamName,
         status: latest?.state ?? ("draft" as VersionState),
-        sunsetAt: latest?.sunsetAt ?? null,
+        sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
         activeNumber: active?.number ?? null,
         lastEdited: edited ? relativeTime(edited, nowDate) : "—",
         owner: { name: t.ownerName, initials: t.ownerInitials, hue: t.ownerHue },

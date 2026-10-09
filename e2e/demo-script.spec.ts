@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
+import { sunsetInstant } from "@/domain/business-zone";
 import { longDate, openDb } from "./api/helpers";
 import {
   advanceClock,
@@ -844,7 +845,8 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await expect(statusBadge(page)).toHaveText("Active");
     const versions = await rows(db, "SELECT number, state, sunset_at FROM versions WHERE template_id = ? AND number IN (2, 3) ORDER BY number", [springId]);
     expect(versions).toEqual([
-      { number: 2, state: "superseded", sunset_at: Date.parse(`${sunsetDay}T00:00:00Z`) },
+      // 00:00 Eastern on the day picked (the business time zone, decision 0017).
+      { number: 2, state: "superseded", sunset_at: sunsetInstant(sunsetDay, "America/New_York").getTime() },
       { number: 3, state: "active", sunset_at: null },
     ]);
   });

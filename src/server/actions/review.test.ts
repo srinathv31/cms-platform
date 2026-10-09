@@ -4,7 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { sunsetInstant } from "@/domain/business-zone";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
@@ -62,6 +63,7 @@ const {
   memberships,
   notifications,
   renderLog,
+  settings,
   versions,
 } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
@@ -375,7 +377,7 @@ describe("resubmitting answers the change request", () => {
 // ── Approve over an Active version ────────────────────────────
 
 describe("approveVersion over an Active version", () => {
-  it("supersedes the previous Active, sets its sunset, and tells Coral", async () => {
+  it("supersedes the previous Active, sets its sunset (00:00 Eastern on the day), and tells Coral", async () => {
     const templateId = ids["cash-back"]!;
     const at = as("jordan");
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
@@ -387,7 +389,7 @@ describe("approveVersion over an Active version", () => {
     expect(await version(templateId, 2)).toMatchObject({
       state: "superseded",
       supersededAt: at,
-      sunsetAt: new Date(`${sunset}T00:00:00.000Z`),
+      sunsetAt: sunsetInstant(sunset, "America/New_York"),
       sunsetSetBy: "jordan",
     });
     expect((await auditAt(at)).map((r) => r.action).sort()).toEqual([
@@ -651,7 +653,7 @@ describe("setSunset", () => {
     const day = new Date(at.getTime() + 30 * DAY).toISOString().slice(0, 10);
     expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day })).toEqual({ ok: true });
     expect(await version(templateId, 1)).toMatchObject({
-      sunsetAt: new Date(`${day}T00:00:00.000Z`),
+      sunsetAt: sunsetInstant(day, "America/New_York"),
       sunsetSetBy: "alex",
     });
     expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.sunset_set"]);
@@ -663,6 +665,49 @@ describe("setSunset", () => {
     expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day })).toEqual({ ok: true });
     expect(await auditAt(again)).toEqual([]);
     expect(await noticesAt(again)).toEqual([]);
+  });
+
+  // A sunset date ends at 00:00 on that day in the business time zone (decision 0017), Eastern until a
+  // Platform Admin picks another: "Sunset on March 1" must not stop renders at 7 PM Eastern on February 28.
+  describe("in the business time zone", () => {
+    const templateId = () => ids["balance-transfer"]!;
+    let before: Date | null = null;
+    beforeAll(async () => {
+      before = (await version(templateId(), 1))!.sunsetAt;
+    });
+    afterEach(async () => {
+      await db.delete(settings).where(eq(settings.key, "business_zone"));
+      await db.update(versions).set({ sunsetAt: before }).where(and(eq(versions.templateId, templateId()), eq(versions.number, 1)));
+    });
+
+    it("stores 00:00 Eastern on the day picked, and records the day and the zone", async () => {
+      const at = as("alex");
+      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2027-03-01" })).toEqual({ ok: true });
+      // 00:00 EST is 05:00 UTC; midnight UTC would be 7 PM Eastern on February 28.
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2027-03-01T05:00:00.000Z"));
+      const [audit] = await auditAt(at);
+      expect(audit!.details).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" });
+      const [notice] = await noticesAt(at);
+      expect(notice!.payload).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" });
+    });
+
+    it("stores 00:00 in the zone Platform settings name", async () => {
+      await db.insert(settings).values({ key: "business_zone", value: "America/Los_Angeles" });
+      as("alex");
+      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2027-03-01" })).toEqual({ ok: true });
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2027-03-01T08:00:00.000Z")); // 00:00 PST
+    });
+
+    it("reads 'after today' there: at 23:30 Eastern, the next day is still after today", async () => {
+      as("alex");
+      env.now = new Date("2026-10-05T03:30:00.000Z"); // 23:30 EDT on October 4; already the 5th in UTC
+      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-04" })).toEqual({
+        ok: false,
+        reason: REFUSALS.sunsetAfterToday,
+      });
+      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-05" })).toEqual({ ok: true });
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2026-10-05T04:00:00.000Z")); // in half an hour
+    });
   });
 
   it("refuses an Active version, a past date, a bad date and a non-approver", async () => {
@@ -693,8 +738,8 @@ describe("setSunset", () => {
     const where = and(eq(versions.templateId, templateId), eq(versions.number, 1));
     const before = (await version(templateId, 1))!;
     const at = as("jordan");
-    // Yesterday's midnight, as a date picked in the dialog is stored.
-    const passed = new Date(`${new Date(at.getTime() - DAY).toISOString().slice(0, 10)}T00:00:00.000Z`);
+    // Yesterday's midnight in the business time zone, as a date picked in the dialog is stored.
+    const passed = sunsetInstant(new Date(at.getTime() - DAY).toISOString().slice(0, 10), "America/New_York");
     await db.update(versions).set({ sunsetAt: passed }).where(where);
     try {
       const { rev } = (await version(templateId, 1))!;

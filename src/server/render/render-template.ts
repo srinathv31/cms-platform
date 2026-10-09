@@ -16,6 +16,7 @@ import {
 } from "@/domain/render";
 import type { RenderError } from "@/domain/render/types";
 import type { Channel, Viewer } from "@/domain/types";
+import { readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db as appDb, type Db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
@@ -213,6 +214,8 @@ async function renderVersion(
       },
       activeNumber: await activeNumber(db, template.id),
       now: at,
+      // A sunset's message names its day in the business time zone.
+      zone: await readBusinessZone(db),
     });
     if (!check.ok) return fail(check.error);
     newerVersion = check.newerVersion;

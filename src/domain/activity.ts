@@ -6,6 +6,7 @@
 // It reads every AuditAction the lifecycle writes, plus the older spellings the seed uses
 // (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
 
+import { recordedSunsetDay } from "./business-zone";
 import { formatLongDate } from "./render/errors";
 import type { AuditAction, Person } from "./review-types";
 
@@ -58,7 +59,9 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       return by === null ? `${v} was superseded.` : `${v} was superseded by v${by}.`;
     }
     case "version.sunset_set": {
-      const at = date(d.sunsetAt);
+      // The day as picked, read in the business time zone it was set in.
+      const day = recordedSunsetDay(d);
+      const at = day ? formatLongDate(day) : "";
       if (!at) return `${who} set a sunset date for ${v}.`;
       return date(d.previousSunsetAt)
         ? `${who} moved the sunset of ${v} to ${at}.`

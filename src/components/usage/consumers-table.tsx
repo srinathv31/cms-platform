@@ -140,7 +140,7 @@ export function ConsumersTable({
               <TableCell>
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-[13px] text-text">v{r.versionNumber}</span>
-                  <StatusBadge state={r.versionState} sunsetAt={r.sunsetAt ? new Date(r.sunsetAt) : null} now={now} />
+                  <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} now={now} />
                 </span>
               </TableCell>
               <TableCell className="text-right text-text tabular-nums">{NF.format(r.renders30d)}</TableCell>

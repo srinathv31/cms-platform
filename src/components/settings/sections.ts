@@ -1,6 +1,7 @@
 import {
   Building2,
   GitMerge,
+  Globe,
   Hourglass,
   Inbox,
   ShieldCheck,
@@ -45,6 +46,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { key: "content-types", label: "Content types", icon: Shapes },
       { key: "channel-rules", label: "Channel rules", icon: SlidersHorizontal },
       { key: "approval-chains", label: "Approval chains", icon: GitMerge },
+      { key: "time-zone", label: "Time zone", icon: Globe },
     ],
   },
 ];

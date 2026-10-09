@@ -56,7 +56,7 @@ export async function WorkspaceHeader({
         tabIndex={-1}
         className="col-start-1 row-start-2 -mx-1.5 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end justify-self-start rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <StatusBadge state={t.status} sunsetAt={t.sunsetAt} now={nowDate} />
+        <StatusBadge state={t.status} sunsetDay={t.sunsetDay} now={nowDate} />
         {t.versionLabel ? <span className="text-[14px] leading-6 text-text-muted">{t.versionLabel}</span> : null}
         {t.editable ? (
           <>

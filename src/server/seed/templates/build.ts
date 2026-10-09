@@ -1,3 +1,4 @@
+import { DEFAULT_BUSINESS_ZONE, sunsetInstant, todayIn } from "@/domain/business-zone";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import {
   REQUIRED_SECTIONS,
@@ -12,6 +13,15 @@ import { userName } from "../people";
 import type { SeedTemplate, SeedVersion } from "./types";
 
 const STAGE_NAME = TEAM_STAGE.name;
+
+/**
+ * A seeded sunset `inDays` days from the seed's base, as the picker sets one: that day in the business
+ * time zone (the default, Eastern), ending at 00:00 there.
+ */
+function seededSunset(ctx: SeedCtx, inDays: number) {
+  const day = todayIn(ctx.at(-inDays), DEFAULT_BUSINESS_ZONE);
+  return { day, at: sunsetInstant(day, DEFAULT_BUSINESS_ZONE) };
+}
 
 /** Fails the reset early if a seeded body breaks the contract (cheaper than finding it in the UI). */
 function check(spec: SeedTemplate, v: SeedVersion) {
@@ -170,7 +180,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       submitNote: v.submitNote ?? null,
       activatedAt: v.activatedAt !== undefined ? ctx.at(v.activatedAt) : null,
       supersededAt: v.supersededAt !== undefined ? ctx.at(v.supersededAt) : null,
-      sunsetAt: v.sunset ? ctx.at(-v.sunset.inDays) : null,
+      sunsetAt: v.sunset ? seededSunset(ctx, v.sunset.inDays).at : null,
       sunsetSetBy: v.sunset?.setBy ?? null,
       revoke: v.revoke
         ? {
@@ -275,13 +285,14 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
 
     if (v.sunset) {
       const successor = spec.versions.find((s) => s.supersedes === v.ref);
-      const sunsetAt = ctx.at(-v.sunset.inDays).toISOString();
+      const sunset = seededSunset(ctx, v.sunset.inDays);
+      const sunsetAt = sunset.at.toISOString();
       audit({
         at: v.sunset.setAt,
         actor: v.sunset.setBy,
         action: "version.sunset_set",
         version: info,
-        details: { number: v.number, sunsetAt },
+        details: { number: v.number, sunsetAt, sunsetDay: sunset.day, zone: DEFAULT_BUSINESS_ZONE },
       });
       for (const consumerId of spec.consumers ?? []) {
         sink.consumerNotices.push({
@@ -294,6 +305,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
             templateName: spec.name,
             versionNumber: v.number,
             sunsetAt,
+            sunsetDay: sunset.day,
             replacedByVersionNumber: successor?.number ?? null,
             contractChanges: successor?.contractChanges ?? [],
           },

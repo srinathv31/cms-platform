@@ -7,17 +7,23 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { PlatformActions } from "@/domain/access-types";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
-import { PLATFORM_REFUSALS, validateChain } from "@/domain/platform-config";
+import { PLATFORM_REFUSALS, describeZoneChange, validateChain } from "@/domain/platform-config";
 import type { ApproverRule, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { getApprovalChainsSection, getChannelRulesSection, getContentTypesSection, getTeamsSection } from "@/server/queries/platform";
+import {
+  getApprovalChainsSection,
+  getBusinessZoneSection,
+  getChannelRulesSection,
+  getContentTypesSection,
+  getTeamsSection,
+} from "@/server/queries/platform";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "@/server/queries/review";
 import { seedDatabase } from "@/server/seed";
 import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
-import { createTeam, saveApprovalChain, setChannelRule, updateContentType } from "./platform";
+import { createTeam, saveApprovalChain, setBusinessZone, setChannelRule, updateContentType } from "./platform";
 import { approveVersion, submitVersion } from "./review";
 
 // Platform settings and the two-stage approval they enable, end to end against a temporary database
@@ -37,7 +43,7 @@ vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
 // The contract (access-types.ts): the actions have exactly these signatures.
-const _contract: PlatformActions = { createTeam, updateContentType, setChannelRule, saveApprovalChain };
+const _contract: PlatformActions = { createTeam, updateContentType, setChannelRule, saveApprovalChain, setBusinessZone };
 void _contract;
 
 const { approvals, approvalStages, auditEvents, contentTypes, membershipRoles, memberships, notifications, teams, versions } =
@@ -125,9 +131,11 @@ describe("only a Platform Admin", () => {
       expect(await setChannelRule({ contentTypeId: CT, channel: "email", allowed: false })).toEqual({ ok: false, reason: REASONS.generic });
       expect(await updateContentType({ contentTypeId: CT, requiredSections: [] })).toEqual({ ok: false, reason: REASONS.generic });
       expect(await saveApprovalChain({ contentTypeId: CT, stages: [] })).toEqual({ ok: false, reason: REASONS.generic });
+      expect(await setBusinessZone({ zone: "America/Chicago" })).toEqual({ ok: false, reason: REASONS.generic });
       expect(await auditAt(at)).toEqual([]);
     }
     await expect(getTeamsSection()).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+    await expect(getBusinessZoneSection()).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
   });
 });
 
@@ -290,6 +298,64 @@ describe("setChannelRule", () => {
       expect(await setChannelRule({ contentTypeId: CT, channel, allowed: true })).toEqual({ ok: true });
     }
     expect((await db.query.contentTypes.findFirst({ where: eq(contentTypes.id, CT) }))?.allowedChannels).toEqual(["pdf", "web", "email"]);
+  });
+});
+
+// ── Business time zone ────────────────────────────────────────
+
+describe("setBusinessZone", () => {
+  const zoneRow = async () => (await db.select().from(schema.settings).where(eq(schema.settings.key, "business_zone")))[0];
+  afterAll(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "business_zone"));
+  });
+
+  it("is Eastern until a Platform Admin picks another, from the US zones and UTC", async () => {
+    as("riley");
+    const section = await getBusinessZoneSection();
+    expect(section.zone).toBe("America/New_York");
+    expect(section.zones[0]).toEqual({ id: "America/New_York", label: "Eastern (America/New_York)" });
+    expect(section.zones.map((z) => z.id)).toContain("UTC");
+    // Decided for the screen: Riley may change it, and Balance Transfer v1's seeded sunset (still to come) stays.
+    expect(section.can).toEqual({ change: { ok: true } });
+    expect(section.consequences).toEqual(["1 sunset already set doesn't move: its consumers have been told when it ends."]);
+  });
+
+  it("changes the zone, records it, and moves no sunset already set", async () => {
+    const sunsetBefore = (await db.select({ id: versions.id, sunsetAt: versions.sunsetAt }).from(versions)).filter((v) => v.sunsetAt);
+    const at = as("riley");
+    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({ ok: true });
+    expect((await zoneRow())?.value).toBe("America/Los_Angeles");
+    expect((await getBusinessZoneSection()).zone).toBe("America/Los_Angeles");
+    const [audit] = await auditAt(at);
+    expect(audit).toMatchObject({ action: "platform.config_changed", actorId: "riley" });
+    expect(audit?.details).toMatchObject({
+      area: "business_zone",
+      summary: "Set the business time zone to Pacific (America/Los_Angeles)",
+      from: "America/New_York",
+      to: "America/Los_Angeles",
+      pendingSunsets: 1,
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    // Sunsets keep their instants: their consumers have been told when they end.
+    const sunsetAfter = (await db.select({ id: versions.id, sunsetAt: versions.sunsetAt }).from(versions)).filter((v) => v.sunsetAt);
+    expect(sunsetAfter).toEqual(sunsetBefore);
+    // The screen's line for the zone picked is the domain's, and the server refuses with the same problem.
+    expect(describeZoneChange({ current: "America/New_York", next: "America/Los_Angeles" })).toEqual({
+      problem: null,
+      changed: true,
+      lines: ["New sunset dates end at 00:00 Pacific (America/Los_Angeles)."],
+    });
+    expect(describeZoneChange({ current: "America/New_York", next: "Europe/London" }).problem).toBe(PLATFORM_REFUSALS.pickZone);
+  });
+
+  it("writes nothing for the zone it already has, and refuses a zone off the list", async () => {
+    const at = as("riley");
+    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({ ok: true });
+    expect(await setBusinessZone({ zone: "Europe/London" })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.pickZone });
+    expect(await setBusinessZone({ zone: "" })).toEqual({ ok: false, reason: "Check the form and try again." });
+    expect(await auditAt(at)).toEqual([]);
+    expect(refresh).not.toHaveBeenCalled();
+    expect((await zoneRow())?.value).toBe("America/Los_Angeles");
   });
 });
 

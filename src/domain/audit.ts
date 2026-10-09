@@ -647,6 +647,8 @@ function areaText(value: unknown): string {
       return "channel rules";
     case "approval_chains":
       return "approval chains";
+    case "business_zone":
+      return "business time zone";
     default:
       return "platform configuration";
   }

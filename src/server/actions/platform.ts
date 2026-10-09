@@ -9,11 +9,13 @@ import { PermissionError, assertCan } from "@/domain/permissions";
 import {
   createTeam as createTeamRule,
   saveApprovalChain as saveApprovalChainRule,
+  setBusinessZone as setBusinessZoneRule,
   setChannelRule as setChannelRuleRule,
   updateRequiredSections,
 } from "@/domain/platform-config";
 import { CHANNELS, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
+import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import {
@@ -21,6 +23,7 @@ import {
   contentTypes,
   membershipRoles,
   memberships,
+  settings,
   teams,
   templates,
   users,
@@ -31,8 +34,8 @@ import { newId } from "@/server/ids";
 import { loadDecisions } from "@/server/queries/review-shared";
 import { getViewer } from "@/server/viewer";
 
-// Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules and
-// approval chains (contract: `PlatformActions` in domain/access-types.ts). Every action checks the
+// Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules, approval
+// chains and the business time zone (contract: `PlatformActions` in domain/access-types.ts). Every action checks the
 // permission first, reads the facts and writes the domain's answer (domain/platform-config.ts) in ONE
 // transaction with its audit rows and notifications, then refreshes every page (the switcher, the
 // sidebar and the settings modal all read this configuration).
@@ -366,6 +369,48 @@ export async function saveApprovalChain(input: {
         { at, actorId: viewer.userId, teamId: v.teamId, templateId: v.templateId, versionId: v.versionId },
       );
     }
+    await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+    wrote = true;
+    return { ok: true };
+  });
+
+  if (result.ok && wrote) refreshAll();
+  return result;
+}
+
+// ── Business time zone ────────────────────────────────────────
+
+const ZoneInput = z.object({ zone: z.string().min(1).max(64) });
+
+/**
+ * Sets the business time zone sunset dates are read in (decision 0017): one of `BUSINESS_ZONES`. Only
+ * dates picked afterwards follow it; every sunset already set keeps its instant, since its consumers
+ * have been told when it ends. The same zone again writes nothing.
+ */
+export async function setBusinessZone(input: { zone: string }): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const refused = checkManage(viewer);
+  if (refused) return refused;
+  const parsed = ZoneInput.safeParse(input);
+  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+
+  const at = await now();
+  let wrote = false;
+  const result = await transact(async (tx) => {
+    const outcome = setBusinessZoneRule({
+      current: await readBusinessZone(tx),
+      next: parsed.data.zone,
+      pendingSunsets: await countPendingSunsets(tx, at),
+      actor: actorOf(viewer),
+      now: at,
+    });
+    if (!outcome.ok) refuse(outcome.reason);
+    if (outcome.effects.length === 0) return { ok: true };
+
+    await tx
+      .insert(settings)
+      .values({ key: BUSINESS_ZONE_KEY, value: outcome.zone })
+      .onConflictDoUpdate({ target: settings.key, set: { value: outcome.zone } });
     await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
     wrote = true;
     return { ok: true };
