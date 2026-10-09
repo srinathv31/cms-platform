@@ -141,6 +141,10 @@ those are design mocks on fixture data.
 - A choice someone might question later gets a record in [docs/decisions/](docs/decisions/README.md).
 - Describe what the code does now, not how it got there.
 
+## Known issues
+
+[docs/handoff-review.md](docs/handoff-review.md) lists every open finding from the October 2026 codebase review, with where it is and how to fix it. Pick work from its "Fix first" list. When a change fixes a finding, update that finding's Status line in the same change.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

@@ -11,6 +11,7 @@ the root [README.md](../README.md).
 | [AGENTS.md](../AGENTS.md) | The rules every change follows: commands, Next.js 16 rules, boundaries, UI rules, files to copy. |
 | [architecture.md](architecture.md) | The layers, what may import what, how a page, a mutation, an autosave and a consumer render flow through the code, and the data model. |
 | [render-spec.md](render-spec.md) | The render engine's specification: the stored document, normalization at save, values, links, lists, the `RenderDoc`, each channel, errors, and the golden-file contract. Normative: a second engine is built from it. Its golden files are in [src/server/render/golden](../src/server/render/golden/README.md). |
+| [handoff-review.md](handoff-review.md) | The October 2026 codebase review as a working backlog: every finding's severity, status, location and fix. Agents pick work from its "Fix first" list, and the PR that fixes a finding updates its status. |
 | Layer READMEs | One per folder under `src/`, next to the code: [app](../src/app/README.md), [components](../src/components/README.md), [contracts](../src/contracts/README.md), [domain](../src/domain/README.md), [editor](../src/editor/README.md), [server](../src/server/README.md), [simulator](../src/simulator/README.md). |
 | [guides/](guides/) | Step-by-step how-tos. Today: the [demo script](guides/demo-script.md). |
 | [reference/](reference/) | Lookup material. Today: the [UI checklist](reference/ui-checklist.md). |
@@ -27,7 +28,8 @@ the root [README.md](../README.md).
   [render-spec.md](render-spec.md) stays at the top of `docs/` because so much code cites it there.
 - **It's a choice someone might question later**: a record in [decisions/](decisions/README.md).
 - **It's a plan, a brief or a status report**: not here. Put it in the PR or issue; it goes stale as soon as the
-  work lands.
+  work lands. The one exception is [handoff-review.md](handoff-review.md): a backlog that stays true because
+  each PR that fixes a finding updates it.
 
 ## Keeping them true
 
