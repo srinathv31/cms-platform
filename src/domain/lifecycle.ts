@@ -17,8 +17,9 @@
 //   confirmRevoke  revoke pending → Revoked (a different approver)
 //   cancelRevoke   revoke pending → no revoke
 //
-// The transitions the review phase added refuse with a one-line reason (`{ ok: false, reason }`)
-// rather than throwing: a second tab or a slower colleague gets there first, and the person reads why.
+// The transitions the review phase added refuse with a code and a one-line reason (`{ ok: false, code,
+// reason }`, from `REFUSALS`) rather than throwing: a second tab or a slower colleague gets there first,
+// and the person reads why.
 //
 // The name is a version field, like the body: a new draft copies it, the author renames the draft, and
 // it freezes at submit. A transition's `templateName` is the name of the version it is about
@@ -38,6 +39,7 @@ import {
 import { sunsetInstant, todayIn } from "./business-zone";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
+import { refusal, refuse, type Refused } from "./refusals";
 import { formatLongDate } from "./render/errors";
 import {
   DOCUMENT_THREAD,
@@ -334,7 +336,7 @@ export interface SubmitChanges {
 }
 
 /** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
-export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | { ok: false; reason: string };
+export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
 
 export interface SubmitInput {
   draft: SubmitDraft;
@@ -381,22 +383,18 @@ export interface SubmitInput {
 export function submit(input: SubmitInput): SubmitResult {
   const { draft, highestNumber, baseline, now, submittedBy } = input;
 
-  if (draft.state === "in_review") return { ok: false, reason: "This version is already in review." };
-  if (draft.state !== "draft") return { ok: false, reason: "Only a draft can be submitted." };
-  if (draft.rev !== input.seenRev) return { ok: false, reason: REFUSALS.summaryStale };
+  if (draft.state === "in_review") return refuse(REFUSALS.alreadyInReview);
+  if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
+  if (draft.rev !== input.seenRev) return refuse(REFUSALS.summaryStale);
 
   const emailOn = draft.channels.includes("email");
 
   const defined = new Set(draft.variables.map((v) => v.key));
   const fields = emailOn ? [draft.body, draft.emailSubject, draft.emailPreheader] : [draft.body];
   const undefinedKeys = unique(fields.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
-  if (undefinedKeys.length > 0) {
-    return { ok: false, reason: `Define or remove ${listKeys(undefinedKeys)} before submitting.` };
-  }
+  if (undefinedKeys.length > 0) return refuse(REFUSALS.undefinedVariables(undefinedKeys));
 
-  if (emailOn && isBlankField(draft.emailSubject)) {
-    return { ok: false, reason: "Add an email subject before submitting." };
-  }
+  if (emailOn && isBlankField(draft.emailSubject)) return refuse(REFUSALS.emailSubjectMissing);
 
   const number = highestNumber + 1;
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
@@ -467,24 +465,34 @@ function unique<T>(items: readonly T[]): T[] {
 // ── Review: shapes ────────────────────────────────────────────
 
 export type Ok<T> = { ok: true } & T;
-export type Refused = { ok: false; reason: string };
+export type { Refused };
 export type Outcome<T> = Ok<T> | Refused;
 
-/** The sentences a refused review transition returns (maker-checker reasons come from `REASONS`). */
+/**
+ * What a refused submit or review transition returns: a code to branch on and the sentence people read
+ * (maker-checker refusals come from `REASONS`).
+ */
 export const REFUSALS = {
+  alreadyInReview: refusal("already_in_review", "This version is already in review."),
+  notDraft: refusal("not_draft", "Only a draft can be submitted."),
   /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */
-  summaryStale: "This draft changed after this summary was made.",
-  notInReview: "This version isn't in review.",
-  stageMissing: "This version's approval stage no longer exists.",
-  giveReason: "Give a reason.",
-  sunsetAfterToday: "Pick a date after today.",
-  sunsetNotSuperseded: "Only a Superseded version can have a sunset date.",
-  sunsetPassed: "This version's sunset has passed. It can't render again.",
-  notRevocable: "Only an Active or Superseded version can be revoked.",
-  alreadyRevoked: "This version is already revoked.",
-  revokePending: "A revoke is already waiting for confirmation.",
-  noRevokePending: "There's no revoke waiting for confirmation.",
-  approvedEarlierStage: "You approved an earlier stage.",
+  summaryStale: refusal("summary_stale", "This draft changed after this summary was made."),
+  undefinedVariables: refusal(
+    "undefined_variables",
+    (keys: readonly string[]) => `Define or remove ${listKeys(keys)} before submitting.`,
+  ),
+  emailSubjectMissing: refusal("email_subject_missing", "Add an email subject before submitting."),
+  notInReview: refusal("not_in_review", "This version isn't in review."),
+  stageMissing: refusal("stage_missing", "This version's approval stage no longer exists."),
+  giveReason: refusal("reason_missing", "Give a reason."),
+  sunsetAfterToday: refusal("sunset_not_after_today", "Pick a date after today."),
+  sunsetNotSuperseded: refusal("sunset_not_superseded", "Only a Superseded version can have a sunset date."),
+  sunsetPassed: refusal("sunset_passed", "This version's sunset has passed. It can't render again."),
+  notRevocable: refusal("not_revocable", "Only an Active or Superseded version can be revoked."),
+  alreadyRevoked: refusal("already_revoked", "This version is already revoked."),
+  revokePending: refusal("revoke_pending", "A revoke is already waiting for confirmation."),
+  noRevokePending: refusal("no_revoke_pending", "There's no revoke waiting for confirmation."),
+  approvedEarlierStage: refusal("approved_earlier_stage", "You approved an earlier stage."),
 } as const;
 
 /**
@@ -1069,10 +1077,6 @@ function pendingRevoke(version: ReviewVersion): ({ ok: true; revoke: RevokeRecor
 }
 
 // ── Review helpers ────────────────────────────────────────────
-
-function refuse(reason: string): Refused {
-  return { ok: false, reason };
-}
 
 /** A version past Draft always has its number; a missing one is a bug, not a refusal. */
 function numberOf(version: { number: number | null; state: VersionState }): number {

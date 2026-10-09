@@ -212,7 +212,7 @@ test("the version Revert reads is a GET route that a request without Eli's sessi
   try {
     const refused = await noSession.get(read);
     expect(refused.status()).toBe(403);
-    expect(await refused.json()).toEqual({ ok: false, reason: expect.stringMatching(/\S/) });
+    expect(await refused.json()).toEqual({ ok: false, code: "generic", reason: expect.stringMatching(/\S/) });
     expect((await noSession.post(read)).status(), "it isn't a POST endpoint").toBe(405);
   } finally {
     await noSession.dispose();

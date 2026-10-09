@@ -119,12 +119,12 @@ describe("access read models", () => {
     expect(section.rows.map((r) => r.person.id)).toEqual(["alex", "dana", "devon", "jordan", "maya", "priya", "sam"]);
     const alex = section.rows.find((r) => r.isYou)!;
     expect(alex.person.id).toBe("alex");
-    expect(alex.can.remove).toEqual({ ok: false, reason: REASONS.ownAccess });
+    expect(alex.can.remove).toEqual({ ok: false, ...REASONS.ownAccess });
     const maya = section.rows.find((r) => r.person.id === "maya")!;
     expect(maya.can).toEqual({
       editRoles: { ok: true },
       remove: { ok: true },
-      reinstate: { ok: false, reason: ACCESS_REFUSALS.alreadyActive },
+      reinstate: { ok: false, ...ACCESS_REFUSALS.alreadyActive },
     });
     expect(maya.consequences).toEqual({
       remove: "Maya Chen loses access to Coral Offers and drops off this list. They can ask for access again.",
@@ -146,7 +146,7 @@ describe("access read models", () => {
       ["priya", true],
       ["sam", true],
     ]);
-    expect(recert.can.start).toEqual({ ok: false, reason: ACCESS_REFUSALS.reviewOpen });
+    expect(recert.can.start).toEqual({ ok: false, ...ACCESS_REFUSALS.reviewOpen });
     // Worded and dated by the domain with the demo clock: the deadline, what's left to decide, the strips.
     expect(recert.current!.footnote).toBe("Anyone not confirmed by Nov 3 loses access to Coral Offers.");
     expect(recert.current!.items.map((i) => i.outcome)).toEqual([null, null, null, null, null, null]);
@@ -175,8 +175,8 @@ describe("access read models", () => {
     }
     await as("alex");
     expect((await getAccessRequestsSection("coral-offers")).decided.map((r) => r.can.decide)).toEqual([
-      { ok: false, reason: ACCESS_REFUSALS.decided },
-      { ok: false, reason: ACCESS_REFUSALS.decided },
+      { ok: false, ...ACCESS_REFUSALS.decided },
+      { ok: false, ...ACCESS_REFUSALS.decided },
     ]);
     await as("alex");
     expect((await getSidebarCards())["coral-offers"]).toMatchObject({
@@ -215,7 +215,7 @@ describe("access read models", () => {
       ["sam", "Access lapsed Nov 3"],
     ]);
     // Everyone but Alex lapsed or was suspended: nobody left to review.
-    expect(recert.can.start).toEqual({ ok: false, reason: ACCESS_REFUSALS.nobodyToReview });
+    expect(recert.can.start).toEqual({ ok: false, ...ACCESS_REFUSALS.nobodyToReview });
     const idle = await getInactivitySection("coral-offers");
     expect(idle.suspended.map((r) => [r.person.id, r.statusReason])).toEqual([["devon", "inactivity_auto"]]);
     const members = await getMembersSection("coral-offers");
@@ -223,7 +223,7 @@ describe("access read models", () => {
     // Roles of a member whose access isn't active can't change: the domain's own answer.
     expect(members.rows.find((r) => r.person.id === "sam")!.can.editRoles).toEqual({
       ok: false,
-      reason: ACCESS_REFUSALS.notActive,
+      ...ACCESS_REFUSALS.notActive,
     });
   });
 });

@@ -40,8 +40,8 @@ const CORAL = [
   "Rate Change Notice",
 ];
 const DEPOSITS = ["Everyday Checking — Fee Schedule", "High-Yield Savings — Rate Disclosure", "Overdraft Protection — Terms"];
-const INVALID = { ok: false, reason: "This search can't be run." };
-const NOT_YOURS = { ok: false, reason: "This team isn't available to you." };
+const INVALID = { ok: false, code: "invalid_search", reason: "This search can't be run." };
+const NOT_YOURS = { ok: false, code: "space_unavailable", reason: "This team isn't available to you." };
 
 let db: Db;
 let libsql: Client;
@@ -67,7 +67,7 @@ function as(userId: string) {
 }
 
 type Row = { id: string; name: string; teamSlug: string; status: string };
-type Body = { ok: boolean; reason?: string; viewerId?: string; space?: string; query?: string; canCreate?: boolean; current?: boolean; recent?: Row[]; templates?: Row[] };
+type Body = { ok: boolean; code?: string; reason?: string; viewerId?: string; space?: string; query?: string; canCreate?: boolean; current?: boolean; recent?: Row[]; templates?: Row[] };
 
 /** GET /api/palette/{space}{query}: the status and the body, checking the headers every answer has. */
 async function search(space: string, query = "") {

@@ -258,7 +258,7 @@ describe("Revert to v1", () => {
   });
 
   it("shows the server's refusal in a toast", async () => {
-    baseRoute.mockResolvedValue({ ok: false, reason: "There is no draft to revert." });
+    baseRoute.mockResolvedValue({ ok: false, code: "no_draft_to_revert", reason: "There is no draft to revert." });
     await openMenu();
     await click(item());
     await until(() => vi.mocked(toast.error).mock.calls.length > 0);

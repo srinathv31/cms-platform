@@ -47,6 +47,7 @@ import {
 } from "@/domain/access-types";
 import { ALL_SPACE, assertCan, can, spacesFor } from "@/domain/permissions";
 import type { Person } from "@/domain/review-types";
+import { refuse, type Refusal, type Refused } from "@/domain/refusals";
 import { TEAM_ROLES, type PermissionResult, type Viewer } from "@/domain/types";
 import { loadMembershipFacts, loadRecertFacts, loadRequestFacts } from "@/server/access-sweep";
 import { db } from "@/server/db/client";
@@ -109,9 +110,8 @@ const iso = (d: Date) => d.toISOString();
 const isoOrNull = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 const isoOrUndefined = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
 const today = (d: Date) => d.toISOString().slice(0, 10);
-const okOr = (r: { ok: true } | { ok: false; reason: string }): PermissionResult =>
-  r.ok ? { ok: true } : { ok: false, reason: r.reason };
-const okUnless = (reason: string | null): PermissionResult => (reason ? { ok: false, reason } : { ok: true });
+const okOr = (r: { ok: true } | Refused): PermissionResult => (r.ok ? { ok: true } : refuse(r));
+const okUnless = (refusal: Refusal | null): PermissionResult => (refusal ? refuse(refusal) : { ok: true });
 
 /** The team behind a space slug (team ids are their slugs). 404 for an unknown one or "all". */
 async function teamBySlug(slug: string) {

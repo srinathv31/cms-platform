@@ -162,11 +162,12 @@ describe("loadIntegrationPanel", () => {
   });
 
   it("no template, or nothing Active yet", async () => {
-    expect(await loadIntegrationPanel(as("riley"), { templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, status: 404, reason: "This template no longer exists." });
-    expect(await loadIntegrationPanel(as("riley"), { templateId: "" })).toEqual({ ok: false, status: 400, reason: "This template no longer exists." });
+    expect(await loadIntegrationPanel(as("riley"), { templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, status: 404, code: "template_gone", reason: "This template no longer exists." });
+    expect(await loadIntegrationPanel(as("riley"), { templateId: "" })).toEqual({ ok: false, status: 400, code: "template_gone", reason: "This template no longer exists." });
     expect(await loadIntegrationPanel(as("maya"), { templateId: id("annual-fee-waiver") })).toEqual({
       ok: false,
       status: 409,
+      code: "no_active_version",
       reason: "This template has no Active version yet.",
     });
   });
@@ -178,6 +179,7 @@ describe("loadIntegrationPanel", () => {
       expect(await loadIntegrationPanel(as("maya"), { templateId: id("rate-change-notice") })).toEqual({
         ok: false,
         status: 409,
+        code: "no_active_version",
         reason: "This template has no Active version yet.",
       });
     } finally {

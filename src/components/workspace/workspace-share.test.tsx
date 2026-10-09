@@ -32,7 +32,7 @@ const ring = () => container.querySelector<HTMLButtonElement>('[data-slot="share
 const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 beforeEach(async () => {
-  integrationRoute.mockReset().mockResolvedValue({ ok: false, reason: NO_ACTIVE });
+  integrationRoute.mockReset().mockResolvedValue({ ok: false, code: "no_active_version", reason: NO_ACTIVE });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

@@ -4,7 +4,6 @@
 // has been decided. No React, so they are tested without the screen.
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
-import { REASONS } from "@/domain/permissions";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 
@@ -34,14 +33,15 @@ export function reasonProblem(reason: string): string | null {
  *   the submitter or another writer, Approver or not, since a self-block explains itself to anyone on the
  *   team), or they are an approver and it isn't theirs to decide (the stage waits on someone else);
  * - hidden: they aren't an approver on the team and wrote none of it, so there is nothing to decide and no
- *   dead buttons.
+ *   dead buttons. That is the refusal coded `generic` (no role gives them the decision); every other code
+ *   is blocked. It reads the code, never the sentence, so rewording a refusal changes nothing here.
  */
 export type DecisionAccess = { kind: "open" } | { kind: "blocked"; reason: string } | { kind: "hidden" };
 
 export function decisionAccess(approve: PermissionResult, requestChanges: PermissionResult): DecisionAccess {
-  if (approve.ok && requestChanges.ok) return { kind: "open" };
-  const reason = !approve.ok ? approve.reason : !requestChanges.ok ? requestChanges.reason : "";
-  return reason === REASONS.generic ? { kind: "hidden" } : { kind: "blocked", reason };
+  const refused = !approve.ok ? approve : !requestChanges.ok ? requestChanges : null;
+  if (!refused) return { kind: "open" };
+  return refused.code === "generic" ? { kind: "hidden" } : { kind: "blocked", reason: refused.reason };
 }
 
 // ── Approving ────────────────────────────────────────────────────────────────

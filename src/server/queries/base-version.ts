@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { can } from "@/domain/permissions";
 import type { Channel, JSONContent, SampleSet, Variable, Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
@@ -31,12 +32,6 @@ export interface BaseVersionContent {
 
 const Input = z.object({ templateId: z.string().min(1).max(64), versionId: z.string().min(1).max(64) });
 
-const REASONS = {
-  missing: "This template isn't available.",
-  noDraft: "There is no draft to revert.",
-  noBase: "This draft wasn't started from an earlier version.",
-} as const;
-
 export async function getBaseVersion(
   viewer: Viewer,
   input: {
@@ -46,17 +41,17 @@ export async function getBaseVersion(
   },
 ): Promise<ReadResult<{ base: BaseVersionContent }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REASONS.missing);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const template = await db
     .select({ id: templates.id, teamId: templates.teamId })
     .from(templates)
     .where(eq(templates.id, parsed.data.templateId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!template) return refusal(404, REASONS.missing);
+  if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
 
   const allowed = can(viewer, "draft.edit", { teamId: template.teamId });
-  if (!allowed.ok) return refusal(403, allowed.reason);
+  if (!allowed.ok) return refusal(403, allowed);
 
   const list = await db
     .select({
@@ -76,10 +71,10 @@ export async function getBaseVersion(
     .where(eq(versions.templateId, template.id));
 
   const draft = list.find((v) => v.id === parsed.data.versionId);
-  if (!draft) return refusal(404, REASONS.noDraft);
-  if (draft.state !== "draft") return refusal(409, REASONS.noDraft);
+  if (!draft) return refusal(404, REQUEST_REFUSALS.noDraftToRevert);
+  if (draft.state !== "draft") return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
   const base = draft.basedOnVersionId ? list.find((v) => v.id === draft.basedOnVersionId) : undefined;
-  if (!base || base.number === null) return refusal(409, REASONS.noBase);
+  if (!base || base.number === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
 
   return {
     ok: true,

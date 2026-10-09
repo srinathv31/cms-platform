@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { can } from "@/domain/permissions";
 import type { JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
@@ -27,18 +28,13 @@ export interface CompareVersion {
 const Id = z.string().min(1).max(64);
 const Input = z.object({ templateId: Id, from: Id, to: Id });
 
-const REASONS = {
-  missing: "This template isn't available to you.",
-  noVersion: "This version isn't available.",
-} as const;
-
 /** The two versions of one template, `from` the older and `to` the newer (the dialog picks them so). */
 export async function loadVersionsToCompare(
   viewer: Viewer,
   input: { templateId: string; from: string | null; to: string | null },
 ): Promise<ReadResult<{ from: CompareVersion; to: CompareVersion }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REASONS.missing);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const { templateId, from, to } = parsed.data;
 
   const template = await db
@@ -47,8 +43,8 @@ export async function loadVersionsToCompare(
     .where(eq(templates.id, templateId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!template) return refusal(404, REASONS.missing);
-  if (!can(viewer, "template.view", { teamId: template.teamId }).ok) return refusal(403, REASONS.missing);
+  if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+  if (!can(viewer, "template.view", { teamId: template.teamId }).ok) return refusal(403, REQUEST_REFUSALS.templateUnavailable);
 
   const rows = await db
     .select({
@@ -68,6 +64,6 @@ export async function loadVersionsToCompare(
   };
   const older = pick(from);
   const newer = pick(to);
-  if (!older || !newer) return refusal(404, REASONS.noVersion);
+  if (!older || !newer) return refusal(404, REQUEST_REFUSALS.versionUnavailable);
   return { ok: true, from: older, to: newer };
 }

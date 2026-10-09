@@ -27,11 +27,12 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 - **This code runs in the browser.** Client components import it (for example
   [sunset-dialog.tsx](../components/versions/sunset-dialog.tsx) recomputes `consequences` as the date changes).
   No Node APIs, no `server-only`, no heavy dependencies.
-- **Wording is behavior.** Refusal sentences (`REFUSALS`, `REASONS`, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`,
-  `PLATFORM_REFUSALS`, `IMPORT_REFUSALS`) are shown as is, and the UI compares some of them:
-  [decision-model.ts](../components/review/decision-model.ts) hides the decision buttons when the reason is
-  `REASONS.generic`, and [version-actions.tsx](../components/versions/version-actions.tsx) checks
-  `REASONS.ownRevoke`. Search for a constant's uses before you reword it.
+- **A refusal is a code and a sentence.** Every refusal is an entry in a table (`REASONS`, `REFUSALS`,
+  `STAGE_REFUSALS`, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `REQUEST_REFUSALS`) built with
+  `refusal(code, sentence)` from [refusals.ts](refusals.ts). The code is a snake_case identifier no other entry has;
+  it is what code branches on and what a ported backend returns. The sentence is shown as is and can be reworded
+  freely: nothing compares it ([decision 0025](../../docs/decisions/0025-refusals-carry-stable-codes.md)).
+  `IMPORT_REFUSALS` keeps its own codes, its keys.
 - Domain inputs use `Date`; read models that cross into client components use ISO strings.
 - Messages and notice payloads never contain a submitted variable value.
 
@@ -46,6 +47,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, and their rename (`nameChange`), for the review screen and Compare. |
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
+| Refusals | [refusals.ts](refusals.ts) | `Refusal`, `Refused` (`{ ok: false, code, reason }`), `refusal()` to build a table entry, `refuse()`, `RefusalCode` (every table's codes), and `REQUEST_REFUSALS`: what the server refuses before a rule runs (input, a record that's gone, a compare-and-set that missed). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
 | | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. Also what the Team settings sections say: each strip's line (`memberConsequences`, `requestConsequences`, `startRecertConsequence`), a review's footnote and settled rows (`recertFootnote`, `recertItemOutcome`), and the checks the forms run live (`describeRoleChange`, `validateDecisionNote`). |
 | | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve), the business time zone. Each Platform screen's live check is the function its transition refuses with: `validateNewTeam`, `describeSectionsChange`, `channelRuleRefusal`, `removeStageRefusal`, `describeZoneChange`. |
@@ -104,8 +106,8 @@ version goes live ([decision 0016](../../docs/decisions/0016-the-name-is-version
 ## How it works
 
 **Transitions take facts and return values.** A transition gets everything as input: the rows it reads, the
-actor, ids, and `now`. It returns either a refusal, `{ ok: false, reason }`, whose `reason` is the sentence the
-person reads, or what to write plus `effects`. Lifecycle transitions return `changes`, plus `approval`,
+actor, ids, and `now`. It returns either a refusal, `{ ok: false, code, reason }`, whose `code` is stable and whose
+`reason` is the sentence the person reads, or what to write plus `effects`. Lifecycle transitions return `changes`, plus `approval`,
 `newDraft`, `reasonComment`, or `previous` when there is more than one row to write. Access and platform functions
 name their rows instead (`request`, `membership`, `recert`, `requiredSections`). Nothing is written here. The
 server writes it all in one transaction with `inTransaction` from [server/effects.ts](../server/effects.ts), which
@@ -116,10 +118,10 @@ caller in `approveVersion` ([actions/review.ts](../server/actions/review.ts)), s
 
 ```ts
 const at = await now();                                 // the demo clock, read once
-const result = await transact(async (tx) => {           // inTransaction; a Refusal becomes { ok: false, reason }
+const result = await transact(async (tx) => {           // inTransaction; a refusal becomes { ok: false, code, reason }
   const version = await loadVersion(tx, found, number); // re-read inside the transaction
   const outcome = approve({ version, chain, actorId: viewer.userId, now: at, /* … */ });
-  if (!outcome.ok) refuse(outcome.reason);              // the domain's sentence; nothing is written
+  if (!outcome.ok) refuse(outcome);                     // the domain's refusal; nothing is written
   await updateVersion(tx, version, { state: outcome.changes.state, /* … */ }, at, REFUSALS.notInReview);
   await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
   return { ok: true, wentLive: outcome.wentLive, number: version.number! };
@@ -132,7 +134,7 @@ const result = await transact(async (tx) => {           // inTransaction; a Refu
 submitter with `REASONS.ownVersion` and any other writer with `REASONS.wroteVersion`). Whether a stage is yours is `canActOnStage`, not
 `can`. Read models carry `PermissionResult`s for the UI, such as `ReviewScreenData.can`.
 
-**Three result shapes, by audience.** People get `{ ok: false, reason }`. Consumer API callers get
+**Three result shapes, by audience.** People get `{ ok: false, code, reason }`. Consumer API callers get
 `{ ok: false, error }`, where `error` has a code that maps to a status (`RENDER_ERROR_STATUS`, `API_ERROR_STATUS`).
 Bugs and drift throw: `LifecycleError` (a numbered state with no number), `ResolveError` (a node the renderer
 doesn't know).
@@ -180,7 +182,8 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
-| Add a lifecycle transition | `startRevoke` or `setSunset` in [lifecycle.ts](lifecycle.ts) | Returns `Outcome<…>`; sentences in `REFUSALS`; tests in [lifecycle.test.ts](lifecycle.test.ts). |
+| Add a lifecycle transition | `startRevoke` or `setSunset` in [lifecycle.ts](lifecycle.ts) | Returns `Outcome<…>`; refusals in `REFUSALS`; tests in [lifecycle.test.ts](lifecycle.test.ts). |
+| Add a refusal | `REFUSALS` in [lifecycle.ts](lifecycle.ts) | `refusal("summary_stale", "This draft changed after this summary was made.")` in its area's table, with a code no other entry has ([refusals.test.ts](refusals.test.ts) checks); `refusal("last_admin", (team: string) => …)` when the sentence names something. Return it with `refuse(…)`. |
 | Add an access or settings rule | `requestAccess` in [access.ts](access.ts) | Limits live in [access-types.ts](access-types.ts), so the form ([request-access.tsx](../components/access/request-access.tsx)) and the server share them. |
 | Validate a settings form live with the server's own rule | `validateChain` in [platform-config.ts](platform-config.ts) | Takes the facts (people's access, the actor, the saved chain) and returns each problem with the stage and field it's about. The read model carries the facts; [approval-chains.tsx](../components/settings/platform/approval-chains.tsx) shows each problem at its field and disables Save with the first; `saveApprovalChain` refuses with the first. |
 | Say what a settings action does before it's confirmed | `memberConsequences` in [access.ts](access.ts) | The read model returns the lines as `consequences` beside `can`, dated with the demo clock by the function that sets the date (`inactivity`, `recertDueAt`); the screen only renders them ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)). A line that depends on what's being typed is a pure function the screen calls, like `describeSectionsChange` in [platform-config.ts](platform-config.ts). |
@@ -194,8 +197,8 @@ Read these before you assume a rule is missing. When you change one, move it her
 - **Throwing for an expected outcome.** `editLatest` throws `LifecycleError` for a version that isn't Active or
   Revoked, and the `startDraft` and `createTemplate` actions throw `Error`. Return `Outcome<T>` with a sentence
   instead; throw only for bugs.
-- **A third `Ok` / `Refused`.** Identical pairs exist in [lifecycle.ts](lifecycle.ts) and
-  [access-types.ts](access-types.ts). Import one of them.
+- **A third `Ok` / `Refused`.** `Refused` is [refusals.ts](refusals.ts)'s, which [lifecycle.ts](lifecycle.ts) and
+  [access-types.ts](access-types.ts) re-export; `Ok` is declared in both. Import them.
 - **Dates through `render/errors`.** `lifecycle.ts`, `activity.ts`, `audit.ts`, `consequences.ts`, and
   `golive/notices.ts` import `formatLongDate` from the re-export in `render/errors.ts`. Import from
   [dates.ts](dates.ts).

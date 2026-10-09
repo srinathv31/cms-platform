@@ -27,6 +27,7 @@ import {
   type VersionSnapshot,
 } from "./lifecycle";
 import { REASONS } from "./permissions";
+import type { Refusal } from "./refusals";
 import type { ApprovalStage, Recipients, VersionStage } from "./review-types";
 import {
   VERSION_STATES,
@@ -525,11 +526,11 @@ describe("submit", () => {
   });
 
   it("refuses a draft that changed after the summary was read, before anything else", () => {
-    expect(run({}, { seenRev: 6 })).toEqual({ ok: false, reason: REFUSALS.summaryStale });
+    expect(run({}, { seenRev: 6 })).toEqual({ ok: false, ...REFUSALS.summaryStale });
     // Even when its content would be refused too: the author sees what changed first.
     const body: JSONContent = { type: "doc", content: [{ type: "paragraph", attrs: { id: "b_one" }, content: [chip("gift_name")] }] };
-    expect(run({ body })).toEqual({ ok: false, reason: "Define or remove {{gift_name}} before submitting." });
-    expect(run({ body }, { seenRev: 6 })).toEqual({ ok: false, reason: REFUSALS.summaryStale });
+    expect(run({ body })).toEqual({ ok: false, code: "undefined_variables", reason: "Define or remove {{gift_name}} before submitting." });
+    expect(run({ body }, { seenRev: 6 })).toEqual({ ok: false, ...REFUSALS.summaryStale });
   });
 
   it("submits the draft the summary showed", () => {
@@ -555,7 +556,7 @@ describe("submit", () => {
         { type: "paragraph", attrs: { id: "b_two" }, content: [text("Use code "), chip("promo_code")] },
       ],
     };
-    expect(run({ body })).toEqual({ ok: false, reason: "Define or remove {{promo_code}} before submitting." });
+    expect(run({ body })).toEqual({ ok: false, code: "undefined_variables", reason: "Define or remove {{promo_code}} before submitting." });
   });
 
   it("names every missing key once, in order of first use", () => {
@@ -568,6 +569,7 @@ describe("submit", () => {
     };
     expect(run({ body })).toEqual({
       ok: false,
+      code: "undefined_variables",
       reason: "Define or remove {{promo_code}} and {{gift_name}} before submitting.",
     });
 
@@ -577,6 +579,7 @@ describe("submit", () => {
     };
     expect(run({ body: more })).toEqual({
       ok: false,
+      code: "undefined_variables",
       reason: "Define or remove {{a_one}}, {{b_two}} and {{c_three}} before submitting.",
     });
   });
@@ -597,7 +600,7 @@ describe("submit", () => {
         },
       ],
     };
-    expect(run({ body: nested })).toEqual({ ok: false, reason: "Define or remove {{in_table}} before submitting." });
+    expect(run({ body: nested })).toEqual({ ok: false, code: "undefined_variables", reason: "Define or remove {{in_table}} before submitting." });
   });
 
   it("checks the email subject and preheader while Email is on", () => {
@@ -606,10 +609,12 @@ describe("submit", () => {
 
     expect(run({ channels: [...channels], emailSubject: oneLine(text("Offer "), chip("promo_code")) })).toEqual({
       ok: false,
+      code: "undefined_variables",
       reason: "Define or remove {{promo_code}} before submitting.",
     });
     expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("gift_name")) })).toEqual({
       ok: false,
+      code: "undefined_variables",
       reason: "Define or remove {{gift_name}} before submitting.",
     });
     expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("purchase_apr")) }).ok).toBe(true);
@@ -623,13 +628,14 @@ describe("submit", () => {
   it("asks for an email subject when Email is on and the subject is empty", () => {
     const reason = "Add an email subject before submitting.";
     const email = ["pdf", "web", "email"] as const;
-    expect(run({ channels: [...email], emailSubject: null })).toEqual({ ok: false, reason });
-    expect(run({ channels: [...email], emailSubject: oneLine() })).toEqual({ ok: false, reason });
+    expect(run({ channels: [...email], emailSubject: null })).toEqual({ ok: false, code: "email_subject_missing", reason });
+    expect(run({ channels: [...email], emailSubject: oneLine() })).toEqual({ ok: false, code: "email_subject_missing", reason });
     expect(run({ channels: [...email], emailSubject: { type: "doc", content: [{ type: "paragraph" }] } })).toEqual({
       ok: false,
+      code: "email_subject_missing",
       reason,
     });
-    expect(run({ channels: [...email], emailSubject: oneLine(text("   ")) })).toEqual({ ok: false, reason });
+    expect(run({ channels: [...email], emailSubject: oneLine(text("   ")) })).toEqual({ ok: false, code: "email_subject_missing", reason });
   });
 
   it("accepts an email subject that is only a chip, and needs no preheader", () => {
@@ -648,6 +654,7 @@ describe("submit", () => {
     };
     expect(run({ body, channels: ["email"], emailSubject: null })).toEqual({
       ok: false,
+      code: "undefined_variables",
       reason: "Define or remove {{promo_code}} before submitting.",
     });
   });
@@ -765,7 +772,7 @@ const tryCancelRevoke = (version: ReviewVersion) => cancelRevoke({ version, acto
 describe("the transitions table: every review move from every state", () => {
   // `true` = allowed; otherwise the exact refusal. Confirm and cancel are tried with a revoke pending.
   const { notInReview, sunsetNotSuperseded, notRevocable, alreadyRevoked, noRevokePending } = REFUSALS;
-  const TABLE: Record<string, { attempt: (v: ReviewVersion) => { ok: boolean }; pending?: true; to: Record<VersionState, true | string> }> = {
+  const TABLE: Record<string, { attempt: (v: ReviewVersion) => { ok: boolean }; pending?: true; to: Record<VersionState, true | Refusal> }> = {
     "request changes": {
       attempt: tryRequestChanges,
       to: { draft: notInReview, in_review: true, changes_requested: notInReview, active: notInReview, superseded: notInReview, revoked: notInReview },
@@ -809,7 +816,7 @@ describe("the transitions table: every review move from every state", () => {
     const version = inState(state, row.pending && state !== "revoked" ? { revoke: PENDING } : {});
     const result = row.attempt(version);
     if (expected === true) expect(result.ok).toBe(true);
-    else expect(result).toEqual({ ok: false, reason: expected });
+    else expect(result).toEqual({ ok: false, ...expected });
   });
 });
 
@@ -910,18 +917,18 @@ describe("requestChanges", () => {
   });
 
   it.each(["", "   ", "\n\t"])("refuses an empty reason (%j)", (reason) => {
-    expect(run({ reason })).toEqual({ ok: false, reason: "Give a reason." });
+    expect(run({ reason })).toEqual({ ok: false, code: "reason_missing", reason: "Give a reason." });
   });
 
   it("refuses the submitter: nobody decides their own version", () => {
-    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: REASONS.ownVersion });
+    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, ...REASONS.ownVersion });
   });
 
   it("refuses anyone else who wrote it: Priya edited Maya's draft, so she can't send it back", () => {
     const version = reviewVersion({ writers: ["maya", "priya"] });
     expect(run({ version, actorId: "priya", actorName: "Priya Raman" })).toEqual({
       ok: false,
-      reason: REASONS.wroteVersion,
+      ...REASONS.wroteVersion,
     });
     expect(run({ version }).ok, "Jordan wrote none of it").toBe(true);
   });
@@ -934,6 +941,7 @@ describe("requestChanges", () => {
   it("checks the state before who is asking", () => {
     expect(run({ version: reviewVersion({ state: "active" }), actorId: "maya" })).toEqual({
       ok: false,
+      code: "not_in_review",
       reason: "This version isn't in review.",
     });
   });
@@ -959,9 +967,10 @@ describe("requestChanges", () => {
   });
 
   it("refuses when the chain has no stage for the version", () => {
-    expect(run({ chain: [] })).toEqual({ ok: false, reason: "This version's approval stage no longer exists." });
+    expect(run({ chain: [] })).toEqual({ ok: false, code: "stage_missing", reason: "This version's approval stage no longer exists." });
     expect(run({ version: reviewVersion({ currentStage: 1 }) })).toEqual({
       ok: false,
+      code: "stage_missing",
       reason: "This version's approval stage no longer exists.",
     });
   });
@@ -1090,7 +1099,7 @@ describe("approve", () => {
     ["today", "2026-10-04"],
     ["in the past", "2026-09-01"],
   ])("refuses a sunset date %s", (_, day) => {
-    expect(run({ sunsetPrevious: day })).toEqual({ ok: false, reason: "Pick a date after today." });
+    expect(run({ sunsetPrevious: day })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
   });
 
   it("accepts a sunset date of tomorrow", () => {
@@ -1099,22 +1108,24 @@ describe("approve", () => {
 
   it("reads today in the business time zone: at 23:30 Eastern, tomorrow is still tomorrow", () => {
     expect(run({ now: LATE_EVENING, sunsetPrevious: TOMORROW_DAY }).ok).toBe(true);
-    expect(run({ now: LATE_EVENING, sunsetPrevious: "2026-10-04" })).toEqual({ ok: false, reason: "Pick a date after today." });
+    expect(run({ now: LATE_EVENING, sunsetPrevious: "2026-10-04" })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
     // In UTC it is already the 5th there, so the 5th isn't after today.
     expect(run({ now: LATE_EVENING, sunsetPrevious: TOMORROW_DAY, zone: "UTC" })).toEqual({
       ok: false,
+      code: "sunset_not_after_today",
       reason: "Pick a date after today.",
     });
   });
 
   it("refuses the submitter: nobody approves their own version", () => {
-    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, reason: "You submitted this version." });
+    expect(run({ actorId: "maya", actorName: "Maya Chen" })).toEqual({ ok: false, code: "submitted_version", reason: "You submitted this version." });
   });
 
   it("refuses anyone else who wrote it, even when someone else submitted it", () => {
     const version = { ...v2, writers: ["priya", "maya"] };
     expect(run({ version, actorId: "priya", actorName: "Priya Raman" })).toEqual({
       ok: false,
+      code: "wrote_version",
       reason: "You wrote part of this version.",
     });
     expect(run({ version }).ok, "Jordan wrote none of it").toBe(true);
@@ -1239,9 +1250,10 @@ describe("approve", () => {
       const approvedTeam = (actorId: string) => [{ stageId: "st_team", actorId, decision: "approved" as const }];
       expect(run({ chain: twoTeamStages, version: second, decisions: approvedTeam("jordan") })).toEqual({
         ok: false,
+        code: "approved_earlier_stage",
         reason: "You approved an earlier stage.",
       });
-      expect(REFUSALS.approvedEarlierStage).toBe("You approved an earlier stage.");
+      expect(REFUSALS.approvedEarlierStage.reason).toBe("You approved an earlier stage.");
       expect(run({ chain: twoTeamStages, version: second, decisions: approvedTeam("alex") }).ok).toBe(true);
       expect(run({ chain: twoTeamStages, version: second, decisions: [] }).ok).toBe(true);
     });
@@ -1288,7 +1300,7 @@ describe("approve", () => {
       const team2: ApprovalStage = { id: "st_team2", position: 0, name: "Second approver", rule: { kind: "team_role", role: "approver" } };
       const version = { ...v2, stages: [{ id: "st_team2", name: "Second approver" }], currentStage: 0 };
       const decisions = [{ stageId: "st_team2", actorId: "jordan", decision: "approved" as const }];
-      expect(run({ chain: [team2], version, decisions })).toEqual({ ok: false, reason: REFUSALS.approvedEarlierStage });
+      expect(run({ chain: [team2], version, decisions })).toEqual({ ok: false, ...REFUSALS.approvedEarlierStage });
       expect(run({ chain: [team2], version, decisions, actorId: "alex", actorName: "Alex Kim" }).ok).toBe(true);
     });
 
@@ -1300,7 +1312,7 @@ describe("approve", () => {
     });
 
     it("refuses when the stage it waits on, or the next one, has left the chain", () => {
-      const missing = { ok: false, reason: "This version's approval stage no longer exists." };
+      const missing = { ok: false, code: "stage_missing", reason: "This version's approval stage no longer exists." };
       expect(run({ chain: [CHAIN_2[1]!], version: { ...v2, stages: STAGES_2 } })).toEqual(missing);
       expect(run({ chain: CHAIN_1, version: { ...v2, stages: STAGES_2 } })).toEqual(missing);
     });
@@ -1309,6 +1321,7 @@ describe("approve", () => {
   it("refuses when the chain has no stage for the version", () => {
     expect(run({ version: { ...v2, currentStage: 1 } })).toEqual({
       ok: false,
+      code: "stage_missing",
       reason: "This version's approval stage no longer exists.",
     });
   });
@@ -1382,12 +1395,12 @@ describe("setSunset", () => {
     ["today", "2026-10-04"],
     ["in the past", "2026-01-01"],
   ])("refuses a date %s", (_, sunsetDay) => {
-    expect(run({ sunsetDay })).toEqual({ ok: false, reason: "Pick a date after today." });
+    expect(run({ sunsetDay })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
   });
 
   it("reads today in the business time zone: at 23:30 Eastern, tomorrow is still tomorrow", () => {
     expect(run({ now: LATE_EVENING, sunsetDay: TOMORROW_DAY })).toMatchObject({ ok: true, changes: { sunsetAt: TOMORROW } });
-    expect(run({ now: LATE_EVENING, sunsetDay: "2026-10-04" })).toEqual({ ok: false, reason: "Pick a date after today." });
+    expect(run({ now: LATE_EVENING, sunsetDay: "2026-10-04" })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
   });
 
   it("sends the contract changes consumers will meet on the Active version, when given", () => {
@@ -1429,6 +1442,7 @@ describe("setSunset", () => {
     for (const sunsetDay of [TOMORROW_DAY, MARCH_1_DAY]) {
       expect(run({ version: sunset, sunsetDay })).toEqual({
         ok: false,
+        code: "sunset_passed",
         reason: "This version's sunset has passed. It can't render again.",
       });
     }
@@ -1436,7 +1450,7 @@ describe("setSunset", () => {
 
   it("says the version isn't Superseded before it says the sunset passed", () => {
     const revoked = { ...v1, state: "revoked" as const, sunsetAt: new Date("2026-10-03T00:00:00.000Z") };
-    expect(run({ version: revoked })).toEqual({ ok: false, reason: REFUSALS.sunsetNotSuperseded });
+    expect(run({ version: revoked })).toEqual({ ok: false, ...REFUSALS.sunsetNotSuperseded });
   });
 });
 
@@ -1477,12 +1491,13 @@ describe("startRevoke", () => {
   it("refuses while another revoke is waiting for confirmation", () => {
     expect(run({ version: reviewVersion({ state: "superseded", revoke: PENDING }), actorId: "alex" })).toEqual({
       ok: false,
+      code: "revoke_pending",
       reason: "A revoke is already waiting for confirmation.",
     });
   });
 
   it.each(["", "  ", "\n"])("refuses an empty reason (%j)", (reason) => {
-    expect(run({ reason })).toEqual({ ok: false, reason: "Give a reason." });
+    expect(run({ reason })).toEqual({ ok: false, code: "reason_missing", reason: "Give a reason." });
   });
 
   it("trims the reason", () => {
@@ -1541,6 +1556,7 @@ describe("confirmRevoke", () => {
   it("refuses the approver who started it: a different approver must confirm", () => {
     expect(run({ actorId: "jordan", actorName: "Jordan Ellis" })).toEqual({
       ok: false,
+      code: "own_revoke",
       reason: "You started this revoke. Another approver must confirm it.",
     });
   });
@@ -1556,10 +1572,12 @@ describe("confirmRevoke", () => {
   it("refuses when nothing is waiting for confirmation", () => {
     expect(run({ version: { ...superseded, revoke: null } })).toEqual({
       ok: false,
+      code: "no_revoke_pending",
       reason: "There's no revoke waiting for confirmation.",
     });
     expect(run({ version: { ...superseded, state: "revoked", revoke: CONFIRMED } })).toEqual({
       ok: false,
+      code: "already_revoked",
       reason: "This version is already revoked.",
     });
   });
@@ -1597,10 +1615,12 @@ describe("cancelRevoke", () => {
   it("refuses when nothing is waiting, or the revoke is already confirmed", () => {
     expect(cancelRevoke({ version: { ...pending, revoke: null }, actorId: "alex", now: NOW })).toEqual({
       ok: false,
+      code: "no_revoke_pending",
       reason: "There's no revoke waiting for confirmation.",
     });
     expect(cancelRevoke({ version: { ...pending, state: "revoked", revoke: CONFIRMED }, actorId: "alex", now: NOW })).toEqual({
       ok: false,
+      code: "already_revoked",
       reason: "This version is already revoked.",
     });
   });
@@ -1662,7 +1682,7 @@ describe("scenario 3: the review loop", () => {
     const v1 = reviewVersion({ ...first.changes, id: "v_1" });
 
     // Maya can't approve her own version; Jordan sends it back.
-    expect(approve({ ...approveArgs(v1), actorId: "maya" })).toEqual({ ok: false, reason: REASONS.ownVersion });
+    expect(approve({ ...approveArgs(v1), actorId: "maya" })).toEqual({ ok: false, ...REASONS.ownVersion });
     const returned = tryRequestChanges(v1);
     if (!returned.ok) throw new Error(returned.reason);
     expect(returned.newDraft.basedOnVersionId).toBe("v_1");
@@ -1733,7 +1753,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       templateName: TEMPLATE.name,
     }),
   });
-  const wrote = { ok: false, reason: REASONS.wroteVersion };
+  const wrote = { ok: false, ...REASONS.wroteVersion };
 
   const starter = { key: "card_offer_terms", name: "Card offer terms", body: BODY, variables: VARIABLES, sampleSets: SAMPLE_SETS };
 
@@ -1753,7 +1773,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     expect(v1.writers).toEqual(["maya", "priya"]);
 
     expect(decide(v1, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
-    expect(decide(v1, "maya").approve).toEqual({ ok: false, reason: REASONS.ownVersion });
+    expect(decide(v1, "maya").approve).toEqual({ ok: false, ...REASONS.ownVersion });
     expect(decide(v1, "jordan").approve.ok).toBe(true);
   });
 
@@ -1818,7 +1838,7 @@ describe("scenario 6: two-person revoke", () => {
 
     expect(confirmRevoke({ version: pending, actorId: "jordan", actorName: "Jordan Ellis", now: NOW, activeNumber: 2, templateName: "x" })).toEqual({
       ok: false,
-      reason: REASONS.ownRevoke,
+      ...REASONS.ownRevoke,
     });
     const confirmed = tryConfirmRevoke(pending);
     expect(confirmed).toMatchObject({ ok: true, changes: { state: "revoked", revoke: { startedBy: "jordan", confirmedBy: "alex" } } });

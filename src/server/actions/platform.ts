@@ -6,7 +6,9 @@ import { z } from "zod";
 import type { ActionResult, ApproverFacts } from "@/domain/access-types";
 import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
 import { PermissionError, assertCan } from "@/domain/permissions";
+import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
 import {
+  PLATFORM_REFUSALS,
   createTeam as createTeamRule,
   saveApprovalChain as saveApprovalChainRule,
   setBusinessZone as setBusinessZoneRule,
@@ -42,31 +44,25 @@ import { getViewer } from "@/server/viewer";
 //
 // A "use server" file may export only async functions: the helpers below stay private.
 
-const REASONS = {
-  noContentType: "This content type no longer exists.",
-  noPerson: "Pick a person.",
-  invalid: "Check the form and try again.",
-} as const;
-
 /** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class Refusal extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
-    this.name = "Refusal";
+class RefusalError extends Error {
+  constructor(readonly refusal: Refusal) {
+    super(refusal.reason);
+    this.name = "RefusalError";
   }
 }
 
-function refuse(reason: string): never {
-  throw new Refusal(reason);
+function refuse(refusal: Refusal): never {
+  throw new RefusalError(refusal);
 }
 
 /** Platform Admin only (a cross-team permission: no team). */
-function checkManage(viewer: Viewer): { ok: false; reason: string } | null {
+function checkManage(viewer: Viewer): Refused | null {
   try {
     assertCan(viewer, "platform.manage", { teamId: null });
     return null;
   } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, reason: error.reason };
+    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
     throw error;
   }
 }
@@ -75,7 +71,7 @@ async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<
   try {
     return await inTransaction(db, run);
   } catch (error) {
-    if (error instanceof Refusal) return { ok: false, reason: error.reason };
+    if (error instanceof RefusalError) return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
     throw error;
   }
 }
@@ -89,7 +85,7 @@ const actorOf = (viewer: Viewer) => ({ id: viewer.userId, name: viewer.name });
 
 async function contentTypeRow(tx: Tx, id: string) {
   const row = await tx.query.contentTypes.findFirst({ where: eq(contentTypes.id, id) });
-  if (!row) refuse(REASONS.noContentType);
+  if (!row) refuse(REQUEST_REFUSALS.contentTypeGone);
   return row;
 }
 
@@ -113,14 +109,14 @@ export async function createTeam(input: {
   const refused = checkManage(viewer);
   if (refused) return refused;
   const parsed = CreateTeamInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
 
   const at = await now();
   const result = await transact<{ slug: string }>(async (tx) => {
     const admin = await tx.query.users.findFirst({ where: eq(users.id, parsed.data.adminUserId) });
-    if (!admin) refuse(REASONS.noPerson);
+    if (!admin) refuse(PLATFORM_REFUSALS.pickPerson);
     // The Auditor is read-only everywhere: they can't be a team's first Team Admin.
-    if (admin.platformRole === "auditor") refuse(`${admin.name} is an Auditor and can't be a Team Admin.`);
+    if (admin.platformRole === "auditor") refuse(PLATFORM_REFUSALS.auditorCantBeAdmin(admin.name));
     const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
     const outcome = createTeamRule({
       name: parsed.data.name,
@@ -131,7 +127,7 @@ export async function createTeam(input: {
       now: at,
       existing,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
 
     await tx.insert(teams).values(outcome.team);
     await applyMembershipChange(tx, outcome.membership);
@@ -162,7 +158,7 @@ export async function updateContentType(input: {
   const refused = checkManage(viewer);
   if (refused) return refused;
   const parsed = SectionsInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
 
   const at = await now();
   let wrote = false;
@@ -174,7 +170,7 @@ export async function updateContentType(input: {
       actor: actorOf(viewer),
       now: at,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     if (outcome.effects.length === 0) return { ok: true };
 
     await tx.update(contentTypes).set({ requiredSections: outcome.requiredSections }).where(eq(contentTypes.id, type.id));
@@ -218,7 +214,7 @@ export async function setChannelRule(input: {
   const refused = checkManage(viewer);
   if (refused) return refused;
   const parsed = ChannelInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
 
   const at = await now();
   let wrote = false;
@@ -232,7 +228,7 @@ export async function setChannelRule(input: {
       actor: actorOf(viewer),
       now: at,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     if (outcome.effects.length === 0) return { ok: true };
 
     await tx.update(contentTypes).set({ allowedChannels: outcome.allowedChannels }).where(eq(contentTypes.id, type.id));
@@ -292,7 +288,7 @@ export async function saveApprovalChain(input: {
   const refused = checkManage(viewer);
   if (refused) return refused;
   const parsed = ChainInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
 
   const at = await now();
   let wrote = false;
@@ -333,7 +329,7 @@ export async function saveApprovalChain(input: {
       actor: actorOf(viewer),
       now: at,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     if (outcome.effects.length === 0) return { ok: true };
 
     const keep = new Set(outcome.stages.flatMap((s) => (s.id ? [s.id] : [])));
@@ -392,7 +388,7 @@ export async function setBusinessZone(input: { zone: string }): Promise<ActionRe
   const refused = checkManage(viewer);
   if (refused) return refused;
   const parsed = ZoneInput.safeParse(input);
-  if (!parsed.success) return { ok: false, reason: REASONS.invalid };
+  if (!parsed.success) return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
 
   const at = await now();
   let wrote = false;
@@ -404,7 +400,7 @@ export async function setBusinessZone(input: { zone: string }): Promise<ActionRe
       actor: actorOf(viewer),
       now: at,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     if (outcome.effects.length === 0) return { ok: true };
 
     await tx

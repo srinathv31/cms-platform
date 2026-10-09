@@ -165,7 +165,7 @@ describe("RequestChangesDialog", () => {
   });
 
   it("shows a refusal at the button, stays open, and keeps the reason", async () => {
-    actions.requestChanges.mockResolvedValue({ ok: false, reason: "This version isn't in review." });
+    actions.requestChanges.mockResolvedValue({ ok: false, code: "not_in_review", reason: "This version isn't in review." });
     await open();
     await typeInto(dialog().querySelector("textarea")!, "Fix the APR.");
     await click(button("Request changes"));
@@ -306,7 +306,7 @@ describe("ApproveDialog", () => {
   });
 
   it("shows a refusal at the button, stays open, and lets the screen know it failed", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: false, reason: "You submitted this version." });
+    actions.approveVersion.mockResolvedValue({ ok: false, code: "submitted_version", reason: "You submitted this version." });
     await open();
     await click(button("Approve v2"));
     expect(alertText()).toBe("You submitted this version.");

@@ -12,7 +12,6 @@ import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
-import { REFUSALS } from "@/domain/lifecycle";
 import { nameChange } from "@/domain/redline";
 import type { ActionResult } from "@/domain/review-types";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
@@ -92,9 +91,9 @@ export interface SubmitDialogProps {
  * description, the body, and a footer with an outline Cancel and the primary. No Close X (Esc and Cancel
  * close it).
  *
- * When the draft changed after this summary was read, the server refuses the submit
- * (`REFUSALS.summaryStale`): the sentence shows at the button, and the button becomes "Refresh
- * summary", which reads it again. The note is kept, and the button goes back to "Submit v{N}".
+ * When the draft changed after this summary was read, the server refuses the submit with the code
+ * `summary_stale` (`REFUSALS.summaryStale`): the sentence shows at the button, and the button becomes
+ * "Refresh summary", which reads it again. The note is kept, and the button goes back to "Submit v{N}".
  *
  * While the server works, nothing that holds focus is `disabled`: a disabled control drops focus to the
  * page, and the next Tab would leave the dialog for the sidebar. The note is read-only and the buttons
@@ -136,8 +135,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
         const result = await onSubmit(trimmed === "" ? undefined : trimmed);
         if (!result.ok) {
           setReason(result.reason);
-          // The sentence is the only signal a refusal carries today (I11 gives them stable codes).
-          setStale(result.reason === REFUSALS.summaryStale);
+          setStale(result.code === "summary_stale");
           return;
         }
         setNote("");

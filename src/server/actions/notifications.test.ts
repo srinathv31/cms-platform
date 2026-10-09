@@ -118,7 +118,7 @@ describe("markNotificationRead", () => {
     as("maya");
     const [alexs] = await unreadOf("alex");
     const refused = await markNotificationRead({ id: alexs!.id });
-    expect(refused).toEqual({ ok: false, reason: "This notification no longer exists." });
+    expect(refused).toEqual({ ok: false, code: "notification_gone", reason: "This notification no longer exists." });
     expect(await markNotificationRead({ id: "nt_nope" })).toEqual(refused);
     expect(await markNotificationRead({ id: "" })).toEqual(refused);
     expect((await unreadOf("alex")).map((n) => n.id)).toContain(alexs!.id);

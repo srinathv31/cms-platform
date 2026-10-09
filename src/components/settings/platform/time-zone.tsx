@@ -72,7 +72,7 @@ function ZoneEditor({ section, onClose }: { section: BusinessZoneSection; onClos
       lines={change.changed && !change.problem ? [...change.lines, ...section.consequences] : []}
       confirmLabel="Change time zone"
       blocked={!change.changed || !!change.problem}
-      message={change.problem}
+      message={change.problem?.reason ?? null}
       onConfirm={() => setBusinessZone({ zone })}
       onCancel={onClose}
       onDone={onClose}

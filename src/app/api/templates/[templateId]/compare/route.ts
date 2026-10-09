@@ -4,7 +4,7 @@ import { loadVersionsToCompare } from "@/server/queries/compare";
 import { getViewer } from "@/server/viewer";
 
 // The Compare dialog's two versions, read when it opens and on each change of pair:
-// GET ?from=<version id>&to=<version id> → { ok: true, from, to } | { ok: false, reason }, with 400, 403
+// GET ?from=<version id>&to=<version id> → { ok: true, from, to } | { ok: false, code, reason }, with 400, 403
 // or 404 (src/server/api/reads.ts). Anyone who can see the template. Request-time only: it reads the
 // persona cookie first.
 

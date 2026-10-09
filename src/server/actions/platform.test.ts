@@ -126,12 +126,12 @@ describe("only a Platform Admin", () => {
       const at = as(id);
       expect(await createTeam({ name: "Home Loans", description: "", icon: "home", adminUserId: "alex" })).toEqual({
         ok: false,
-        reason: REASONS.generic,
+        ...REASONS.generic,
       });
-      expect(await setChannelRule({ contentTypeId: CT, channel: "email", allowed: false })).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await updateContentType({ contentTypeId: CT, requiredSections: [] })).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await saveApprovalChain({ contentTypeId: CT, stages: [] })).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await setBusinessZone({ zone: "America/Chicago" })).toEqual({ ok: false, reason: REASONS.generic });
+      expect(await setChannelRule({ contentTypeId: CT, channel: "email", allowed: false })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await updateContentType({ contentTypeId: CT, requiredSections: [] })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [] })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await setBusinessZone({ zone: "America/Chicago" })).toEqual({ ok: false, ...REASONS.generic });
       expect(await auditAt(at)).toEqual([]);
     }
     await expect(getTeamsSection()).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
@@ -184,11 +184,12 @@ describe("createTeam", () => {
     as("riley");
     expect(await createTeam({ name: "coral offers", description: "", icon: "home", adminUserId: "alex" })).toEqual({
       ok: false,
+      code: "team_name_taken",
       reason: "A team called Coral Offers already exists.",
     });
     expect(await createTeam({ name: "Auto Loans", description: "", icon: "car", adminUserId: "nobody" })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.pickPerson,
+      ...PLATFORM_REFUSALS.pickPerson,
     });
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -197,6 +198,7 @@ describe("createTeam", () => {
     const at = as("riley");
     expect(await createTeam({ name: "Auto Loans", description: "", icon: "car", adminUserId: "taylor" })).toEqual({
       ok: false,
+      code: "auditor_cant_be_admin",
       reason: "Taylor Nguyen is an Auditor and can't be a Team Admin.",
     });
     expect(await auditAt(at)).toEqual([]);
@@ -246,7 +248,7 @@ describe("updateContentType", () => {
 
   it("refuses no sections and a duplicate title", async () => {
     as("riley");
-    expect(await updateContentType({ contentTypeId: CT, requiredSections: [] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.oneSection });
+    expect(await updateContentType({ contentTypeId: CT, requiredSections: [] })).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneSection });
     expect(
       await updateContentType({
         contentTypeId: CT,
@@ -255,9 +257,10 @@ describe("updateContentType", () => {
           { key: "", title: "offer details" },
         ],
       }),
-    ).toEqual({ ok: false, reason: "There are two sections called offer details." });
+    ).toEqual({ ok: false, code: "section_duplicate", reason: "There are two sections called offer details." });
     expect(await updateContentType({ contentTypeId: "ct_nope", requiredSections: [{ key: "", title: "A" }] })).toEqual({
       ok: false,
+      code: "content_type_gone",
       reason: "This content type no longer exists.",
     });
   });
@@ -290,7 +293,7 @@ describe("setChannelRule", () => {
     as("riley");
     expect(await setChannelRule({ contentTypeId: CT, channel: "web", allowed: false })).toEqual({
       ok: false,
-      reason: PLATFORM_REFUSALS.oneChannel,
+      ...PLATFORM_REFUSALS.oneChannel,
     });
 
     for (const channel of ["pdf", "email"] as const) {
@@ -351,8 +354,8 @@ describe("setBusinessZone", () => {
   it("writes nothing for the zone it already has, and refuses a zone off the list", async () => {
     const at = as("riley");
     expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({ ok: true });
-    expect(await setBusinessZone({ zone: "Europe/London" })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.pickZone });
-    expect(await setBusinessZone({ zone: "" })).toEqual({ ok: false, reason: "Check the form and try again." });
+    expect(await setBusinessZone({ zone: "Europe/London" })).toEqual({ ok: false, ...PLATFORM_REFUSALS.pickZone });
+    expect(await setBusinessZone({ zone: "" })).toEqual({ ok: false, code: "invalid_input", reason: "Check the form and try again." });
     expect(await auditAt(at)).toEqual([]);
     expect(refresh).not.toHaveBeenCalled();
     expect((await zoneRow())?.value).toBe("America/Los_Angeles");
@@ -429,10 +432,12 @@ describe("saveApprovalChain", () => {
     const naming = (userId: string) => ({ name: "Audit sign-off", rule: { kind: "user", userId } as ApproverRule });
     expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, naming("taylor")] })).toEqual({
       ok: false,
+      code: "auditor_cant_approve",
       reason: "Taylor Nguyen is an Auditor and can't approve.",
     });
     expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, naming("morgan")] })).toEqual({
       ok: false,
+      code: "no_active_access",
       reason: "Morgan Lee has no active access.",
     });
     expect((await getApprovalChainsSection()).people.some((p) => p.id === "taylor")).toBe(false);
@@ -444,6 +449,7 @@ describe("saveApprovalChain", () => {
     // Keeping the stage id and switching its rule to the acting admin: the self-approval route.
     expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Sign-off", rule: { kind: "user", userId: "riley" } }] })).toEqual({
       ok: false,
+      code: "names_yourself",
       reason: "You can't name yourself as an approver.",
     });
     expect(await auditAt(at)).toEqual([]);
@@ -455,6 +461,7 @@ describe("saveApprovalChain", () => {
     try {
       expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }, { name: "Sign-off", rule: { kind: "user", userId: "pat" } }] })).toEqual({
         ok: false,
+        code: "admin_without_team_role",
         reason: "Pat Admin is a Platform Admin with no team role and can't approve.",
       });
       expect((await getApprovalChainsSection()).people.some((p) => p.id === "pat")).toBe(false);
@@ -493,11 +500,11 @@ describe("saveApprovalChain", () => {
       const at = as("casey");
       expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, legalStage, caseyStage, { name: "Final sign-off", rule: casey }] })).toEqual({
         ok: false,
-        reason: PLATFORM_REFUSALS.nameYourself,
+        ...PLATFORM_REFUSALS.nameYourself,
       });
       expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, { ...legalStage, rule: casey }] })).toEqual({
         ok: false,
-        reason: PLATFORM_REFUSALS.nameYourself,
+        ...PLATFORM_REFUSALS.nameYourself,
       });
       expect(await chain()).toEqual(before);
       expect(await auditAt(at)).toEqual([]);
@@ -521,7 +528,7 @@ describe("saveApprovalChain", () => {
         contentTypeId: CT,
         stages: [...kept, { name: "Compliance", rule: jordan }, { name: "Final sign-off", rule: jordan }],
       }),
-    ).toEqual({ ok: false, reason: `Jordan Ellis already reviews stage ${before.length + 1}.` });
+    ).toEqual({ ok: false, code: "person_on_two_stages", reason: `Jordan Ellis already reviews stage ${before.length + 1}.` });
     expect(await chain()).toEqual(before);
     expect(await auditAt(at)).toEqual([]);
     expect(await notificationsAt(at)).toEqual([]);
@@ -532,7 +539,7 @@ describe("saveApprovalChain", () => {
     const before = await chain();
     as("riley");
     const viewers = { id: TEAM_STAGE, name: "Team approver", rule: { kind: "team_role", role: "viewer" } as ApproverRule };
-    expect(await saveApprovalChain({ contentTypeId: CT, stages: [viewers] })).toEqual({ ok: false, reason: "Check the form and try again." });
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: [viewers] })).toEqual({ ok: false, code: "invalid_input", reason: "Check the form and try again." });
     expect(await chain()).toEqual(before);
   });
 
@@ -543,7 +550,7 @@ describe("saveApprovalChain", () => {
     await db.update(memberships).set({ status: "suspended" }).where(eq(memberships.userId, "dana"));
     try {
       const at = as("riley");
-      expect(await saveApprovalChain({ contentTypeId: CT, stages: renamed })).toEqual({ ok: false, reason: "Dana Park has no active access." });
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: renamed })).toEqual({ ok: false, code: "no_active_access", reason: "Dana Park has no active access." });
       expect(await chain()).toEqual(before);
       expect(await auditAt(at)).toEqual([]);
       // The editor gets the same facts, so it shows the reason at Dana's stage before anyone saves.
@@ -642,9 +649,10 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
     as("jordan");
     expect((await getReviewScreen("coral-offers", templateId, 1)).can.approve).toEqual({
       ok: false,
+      code: "waiting_on_stage",
       reason: "Waiting on Legal reviewer.",
     });
-    expect(await approve(templateId)).toEqual({ ok: false, reason: "Waiting on Legal reviewer." });
+    expect(await approve(templateId)).toEqual({ ok: false, code: "waiting_on_stage", reason: "Waiting on Legal reviewer." });
 
     // Stage 2: Dana.
     const live = as("dana");
@@ -670,11 +678,11 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
     expect(await approve(templateId)).toMatchObject({ ok: true, wentLive: false });
 
     as("alex"); // an Approver (and Team Admin) on Coral, but not Dana
-    expect(await approve(templateId)).toEqual({ ok: false, reason: "Waiting on Legal reviewer." });
+    expect(await approve(templateId)).toEqual({ ok: false, code: "waiting_on_stage", reason: "Waiting on Legal reviewer." });
     as("sam"); // a Viewer
-    expect(await approve(templateId)).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await approve(templateId)).toEqual({ ok: false, ...REASONS.generic });
     as("maya");
-    expect(await approve(templateId)).toEqual({ ok: false, reason: REASONS.ownVersion });
+    expect(await approve(templateId)).toEqual({ ok: false, ...REASONS.ownVersion });
     expect(await versionOf(templateId)).toMatchObject({ state: "in_review", currentStage: 1 });
 
     // Sam can't comment either; Dana can.
@@ -682,7 +690,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
     as("sam");
     expect(await addComment({ templateId, versionId: version.id, blockId: "doc", body: "Hi" })).toEqual({
       ok: false,
-      reason: REASONS.generic,
+      ...REASONS.generic,
     });
   });
 
@@ -705,10 +713,10 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
     as("jordan");
     expect((await getReviewScreen("coral-offers", templateId, 1)).can.approve).toEqual({
       ok: false,
-      reason: REFUSALS.approvedEarlierStage,
+      ...REFUSALS.approvedEarlierStage,
     });
     expect((await getReviewQueue("coral-offers")).waiting.some((r) => r.templateId === templateId)).toBe(false);
-    expect(await approve(templateId)).toEqual({ ok: false, reason: "You approved an earlier stage." });
+    expect(await approve(templateId)).toEqual({ ok: false, code: "approved_earlier_stage", reason: "You approved an earlier stage." });
     expect(await versionOf(templateId)).toMatchObject({ state: "in_review", currentStage: 1 });
 
     as("alex");
@@ -733,7 +741,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
 
     as("riley");
     const result = await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }] });
-    expect(result).toEqual({ ok: false, reason: expect.stringMatching(/^\d+ versions? in review still needs? Legal reviewer\.$/) });
+    expect(result).toEqual({ ok: false, code: "stage_in_use", reason: expect.stringMatching(/^\d+ versions? in review still needs? Legal reviewer\.$/) });
     expect((await chain()).length).toBe(2);
     expect((await getApprovalChainsSection()).chains[0]!.stages[1]!.waiting).toBeGreaterThanOrEqual(1);
   });
@@ -854,6 +862,7 @@ describe("editing the chain while versions are in review: each version keeps the
     const withoutCompliance = current.filter((s) => s.name !== "Compliance").map((s) => ({ id: s.id, name: s.name, rule: s.approverRule }));
     expect(await saveApprovalChain({ contentTypeId: CT, stages: withoutCompliance })).toEqual({
       ok: false,
+      code: "stage_in_use",
       reason: expect.stringMatching(/^\d+ versions? in review still needs? Compliance\.$/),
     });
     const section = (await getApprovalChainsSection()).chains.find((c) => c.contentTypeId === CT)!;
@@ -905,7 +914,7 @@ describe("editing the chain while versions are in review: each version keeps the
     expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, { ...legal, rule: { kind: "user", userId: "jordan" } }] })).toEqual({ ok: true });
     expect((await notificationsAt(at)).filter((n) => n.href?.includes(templateId)), "nobody is asked").toEqual([]);
     as("jordan");
-    expect(await approve(templateId)).toEqual({ ok: false, reason: REFUSALS.approvedEarlierStage });
+    expect(await approve(templateId)).toEqual({ ok: false, ...REFUSALS.approvedEarlierStage });
 
     // The unblock path of decision 0007: name someone else, who is told and decides.
     at = as("riley");
@@ -980,8 +989,8 @@ describe("the stages backfill in the migration", () => {
 
     // Matched to the stage the version waits on, his approval still counts: two stages need two people.
     as("jordan");
-    expect((await getReviewScreen("coral-offers", templateId, 1)).can.approve).toEqual({ ok: false, reason: REFUSALS.approvedEarlierStage });
-    expect(await approve(templateId)).toEqual({ ok: false, reason: REFUSALS.approvedEarlierStage });
+    expect((await getReviewScreen("coral-offers", templateId, 1)).can.approve).toEqual({ ok: false, ...REFUSALS.approvedEarlierStage });
+    expect(await approve(templateId)).toEqual({ ok: false, ...REFUSALS.approvedEarlierStage });
     as("alex");
     expect(await approve(templateId)).toEqual({ ok: true, wentLive: true, number: 1 });
   });

@@ -15,6 +15,7 @@ import { newId } from "@/server/ids";
 import { draftRow } from "@/server/templates/create";
 import { assertCan } from "@/domain/permissions";
 import { editLatest, planDraftStart, type VersionSnapshot } from "@/domain/lifecycle";
+import type { ActionResult } from "@/domain/review-types";
 
 // Template editing. Every action checks permissions first, writes in one transaction, refreshes
 // what it changed, and redirects last. New template (`createTemplate`) is in `create-template.ts`,
@@ -120,8 +121,8 @@ export async function startDraft(input: { templateId: string }): Promise<void> {
 
 // ── Submit for review ─────────────────────────────────────────
 
-/** What the Submit button needs: the new version's number, or the one-line reason it was refused. */
-export type SubmitDraftResult = { ok: true; number: number } | { ok: false; reason: string };
+/** What the Submit button needs: the new version's number, or the refusal (its code and one-line reason). */
+export type SubmitDraftResult = ActionResult<{ number: number }>;
 
 /**
  * "Submit for review" from Phase 3. The submit now lives with the review actions (`submitVersion`,

@@ -143,7 +143,7 @@ to a client component as props. Server components here include screen views (`au
 skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you the side
 (`settings/team/inactivity-view.tsx` is a client component): look for `"use client"`.
 
-**Permissions.** The server decides. Read models carry `PermissionResult`s (`{ ok: true } | { ok: false; reason }`)
+**Permissions.** The server decides. Read models carry `PermissionResult`s (`{ ok: true } | { ok: false; code; reason }`)
 or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.approve` and `data.can.comment` in
 `review/review-workspace.tsx`, `canSubmit` in `workspace/workspace-tab-bar.tsx`. The settings rows render a
 refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`). What an action does comes the
@@ -151,11 +151,16 @@ same way: the settings read models send each strip's line as `consequences` besi
 A form checked as someone types calls the domain's own check with the read model's facts (`validateChain`,
 `validateNewTeam`, `describeSectionsChange`, `describeRoleChange`, `describeZoneChange`), never a copy of a refusal ladder, a refusal
 constant, a stand-in actor or the clock; `settings/settings-decided.test.tsx` fails on any of those under
-`settings/` ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)).
+`settings/` ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)). A screen that treats
+one refusal differently from the rest branches on its `code`, never its sentence: `review/decision-model.ts` hides
+the decision buttons for `generic`, `versions/version-actions.tsx` keeps Confirm revoke (disabled) for `own_revoke`,
+and `submit/submit-dialog.tsx` offers Refresh summary on `summary_stale`. The sentence is shown as written and can be
+reworded freely ([decision 0025](../../docs/decisions/0025-refusals-carry-stable-codes.md)).
 
 **Mutations.** Client components import server actions from `@/server/actions/*` and call them in a transition.
-Most return `ActionResult` (`src/domain/review-types.ts`): `{ ok: true, … } | { ok: false, reason }`. Show the
-`reason` as written. On success the action calls `refresh()` or `revalidatePath`, so the server components
+Most return `ActionResult` (`src/domain/review-types.ts`): `{ ok: true, … } | { ok: false, code, reason }`. Show
+the `reason` as written. A refusal made in the browser (the call threw, or the server couldn't be reached) has the
+code `failed` and the screen's own sentence (`runAction` in `versions/action-dialog.tsx`). On success the action calls `refresh()` or `revalidatePath`, so the server components
 re-render with fresh props; the client doesn't refetch. The dialog pattern ([versions/action-dialog.tsx](versions/action-dialog.tsx)):
 
 ```tsx
@@ -217,10 +222,8 @@ header's `SaveStopped` says why and offers Reload. Anything else that has to sto
   (`src/server/queries/format.ts`); "3 days ago" as `formatWhen` (`versions/format.ts`), `formatLastRender`
   (`usage/format.ts`), and `daysAgo` (`settings/team/format.ts`); a clipboard fallback in `primitives/template-id.tsx`
   and `integration/copy-button.tsx`. Take dates from `src/domain/dates.ts` and relative times from `versions/format.ts`.
-- **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`;
-  `review/decision-model.ts` hides a control when the reason is `REASONS.generic`; `versions/version-actions.tsx`
-  branches on `REASONS.ownRevoke`, and `submit/submit-dialog.tsx` offers Refresh summary on `REFUSALS.summaryStale`.
-  Have the query return the result.
+- **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`. Have the
+  query return the result.
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
   and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
   `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.

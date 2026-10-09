@@ -15,8 +15,9 @@
 // either. Someone the waiting stage names acts from any team, but only on the version in review and the
 // threads its screen shows (docs/decisions/0010-comments-are-answered-where-they-show.md).
 
-import type { Outcome, Refused } from "./lifecycle";
+import type { Outcome } from "./lifecycle";
 import { can } from "./permissions";
+import { refusal, refuse } from "./refusals";
 import {
   DOCUMENT_THREAD,
   type LifecycleEffect,
@@ -32,12 +33,12 @@ export const COMMENT_MAX = 4000;
 /** The quoted text a thread keeps, in characters; a longer selection is cut. */
 export const QUOTE_MAX = 500;
 
-/** The sentences a refused comment returns (who may comment at all comes from `REASONS`). */
+/** What a refused comment returns (who may comment at all comes from `REASONS`). */
 export const COMMENT_REFUSALS = {
-  empty: "Write a comment first.",
-  tooLong: `Keep a comment under ${COMMENT_MAX.toLocaleString("en-US")} characters.`,
-  noBlock: "That block isn't in this version any more.",
-  closed: "Only a draft or a version in review takes comments.",
+  empty: refusal("comment_empty", "Write a comment first."),
+  tooLong: refusal("comment_too_long", `Keep a comment under ${COMMENT_MAX.toLocaleString("en-US")} characters.`),
+  noBlock: refusal("block_gone", "That block isn't in this version any more."),
+  closed: refusal("comments_closed", "Only a draft or a version in review takes comments."),
 } as const;
 
 // ── Facts ─────────────────────────────────────────────────────
@@ -369,6 +370,3 @@ function newComment(id: string, threadId: string, authorId: string, body: string
   return { id, threadId, authorId, body, kind: "comment", createdAt: now };
 }
 
-function refuse(reason: string): Refused {
-  return { ok: false, reason };
-}

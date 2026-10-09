@@ -144,10 +144,8 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
           const saved = chain.stages.find((s) => s.id === row.id);
           const isEditing = editing === row.key;
           // The server's own rule: a stage being added has nobody waiting on it.
-          const removeReason = removeStageRefusal(
-            { name: saved?.name ?? row.name, waiting: saved?.waiting ?? 0 },
-            rows.length - 1,
-          );
+          const removeReason =
+            removeStageRefusal({ name: saved?.name ?? row.name, waiting: saved?.waiting ?? 0 }, rows.length - 1)?.reason ?? null;
           // A name still being typed isn't flagged while it's empty; the strip still says why Save waits.
           const nameProblem = isEditing && !row.name.trim() ? null : problemAt(index, "name");
           const reviewerProblem = problemAt(index, "reviewer");

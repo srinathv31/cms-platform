@@ -178,7 +178,7 @@ describe("StartRevokeDialog", () => {
     await pressKey(field, { key: "Enter", metaKey: true });
     expect(actions.startRevoke).toHaveBeenCalledTimes(1);
 
-    await act(async () => answer({ ok: false, reason: "A revoke is already waiting for a second approver." }));
+    await act(async () => answer({ ok: false, code: "revoke_pending", reason: "A revoke is already waiting for a second approver." }));
     expect(alertText()).toBe("A revoke is already waiting for a second approver.");
     expect(field.readOnly).toBe(false);
     expect(document.activeElement).toBe(field);
@@ -186,7 +186,7 @@ describe("StartRevokeDialog", () => {
   });
 
   it("shows a refusal at the button and stays open", async () => {
-    actions.startRevoke.mockResolvedValue({ ok: false, reason: "A revoke is already waiting for a second approver." });
+    actions.startRevoke.mockResolvedValue({ ok: false, code: "revoke_pending", reason: "A revoke is already waiting for a second approver." });
     await open();
     await typeInto(dialog().querySelector("textarea")!, "Wrong APR.");
     await click(button("Start revoke"));
@@ -205,7 +205,7 @@ describe("StartRevokeDialog", () => {
   });
 
   it("clears a refusal once the reason changes", async () => {
-    actions.startRevoke.mockResolvedValue({ ok: false, reason: "No." });
+    actions.startRevoke.mockResolvedValue({ ok: false, code: "generic", reason: "No." });
     await open();
     const field = dialog().querySelector("textarea")!;
     await typeInto(field, "Wrong APR.");
@@ -230,7 +230,7 @@ describe("ConfirmRevokeDialog", () => {
   });
 
   it("confirms, and shows the server's refusal at the button", async () => {
-    actions.confirmRevoke.mockResolvedValue({ ok: false, reason: "You started this revoke. Another approver must confirm it." });
+    actions.confirmRevoke.mockResolvedValue({ ok: false, code: "own_revoke", reason: "You started this revoke. Another approver must confirm it." });
     await render(<ConfirmRevokeDialog open onOpenChange={onOpenChange} {...BASE} startedBy="Jordan Ellis" reason="Wrong APR." />);
     await click(button("Confirm revoke"));
     expect(actions.confirmRevoke).toHaveBeenCalledWith({ templateId: "UC-ABC123", versionNumber: 1 });
@@ -285,7 +285,7 @@ describe("SunsetDialog", () => {
   });
 
   it("shows a refusal at the button and stays open", async () => {
-    actions.setSunset.mockResolvedValue({ ok: false, reason: "Only a Superseded version can be given a sunset date." });
+    actions.setSunset.mockResolvedValue({ ok: false, code: "sunset_not_superseded", reason: "Only a Superseded version can be given a sunset date." });
     await open();
     await click(button("Set sunset"));
     expect(alertText()).toBe("Only a Superseded version can be given a sunset date.");

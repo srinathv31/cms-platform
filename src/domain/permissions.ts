@@ -8,6 +8,7 @@
 //      every team and in the cross-team "All teams" space. Grants add up across roles.
 //   2. Guards: separation-of-duties rules that block an action even when a role grants it.
 
+import { refusal, refuse, type Refusal, type RefusalCode } from "./refusals";
 import type {
   Action,
   PermissionResource,
@@ -20,17 +21,21 @@ import type {
 /** Slug of the cross-team "All teams" space. */
 export const ALL_SPACE = "all";
 
-/** The only wording the UI shows for a blocked action ("explain only when blocked"). */
+/**
+ * Why `can` refuses: the only wording the UI shows for a blocked action ("explain only when blocked").
+ * `generic` is the one that means "no role gives you this": the review screen hides what it refuses
+ * instead of showing it dimmed. Branch on the code, never on the sentence (domain/refusals.ts).
+ */
 export const REASONS = {
-  generic: "You don't have access to do this.",
-  ownVersion: "You submitted this version.",
+  generic: refusal("generic", "You don't have access to do this."),
+  ownVersion: refusal("submitted_version", "You submitted this version."),
   /** Maker-checker for everyone else who wrote it: started the draft or saved an edit to it. */
-  wroteVersion: "You wrote part of this version.",
-  ownRevoke: "You started this revoke. Another approver must confirm it.",
-  ownRequest: "You can't decide your own access request.",
-  ownAccess: "You can't change your own access.",
+  wroteVersion: refusal("wrote_version", "You wrote part of this version."),
+  ownRevoke: refusal("own_revoke", "You started this revoke. Another approver must confirm it."),
+  ownRequest: refusal("own_request", "You can't decide your own access request."),
+  ownAccess: refusal("own_access", "You can't change your own access."),
   /** The Auditor is read-only everywhere: no team role, request or approval gives them more. */
-  auditorReadOnly: "Auditors have read-only access and can't hold team roles.",
+  auditorReadOnly: refusal("auditor_read_only", "Auditors have read-only access and can't hold team roles."),
 } as const;
 
 // ── Grants ────────────────────────────────────────────────────
@@ -79,7 +84,7 @@ const NAMED_APPROVER: readonly Action[] = ["template.view", "version.decide", "r
 
 // ── Guards ────────────────────────────────────────────────────
 
-type Guard = (viewer: Viewer, resource: PermissionResource) => string | null;
+type Guard = (viewer: Viewer, resource: PermissionResource) => Refusal | null;
 
 const GUARDS: Partial<Record<Action, Guard>> = {
   // Maker-checker: nobody approves their own work.
@@ -101,7 +106,7 @@ const GUARDS: Partial<Record<Action, Guard>> = {
 export function makerCheckerRefusal(
   actorId: string,
   version: { submittedBy?: string | null; writers?: readonly string[] | null },
-): string | null {
+): Refusal | null {
   if (version.submittedBy === actorId) return REASONS.ownVersion;
   if (version.writers?.includes(actorId)) return REASONS.wroteVersion;
   return null;
@@ -115,29 +120,31 @@ export function can(viewer: Viewer, action: Action, resource: PermissionResource
   // A self-block explains itself to anyone who can see the item, role or not:
   // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker),
   // and a co-author sees why they can't decide what they wrote.
-  if (blocked && granted(viewer, "template.view", teamId)) return { ok: false, reason: blocked };
+  if (blocked && granted(viewer, "template.view", teamId)) return refuse(blocked);
   if (!granted(viewer, action, teamId) && !namedApprover(viewer, action, resource, teamId)) {
-    return { ok: false, reason: REASONS.generic };
+    return refuse(REASONS.generic);
   }
-  return blocked ? { ok: false, reason: blocked } : { ok: true };
+  return blocked ? refuse(blocked) : { ok: true };
 }
 
 export class PermissionError extends Error {
   readonly action: Action;
+  readonly code: RefusalCode;
   readonly reason: string;
 
-  constructor(action: Action, reason: string) {
+  constructor(action: Action, { code, reason }: Refusal) {
     super(reason);
     this.name = "PermissionError";
     this.action = action;
+    this.code = code;
     this.reason = reason;
   }
 }
 
-/** Throws a `PermissionError` carrying the reason when `can` says no. */
+/** Throws a `PermissionError` carrying the refusal's code and reason when `can` says no. */
 export function assertCan(viewer: Viewer, action: Action, resource?: PermissionResource): void {
   const result = can(viewer, action, resource);
-  if (!result.ok) throw new PermissionError(action, result.reason);
+  if (!result.ok) throw new PermissionError(action, result);
 }
 
 function granted(viewer: Viewer, action: Action, teamId: string | null): boolean {

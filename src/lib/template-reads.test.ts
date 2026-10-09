@@ -36,8 +36,8 @@ describe("readTemplate", () => {
   });
 
   it("hands back a refusal's reason, whatever its status", async () => {
-    fetchMock.mockResolvedValue(json({ ok: false, reason: "There is no draft to revert." }, 409));
-    expect(await readTemplate("UC-4F7K2Q", "base-version", { draft: "v_1" })).toEqual({ ok: false, reason: "There is no draft to revert." });
+    fetchMock.mockResolvedValue(json({ ok: false, code: "no_draft_to_revert", reason: "There is no draft to revert." }, 409));
+    expect(await readTemplate("UC-4F7K2Q", "base-version", { draft: "v_1" })).toEqual({ ok: false, code: "no_draft_to_revert", reason: "There is no draft to revert." });
   });
 
   it("throws when the answer isn't a result: an error page, or JSON of another shape", async () => {

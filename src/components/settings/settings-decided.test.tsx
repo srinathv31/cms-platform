@@ -141,7 +141,7 @@ describe("Channel rules", () => {
     // Three channels on, so the rule alone would refuse none: the refusal here is the server's word.
     await show(
       <ChannelRulesSectionView
-        section={{ channels: ["pdf", "web", "email"], rows: [row({ pdf: OK, web: { ok: false, reason: "Decided by the server." }, email: OK })] }}
+        section={{ channels: ["pdf", "web", "email"], rows: [row({ pdf: OK, web: { ok: false, code: "last_channel", reason: "Decided by the server." }, email: OK })] }}
       />,
     );
     const sw = (label: string) => container.querySelector(`[role="switch"][aria-label="${label}"]`)!;
@@ -177,7 +177,7 @@ describe("Time zone", () => {
   });
 
   it("disables the change the read model refuses", async () => {
-    await show(<TimeZoneSectionView section={section({ can: { change: { ok: false, reason: "Decided by the server." } } })} />);
+    await show(<TimeZoneSectionView section={section({ can: { change: { ok: false, code: "generic", reason: "Decided by the server." } } })} />);
     const opener = buttonNamed("Change time zone");
     expect(opener?.getAttribute("aria-disabled")).toBe("true");
     await click(opener);
@@ -198,7 +198,7 @@ describe("Members", () => {
     lastActiveAt: "2026-10-03T12:00:00.000Z",
     addedAt: "2026-01-01T12:00:00.000Z",
     isYou: false,
-    can: { editRoles: OK, remove: OK, reinstate: { ok: false, reason: "Already active." } },
+    can: { editRoles: OK, remove: OK, reinstate: { ok: false, code: "membership_already_active", reason: "Already active." } },
     consequences: { remove: "What the server says Remove does.", reinstate: "What the server says Restore does." },
   };
   const section: MembersSection = { team: TEAM, rows: [member], roles: ["viewer", "author", "approver", "team_admin"], today: TODAY };
@@ -232,7 +232,7 @@ describe("Inactivity", () => {
     status: "active",
     statusReason: null,
     heldAsLastAdmin: false,
-    can: { suspend: OK, keep: OK, reinstate: { ok: false, reason: "Already active." } },
+    can: { suspend: OK, keep: OK, reinstate: { ok: false, code: "membership_already_active", reason: "Already active." } },
     consequences: { suspend: "Suspend, as the server says.", keep: "Keep, as the server says.", reinstate: "Restore, as the server says." },
     ...over,
   });
@@ -286,7 +286,7 @@ describe("Recertification", () => {
       lapsed: [],
       footnote: "The footnote the server wrote.",
     },
-    can: { start: { ok: false, reason: "A review is already open." } },
+    can: { start: { ok: false, code: "recert_open", reason: "A review is already open." } },
     consequences: { start: "Start, as the server says." },
     today: TODAY,
     ...over,

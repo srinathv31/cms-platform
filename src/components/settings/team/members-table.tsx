@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ROLE_LABEL, describeRoleChange, rolesLabel, sortRoles } from "@/domain/access";
 import type { MemberRow, MembersSection } from "@/domain/access-types";
-import type { TeamRole } from "@/domain/types";
+import type { PermissionResult, TeamRole } from "@/domain/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { changeMemberRoles, reinstateMember, removeMember } from "@/server/actions/access";
 import { fmtDay, daysAgo, firstName } from "./format";
@@ -58,7 +58,7 @@ function RolesEditor({
 
 export function MembersTable({ section }: { section: MembersSection }) {
   const { team, today } = section;
-  const reason = (r: { ok: true } | { ok: false; reason: string }) => (r.ok ? null : r.reason);
+  const reason = (r: PermissionResult) => (r.ok ? null : r.reason);
 
   const rows: RowData[] = section.rows.map((m) => {
     const first = firstName(m.person.name);

@@ -2,7 +2,8 @@ import type { ActionResult } from "@/domain/review-types";
 
 // The browser's side of the reads a screen makes on demand, when a dialog or a menu opens: GET
 // /api/templates/[templateId]/… (src/app/api/templates/[templateId]/, src/server/api/reads.ts). Each
-// answers `{ ok: true, … }`, or `{ ok: false, reason }` with the sentence to show and a 4xx status.
+// answers `{ ok: true, … }`, or `{ ok: false, code, reason }` with the refusal's code, the sentence to
+// show and a 4xx status.
 // Route handlers rather than server actions: actions run one at a time with the page's mutations.
 
 /** A template's reads, by the last segment of their route. */
@@ -15,7 +16,7 @@ export function templateReadUrl(templateId: string, read: TemplateRead, params: 
 }
 
 /**
- * One read: the data, or the refusal with its reason. Throws when the answer isn't a result (the
+ * One read: the data, or the refusal with its code and reason. Throws when the answer isn't a result (the
  * request failed, or the server sent an error page); each caller treats that as its own failure.
  */
 export async function readTemplate<T>(
@@ -32,6 +33,6 @@ export async function readTemplate<T>(
 
 function isResult(body: unknown): boolean {
   if (typeof body !== "object" || body === null) return false;
-  const { ok, reason } = body as { ok?: unknown; reason?: unknown };
-  return ok === true || (ok === false && typeof reason === "string");
+  const { ok, code, reason } = body as { ok?: unknown; code?: unknown; reason?: unknown };
+  return ok === true || (ok === false && typeof code === "string" && typeof reason === "string");
 }

@@ -107,7 +107,7 @@ describe("Copilot prompt", () => {
   });
 
   it("a refusal or an unsaved draft shows its reason and no prompt", async () => {
-    getCopilotPrompt.mockResolvedValue({ ok: false, reason: "Only authors on this team can edit drafts." });
+    getCopilotPrompt.mockResolvedValue({ ok: false, code: "generic", reason: "Only authors on this team can edit drafts." });
     await openDialog();
     expect(alert()).toBe("Only authors on this team can edit drafts.");
     expect(dialog()?.querySelector("pre")).toBeNull();

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PaletteResults } from "@/domain/import-types";
 import { normalizePaletteQuery } from "@/domain/palette";
+import type { Refused } from "@/domain/refusals";
 import { emptyPaletteCache, nearestAnswer, paletteAskKey, withAnswer, type PaletteAsk } from "./palette-cache";
 
 // The palette's side of GET /api/palette/{space}: nothing is asked until the palette opens. Each
@@ -26,7 +27,7 @@ export function paletteUrl(ask: Pick<PaletteAsk, "space" | "current" | "query">)
 async function readPalette(ask: PaletteAsk): Promise<PaletteResults> {
   const url = paletteUrl(ask);
   const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
-  const body = (await response.json()) as ({ ok: true } & PaletteResults) | { ok: false; reason: string };
+  const body = (await response.json()) as ({ ok: true } & PaletteResults) | Refused;
   if (body.ok !== true) throw new Error(`GET ${url} answered ${response.status}.`);
   return {
     viewerId: body.viewerId,

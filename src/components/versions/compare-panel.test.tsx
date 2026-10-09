@@ -70,7 +70,7 @@ describe("ComparePanel", () => {
   });
 
   it("says it couldn't load them when the route refuses, and Try again reads them again", async () => {
-    compareRoute.mockResolvedValueOnce({ ok: false, reason: "This version isn't available." });
+    compareRoute.mockResolvedValueOnce({ ok: false, code: "version_unavailable", reason: "This version isn't available." });
     await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
     await tick();
     expect(text()).toContain("Couldn't load these versions.");

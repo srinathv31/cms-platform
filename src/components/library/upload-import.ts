@@ -43,7 +43,10 @@ export async function precheckImportBytes(file: Pick<Blob, "slice"> & { name: st
   return pdf ? IMPORT_REFUSALS.notPdf : IMPORT_REFUSALS.notWord;
 }
 
-/** Sends the file to be imported into a new template on `teamSlug`. A refusal comes back as `{ ok: false, reason }`. */
+/**
+ * Sends the file to be imported into a new template on `teamSlug`. A refusal comes back as
+ * `{ ok: false, code, reason }`, with an import refusal code (`IMPORT_REFUSALS`, or `permission`).
+ */
 export async function uploadImport(file: File, teamSlug: string): Promise<ImportResponse> {
   const form = new FormData();
   form.set("file", file);

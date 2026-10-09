@@ -21,6 +21,7 @@ import {
   type ReviewVersion,
 } from "@/domain/lifecycle";
 import { PermissionError, assertCan } from "@/domain/permissions";
+import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
 import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
 import type { Action, PermissionResource, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
@@ -48,48 +49,37 @@ import { getViewer } from "@/server/viewer";
 const NOTE_MAX = 2000;
 const REASON_MAX = 2000;
 
-const REASONS = {
-  noTemplate: "This template no longer exists.",
-  noVersion: "This version no longer exists.",
-  noDraft: "There is no draft to submit.",
-  draftChanged: "This draft changed. Try again.",
-  noteTooLong: `Keep the note under ${NOTE_MAX.toLocaleString("en-US")} characters.`,
-  reasonTooLong: `Keep the reason under ${REASON_MAX.toLocaleString("en-US")} characters.`,
-  badDate: "Pick a valid date.",
-  activeChanged: "The Active version changed. Try again.",
-} as const;
-
 // ── Helpers ───────────────────────────────────────────────────
 
 /** A refusal raised inside a transaction: it rolls the transaction back and becomes the answer. */
-class Refusal extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
-    this.name = "Refusal";
+class RefusalError extends Error {
+  constructor(readonly refusal: Refusal) {
+    super(refusal.reason);
+    this.name = "RefusalError";
   }
 }
 
-function refuse(reason: string): never {
-  throw new Refusal(reason);
+function refuse(refusal: Refusal): never {
+  throw new RefusalError(refusal);
 }
 
 /** `assertCan`, with the refusal returned as the action's answer instead of thrown. */
-function check(viewer: Viewer, action: Action, resource: PermissionResource): { ok: false; reason: string } | null {
+function check(viewer: Viewer, action: Action, resource: PermissionResource): Refused | null {
   try {
     assertCan(viewer, action, resource);
     return null;
   } catch (error) {
-    if (error instanceof PermissionError) return { ok: false, reason: error.reason };
+    if (error instanceof PermissionError) return { ok: false, code: error.code, reason: error.reason };
     throw error;
   }
 }
 
-/** One transaction, retried when busy; a `Refusal` anywhere in it rolls it back and is returned. */
+/** One transaction, retried when busy; a `RefusalError` anywhere in it rolls it back and is returned. */
 async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
   try {
     return await inTransaction(db, run);
   } catch (error) {
-    if (error instanceof Refusal) return { ok: false, reason: error.reason };
+    if (error instanceof RefusalError) return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
     throw error;
   }
 }
@@ -154,7 +144,7 @@ async function loadVersion(tx: Tx, found: FoundVersion, number: number) {
   const row = await tx.query.versions.findFirst({
     where: and(eq(versions.templateId, found.templateId), eq(versions.number, number)),
   });
-  if (!row) refuse(REASONS.noVersion);
+  if (!row) refuse(REQUEST_REFUSALS.versionGone);
   return row satisfies ReviewVersion;
 }
 
@@ -171,7 +161,7 @@ function assertStage(viewer: Viewer, chain: readonly ApprovalStage[], version: R
   const stage = currentStageOf(version, chain);
   if (!stage) return;
   const result = canActOnStage(viewer, stage, teamId);
-  if (!result.ok) refuse(result.reason);
+  if (!result.ok) refuse(result);
 }
 
 /**
@@ -184,7 +174,7 @@ async function updateVersion(
   version: { id: string; state: ReviewVersion["state"]; rev: number; currentStage: number },
   set: Partial<typeof versions.$inferInsert>,
   at: Date,
-  whenMissed: string,
+  whenMissed: Refusal,
 ) {
   const [saved] = await tx
     .update(versions)
@@ -260,8 +250,8 @@ export async function submitVersion(input: {
   const found = parsed.success ? await findTemplate(parsed.data.templateId) : undefined;
   const refused = check(viewer, "version.submit", { teamId: found?.teamId ?? null });
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noTemplate };
-  if ((parsed.data.note?.trim().length ?? 0) > NOTE_MAX) return { ok: false, reason: REASONS.noteTooLong };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.templateGone };
+  if ((parsed.data.note?.trim().length ?? 0) > NOTE_MAX) return { ok: false, ...REQUEST_REFUSALS.noteTooLong(NOTE_MAX) };
 
   const at = await now();
   const result = await transact<{ number: number }>(async (tx) => {
@@ -271,9 +261,9 @@ export async function submitVersion(input: {
       .where(eq(versions.templateId, found.id));
 
     const open = list.find((v) => v.state === "draft");
-    if (!open) refuse(list.some((v) => v.state === "in_review") ? "This version is already in review." : REASONS.noDraft);
+    if (!open) refuse(list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
     const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
-    if (!draft) refuse(REASONS.noDraft);
+    if (!draft) refuse(REQUEST_REFUSALS.noDraftToSubmit);
 
     const baselineId = contractBaseline(list, at)?.id;
     const baseline = baselineId
@@ -297,7 +287,7 @@ export async function submitVersion(input: {
       note: parsed.data.note ?? null,
       chain: await loadChain(tx, found.contentTypeId),
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     const { changes, effects } = outcome;
 
     await updateVersion(
@@ -315,7 +305,7 @@ export async function submitVersion(input: {
         contractChanges: changes.contractChanges,
       },
       at,
-      REASONS.draftChanged,
+      REQUEST_REFUSALS.draftChanged,
     );
     // Submitting the next version answers the change request that sent the last one back (Sri, Oct 5):
     // open whole-version threads resolve as the submitter's, recording the version that answered them.
@@ -375,8 +365,8 @@ export async function requestChanges(input: {
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
   const refused = check(viewer, "version.decide", await decideResource(found));
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
-  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, reason: REASONS.reasonTooLong };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
+  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, ...REQUEST_REFUSALS.reasonTooLong(REASON_MAX) };
 
   const at = await now();
   const result = await transact(async (tx) => {
@@ -393,7 +383,7 @@ export async function requestChanges(input: {
       now: at,
       templateName: version.name,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
 
     await updateVersion(tx, version, { state: outcome.changes.state }, at, REFUSALS.notInReview);
     await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
@@ -469,11 +459,11 @@ export async function approveVersion(input: {
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
   const refused = check(viewer, "version.decide", await decideResource(found));
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
 
   // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
   const sunsetPrevious = parsed.data.sunsetPrevious || null;
-  if (sunsetPrevious !== null && !isCalendarDay(sunsetPrevious)) return { ok: false, reason: REASONS.badDate };
+  if (sunsetPrevious !== null && !isCalendarDay(sunsetPrevious)) return { ok: false, ...REQUEST_REFUSALS.invalidDate };
 
   const at = await now();
   const result = await transact<{ wentLive: boolean; number: number }>(async (tx) => {
@@ -495,7 +485,7 @@ export async function approveVersion(input: {
       templateName: version.name,
       decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
 
     // The previous Active steps down before this one steps up (the one-Active index).
     if (outcome.previous) {
@@ -504,7 +494,7 @@ export async function approveVersion(input: {
         .set({ ...outcome.previous.changes, rev: sql`${versions.rev} + 1`, updatedAt: at })
         .where(and(eq(versions.id, outcome.previous.id), eq(versions.state, "active")))
         .returning({ id: versions.id });
-      if (!superseded) refuse(REASONS.activeChanged);
+      if (!superseded) refuse(REQUEST_REFUSALS.activeChanged);
     }
 
     const { changes } = outcome;
@@ -551,9 +541,9 @@ export async function setSunset(input: {
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
   const refused = check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
   const sunsetDay = parsed.data.sunsetAt;
-  if (!isCalendarDay(sunsetDay)) return { ok: false, reason: REASONS.badDate };
+  if (!isCalendarDay(sunsetDay)) return { ok: false, ...REQUEST_REFUSALS.invalidDate };
 
   const at = await now();
   let wrote = false;
@@ -574,7 +564,7 @@ export async function setSunset(input: {
       templateName: version.name,
       contractChanges: active?.contractChanges ?? null,
     });
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
 
     await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded);
     await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
@@ -601,8 +591,8 @@ export async function startRevoke(input: {
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
   const refused = check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
-  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, reason: REASONS.reasonTooLong };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
+  if (parsed.data.reason.trim().length > REASON_MAX) return { ok: false, ...REQUEST_REFUSALS.reasonTooLong(REASON_MAX) };
 
   return revokeStep(viewer, found, parsed.data.versionNumber, (version, at) =>
     startRevokeTransition({
@@ -626,7 +616,7 @@ export async function confirmRevoke(input: { templateId: string; versionNumber: 
     revokeStartedBy: found?.revoke && !found.revoke.confirmedAt ? found.revoke.startedBy : null,
   });
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
 
   return revokeStep(viewer, found, parsed.data.versionNumber, async (version, at, tx) => {
     const active = await activeVersion(tx, found.templateId);
@@ -652,7 +642,7 @@ export async function cancelRevoke(input: { templateId: string; versionNumber: n
   const found = parsed.success ? await findVersion(parsed.data.templateId, parsed.data.versionNumber) : undefined;
   const refused = check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
   if (refused) return refused;
-  if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
+  if (!parsed.success || !found) return { ok: false, ...REQUEST_REFUSALS.versionGone };
 
   return revokeStep(viewer, found, parsed.data.versionNumber, (version, at) =>
     cancelRevokeTransition({ version, actorId: viewer.userId, now: at }),
@@ -661,7 +651,7 @@ export async function cancelRevoke(input: { templateId: string; versionNumber: n
 
 type RevokeOutcome =
   | { ok: true; changes: Partial<Pick<typeof versions.$inferInsert, "state" | "revoke">>; effects: LifecycleEffect[] }
-  | { ok: false; reason: string };
+  | Refused;
 
 /** The three revoke steps share their transaction: read, transition, compare-and-set, effects. */
 async function revokeStep(
@@ -674,7 +664,7 @@ async function revokeStep(
   const result = await transact(async (tx) => {
     const version = await loadVersion(tx, found, number);
     const outcome = await transition(version, at, tx);
-    if (!outcome.ok) refuse(outcome.reason);
+    if (!outcome.ok) refuse(outcome);
     await updateVersion(tx, version, outcome.changes, at, REFUSALS.noRevokePending);
     await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
     return { ok: true };

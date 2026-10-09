@@ -117,7 +117,7 @@ describe("the page while Submit reads the summary", () => {
   });
 
   it("is editable again, with the reason at the button, when the summary can't be read", async () => {
-    server.summaryRoute.mockResolvedValueOnce({ ok: false, reason: "This version is already in review." });
+    server.summaryRoute.mockResolvedValueOnce({ ok: false, code: "already_in_review", reason: "This version is already in review." });
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
@@ -176,10 +176,10 @@ describe("submitting", () => {
   it("offers to refresh a summary the draft has moved past, reads it again, and submits the new rev", async () => {
     await click(submitButton());
     await tick();
-    server.submitVersion.mockResolvedValueOnce({ ok: false, reason: REFUSALS.summaryStale });
+    server.submitVersion.mockResolvedValueOnce({ ok: false, ...REFUSALS.summaryStale });
     await click(button(/^Submit v3$/)!);
     await tick();
-    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(REFUSALS.summaryStale);
+    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(REFUSALS.summaryStale.reason);
     expect(session.getInert()).toBe(true);
 
     server.summaryRoute.mockResolvedValueOnce({ ok: true, summary: summary({ rev: 6 }) });

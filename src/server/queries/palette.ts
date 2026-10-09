@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { PaletteResults, PaletteTemplateRow } from "@/domain/import-types";
 import { normalizePaletteQuery, PALETTE_QUERY_MAX, paletteTemplates } from "@/domain/palette";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { VersionState, Viewer } from "@/domain/types";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -22,11 +23,6 @@ const Input = z.object({
   template: z.string().min(1).max(64).nullable(),
 });
 
-const REASONS = {
-  invalid: "This search can't be run.",
-  space: "This team isn't available to you.",
-} as const;
-
 /** How many of the viewer's newest audit rows to read to find five distinct templates. */
 const RECENT_SCAN = 200;
 
@@ -40,9 +36,9 @@ export async function searchPalette(
   input: { space: string; q: string | null; template: string | null },
 ): Promise<ReadResult<PaletteResults>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REASONS.invalid);
+  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.invalidSearch);
   const { space, template: currentId } = parsed.data;
-  if (!canSeeSpace(viewer, space)) return refusal(404, REASONS.space);
+  if (!canSeeSpace(viewer, space)) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
 
   const query = normalizePaletteQuery(parsed.data.q ?? "");
   const [rows, recentIds] = await Promise.all([spaceTemplates(viewer, space), recentTemplateIds(viewer)]);

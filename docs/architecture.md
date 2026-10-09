@@ -88,7 +88,8 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row, notifications,
    consumer notices) with `writeEffects`. On success, `revalidatePath()` and `refresh()`.
 3. The transition (`setSunset` in [lifecycle.ts](../src/domain/lifecycle.ts)) decides; the action only writes. A
-   refusal is a value whose `reason` is the sentence the person reads.
+   refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
+   ([refusals.ts](../src/domain/refusals.ts)).
 
 The [server README](../src/server/README.md#anatomy-of-a-mutation) walks through it line by line, with the
 variations to avoid.

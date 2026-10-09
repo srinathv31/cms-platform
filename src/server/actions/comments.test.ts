@@ -183,14 +183,15 @@ describe("addComment", () => {
     as("jordan");
     expect(await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: "nope", body: "x" })).toEqual({
       ok: false,
+      code: "block_gone",
       reason: "That block isn't in this version any more.",
     });
     expect(
       await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "  " }),
-    ).toEqual({ ok: false, reason: "Write a comment first." });
+    ).toEqual({ ok: false, code: "comment_empty", reason: "Write a comment first." });
     expect(
       await addComment({ templateId: ids["balance-transfer"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "x" }),
-    ).toEqual({ ok: false, reason: REASONS.generic });
+    ).toEqual({ ok: false, ...REASONS.generic });
   });
 });
 
@@ -254,7 +255,7 @@ describe("which versions take comments", () => {
     const at = as("jordan");
     expect(
       await addComment({ templateId: ids["cash-back"]!, versionId: v2.id, blockId: blockAt(v2.body, 1), body: "Still right?" }),
-    ).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+    ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
     expect(await writtenAt(at)).toEqual(nothing);
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -271,7 +272,7 @@ describe("which versions take comments", () => {
       expect(
         await addComment({ templateId: ids[template]!, versionId: version.id, blockId: DOCUMENT_THREAD, body: "x" }),
         `${template} v${number}`,
-      ).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+      ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
       expect(await writtenAt(at)).toEqual(nothing);
     }
   });
@@ -288,9 +289,9 @@ describe("which versions take comments", () => {
     await db.insert(comments).values({ id: "cm_test_record", threadId: open, authorId: "jordan", body: "Noted.", createdAt: BASE });
     try {
       const at = as("maya");
-      expect(await reply({ threadId: open, body: "x" })).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
-      expect(await resolveThread({ threadId: open })).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
-      expect(await reopenThread({ threadId: resolved })).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+      expect(await reply({ threadId: open, body: "x" })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+      expect(await resolveThread({ threadId: open })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+      expect(await reopenThread({ threadId: resolved })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
       expect(await writtenAt(at)).toEqual(nothing);
       expect(await threadRow(open)).toMatchObject({ status: "open" });
       expect(await threadRow(resolved)).toMatchObject({ status: "resolved", resolvedBy: "jordan" });
@@ -307,7 +308,7 @@ describe("which versions take comments", () => {
       const at = as("jordan");
       expect(
         await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "Late." }),
-      ).toEqual({ ok: false, reason: COMMENT_REFUSALS.closed });
+      ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
       expect(await writtenAt(at)).toEqual(nothing);
     } finally {
       await db.update(versions).set({ state: "in_review" }).where(eq(versions.id, v3.id));
@@ -362,11 +363,11 @@ describe("a stage reviewer from another team", () => {
 
   it("can't reply to, resolve or reopen a thread begun in the open draft, and nothing is written", async () => {
     const at = as("naomi");
-    expect(await reply({ threadId: ON_DRAFT, body: "Seen." })).toEqual({ ok: false, reason: REASONS.generic });
-    expect(await resolveThread({ threadId: ON_DRAFT })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await reply({ threadId: ON_DRAFT, body: "Seen." })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await resolveThread({ threadId: ON_DRAFT })).toEqual({ ok: false, ...REASONS.generic });
     expect(await threadRow(ON_DRAFT)).toMatchObject({ status: "open", resolvedBy: null });
     await db.update(commentThreads).set({ status: "resolved", resolvedBy: "maya", resolvedAt: BASE }).where(eq(commentThreads.id, ON_DRAFT));
-    expect(await reopenThread({ threadId: ON_DRAFT })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await reopenThread({ threadId: ON_DRAFT })).toEqual({ ok: false, ...REASONS.generic });
     expect(await threadRow(ON_DRAFT)).toMatchObject({ status: "resolved", resolvedBy: "maya" });
     expect(await db.select().from(comments).where(eq(comments.threadId, ON_DRAFT))).toHaveLength(1);
     expect(await auditAt(at)).toEqual([]);
@@ -377,7 +378,7 @@ describe("a stage reviewer from another team", () => {
     const at = as("naomi");
     expect(
       await addComment({ templateId: ids["cash-back"]!, versionId: DRAFT, blockId: DOCUMENT_THREAD, body: "x" }),
-    ).toEqual({ ok: false, reason: REASONS.generic });
+    ).toEqual({ ok: false, ...REASONS.generic });
     expect(await auditAt(at)).toEqual([]);
   });
 
@@ -421,16 +422,16 @@ describe("who may comment", () => {
       const at = as(userId);
       expect(
         await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "x" }),
-      ).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await reply({ threadId: thread!.id, body: "x" })).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await resolveThread({ threadId: thread!.id })).toEqual({ ok: false, reason: REASONS.generic });
-      expect(await reopenThread({ threadId: thread!.id })).toEqual({ ok: false, reason: REASONS.generic });
+      ).toEqual({ ok: false, ...REASONS.generic });
+      expect(await reply({ threadId: thread!.id, body: "x" })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await resolveThread({ threadId: thread!.id })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await reopenThread({ threadId: thread!.id })).toEqual({ ok: false, ...REASONS.generic });
       expect(await auditAt(at)).toEqual([]);
     }
   });
 
   it("an unknown thread is refused like a forbidden one", async () => {
     as("jordan");
-    expect(await reply({ threadId: "th_missing", body: "x" })).toEqual({ ok: false, reason: REASONS.generic });
+    expect(await reply({ threadId: "th_missing", body: "x" })).toEqual({ ok: false, ...REASONS.generic });
   });
 });

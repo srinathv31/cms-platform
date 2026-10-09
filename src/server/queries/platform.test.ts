@@ -54,7 +54,7 @@ describe("platform read models", () => {
     const after = (await getChannelRulesSection()).rows.find((r) => r.contentTypeId === "ct_disclosure")!;
     expect(after.allowed).toEqual({ pdf: true, web: false, email: false });
     expect(after.can.toggle).toEqual({
-      pdf: { ok: false, reason: PLATFORM_REFUSALS.oneChannel },
+      pdf: { ok: false, ...PLATFORM_REFUSALS.oneChannel },
       web: { ok: true },
       email: { ok: true },
     });
