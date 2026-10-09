@@ -417,10 +417,11 @@ describe("revert to when the page opened", () => {
     const { session, save, content } = setup();
     session.save({ body: body("Edited") });
     const previous = session.revert()!;
+    const since = session.getEditGeneration();
     save.mockClear();
     content.mockClear();
 
-    session.restore(previous);
+    expect(session.restore(previous, since)).toBe(true);
     expect(save).toHaveBeenCalledWith({ body: body("Edited") });
     expect(content).toHaveBeenCalledWith({ body: body("Edited") }, { body: body("Edited"), channels: ["pdf"], name: "Card agreement" });
     expect(session.getCanRevert()).toBe(true);
@@ -433,6 +434,7 @@ describe("revert to when the page opened", () => {
     expect(session.getOwnedFields()).toBe("body,channels,name");
 
     const previous = session.replace({ body: body("v3"), channels: ["pdf", "email"] });
+    const since = session.getEditGeneration();
     expect(previous).toEqual({ body: body("Edited"), channels: ["pdf"] });
     expect(save).toHaveBeenCalledWith({ body: body("v3"), channels: ["pdf", "email"] });
     expect(content).toHaveBeenLastCalledWith(
@@ -442,11 +444,129 @@ describe("revert to when the page opened", () => {
     // Still a change since the page opened: the revert to it stays on offer.
     expect(session.getCanRevert()).toBe(true);
 
-    session.restore(previous!);
+    expect(session.restore(previous!, since)).toBe(true);
     expect(save).toHaveBeenLastCalledWith({ body: body("Edited"), channels: ["pdf"] });
 
     // A field nothing on screen can show isn't replaced.
     expect(session.replace({ sampleSets: [] })).toBeNull();
+  });
+
+  describe("undoing one safely", () => {
+    it("refuses once anything was edited since the revert, and leaves the newer edit in place", () => {
+      const { session, save, content } = setup();
+      session.save({ body: body("Before") });
+      const previous = session.revert()!;
+      const since = session.getEditGeneration();
+
+      session.save({ body: body("Typed after the revert") });
+      save.mockClear();
+      content.mockClear();
+
+      expect(session.canRestore(previous, since)).toBe(false);
+      expect(session.restore(previous, since)).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+      expect(content).not.toHaveBeenCalled();
+    });
+
+    it("refuses after an edit to another field too, and after a replace", () => {
+      const { session } = setup();
+      session.save({ body: body("Before") });
+      const previous = session.replace({ body: body("v3") })!;
+      const since = session.getEditGeneration();
+
+      session.save({ name: "Renamed" });
+      expect(session.restore(previous, since)).toBe(false);
+
+      const again = session.replace({ body: body("v3 again") })!;
+      const after = session.getEditGeneration();
+      session.replace({ channels: ["web"] });
+      expect(session.restore(again, after)).toBe(false);
+    });
+
+    it("refuses after a tab switch takes the content off screen, and saves nothing the hidden editor doesn't show", () => {
+      const session = createWorkspaceSession();
+      const save = vi.fn();
+      session.bind({ versionId: "v_1", rev: 0 });
+      session.attach(save);
+      const content = vi.fn();
+      const removeContent = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: content });
+      session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: vi.fn() });
+
+      session.save({ body: body("Edited") });
+      const previous = session.revert()!;
+      const since = session.getEditGeneration();
+      save.mockClear();
+      content.mockClear();
+
+      // Versions, Usage or Activity: Next keeps the Content page hidden, and its effects (the target) go.
+      removeContent();
+      expect(session.canRestore(previous, since)).toBe(false);
+      expect(session.restore(previous, since)).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+      expect(content).not.toHaveBeenCalled();
+    });
+
+    it("still undoes a name-only revert on another tab: the name field is in the header on every tab", () => {
+      const session = createWorkspaceSession();
+      const save = vi.fn();
+      session.bind({ versionId: "v_1", rev: 0 });
+      session.attach(save);
+      const removeContent = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
+      session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: vi.fn() });
+
+      session.save({ name: "Renamed" });
+      const previous = session.revert()!;
+      const since = session.getEditGeneration();
+      removeContent();
+
+      expect(session.restore(previous, since)).toBe(true);
+      expect(save).toHaveBeenLastCalledWith({ name: "Renamed" });
+    });
+
+    it("refuses once the page turns read-only or another draft is bound", () => {
+      const { session } = setup();
+      session.save({ body: body("Edited") });
+      const previous = session.revert()!;
+      const since = session.getEditGeneration();
+
+      session.bind(null);
+      expect(session.restore(previous, since)).toBe(false);
+      session.bind({ versionId: "v_2", rev: 0 });
+      expect(session.restore(previous, since)).toBe(false);
+    });
+
+    it("undoes only once", () => {
+      const { session } = setup();
+      session.save({ body: body("Edited") });
+      const previous = session.revert()!;
+      const since = session.getEditGeneration();
+      expect(session.restore(previous, since)).toBe(true);
+      expect(session.restore(previous, since)).toBe(false);
+    });
+
+    it("tells subscribers about every edit, so a toast can take its Undo away", () => {
+      const { session } = setup();
+      const listener = vi.fn();
+      session.subscribe(listener);
+      const before = session.getEditGeneration();
+
+      session.save({ body: body("One") });
+      session.save({ body: body("Two") });
+      expect(session.getEditGeneration()).toBe(before + 2);
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it("doesn't move for what isn't an edit: a save landing, the history, the rail, the preview", () => {
+      const { session } = setup();
+      const before = session.getEditGeneration();
+      session.publishStatus({ status: "saving" });
+      session.publishStatus({ status: "saved" });
+      session.setHistory({ canUndo: true, canRedo: false, undo: vi.fn(), redo: vi.fn() });
+      session.setRailOpen(true);
+      session.openPreview();
+      session.bind({ versionId: "v_1", rev: 7 });
+      expect(session.getEditGeneration()).toBe(before);
+    });
   });
 
   it("starts over for a new version, and stops offering once the page's part is gone", () => {

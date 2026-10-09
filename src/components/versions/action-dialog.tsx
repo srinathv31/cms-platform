@@ -24,8 +24,8 @@ import type { ActionResult } from "@/domain/review-types";
 
 export const GENERIC_FAILURE = "Something went wrong. Try again.";
 
-/** Runs a server action, turning a thrown error into the one generic message. */
-export async function runAction(action: () => Promise<ActionResult>): Promise<ActionResult> {
+/** Runs a server action, turning a thrown error into the one generic message. A successful result keeps what it carries. */
+export async function runAction<T = Record<never, never>>(action: () => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
   try {
     return await action();
   } catch {

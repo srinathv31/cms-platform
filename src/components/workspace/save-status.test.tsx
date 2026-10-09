@@ -3,6 +3,8 @@ import { act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { BaseVersionContent } from "@/server/queries/base-version";
+import type { SaveFields } from "./autosave/autosave-scheduler";
 import type { WorkspaceSession } from "./session/session-store";
 
 // The draft's undo and redo buttons hold their place from the first paint: the server renders both,
@@ -12,9 +14,16 @@ import type { WorkspaceSession } from "./session/session-store";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/server/queries/base-version", () => ({ getBaseVersion: vi.fn() }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(() => "revert-toast"), { error: vi.fn(), dismiss: vi.fn() }) }));
+// The session's autosave host, without the network: what it is handed is the session's business.
+const autosave = vi.hoisted(() => ({ save: () => {}, flush: async () => {} }));
+vi.mock("./autosave/use-draft-autosave", () => ({ useDraftAutosave: () => ({ ...autosave, status: "saved" }) }));
 
 const { SaveStatus } = await import("./save-status");
 const { WorkspaceSessionProvider, useWorkspaceSession } = await import("./session/workspace-session");
+const { getBaseVersion } = await import("@/server/queries/base-version");
+const { toast } = await import("sonner");
+const { GENERIC_FAILURE } = await import("@/components/versions/action-dialog");
 
 let session: WorkspaceSession | null;
 
@@ -93,5 +102,177 @@ describe("SaveStatus, in the browser", () => {
     expect(layout(container)).toEqual(["Undo", "Redo", "Saved"]);
     await act(async () => session!.setHistory(null));
     expect(layout(container)).toEqual(["Undo (greyed)", "Redo (greyed)", "Saved"]);
+  });
+});
+
+// "Revert to v1" reads the version from the server: one read at a time, the menu greyed out with
+// "Reverting…" meanwhile, a failure in a toast, and an Undo in the success toast that goes as soon as
+// anything else is edited, so it can never put the old content over a newer edit.
+describe("Revert to v1", () => {
+  const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+  const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
+  const V1: BaseVersionContent = { number: 1, body: doc("Version 1"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
+
+  let root: Root;
+  let container: HTMLElement;
+  /** What the Content page would show: the session hands it new values to put on screen. */
+  const content = vi.fn();
+  let removeContent: () => void;
+
+  const sleep = (ms: number) => act(async () => void (await new Promise((resolve) => setTimeout(resolve, ms))));
+  async function until(check: () => unknown) {
+    for (let i = 0; i < 40; i++) {
+      if (check()) return;
+      await sleep(25);
+    }
+    throw new Error("timed out waiting for the UI");
+  }
+  async function click(el: Element) {
+    await act(async () => {
+      const init = { bubbles: true, cancelable: true, button: 0 };
+      el.dispatchEvent(new PointerEvent("pointerdown", { ...init, pointerType: "mouse" }));
+      el.dispatchEvent(new MouseEvent("mousedown", init));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...init, pointerType: "mouse" }));
+      el.dispatchEvent(new MouseEvent("mouseup", init));
+      el.dispatchEvent(new MouseEvent("click", init));
+    });
+  }
+  const trigger = () => container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+  const menu = () => document.querySelector('[role="menu"]');
+  const item = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes("Revert to v1"))!;
+  /** The item's lines a sighted person reads (a line kept only to hold the menu's width is invisible). */
+  const visibleText = (el: HTMLElement) =>
+    [...el.querySelectorAll<HTMLElement>("span")].filter((s) => !s.children.length && !s.closest(".invisible")).map((s) => s.textContent);
+
+  async function openMenu() {
+    await click(trigger());
+    await until(menu);
+  }
+
+  /** The success toast's Undo, as sonner was handed it. */
+  function undoToast() {
+    const call = vi.mocked(toast).mock.calls.find(([message]) => message === "Reverted to v1");
+    if (!call) throw new Error("no revert toast");
+    const { onClick } = call[1]!.action as { onClick: (event: React.MouseEvent<HTMLButtonElement>) => void };
+    return { undo: () => act(async () => onClick(new MouseEvent("click") as unknown as React.MouseEvent<HTMLButtonElement>)) };
+  }
+
+  beforeEach(async () => {
+    session = null;
+    vi.mocked(getBaseVersion).mockReset();
+    vi.mocked(toast).mockClear();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.dismiss).mockClear();
+    content.mockClear();
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root.render(page()));
+    // The Content page, editable: it binds the draft and can show the version's fields.
+    await act(async () => {
+      session!.bind({ versionId: "v_draft", rev: 4 });
+      removeContent = session!.addRestoreTarget({ opening: OPENING, restore: content });
+    });
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    document.body.innerHTML = "";
+  });
+
+  it("reads the base of the draft on screen, by its version id", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+    expect(getBaseVersion).toHaveBeenCalledWith({ templateId: "UC-ABC123", versionId: "v_draft" });
+    expect(content).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith("Reverted to v1", expect.objectContaining({ duration: 10_000 }));
+  });
+
+  it("while the version loads, greys the item out with Reverting… and doesn't start a second revert", async () => {
+    let answer: (value: Awaited<ReturnType<typeof getBaseVersion>>) => void = () => {};
+    vi.mocked(getBaseVersion).mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    await openMenu();
+    await click(item());
+
+    // The menu stays open while it loads, so the state shows at the control.
+    expect(menu()).not.toBeNull();
+    expect(item().hasAttribute("data-disabled")).toBe(true);
+    expect(item().getAttribute("aria-busy")).toBe("true");
+    expect(visibleText(item())).toEqual(["Revert to v1", "Reverting…"]);
+
+    await click(item());
+    await click(item());
+    expect(getBaseVersion).toHaveBeenCalledTimes(1);
+
+    await act(async () => answer({ ok: true, base: V1 }));
+    await until(() => !menu());
+    expect(content).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.filter(([message]) => message === "Reverted to v1")).toHaveLength(1);
+  });
+
+  it("shows a failure in a toast when the read throws, and offers the item again", async () => {
+    vi.mocked(getBaseVersion).mockRejectedValue(new Error("network down"));
+    await openMenu();
+    await click(item());
+    await until(() => vi.mocked(toast.error).mock.calls.length > 0);
+    expect(toast.error).toHaveBeenCalledWith(GENERIC_FAILURE);
+    expect(content).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+
+    await until(() => !menu());
+    await openMenu();
+    expect(item().hasAttribute("data-disabled")).toBe(false);
+    expect(visibleText(item())).toEqual(["Revert to v1", "Where this draft started. It stays open."]);
+  });
+
+  it("shows the server's refusal in a toast", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: false, reason: "There is no draft to revert." });
+    await openMenu();
+    await click(item());
+    await until(() => vi.mocked(toast.error).mock.calls.length > 0);
+    expect(toast.error).toHaveBeenCalledWith("There is no draft to revert.");
+    expect(content).not.toHaveBeenCalled();
+  });
+
+  it("takes the Undo away as soon as anything is typed, and Undo then changes nothing", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+    const { undo } = undoToast();
+    expect(toast.dismiss).not.toHaveBeenCalled();
+
+    await act(async () => session!.save({ body: doc("Typed after the revert") }));
+    expect(toast.dismiss).toHaveBeenCalledWith("revert-toast");
+
+    content.mockClear();
+    await undo();
+    expect(content).not.toHaveBeenCalled();
+  });
+
+  it("takes the Undo away when the content leaves the screen (another tab)", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+
+    await act(async () => removeContent());
+    expect(toast.dismiss).toHaveBeenCalledWith("revert-toast");
+  });
+
+  it("puts the content back when Undo is pressed before anything else changed", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+    content.mockClear();
+
+    await undoToast().undo();
+    expect(content).toHaveBeenCalledTimes(1);
+    expect(content.mock.calls[0]![0]).toMatchObject({ body: doc("Opening") });
+    expect(toast.dismiss).not.toHaveBeenCalled();
   });
 });

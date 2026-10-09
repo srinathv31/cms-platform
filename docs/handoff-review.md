@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 12 | 31 | 13 | 56 |
+| Open | 0 | 11 | 30 | 13 | 54 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 10 | 4 | 1 | 16 |
+| Fixed | 1 | 11 | 5 | 1 | 18 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -335,7 +335,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I2 · High: The revert toast's Undo overwrites edits made after the revert
 
-- **Status:** Open
+- **Status:** Fixed. The session counts edits, `restore` refuses once anything was edited since the revert or a field it would put back is off screen, and the toast goes at that moment ([decision 0005](decisions/0005-revert-undo-goes-when-anything-changes.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 171; `src/components/workspace/session/session-store.ts` line 369
 - **What happens:** Undo stays live for the toast's lifetime and `restore(previous)` applies the pre-revert values unconditionally. Revert, type a paragraph, click Undo: the paragraph is gone, and the remount already wiped the editor's history. If the author switched tabs first, `restore` sends content the hidden editor doesn't show, and the next keystroke saves the reverted content over it. New in the undo/redo merge.
 - **Fix:** Track a save generation and make `restore` refuse (and dismiss the toast) when anything was edited since, or when not every field is on screen.
@@ -391,7 +391,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I9 · Medium: "Revert to vN" has no error handling or pending guard
 
-- **Status:** Open
+- **Status:** Fixed. It runs in a transition through `runAction` with the draft's version id, keeps the menu open with its items greyed out while it loads, and shows a failure in a toast.
 - **Where:** `src/components/workspace/save-status.tsx` line 174
 - **What happens:** A failed `getBaseVersion` call is an unhandled rejection with no feedback, and a double activation stacks two replaces and two Undo toasts. `getBaseVersion` also returns the base of whichever draft the template has, not the one on screen.
 - **Fix:** Use the transition plus `runAction` pattern, disable the item while pending, and pass the version id.

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition, type ComponentType, type ReactNode } from "react";
 import { ChevronDown, History, Redo2, RotateCcw, Undo2, type LucideProps } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,10 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { runAction } from "@/components/versions/action-dialog";
 import { formatRelative } from "@/components/versions/format";
 import { isApple } from "@/editor/lib/platform";
 import { getBaseVersion } from "@/server/queries/base-version";
+import type { SaveFields } from "./autosave/autosave-scheduler";
 import { SaveIndicator } from "./autosave/save-indicator";
+import type { WorkspaceSession } from "./session/session-store";
 import { useCanRevert, useHistoryControls, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
 
 /** What "Revert to v3" replaces: the draft's versioned content (the name lives on the template, so it stays). */
@@ -38,7 +42,8 @@ export interface SaveStatusProps {
  *     ready. They act where ⌘Z would: the field last typed in (the document until another has had focus).
  *   - The status itself opens a small menu when there is something to go back to: "Revert to when you
  *     opened it" once something has changed, and "Revert to v3" on a draft started from v3. Each
- *     toast has an Undo that puts the changes back.
+ *     toast has an Undo that puts the changes back, until anything else is edited or the content
+ *     leaves the screen: then the toast goes, so Undo never drops a newer edit.
  * Undo and redo come first, so nothing the status does moves them: it changes width as it saves, and
  * gains its menu's chevron once the Content tab is on screen. Before them, either would be a layout shift.
  */
@@ -143,9 +148,34 @@ function HistoryButton({
   );
 }
 
-/** Undo for a revert's toast, and focus somewhere sensible when the menu went away with the changes. */
-function announce(message: string, undo: () => void) {
-  toast(message, { action: { label: "Undo", onClick: undo }, duration: 10_000 });
+/**
+ * A revert's toast, with an Undo that puts the changes back, and focus somewhere sensible when the
+ * menu went away with the changes.
+ *
+ * Undo is offered only while it is safe (`session.canRestore`): the toast goes as soon as anything
+ * else is edited, or a field it would put back leaves the screen (another tab). Putting the old
+ * values back then would drop the newer edit, or save content the hidden tab doesn't show.
+ */
+function offerUndo(session: WorkspaceSession, message: string, previous: SaveFields) {
+  const since = session.getEditGeneration();
+  let stop = () => {};
+  const id = toast(message, {
+    action: {
+      label: "Undo",
+      onClick: () => {
+        stop();
+        session.restore(previous, since);
+      },
+    },
+    duration: 10_000,
+    onDismiss: () => stop(),
+    onAutoClose: () => stop(),
+  });
+  stop = session.subscribe(() => {
+    if (session.canRestore(previous, since)) return;
+    stop();
+    toast.dismiss(id);
+  });
   // Land on the status row, where the outcome reads, rather than the page.
   requestAnimationFrame(() => {
     const active = document.activeElement;
@@ -154,7 +184,12 @@ function announce(message: string, undo: () => void) {
   });
 }
 
-/** The status, as the trigger of a small menu: Revert to when you opened it, Revert to v3. */
+/**
+ * The status, as the trigger of a small menu: Revert to when you opened it, Revert to v3.
+ * "Revert to v3" reads the version from the server. While it does, the menu stays open with both
+ * items greyed out and "Reverting…" under the one pressed, so a second press can't start another; a
+ * failure shows in a toast.
+ */
 function RevertMenu({
   templateId,
   sinceOpened,
@@ -167,29 +202,45 @@ function RevertMenu({
   children: ReactNode;
 }) {
   const session = useWorkspaceSession();
+  const [open, setOpen] = useState(false);
   const [opened, setOpened] = useState("");
+  const [pending, start] = useTransition();
+  const reading = useRef(false);
 
   function revert() {
     const previous = session.revert();
-    if (previous) announce("Reverted to when you opened it", () => session.restore(previous));
+    if (previous) offerUndo(session, "Reverted to when you opened it", previous);
   }
 
-  async function revertToBase() {
-    // Only the base version is read from the server: what Undo puts back is what is on screen now.
-    const result = await getBaseVersion({ templateId });
-    if (!result.ok) {
-      toast.error(result.reason);
-      return;
-    }
-    const { number, ...fields } = result.base;
-    const previous = session.replace(fields);
-    if (previous) announce(`Reverted to v${number}`, () => session.restore(previous));
+  function revertToBase() {
+    // The base of the draft on screen, not of whichever draft the template has by the time this lands.
+    const versionId = session.getBinding()?.versionId;
+    if (reading.current || !versionId) return;
+    reading.current = true;
+    start(async () => {
+      try {
+        const result = await runAction(() => getBaseVersion({ templateId, versionId }));
+        setOpen(false);
+        if (!result.ok) {
+          toast.error(result.reason);
+          return;
+        }
+        // Only the base version is read from the server: what Undo puts back is what is on screen now.
+        const { number, ...fields } = result.base;
+        const previous = session.replace(fields);
+        if (previous) offerUndo(session, `Reverted to v${number}`, previous);
+      } finally {
+        reading.current = false;
+      }
+    });
   }
 
   return (
     <DropdownMenu
-      onOpenChange={(open) => {
-        if (open) setOpened(formatRelative(new Date(session.getOpenedAt()).toISOString(), new Date()));
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setOpened(formatRelative(new Date(session.getOpenedAt()).toISOString(), new Date()));
+        setOpen(next);
       }}
     >
       <DropdownMenuTrigger
@@ -205,7 +256,7 @@ function RevertMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-auto min-w-64">
         {sinceOpened ? (
-          <DropdownMenuItem onClick={revert} className="items-start gap-2.5 px-2 py-1.5">
+          <DropdownMenuItem onClick={revert} disabled={pending} className="items-start gap-2.5 px-2 py-1.5">
             <RotateCcw aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
               <span className="text-[14px] leading-5">Revert to when you opened it</span>
@@ -215,12 +266,23 @@ function RevertMenu({
         ) : null}
         {sinceOpened && base ? <DropdownMenuSeparator /> : null}
         {base ? (
-          <DropdownMenuItem onClick={() => void revertToBase()} className="items-start gap-2.5 px-2 py-1.5">
+          <DropdownMenuItem
+            onClick={revertToBase}
+            // It closes once the version has arrived (or failed), so its greyed "Reverting…" shows meanwhile.
+            closeOnClick={false}
+            disabled={pending}
+            aria-busy={pending || undefined}
+            className="items-start gap-2.5 px-2 py-1.5"
+          >
             <History aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
               <span className="text-[14px] leading-5">Revert to v{base.number}</span>
-              <span className="text-[12px] leading-4 text-text-muted">
-                {base.active ? "The Active version. The draft stays open." : "Where this draft started. It stays open."}
+              {/* Both lines hold the cell, so the menu keeps its width as one replaces the other. */}
+              <span className="grid text-[12px] leading-4 text-text-muted">
+                <span className={cn("col-start-1 row-start-1", pending && "invisible")}>
+                  {base.active ? "The Active version. The draft stays open." : "Where this draft started. It stays open."}
+                </span>
+                <span className={cn("col-start-1 row-start-1", !pending && "invisible")}>Reverting…</span>
               </span>
             </span>
           </DropdownMenuItem>
