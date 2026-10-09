@@ -292,7 +292,8 @@ const LEGAL = { name: "Legal reviewer", rule: { kind: "user" as const, userId: "
 
 /**
  * Everyone a chain test may name. Riley is the Platform Admin saving; Alex, Dana and Jordan hold active
- * team roles; Taylor is the Auditor; Morgan has no active access; Pat is a Platform Admin with no team role.
+ * team roles; Taylor is the Auditor; Morgan has no active access; Pat is a Platform Admin with no team
+ * role; Casey is a Platform Admin who also holds a team role, so another admin may name them.
  */
 const approvers: ApproverFacts[] = [
   { ...riley, platformRole: "platform_admin", activeTeamRole: false },
@@ -302,12 +303,16 @@ const approvers: ApproverFacts[] = [
   { id: "taylor", name: "Taylor Nguyen", platformRole: "auditor", activeTeamRole: false },
   { id: "morgan", name: "Morgan Lee", platformRole: null, activeTeamRole: false },
   { id: "pat", name: "Pat Admin", platformRole: "platform_admin", activeTeamRole: false },
+  { id: "casey", name: "Casey Admin", platformRole: "platform_admin", activeTeamRole: true },
 ];
 const naming = (userId: string, name = "Sign-off") => ({ name, rule: { kind: "user" as const, userId } });
 
 describe("validateChain", () => {
-  const check = (stages: { name: string; rule: ApproverRule }[], actorId = "riley") =>
-    validateChain({ stages, actorId, people: approvers });
+  const check = (
+    stages: { id?: string; name: string; rule: ApproverRule }[],
+    actorId = "riley",
+    current: { id: string; rule: ApproverRule }[] = [],
+  ) => validateChain({ stages, current, actorId, people: approvers });
   const team = { name: "Team approver", rule: TEAM.rule };
 
   it("passes a chain somebody can approve: the Approver role, then different people", () => {
@@ -343,6 +348,38 @@ describe("validateChain", () => {
     ]);
   });
 
+  describe("naming yourself is about the act: Casey, named on stage 1 by Riley, saves the chain", () => {
+    const saved = [
+      { id: "stage_casey", rule: { kind: "user" as const, userId: "casey" } },
+      { id: "stage_team", rule: TEAM.rule },
+    ];
+    const caseyStage = { id: "stage_casey", name: "Admin sign-off", rule: saved[0]!.rule };
+
+    it("can rename stage 2 and save: the stage Riley named them on stays theirs", () => {
+      expect(check([caseyStage, { id: "stage_team", name: "Team sign-off", rule: TEAM.rule }], "casey", saved)).toEqual([]);
+      expect(check([{ id: "stage_team", ...team }, caseyStage], "casey", saved)).toEqual([]); // moved, same stage id
+    });
+
+    it("can't newly name themselves on another stage", () => {
+      expect(check([caseyStage, { id: "stage_team", ...team }, naming("casey", "Final sign-off")], "casey", saved)).toEqual([
+        { stage: 2, field: "reviewer", reason: "You can't name yourself as an approver." },
+      ]);
+    });
+
+    it("can't swap a stage's reviewer to themselves after someone else held it", () => {
+      expect(check([{ id: "stage_team", ...naming("casey", "Team approver") }], "casey", saved)).toEqual([
+        { stage: 0, field: "reviewer", reason: "You can't name yourself as an approver." },
+      ]);
+    });
+
+    it("still can't keep a stage that would stall: the other checks apply to stages the actor kept", () => {
+      const lapsed = [{ id: "stage_casey", rule: { kind: "user" as const, userId: "pat" } }];
+      expect(check([{ id: "stage_casey", ...naming("pat") }], "pat", lapsed)).toEqual([
+        { stage: 0, field: "reviewer", reason: "Pat Admin is a Platform Admin with no team role and can't approve." },
+      ]);
+    });
+  });
+
   it("refuses an Auditor", () => {
     expect(check([team, naming("taylor")])).toEqual([{ stage: 1, field: "reviewer", reason: "Taylor Nguyen is an Auditor and can't approve." }]);
   });
@@ -367,7 +404,8 @@ describe("validateChain", () => {
   });
 
   it("offers in the picker only the people approverProblem allows", () => {
-    expect(approvers.filter((p) => !approverProblem(p, "riley")).map((p) => p.id)).toEqual(["alex", "dana", "jordan"]);
+    expect(approvers.filter((p) => !approverProblem(p, "riley")).map((p) => p.id)).toEqual(["alex", "dana", "jordan", "casey"]);
+    expect(approvers.filter((p) => !approverProblem(p, "casey")).map((p) => p.id)).toEqual(["alex", "dana", "jordan"]);
   });
 });
 
@@ -483,6 +521,18 @@ describe("saveApprovalChain", () => {
     expect(run({ next: [team, naming("riley")] })).toEqual({ ok: false, reason: PLATFORM_REFUSALS.nameYourself });
     expect(run({ next: [team, naming("taylor")] })).toEqual({ ok: false, reason: "Taylor Nguyen is an Auditor and can't approve." });
     expect(run({ next: [team, naming("morgan")] })).toEqual({ ok: false, reason: "Morgan Lee has no active access." });
+  });
+
+  it("lets an admin save a chain another admin named them on, but not swap a stage to themselves", () => {
+    const casey = { id: "casey", name: "Casey Admin" };
+    const caseyStage = { id: "stage_casey", position: 1, name: "Admin sign-off", rule: { kind: "user" as const, userId: "casey" } };
+    const current = [TEAM, caseyStage];
+    const kept = { id: "stage_casey", name: caseyStage.name, rule: caseyStage.rule };
+    expect(run({ actor: casey, current, next: [{ id: "stage_team", name: "Team sign-off", rule: TEAM.rule }, kept] }).ok).toBe(true);
+    expect(run({ actor: casey, current, next: [{ id: "stage_team", name: "Team approver", rule: caseyStage.rule }, kept] })).toEqual({
+      ok: false,
+      reason: PLATFORM_REFUSALS.nameYourself,
+    });
   });
 
   it("refuses re-saving a stage whose person has lost access since they were named", () => {

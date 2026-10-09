@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { PlatformActions } from "@/domain/access-types";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
-import { PLATFORM_REFUSALS } from "@/domain/platform-config";
+import { PLATFORM_REFUSALS, validateChain } from "@/domain/platform-config";
 import type { ApproverRule, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -380,6 +380,54 @@ describe("saveApprovalChain", () => {
       expect((await getApprovalChainsSection()).people.some((p) => p.id === "pat")).toBe(false);
     } finally {
       await db.delete(schema.users).where(eq(schema.users.id, "pat"));
+    }
+  });
+
+  it("an admin another admin named on a stage can still save the chain, but never names themselves", async () => {
+    // Casey: a second Platform Admin who is also an Approver on Deposits, so a stage may name them.
+    await db.insert(schema.users).values({ id: "casey", name: "Casey Admin", email: "casey@example.test", initials: "CA", avatarHue: 20, title: "", platformRole: "platform_admin" });
+    await db.insert(memberships).values({ id: "m_casey", userId: "casey", teamId: "deposits", status: "active", addedAt: BASE });
+    await db.insert(membershipRoles).values({ membershipId: "m_casey", role: "approver" });
+    people.casey = await loadPersona(db, "casey");
+    const legal = (await chain()).find((s) => s.name === "Legal reviewer")!;
+    const team = { id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE };
+    const legalStage = { id: legal.id, ...LEGAL };
+    const casey: ApproverRule = { kind: "user", userId: "casey" };
+    try {
+      as("riley");
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, legalStage, { name: "Admin sign-off", rule: casey }] })).toEqual({ ok: true });
+      const caseyStage = { id: (await chain())[2]!.id, name: "Admin sign-off", rule: casey };
+
+      // Casey renames another stage and saves: the stage Riley named them on stays theirs.
+      as("casey");
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ ...team, name: "Team sign-off" }, legalStage, caseyStage] })).toEqual({ ok: true });
+      expect((await chain()).map((s) => s.name)).toEqual(["Team sign-off", "Legal reviewer", "Admin sign-off"]);
+      // The editor agrees from its read model: Casey isn't offered, but their own stage raises nothing.
+      const section = await getApprovalChainsSection();
+      const saved = section.chains.find((c) => c.contentTypeId === CT)!.stages;
+      expect(section.people.some((p) => p.id === "casey")).toBe(false);
+      expect(validateChain({ stages: saved, current: saved, actorId: section.viewerId, people: section.approvers })).toEqual([]);
+
+      // Casey can't newly name themselves on another stage, or swap a stage someone else held to themselves.
+      const before = await chain();
+      const at = as("casey");
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, legalStage, caseyStage, { name: "Final sign-off", rule: casey }] })).toEqual({
+        ok: false,
+        reason: PLATFORM_REFUSALS.nameYourself,
+      });
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, { ...legalStage, rule: casey }] })).toEqual({
+        ok: false,
+        reason: PLATFORM_REFUSALS.nameYourself,
+      });
+      expect(await chain()).toEqual(before);
+      expect(await auditAt(at)).toEqual([]);
+    } finally {
+      as("riley");
+      expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, legalStage] })).toEqual({ ok: true });
+      await db.delete(auditEvents).where(eq(auditEvents.actorId, "casey"));
+      await db.delete(membershipRoles).where(eq(membershipRoles.membershipId, "m_casey"));
+      await db.delete(memberships).where(eq(memberships.id, "m_casey"));
+      await db.delete(schema.users).where(eq(schema.users.id, "casey"));
     }
   });
 

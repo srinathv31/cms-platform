@@ -458,7 +458,6 @@ export interface ApprovalChainsSection {
   approvers: ApproverFacts[];
   /** The Platform Admin editing: nobody names themselves. */
   viewerId: string;
-  roles: readonly TeamRole[];
 }
 
 // ── Audit page — /{team}/audit ───────────────────────────────────────────────
@@ -649,7 +648,8 @@ export interface PlatformConfigDomain {
 
   /**
    * At least one stage, and every stage passes `validateChain`: names 1–40 chars, unique; the Approver
-   * role or a person who can approve, never the actor, never on two stages. A stage some in-review
+   * role or a person who can approve, never on two stages, and never the actor naming themselves (a
+   * stage that already named them stays theirs). A stage some in-review
    * version waits on can't be removed ("2 versions are waiting on Legal reviewer."). In-review
    * versions keep waiting on the same stage (by id) wherever it moves: `moves` remaps currentStage.
    */

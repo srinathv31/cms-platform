@@ -13,7 +13,7 @@
 //   - A channel turned off stops rendering at once, Active versions included: the consequence names
 //     how many. At least one channel stays on.
 //   - Approval chains: every stage must be one somebody can approve (`validateChain`): the Approver
-//     role, or a person who can approve, isn't the admin saving it, and isn't on another stage.
+//     role, or a person who can approve and isn't on another stage. Nobody names themselves.
 //     In-review versions keep waiting on the same stage (by id) wherever it moves. A stage some
 //     version waits on can't be removed.
 
@@ -463,14 +463,12 @@ export interface StageProblem {
 }
 
 /**
- * Why `person` can't be named on a stage by `actorId`, or null. A named stage gives its person the
- * power to decide only while they hold an active team role somewhere, and never an Auditor
- * (permissions.ts, `namedApprover`); a platform role alone is no approve power. Nobody names
- * themselves: a Platform Admin would be granting themselves approval. The chain picker offers only the
- * people this returns null for.
+ * Why a stage naming `person` would stall, or null: a named stage gives its person the power to
+ * decide only while they hold an active team role somewhere, and never an Auditor (permissions.ts,
+ * `namedApprover`); a platform role alone is no approve power. It holds whoever named them and
+ * whenever, so `validateChain` checks it for every named person on every save.
  */
-export function approverProblem(person: ApproverFacts, actorId: string): string | null {
-  if (person.id === actorId) return PLATFORM_REFUSALS.nameYourself;
+export function cannotApprove(person: ApproverFacts): string | null {
   if (person.platformRole === "auditor") return PLATFORM_REFUSALS.auditorCantApprove(person.name);
   if (!person.activeTeamRole) {
     return person.platformRole === "platform_admin"
@@ -481,23 +479,41 @@ export function approverProblem(person: ApproverFacts, actorId: string): string 
 }
 
 /**
+ * Why `actorId` can't newly name `person` on a stage (a new stage, or a stage whose reviewer changes
+ * to them), or null: `cannotApprove`, and nobody names themselves, since a Platform Admin would be
+ * granting themselves approval. The rule is about the act of naming: a stage another admin already
+ * named the actor on stays theirs when the actor saves the chain. The chain picker offers only the
+ * people this returns null for.
+ */
+export function approverProblem(person: ApproverFacts, actorId: string): string | null {
+  if (person.id === actorId) return PLATFORM_REFUSALS.nameYourself;
+  return cannotApprove(person);
+}
+
+/**
  * Everything that would stop a chain being saved or, once saved, stall every submission, tied to the
  * stage it's about. Names: blank, too long, or the same as an earlier stage's. Reviewers: a team role
- * other than Approver (no other role can decide); a person who doesn't exist, can't be named
- * (`approverProblem`), or is already named on an earlier stage (nobody approves two stages of one
- * round). Every named person is checked, not only new ones: someone named earlier who has since lost
- * access stalls the chain too. In stage order, name before reviewer; empty when the chain is fine.
- * The chain editor runs it as the admin edits, with the facts its read model carries; the server
- * runs it again inside `saveApprovalChain`.
+ * other than Approver (no other role can decide); a person who doesn't exist, can't approve
+ * (`cannotApprove`), or is already named on an earlier stage (nobody approves two stages of one
+ * round); the actor naming themselves on a stage that didn't already name them (`current`, matched by
+ * stage id). Every named person is checked, not only new ones: someone named earlier who has since
+ * lost access stalls the chain too. In stage order, name before reviewer; empty when the chain is
+ * fine. The chain editor runs it as the admin edits, with the facts its read model carries; the
+ * server runs it again inside `saveApprovalChain`.
  */
 export function validateChain(input: {
-  stages: readonly { name: string; rule: ApproverRule }[];
+  stages: readonly { id?: string; name: string; rule: ApproverRule }[];
+  /** The saved chain: a stage (by id) that already names the actor stays theirs. */
+  current: readonly { id: string; rule: ApproverRule }[];
   actorId: string;
   people: readonly ApproverFacts[];
 }): StageProblem[] {
   const problems: StageProblem[] = [];
   const names = new Set<string>();
   const namedOn = new Map<string, number>();
+  const actorsStages = new Set(
+    input.current.flatMap((s) => (s.rule.kind === "user" && s.rule.userId === input.actorId ? [s.id] : [])),
+  );
   input.stages.forEach((stage, index) => {
     const name = stage.name.trim();
     const key = name.toLowerCase();
@@ -511,7 +527,8 @@ export function validateChain(input: {
     if (name) names.add(key);
     if (nameReason) problems.push({ stage: index, field: "name", reason: nameReason });
 
-    const reviewerReason = reviewerProblem(stage.rule, input.actorId, input.people, namedOn, index);
+    const keptByActor = stage.id !== undefined && actorsStages.has(stage.id);
+    const reviewerReason = reviewerProblem(stage.rule, input, keptByActor, namedOn, index);
     if (reviewerReason) problems.push({ stage: index, field: "reviewer", reason: reviewerReason });
   });
   return problems;
@@ -519,8 +536,8 @@ export function validateChain(input: {
 
 function reviewerProblem(
   rule: ApproverRule,
-  actorId: string,
-  people: readonly ApproverFacts[],
+  { actorId, people }: { actorId: string; people: readonly ApproverFacts[] },
+  keptByActor: boolean,
   namedOn: Map<string, number>,
   index: number,
 ): string | null {
@@ -530,7 +547,8 @@ function reviewerProblem(
   }
   const person = people.find((p) => p.id === rule.userId);
   if (!person) return PLATFORM_REFUSALS.pickPerson;
-  const cannot = approverProblem(person, actorId);
+  // A stage that already named the actor stays theirs; every other naming of them is them naming themselves.
+  const cannot = keptByActor ? cannotApprove(person) : approverProblem(person, actorId);
   if (cannot) return cannot;
   const earlier = namedOn.get(person.id);
   if (earlier !== undefined) return PLATFORM_REFUSALS.personTwice(person.name, earlier + 1);
@@ -569,7 +587,7 @@ export function saveApprovalChain(input: {
     if (s.id !== undefined && (!currentIds.has(s.id) || ids.has(s.id))) return refuse(PLATFORM_REFUSALS.stageGone);
     if (s.id) ids.add(s.id);
   }
-  const problem = validateChain({ stages: input.next, actorId: input.actor.id, people })[0];
+  const problem = validateChain({ stages: input.next, current, actorId: input.actor.id, people })[0];
   if (problem) return refuse(problem.reason);
 
   // Which stage each version waits on (a stage index past the end reads as the last, as on screen).

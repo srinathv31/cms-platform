@@ -90,7 +90,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
     waiting,
   });
 
-  const problems = validateChain({ stages: rows, actorId: section.viewerId, people: approvers });
+  const problems = validateChain({ stages: rows, current: chain.stages, actorId: section.viewerId, people: approvers });
   const problemAt = (index: number, field: StageProblem["field"]) =>
     problems.find((p) => p.stage === index && p.field === field)?.reason ?? null;
   const blocked = problems.length > 0;

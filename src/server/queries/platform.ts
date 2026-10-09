@@ -12,7 +12,7 @@ import type {
 } from "@/domain/access-types";
 import { can } from "@/domain/permissions";
 import { approverProblem, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
-import { CHANNELS, TEAM_ROLES, type Channel } from "@/domain/types";
+import { CHANNELS, type Channel } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -33,7 +33,8 @@ import { getPeople, iso, personOf } from "./review-shared";
 //   - a channel turned off: `channelOffConsequences(row.name, channel, row.activeUsing[channel])`;
 //   - a chain edit: `describeChainChange({ contentTypeName, current: chain.stages, next, people,
 //     waiting })`, the "Now / After" cards and the lines under them, and `validateChain({ stages,
-//     actorId: viewerId, people: approvers })`, the reason at each stage that can't be saved.
+//     current: chain.stages, actorId: viewerId, people: approvers })`, the reason at each stage that
+//     can't be saved.
 
 /** Platform Admin only; anyone else gets a 404 (the Platform group isn't shown to them). */
 async function requireManage() {
@@ -209,6 +210,5 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
     people: choices.sort(byName),
     approvers: facts.filter((f) => relevant.has(f.id)),
     viewerId: viewer.userId,
-    roles: TEAM_ROLES,
   };
 });

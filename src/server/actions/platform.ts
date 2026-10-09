@@ -273,9 +273,9 @@ async function approverFacts(tx: Tx): Promise<ApproverFacts[]> {
 
 /**
  * Saves the whole chain, in order. Every stage must pass the domain's `validateChain`, which the chain
- * editor also runs as the admin edits: the Approver role or a person who can approve, never the admin
- * saving it, never one person on two stages. Every named person is checked, including people named
- * before who have since lost access. Existing stages keep their id; versions in review keep waiting on
+ * editor also runs as the admin edits: the Approver role or a person who can approve, never one person
+ * on two stages, and never the admin naming themselves (a stage another admin named them on stays
+ * theirs). Every named person is checked, including people named before who have since lost access. Existing stages keep their id; versions in review keep waiting on
  * the same stage wherever it moves (their currentStage is remapped, compare-and-set). Removing a stage
  * a version waits on is refused.
  */
