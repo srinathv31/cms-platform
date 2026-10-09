@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 14 | 31 | 13 | 58 |
+| Open | 0 | 13 | 31 | 13 | 57 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 8 | 4 | 1 | 14 |
+| Fixed | 1 | 9 | 4 | 1 | 15 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -655,7 +655,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T1 · High: main fails e2e: the undo/redo merge added a layout shift
 
-- **Status:** Open
+- **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
 - **Where:** `src/components/workspace/save-status.tsx` line 51; `e2e/principles.spec.ts` line 271
 - **What happens:** 4 of 241 Playwright tests fail on the project's own zero-layout-shift check, all on the template workspace and its dialogs. Each reports a 0.000004 shift at about 400 ms from the `span.inline-flex.items-center.gap-1.5` that wraps the save status and the new undo/redo buttons.
 - **Fix:** Reserve the undo/redo buttons' space from the first paint, or render them disabled until history is ready (the "disabled, not hidden" rule).
