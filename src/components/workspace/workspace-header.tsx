@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/server/clock";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { NameField } from "./name-field";
-import { SaveStatus } from "./save-status";
+import { SaveStatus, SaveStopped } from "./save-status";
+import { BindDraft } from "./session/workspace-session";
 import { WS } from "./workspace-grid";
 import { WorkspaceShare } from "./workspace-share";
 
@@ -15,11 +16,12 @@ import { WorkspaceShare } from "./workspace-share";
 //
 //   name ......................................  ┐
 //   status row .............   TEMPLATE ID       │ SHARE ring (Active only), 76px, spans both rows
+//   why saving stopped, and Reload (only then) ..........
 //
 // The ID sits on the status row's line, as in the layout study, rather than beside the name, so a long
 // name keeps nearly the whole width (the ring's column is the only thing it gives up) and wraps to a
 // second line only when it must. Draft and Active are the same height: the ring is shorter than the
-// two rows, and a wrapped name is the only thing that makes the header grow.
+// two rows, and only a wrapped name, or saving stopping for good (its third line), makes the header grow.
 const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
 
 /**
@@ -27,6 +29,9 @@ const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
  * The badge carries the state, so the label beside it never repeats it:
  *   Draft   [Draft] Based on v2 · Saved      Active  [Active] v2      Viewer  [Active] v3 [View only]
  * A draft with nothing earlier to be based on reads [Draft] Saved.
+ *
+ * It is in the layout, on every tab, so it binds the workspace's autosave session to the draft it
+ * shows (`BindDraft`): the name field saves wherever the author renames, and the status says so.
  */
 export async function WorkspaceHeader({
   params,
@@ -39,6 +44,7 @@ export async function WorkspaceHeader({
 
   return (
     <header className={cn(WS.header, HEADER)}>
+      <BindDraft draft={t.draft} />
       <div className="col-span-2 col-start-1 row-start-1 min-w-0">
         <NameField name={t.name} editable={t.editable} />
       </div>
@@ -71,6 +77,8 @@ export async function WorkspaceHeader({
       </div>
       {/* The value row sits on the status row's line. */}
       <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
+      {/* Saving stopped for good: a line of its own, the header's full width. */}
+      {t.editable ? <SaveStopped className="col-span-3 col-start-1 row-start-3" /> : null}
       {t.activeNumber !== null ? (
         // The SHARE signature: Active versions only. It shows what consumers get, so the Active version's name.
         <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start">

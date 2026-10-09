@@ -37,7 +37,7 @@ describe("SaveIndicator", () => {
   });
 
   it("marks an error so it isn't missed", () => {
-    const out = html({ status: "error", error: "Not saved — this draft changed elsewhere. Reload to continue." });
+    const out = html({ status: "error", error: "Your latest changes can't be saved — this draft changed elsewhere." });
     expect(out).toContain("text-danger-text");
     expect(out).not.toContain("text-text-muted");
     expect(out).toContain("this draft changed elsewhere");

@@ -7,9 +7,10 @@ import type { Send } from "./autosave-scheduler";
 /**
  * Browsers cap the bodies of in-flight `keepalive` requests at 64 KB in total. Stay well under it,
  * because the cap is shared with any other keepalive request and some browsers count headers too.
- * A larger patch goes out as an ordinary request when the page is closing, and the browser may
- * cancel it: edits since the last debounced save can be lost. A long document edited continuously
- * saves at least every 5 s, so the exposure is that window.
+ * A larger patch (a long document: every block carries an id) goes out as an ordinary request when
+ * the page is closing, and the browser may cancel it. That is why closing or reloading the page asks
+ * first while anything isn't saved (`beforeunload` in use-draft-autosave.ts): the request goes out as
+ * it asks, and staying lets it land.
  */
 export const KEEPALIVE_LIMIT_BYTES = 60_000;
 

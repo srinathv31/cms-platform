@@ -131,6 +131,16 @@ describe("a rename in a draft goes live only with its version", () => {
     expect({ name: header.name, activeName: header.activeName, editable: header.editable }).toEqual({ name: RENAMED, activeName: LIVE, editable: true });
   });
 
+  // The header binds autosave on every tab, so a rename on Versions saves too (handoff review I1).
+  it("the workspace header names the draft autosave saves to, with its rev, only for someone who can edit it", async () => {
+    const open = await draft();
+    as("maya");
+    expect((await getWorkspaceHeader("coral-offers", templateId)).draft).toEqual({ versionId: open.id, rev: open.rev });
+    as("jordan");
+    const approver = await getWorkspaceHeader("coral-offers", templateId);
+    expect([approver.editable, approver.draft]).toEqual([false, null]);
+  });
+
   it("the CMS's lists show the draft's name", async () => {
     as("maya");
     expect((await getLibraryRows("coral-offers")).find((r) => r.id === templateId)?.name).toBe(RENAMED);

@@ -13,6 +13,8 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => new Date("2026-10-04T1
 const { WorkspaceHeader } = await import("./workspace-header");
 const { NameField } = await import("./name-field");
 const { WorkspaceShare } = await import("./workspace-share");
+const { BindDraft } = await import("./session/workspace-session");
+const { SaveStopped } = await import("./save-status");
 
 const DRAFT: WorkspaceHeaderData = {
   id: "UC-4F7K2Q",
@@ -28,6 +30,7 @@ const DRAFT: WorkspaceHeaderData = {
   versionNumber: 3,
   canEdit: true,
   editable: true,
+  draft: { versionId: "v_draft3", rev: 7 },
   canStartDraft: false,
   canSubmit: true,
 };
@@ -59,5 +62,25 @@ describe("WorkspaceHeader names", () => {
   it("has no SHARE ring when nothing is Active", async () => {
     const tree = await render({ ...DRAFT, activeName: null, activeNumber: null, versionLabel: null, basedOnNumber: null });
     expect(find(tree, WorkspaceShare)).toEqual([]);
+  });
+});
+
+// The header is in the layout, on every tab, so it binds the autosave session: a rename on Versions,
+// Usage or Activity saves like one on Content (handoff review I1).
+describe("WorkspaceHeader binding", () => {
+  it("binds the session to the draft it shows, with the rev autosave starts from", async () => {
+    const tree = await render(DRAFT);
+    expect(find<{ draft: unknown }>(tree, BindDraft).map((el) => el.props)).toEqual([{ draft: { versionId: "v_draft3", rev: 7 } }]);
+  });
+
+  it("unbinds on a version that can't be edited", async () => {
+    const tree = await render({ ...DRAFT, status: "in_review", editable: false, draft: null, canSubmit: false });
+    expect(find<{ draft: unknown }>(tree, BindDraft).map((el) => el.props)).toEqual([{ draft: null }]);
+  });
+
+  // A save refused for good says why and offers Reload on a line of its own (handoff review I6).
+  it("keeps a line across the header, under the status row, for a save that stopped: on an editable draft only", async () => {
+    expect(find<{ className: string }>(await render(DRAFT), SaveStopped).map((el) => el.props.className)).toEqual(["col-span-3 col-start-1 row-start-3"]);
+    expect(find(await render({ ...DRAFT, editable: false, draft: null }), SaveStopped)).toEqual([]);
   });
 });

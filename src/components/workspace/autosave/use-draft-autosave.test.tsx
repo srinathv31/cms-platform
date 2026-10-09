@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { Activity, StrictMode, act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import type { DraftPatch } from "@/domain/types";
 import { useDraftAutosave, type DraftAutosave } from "./use-draft-autosave";
 
@@ -209,6 +209,102 @@ describe("useDraftAutosave", () => {
     await act(async () => api.save({ name: "Editable now" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Large drafts can't save with keepalive as the page closes (handoff review I10): leaving asks first.
+  describe("leaving with something unsaved", () => {
+    /** Fires what a closing or reloading page fires, and says whether the page asked to stay. */
+    const leave = async () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      await act(async () => void window.dispatchEvent(event));
+      return event.defaultPrevented;
+    };
+    const guards = () => ({
+      added: addSpy.mock.calls.filter(([type]) => type === "beforeunload").length,
+      removed: removeSpy.mock.calls.filter(([type]) => type === "beforeunload").length,
+    });
+    let addSpy: MockInstance<typeof window.addEventListener>;
+    let removeSpy: MockInstance<typeof window.removeEventListener>;
+    beforeEach(() => {
+      addSpy = vi.spyOn(window, "addEventListener");
+      removeSpy = vi.spyOn(window, "removeEventListener");
+    });
+    afterEach(() => {
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    });
+
+    it("lets a saved page go without asking, and registers nothing", async () => {
+      await render(<Probe />);
+      expect(await leave()).toBe(false);
+      expect(guards().added).toBe(0);
+    });
+
+    it("asks while a change waits to save, sends it as it asks, and lets go once it has landed", async () => {
+      let land: (response: Response) => void = () => {};
+      fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (land = resolve)));
+      await render(<Probe />);
+
+      await act(async () => api.save({ name: "Typed just now" }));
+      expect(api.status).toBe("unsaved");
+      expect(await leave(), "waiting to save").toBe(true);
+      expect(fetchMock, "it sends what is waiting as it asks").toHaveBeenCalledTimes(1);
+      expect(sent(0).init.keepalive).toBe(true);
+      expect(api.status).toBe("saving");
+      expect(await leave(), "saving").toBe(true);
+      expect(guards(), "one guard for the whole stretch").toEqual({ added: 1, removed: 0 });
+
+      await act(async () => land(answer(8)));
+      expect(api.status).toBe("saved");
+      expect(await leave()).toBe(false);
+      expect(guards()).toEqual({ added: 1, removed: 1 });
+    });
+
+    it("asks while a failed save waits to retry", async () => {
+      fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+      await render(<Probe />);
+      await act(async () => api.save({ name: "Offline edit" }));
+      await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
+      expect(api.status).toBe("error");
+      expect(await leave()).toBe(true);
+    });
+
+    it("asks after saving has stopped for good: what wasn't saved is still on the page to copy", async () => {
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, error: "conflict", rev: 9, message: "This draft changed elsewhere." }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      await render(<Probe />);
+      await act(async () => api.save({ name: "Mine" }));
+      await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
+      expect(api).toMatchObject({ status: "error", stopped: true });
+      expect(await leave()).toBe(true);
+    });
+
+    it("takes the guard away when it unmounts", async () => {
+      fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+      await render(<Probe />);
+      await act(async () => api.save({ name: "Still going" }));
+      await act(async () => root.unmount());
+      expect(await leave()).toBe(false);
+      root = createRoot(container); // the afterEach unmounts this one
+    });
+  });
+
+  it("says when saving has stopped for good, and not before", async () => {
+    await render(<Probe />);
+    expect(api.stopped).toBe(false);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: false, error: "not_draft", message: "This version is no longer a draft." }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await act(async () => api.save({ name: "Too late" }));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
+    expect(api).toMatchObject({ status: "error", stopped: true, error: "Your latest changes can't be saved — this version is no longer a draft." });
   });
 
   it("returns stable save and flush functions", async () => {

@@ -21,9 +21,9 @@ export async function WorkspaceContent({
   const reviewHref = status === "in_review" ? `/${team}/review/${templateId}/${versionNumber}` : null;
   return (
     <ContentWorkspace
-      // A different version is a different document, editor and autosave session. So is the same
-      // version once it can't be edited any more (submitted, or the viewer changed): the key then
-      // changes with `editable`, and the new workspace mounts read-only and unbinds the session.
+      // A different version is a different document and editor. So is the same version once it can't
+      // be edited any more (submitted, or the viewer changed): the key then changes with `editable`,
+      // and the new workspace mounts read-only. The header, re-rendered with it, unbinds the session.
       key={`${doc.versionId}:${doc.editable ? "edit" : "view"}`}
       templateId={doc.templateId}
       teamName={doc.teamName}
