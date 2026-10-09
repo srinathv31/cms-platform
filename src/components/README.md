@@ -139,7 +139,12 @@ skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you th
 **Permissions.** The server decides. Read models carry `PermissionResult`s (`{ ok: true } | { ok: false; reason }`)
 or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.approve` and `data.can.comment` in
 `review/review-workspace.tsx`, `canSubmit` in `workspace/workspace-tab-bar.tsx`. The settings rows render a
-refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`).
+refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`). What an action does comes the
+same way: the settings read models send each strip's line as `consequences` beside `can` (`m.consequences.remove`).
+A form checked as someone types calls the domain's own check with the read model's facts (`validateChain`,
+`validateNewTeam`, `describeSectionsChange`, `describeRoleChange`), never a copy of a refusal ladder, a refusal
+constant, a stand-in actor or the clock; `settings/settings-decided.test.tsx` fails on any of those under
+`settings/` ([decision 0018](../../docs/decisions/0018-settings-screens-render-decisions.md)).
 
 **Mutations.** Client components import server actions from `@/server/actions/*` and call them in a transition.
 Most return `ActionResult` (`src/domain/review-types.ts`): `{ ok: true, … } | { ok: false, reason }`. Show the
@@ -173,7 +178,7 @@ Anything else that has to stop edits for a while takes a hold the same way.
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
 | Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain constant, as `access/request-access.tsx` does with `ACCESS_REASON_MAX`. |
-| Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*`; `rows.tsx` renders refusals. |
+| Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*` and `m.consequences.*`; `rows.tsx` renders refusals and strips. |
 | Show an action the viewer can't take, with why | `BlockedButton` in [review/decision-rail.tsx](review/decision-rail.tsx) | Greyed and focusable; `describedBy` points at a visible reason when there is one. |
 | Make a chart readable without a pointer | `StackedBars` in [usage/charts.tsx](usage/charts.tsx) | `markProps` on each hit area inside `ChartKeys`, then a `ChartTable`. |
 | Update optimistically | [comments/use-review-threads.ts](comments/use-review-threads.ts) with [thread-list.tsx](comments/thread-list.tsx) | Pure reducer in `thread-state.ts`, tested. |
@@ -189,7 +194,7 @@ Anything else that has to stop edits for a while takes a hold the same way.
   `access/role-picker.tsx`. Export the one in `preview/controls.tsx` (or move it to `primitives/`) instead of a fifth copy.
 - **Two action runners.** `useActionRun` and `Strip` exist in both `settings/team/rows.tsx` and
   `settings/platform/ui.tsx`. Reuse one; don't write a third.
-- **Copied formatters.** `plural` and `andList` exist in several `format.ts` files; `new Intl.NumberFormat("en-US")`
+- **Copied formatters.** `plural` exists in several `format.ts` files, `andList` in `access/format.ts`; `new Intl.NumberFormat("en-US")`
   in six files; "3 minutes ago" as `formatRelative` (`versions/format.ts`) and as `relativeTime`
   (`src/server/queries/format.ts`); "3 days ago" as `formatWhen` (`versions/format.ts`), `formatLastRender`
   (`usage/format.ts`), and `daysAgo` (`settings/team/format.ts`); a clipboard fallback in `primitives/template-id.tsx`

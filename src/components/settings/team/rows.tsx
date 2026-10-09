@@ -61,7 +61,7 @@ export function Strip({
   consequence: ReactNode;
   children?: ReactNode;
   confirmLabel: string;
-  /** The confirm can't run yet (a required note is empty, no role is picked). */
+  /** The confirm can't run yet (a required note is empty, nothing to save). */
   blocked?: boolean;
   /** Said beside the buttons while it applies. */
   message?: string | null;
@@ -133,28 +133,29 @@ export function ConfirmStrip({
 }) {
   const [note, setNote] = useState("");
   const noteId = useId();
-  const missingNote = spec.note !== undefined && note.trim() === "";
+  // The note's own rule (the domain's check, passed in with it) holds the confirm until it's met.
+  const noteBlocked = spec.note ? spec.note.problem(note) !== null : false;
   return (
     <Strip
       consequence={spec.consequence}
       confirmLabel={spec.confirmLabel}
-      blocked={missingNote}
-      onConfirm={() => spec.run(spec.note !== undefined ? note.trim() : undefined)}
+      blocked={noteBlocked}
+      onConfirm={() => spec.run(spec.note ? note.trim() : undefined)}
       onCancel={onCancel}
       onDone={onDone}
     >
       {spec.detail}
-      {spec.note !== undefined ? (
+      {spec.note ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={noteId} className="text-[13px] text-text-muted">
-            {spec.note}
+            {spec.note.label}
           </label>
           <Input
             id={noteId}
             data-autofocus
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            maxLength={500}
+            maxLength={spec.note.max}
             className="bg-surface"
           />
         </div>
@@ -170,8 +171,11 @@ export interface StripSpec {
   confirmLabel: string;
   /** Shown in full under the consequence (what's being decided on, like a request's reason). */
   detail?: ReactNode;
-  /** A required note: its label, shown above the field. */
-  note?: string;
+  /**
+   * A note typed in the strip: its label above the field, its length limit, and the domain's check,
+   * which holds the confirm while it returns a reason (a denial needs a note).
+   */
+  note?: { label: string; max: number; problem: (note: string) => string | null };
   run: (note?: string) => Promise<ActionResult>;
 }
 

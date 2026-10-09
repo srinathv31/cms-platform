@@ -5,9 +5,9 @@ import { ArrowDown, ArrowRight, ArrowUp, Plus } from "lucide-react";
 import type { ApprovalChainView, ApprovalChainsSection } from "@/domain/access-types";
 import { ROLE_LABEL } from "@/domain/access";
 import {
-  PLATFORM_REFUSALS,
   STAGE_NAME_MAX,
   describeChainChange,
+  removeStageRefusal,
   ruleLabel,
   validateChain,
   type ChainCardStage,
@@ -27,7 +27,7 @@ import { Blocked, Pick, Strip, useFocusAfterCommit } from "./ui";
 // (who reviews what, that a named person reviews every team's submissions), so the consequence comes
 // before the commitment. The draft is checked as it changes with the domain's `validateChain`, the
 // same function the server runs on save: each problem shows under the field it's about, and the
-// confirm stays disabled with the first one beside it.
+// confirm stays disabled with the first one beside it. Remove asks the domain's `removeStageRefusal`.
 
 const COLS = "1.5rem minmax(0,0.85fr) minmax(0,1.15fr) auto";
 
@@ -143,12 +143,11 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
         {rows.map((row, index) => {
           const saved = chain.stages.find((s) => s.id === row.id);
           const isEditing = editing === row.key;
-          const removeReason =
-            rows.length === 1
-              ? PLATFORM_REFUSALS.oneStage
-              : saved && saved.waiting > 0
-                ? PLATFORM_REFUSALS.stageWaiting(saved.waiting, saved.name)
-                : null;
+          // The server's own rule: a stage being added has nobody waiting on it.
+          const removeReason = removeStageRefusal(
+            { name: saved?.name ?? row.name, waiting: saved?.waiting ?? 0 },
+            rows.length - 1,
+          );
           // A name still being typed isn't flagged while it's empty; the strip still says why Save waits.
           const nameProblem = isEditing && !row.name.trim() ? null : problemAt(index, "name");
           const reviewerProblem = problemAt(index, "reviewer");

@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 4 | 25 | 12 | 41 |
+| Open | 0 | 4 | 24 | 12 | 40 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 18 | 10 | 2 | 31 |
+| Fixed | 1 | 18 | 11 | 2 | 32 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -787,7 +787,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H2 · Medium: Client components re-implement domain rules
 
-- **Status:** Open
+- **Status:** Fixed. The settings read models return `can` and each strip's `consequences` decided by the domain with the demo clock, and every live form check is one exported domain function the action's rule also runs (`validateNewTeam`, `describeSectionsChange`, `describeRoleChange`, `validateDecisionNote`, `removeStageRefusal`, with `validateChain`); a test fails if a settings component copies a refusal, reads a clock, makes up an actor or runs a domain transition ([decision 0018](decisions/0018-settings-screens-render-decisions.md)).
 - **Where:** `src/components/settings/platform/content-types.tsx` line 94; `src/components/settings/team/rows.tsx` line 20
 - **What happens:** The content-types screen calls the real domain function on every render with a blank actor and `new Date(0)`. Teams and approval-chain screens mirror the server's refusal ladders; several settings views hard-code consequence sentences and compute due dates themselves. The platform channel screen does it right with `channelOffConsequences`.
 - **Fix:** Server returns `can` plus consequence lines; for live validation, one exported pure `validateX` per rule.

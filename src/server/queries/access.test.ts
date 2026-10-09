@@ -106,6 +106,11 @@ describe("access read models", () => {
       ["morgan", true],
     ]);
     expect(section.decided).toEqual([]);
+    // The strips' lines come worded by the domain, not by the screen.
+    expect(section.pending[0]!.consequences).toEqual({
+      approve: "Chris Morales gets Author access to Coral Offers and sees its Library the next time they open Stencil.",
+      deny: "Chris sees your note and can ask again.",
+    });
   });
 
   it("Members section: active first, by name; nobody can change their own access", async () => {
@@ -120,6 +125,10 @@ describe("access read models", () => {
       editRoles: { ok: true },
       remove: { ok: true },
       reinstate: { ok: false, reason: ACCESS_REFUSALS.alreadyActive },
+    });
+    expect(maya.consequences).toEqual({
+      remove: "Maya Chen loses access to Coral Offers and drops off this list. They can ask for access again.",
+      reinstate: "Maya signs in to Coral Offers again as Author. The inactivity count restarts today.",
     });
     await as("maya");
     await expect(getMembersSection("coral-offers")).rejects.toBeInstanceOf(PermissionError);
@@ -138,17 +147,37 @@ describe("access read models", () => {
       ["sam", true],
     ]);
     expect(recert.can.start).toEqual({ ok: false, reason: ACCESS_REFUSALS.reviewOpen });
+    // Worded and dated by the domain with the demo clock: the deadline, what's left to decide, the strips.
+    expect(recert.current!.footnote).toBe("Anyone not confirmed by Nov 3 loses access to Coral Offers.");
+    expect(recert.current!.items.map((i) => i.outcome)).toEqual([null, null, null, null, null, null]);
+    expect(recert.current!.items.find((i) => i.userId === "sam")!.consequences).toEqual({
+      remove: "Sam Ortiz loses access to Coral Offers now, not at the deadline.",
+    });
+    expect(recert.consequences.start).toBe(
+      "Every member except Team Admins is asked to be kept or removed by Nov 3, 30 days from today. Anyone not confirmed by then loses access to Coral Offers.",
+    );
 
     const idle = await getInactivitySection("coral-offers");
     expect(idle.flagged.map((r) => [r.person.id, r.daysInactive, r.suspendsAt])).toEqual([
       ["devon", 95, new Date(BASE.getTime() + 25 * DAY).toISOString()],
     ]);
+    expect(idle.flagged[0]!.heldAsLastAdmin).toBe(false);
+    expect(idle.flagged[0]!.consequences).toEqual({
+      suspend: "Devon can't sign in to Coral Offers until you restore them.",
+      keep: "Devon stays on Coral Offers. The count restarts today, so they're flagged again on Jan 2, 2027 if they still haven't signed in.",
+      reinstate: "Devon signs in to Coral Offers again as Viewer. The inactivity count restarts today.",
+    });
     expect(idle.suspended).toEqual([]);
 
     for (const r of (await getAccessRequestsSection("coral-offers")).pending) {
       await as("alex");
       expect((await decideAccessRequest({ requestId: r.id, decision: "deny", note: "Not now." })).ok).toBe(true);
     }
+    await as("alex");
+    expect((await getAccessRequestsSection("coral-offers")).decided.map((r) => r.can.decide)).toEqual([
+      { ok: false, reason: ACCESS_REFUSALS.decided },
+      { ok: false, reason: ACCESS_REFUSALS.decided },
+    ]);
     await as("alex");
     expect((await getSidebarCards())["coral-offers"]).toMatchObject({
       kind: "recert_due",
@@ -174,11 +203,27 @@ describe("access read models", () => {
     const recert = await getRecertificationSection("coral-offers");
     expect(recert.current!.phase).toBe("closed");
     expect(recert.current!.lapsed.map((p) => p.id)).toEqual(["dana", "jordan", "maya", "priya", "sam"]);
+    expect(recert.current!.footnote).toBe(
+      "Access lapsed on Nov 3 for Dana Park, Jordan Ellis, Maya Chen, Priya Raman and Sam Ortiz.",
+    );
+    expect(recert.current!.items.map((i) => [i.userId, i.outcome])).toEqual([
+      ["dana", "Access lapsed Nov 3"],
+      ["devon", "Suspended for inactivity"],
+      ["jordan", "Access lapsed Nov 3"],
+      ["maya", "Access lapsed Nov 3"],
+      ["priya", "Access lapsed Nov 3"],
+      ["sam", "Access lapsed Nov 3"],
+    ]);
     // Everyone but Alex lapsed or was suspended: nobody left to review.
     expect(recert.can.start).toEqual({ ok: false, reason: ACCESS_REFUSALS.nobodyToReview });
     const idle = await getInactivitySection("coral-offers");
     expect(idle.suspended.map((r) => [r.person.id, r.statusReason])).toEqual([["devon", "inactivity_auto"]]);
     const members = await getMembersSection("coral-offers");
     expect(members.rows.find((r) => r.person.id === "sam")!.can.reinstate).toEqual({ ok: true });
+    // Roles of a member whose access isn't active can't change: the domain's own answer.
+    expect(members.rows.find((r) => r.person.id === "sam")!.can.editRoles).toEqual({
+      ok: false,
+      reason: ACCESS_REFUSALS.notActive,
+    });
   });
 });

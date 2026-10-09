@@ -4,14 +4,24 @@ import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   DAY_MS,
+  changeRoles,
   decideRecertItem,
+  firstName,
+  heldAsLastAdmin,
   inactivity,
   keepInactive,
+  memberConsequences,
+  recertFootnote,
+  recertItemOutcome,
   recertPhase,
   recertProgress,
+  recertRemoveConsequence,
   reinstate,
   removeMember,
+  requestConsequences,
+  requestDecisionRefusal,
   startRecert,
+  startRecertConsequence,
   suspendInactive,
 } from "@/domain/access";
 import {
@@ -47,7 +57,8 @@ import { demoNow } from "./dynamic";
 // Read models for team access: the Request access page (anyone), the four Team sections of the
 // settings modal (the team's Team Admins) and the sidebar cards. Every date is relative to the demo
 // clock. `can` on each row is the domain's own answer, dry-run against the facts, so a disabled
-// control carries the exact sentence the action would refuse with.
+// control carries the exact sentence the action would refuse with; `consequences` are the domain's
+// lines for each action's strip, so the screens word nothing themselves.
 
 const DECIDED_WINDOW_DAYS = 30;
 
@@ -100,6 +111,7 @@ const isoOrUndefined = (d: Date | null | undefined) => (d ? d.toISOString() : un
 const today = (d: Date) => d.toISOString().slice(0, 10);
 const okOr = (r: { ok: true } | { ok: false; reason: string }): PermissionResult =>
   r.ok ? { ok: true } : { ok: false, reason: r.reason };
+const okUnless = (reason: string | null): PermissionResult => (reason ? { ok: false, reason } : { ok: true });
 
 /** The team behind a space slug (team ids are their slugs). 404 for an unknown one or "all". */
 async function teamBySlug(slug: string) {
@@ -197,6 +209,7 @@ export const getMembersSection = cache(async (teamSlug: string): Promise<Members
   const rows = teamMemberships.map((m): MemberRow => {
     const user = userOf(people, m.userId);
     const input = { membership: m, member: named(user), team: named(team), actor, now: nowDate, teamMemberships };
+    const said = memberConsequences(input);
     return {
       membershipId: m.id,
       person: personOf(people, m.userId),
@@ -211,12 +224,11 @@ export const getMembersSection = cache(async (teamSlug: string): Promise<Members
       isYou: m.userId === viewer.userId,
       can: {
         // Which roles is the editor's choice: here, only whether this member's roles can change at all.
-        editRoles: manage(viewer, team.id, m.userId, () =>
-          m.status === "active" ? { ok: true } : { ok: false, reason: "This member's access isn't active." },
-        ),
+        editRoles: manage(viewer, team.id, m.userId, () => okOr(changeRoles({ ...input, roles: m.roles }))),
         remove: manage(viewer, team.id, m.userId, () => okOr(removeMember(input))),
         reinstate: manage(viewer, team.id, m.userId, () => okOr(reinstate(input))),
       },
+      consequences: { remove: said.remove, reinstate: said.reinstate },
     };
   });
   rows.sort(
@@ -230,6 +242,7 @@ export const getMembersSection = cache(async (teamSlug: string): Promise<Members
 export const getAccessRequestsSection = cache(async (teamSlug: string): Promise<AccessRequestsSection> => {
   const { viewer, team, nowDate, people, header } = await teamSection(teamSlug, "team.decideAccessRequest");
   const requests = await loadRequestFacts(db, eq(accessRequests.teamId, team.id)); // oldest first
+  const actor = { id: viewer.userId, name: viewer.name };
   const since = nowDate.getTime() - DECIDED_WINDOW_DAYS * DAY_MS;
 
   const row = (r: AccessRequestFacts): AccessRequestRow => {
@@ -246,13 +259,8 @@ export const getAccessRequestsSection = cache(async (teamSlug: string): Promise<
       decidedBy: r.decidedBy ? personOf(people, r.decidedBy) : undefined,
       decidedAt: isoOrUndefined(r.decidedAt),
       note: r.decisionNote,
-      can: {
-        decide: !allowed.ok
-          ? allowed
-          : r.status === "pending"
-            ? { ok: true }
-            : { ok: false, reason: "This request was already decided." },
-      },
+      can: { decide: allowed.ok ? okUnless(requestDecisionRefusal(r, actor)) : allowed },
+      consequences: requestConsequences({ requester: named(user), role: r.role, team: named(team) }),
     };
   };
 
@@ -301,6 +309,7 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
     const items = r.items.map((i): RecertItemRow => {
       const user = userOf(people, i.userId);
       const m = teamMemberships.find((x) => x.userId === i.userId) ?? null;
+      const decidedBy = i.decidedBy ? personOf(people, i.decidedBy) : undefined;
       return {
         userId: i.userId,
         person: personOf(people, i.userId),
@@ -308,9 +317,16 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
         roles: m?.roles ?? [],
         lastActiveAt: isoOrNull(user.lastActiveAt),
         decision: i.decision,
-        decidedBy: i.decidedBy ? personOf(people, i.decidedBy) : undefined,
+        decidedBy,
         decidedAt: isoOrUndefined(i.decidedAt),
         membership: m?.status ?? "removed",
+        outcome: recertItemOutcome({
+          item: i,
+          decidedBy: decidedBy ?? null,
+          membership: m?.status ?? "removed",
+          recert: r,
+          now: nowDate,
+        }),
         can: {
           decide: manage(viewer, team.id, i.userId, () =>
             okOr(
@@ -327,9 +343,11 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
             ),
           ),
         },
+        consequences: { remove: recertRemoveConsequence(named(user), named(team)) },
       };
     });
     items.sort((a, b) => a.person.name.localeCompare(b.person.name));
+    const lapsed = [...new Set(lapsedIds)].map((id) => personOf(people, id)).sort((a, b) => a.name.localeCompare(b.name));
 
     current = {
       id: r.id,
@@ -340,7 +358,8 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
       phase,
       progress: recertProgress(r, teamMemberships),
       items,
-      lapsed: [...new Set(lapsedIds)].map((id) => personOf(people, id)).sort((a, b) => a.name.localeCompare(b.name)),
+      lapsed,
+      footnote: recertFootnote({ recert: r, lapsed, team: named(team), now: nowDate }),
     };
   }
 
@@ -356,7 +375,13 @@ export const getRecertificationSection = cache(async (teamSlug: string): Promise
         }),
       )
     : allowed;
-  return { team: header, current, can: { start }, today: today(nowDate) };
+  return {
+    team: header,
+    current,
+    can: { start },
+    consequences: { start: startRecertConsequence(named(team), nowDate) },
+    today: today(nowDate),
+  };
 });
 
 // ── Inactivity ───────────────────────────────────────────────
@@ -370,6 +395,7 @@ export const getInactivitySection = cache(async (teamSlug: string): Promise<Inac
     const user = userOf(people, m.userId);
     const idle = inactivity(m, nowDate);
     const input = { membership: m, member: named(user), team: named(team), actor, now: nowDate, teamMemberships };
+    const said = memberConsequences(input);
     return {
       membershipId: m.id,
       person: personOf(people, m.userId),
@@ -381,11 +407,13 @@ export const getInactivitySection = cache(async (teamSlug: string): Promise<Inac
       suspendsAt: iso(m.status === "suspended" && m.statusChangedAt ? m.statusChangedAt : idle.suspendAt),
       status: m.status,
       statusReason: m.statusReason,
+      heldAsLastAdmin: heldAsLastAdmin(m, nowDate),
       can: {
         suspend: manage(viewer, team.id, m.userId, () => okOr(suspendInactive(input))),
         keep: manage(viewer, team.id, m.userId, () => okOr(keepInactive(input))),
         reinstate: manage(viewer, team.id, m.userId, () => okOr(reinstate(input))),
       },
+      consequences: { suspend: said.suspend, keep: said.keep, reinstate: said.reinstate },
     };
   };
 
@@ -406,8 +434,6 @@ export const getInactivitySection = cache(async (teamSlug: string): Promise<Inac
 });
 
 // ── Sidebar cards ────────────────────────────────────────────
-
-const firstName = (name: string) => name.split(" ")[0] ?? name;
 
 /**
  * One card per space the viewer can switch to, by priority: access requests waiting (Team Admin),

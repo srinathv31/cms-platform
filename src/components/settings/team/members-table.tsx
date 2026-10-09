@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ROLE_LABEL, rolesLabel, sortRoles } from "@/domain/access";
+import { ROLE_LABEL, describeRoleChange, rolesLabel, sortRoles } from "@/domain/access";
 import type { MemberRow, MembersSection } from "@/domain/access-types";
 import type { TeamRole } from "@/domain/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,23 +23,19 @@ function RolesEditor({
   close,
 }: {
   m: MemberRow;
-  team: string;
+  team: MembersSection["team"];
   roles: readonly TeamRole[];
   close: () => void;
 }) {
   const [picked, setPicked] = useState<TeamRole[]>(sortRoles(m.roles));
   const next = sortRoles(picked);
-  const unchanged = next.join() === sortRoles(m.roles).join();
-  const none = next.length === 0;
+  // The domain words the line and says when there's nothing to save, as the roles are ticked.
+  const change = describeRoleChange({ member: m.person, team, from: m.roles, to: next });
   return (
     <Strip
-      consequence={
-        none
-          ? `${firstName(m.person.name)} needs at least one role on ${team}.`
-          : `${m.person.name} will be ${rolesLabel(next)} on ${team}.`
-      }
+      consequence={change.line}
       confirmLabel="Save roles"
-      blocked={none || unchanged}
+      blocked={change.blocked}
       onConfirm={() => changeMemberRoles({ membershipId: m.membershipId, roles: next })}
       onCancel={close}
       onDone={close}
@@ -73,14 +69,14 @@ export function MembersTable({ section }: { section: MembersSection }) {
             key: "roles",
             label: "Edit roles",
             blocked: reason(m.can.editRoles),
-            custom: ({ close }) => <RolesEditor m={m} team={team.name} roles={section.roles} close={close} />,
+            custom: ({ close }) => <RolesEditor m={m} team={team} roles={section.roles} close={close} />,
           }
         : {
             key: "restore",
             label: "Restore",
             blocked: reason(m.can.reinstate),
             strip: {
-              consequence: `${first} signs in to ${team.name} again as ${rolesLabel(m.roles)}. The inactivity count restarts today.`,
+              consequence: m.consequences.reinstate,
               confirmLabel: `Restore ${first}`,
               run: () => reinstateMember({ membershipId: m.membershipId }),
             },
@@ -90,7 +86,7 @@ export function MembersTable({ section }: { section: MembersSection }) {
         label: "Remove",
         blocked: reason(m.can.remove),
         strip: {
-          consequence: `${m.person.name} loses access to ${team.name} and drops off this list. They can ask for access again.`,
+          consequence: m.consequences.remove,
           confirmLabel: `Remove ${first}`,
           run: () => removeMember({ membershipId: m.membershipId }),
         },

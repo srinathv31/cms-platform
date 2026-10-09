@@ -2,9 +2,8 @@
 
 import { rolesLabel } from "@/domain/access";
 import type { InactivityRow, InactivitySection } from "@/domain/access-types";
-import { INACTIVITY_FLAG_DAYS } from "@/domain/access-types";
 import { keepInactive, reinstateMember, suspendInactive } from "@/server/actions/access";
-import { addDays, daysUntil, firstName, fmtDay, plural } from "./format";
+import { daysUntil, firstName, fmtDay, plural } from "./format";
 import { GroupHeading, RowTable, type RowAct, type RowData } from "./rows";
 
 /** Days idle against the suspend line, the flag line marked. */
@@ -24,14 +23,14 @@ function IdleTrack({ days, flagDays, suspendDays }: { days: number; flagDays: nu
 const reasonOf = (r: { ok: true } | { ok: false; reason: string }) => (r.ok ? null : r.reason);
 
 export function InactivityView({ section, today }: { section: InactivitySection; today: string }) {
-  const { team, thresholds } = section;
+  const { thresholds } = section;
 
   const restore = (m: InactivityRow): RowAct => ({
     key: "restore",
     label: "Restore",
     blocked: reasonOf(m.can.reinstate),
     strip: {
-      consequence: `${firstName(m.person.name)} signs in to ${team.name} again as ${rolesLabel(m.roles)}. The inactivity count restarts today.`,
+      consequence: m.consequences.reinstate,
       confirmLabel: `Restore ${firstName(m.person.name)}`,
       run: () => reinstateMember({ membershipId: m.membershipId }),
     },
@@ -40,15 +39,13 @@ export function InactivityView({ section, today }: { section: InactivitySection;
   const flagged: RowData[] = section.flagged.map((m) => {
     const first = firstName(m.person.name);
     const left = daysUntil(m.suspendsAt, today);
-    // Still active past day 120: the sweep kept them as the team's last Team Admin.
-    const kept = m.daysInactive >= thresholds.suspendDays;
     return {
       id: m.membershipId,
       person: m.person,
       sub: rolesLabel(m.roles),
       cells: [
         <IdleTrack key="idle" days={m.daysInactive} flagDays={thresholds.flagDays} suspendDays={thresholds.suspendDays} />,
-        kept ? (
+        m.heldAsLastAdmin ? (
           <div key="suspends">
             <div>Kept active</div>
             <div className="text-[13px] text-text-muted">Last Team Admin</div>
@@ -66,7 +63,7 @@ export function InactivityView({ section, today }: { section: InactivitySection;
           label: "Suspend",
           blocked: reasonOf(m.can.suspend),
           strip: {
-            consequence: `${first} can't sign in to ${team.name} until you restore them.`,
+            consequence: m.consequences.suspend,
             confirmLabel: `Suspend ${first}`,
             run: () => suspendInactive({ membershipId: m.membershipId }),
           },
@@ -76,7 +73,7 @@ export function InactivityView({ section, today }: { section: InactivitySection;
           label: "Keep",
           blocked: reasonOf(m.can.keep),
           strip: {
-            consequence: `${first} stays on ${team.name}. The count restarts today, so they're flagged again on ${fmtDay(addDays(today, INACTIVITY_FLAG_DAYS), today)} if they still haven't signed in.`,
+            consequence: m.consequences.keep,
             confirmLabel: `Keep ${first}`,
             run: () => keepInactive({ membershipId: m.membershipId }),
           },

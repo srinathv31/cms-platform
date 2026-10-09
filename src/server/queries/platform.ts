@@ -12,8 +12,8 @@ import type {
 } from "@/domain/access-types";
 import { versionsNeeding } from "@/domain/approval-chain";
 import { can } from "@/domain/permissions";
-import { approverProblem, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
-import { CHANNELS, type Channel } from "@/domain/types";
+import { approverProblem, channelRuleRefusal, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
+import { CHANNELS, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -31,7 +31,12 @@ import { getPeople, iso, personOf } from "./review-shared";
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules and
 // Approval chains. Read models: domain/access-types.ts. The consequences the UI shows before a change
 // is committed come from the pure functions in domain/platform-config.ts, fed by these models:
+//   - a new team: `validateNewTeam({ name, description, icon, existing: section.teams })` as the
+//     admin types, and `newTeamConsequences(name, admin)`;
+//   - a content type's sections: `describeSectionsChange({ contentTypeName, current, next })`, the
+//     strip's lines and the reason Save waits, and `removeSectionRefusal(count)`;
 //   - a channel turned off: `channelOffConsequences(row.name, channel, row.activeUsing[channel])`;
+//     whether a switch may flip at all comes decided, `row.can.toggle[channel]`;
 //   - a chain edit: `describeChainChange({ contentTypeName, current: chain.stages, next, people,
 //     waiting })`, the "Now / After" cards and the lines under them, and `validateChain({ stages,
 //     current: chain.stages, actorId: viewerId, people: approvers })`, the reason at each stage that
@@ -138,6 +143,12 @@ export const getChannelRulesSection = cache(async (): Promise<ChannelRulesSectio
         name: t.name,
         allowed: perChannel((c) => t.allowedChannels.includes(c)),
         activeUsing: perChannel((c) => mine.filter((v) => v.channels.includes(c)).length),
+        can: {
+          toggle: perChannel((c): PermissionResult => {
+            const reason = channelRuleRefusal(t.allowedChannels, c, !t.allowedChannels.includes(c));
+            return reason ? { ok: false, reason } : { ok: true };
+          }),
+        },
       };
     }),
   };

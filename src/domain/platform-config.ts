@@ -132,6 +132,47 @@ export function slugify(name: string): string {
     .replace(/-+$/g, "");
 }
 
+/** A new team as typed, tidied: the name with its spaces collapsed, the description trimmed, the slug. */
+export interface NewTeamCheck {
+  name: string;
+  description: string;
+  slug: string;
+  /** The first reason `createTeam` refuses it, or null. */
+  problem: string | null;
+}
+
+/**
+ * Checks a new team before it's created: a name of at most 60 characters, a description of at most
+ * 200, an icon the picker offers, and a slug that's neither a route the app owns nor another team's
+ * (slug or name, case-insensitive). The Create team form runs it as the admin types; `createTeam`
+ * refuses with its problem.
+ */
+export function validateNewTeam(input: {
+  name: string;
+  description: string;
+  icon: string;
+  existing: readonly { slug: string; name: string }[];
+}): NewTeamCheck {
+  const name = input.name.trim().replace(/\s+/g, " ");
+  const description = input.description.trim();
+  const slug = slugify(name);
+  const problem = ((): string | null => {
+    if (!name) return PLATFORM_REFUSALS.teamName;
+    if (name.length > TEAM_NAME_MAX) return PLATFORM_REFUSALS.teamNameTooLong;
+    if (description.length > TEAM_DESCRIPTION_MAX) return PLATFORM_REFUSALS.descriptionTooLong;
+    if (!(TEAM_ICONS as readonly string[]).includes(input.icon)) return PLATFORM_REFUSALS.icon;
+    if (!slug || RESERVED_SLUGS.has(slug)) return PLATFORM_REFUSALS.reservedName(name);
+    const taken = input.existing.find((t) => t.slug === slug || t.name.toLowerCase() === name.toLowerCase());
+    return taken ? PLATFORM_REFUSALS.teamTaken(taken.name) : null;
+  })();
+  return { name, description, slug, problem };
+}
+
+/** What creating the team does, said before it's confirmed. */
+export function newTeamConsequences(name: string, adminName: string): string[] {
+  return [`${adminName} becomes Team Admin of ${name} and approves its access requests.`, `${name} starts with no templates.`];
+}
+
 /** Creates a team (id = slug, the seed contract) with `admin` as its first Team Admin. */
 export function createTeam(input: {
   name: string;
@@ -148,17 +189,8 @@ export function createTeam(input: {
       effects: AccessEffect[];
     }>
   | Refused {
-  const name = input.name.trim().replace(/\s+/g, " ");
-  const description = input.description.trim();
-  if (!name) return refuse(PLATFORM_REFUSALS.teamName);
-  if (name.length > TEAM_NAME_MAX) return refuse(PLATFORM_REFUSALS.teamNameTooLong);
-  if (description.length > TEAM_DESCRIPTION_MAX) return refuse(PLATFORM_REFUSALS.descriptionTooLong);
-  if (!(TEAM_ICONS as readonly string[]).includes(input.icon)) return refuse(PLATFORM_REFUSALS.icon);
-
-  const slug = slugify(name);
-  if (!slug || RESERVED_SLUGS.has(slug)) return refuse(PLATFORM_REFUSALS.reservedName(name));
-  const taken = input.existing.find((t) => t.slug === slug || t.name.toLowerCase() === name.toLowerCase());
-  if (taken) return refuse(PLATFORM_REFUSALS.teamTaken(taken.name));
+  const { name, description, slug, problem } = validateNewTeam(input);
+  if (problem) return refuse(problem);
 
   const { admin, actor, now } = input;
   const team = { id: slug, slug, name, description, icon: input.icon, createdAt: now };
@@ -209,33 +241,34 @@ export function sectionKey(title: string): string {
 }
 
 /**
- * The content type's required sections, replaced. `next` lists every section in order: an existing
- * one by its key (its title may change: a rename keeps the key), a new one with any other key (the
- * key is made from its title, never reusing one the type has or had in this list).
+ * The first reason a content type's required sections can't be saved, or null: at least one section,
+ * and every title given, at most 60 characters and unlike the others (case-insensitive). The sections
+ * editor runs it as the admin types; `updateRequiredSections` refuses with it.
  */
-export function updateRequiredSections(input: {
-  contentType: { id: string; name: string; requiredSections: RequiredSection[] };
-  next: RequiredSection[];
-  actor: Named;
-  now: Date;
-}): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused {
-  const { contentType } = input;
-  const current = contentType.requiredSections;
-  if (input.next.length === 0) return refuse(PLATFORM_REFUSALS.oneSection);
-
+export function validateRequiredSections(next: readonly { title: string }[]): string | null {
+  if (next.length === 0) return PLATFORM_REFUSALS.oneSection;
   const titles = new Set<string>();
-  for (const s of input.next) {
+  for (const s of next) {
     const title = s.title.trim();
-    if (!title) return refuse(PLATFORM_REFUSALS.sectionTitle);
-    if (title.length > SECTION_TITLE_MAX) return refuse(PLATFORM_REFUSALS.sectionTitleTooLong);
-    if (titles.has(title.toLowerCase())) return refuse(PLATFORM_REFUSALS.sectionDuplicate(title));
+    if (!title) return PLATFORM_REFUSALS.sectionTitle;
+    if (title.length > SECTION_TITLE_MAX) return PLATFORM_REFUSALS.sectionTitleTooLong;
+    if (titles.has(title.toLowerCase())) return PLATFORM_REFUSALS.sectionDuplicate(title);
     titles.add(title.toLowerCase());
   }
+  return null;
+}
 
+/** Why a section can't be removed from a list of `count`, or null: at least one section stays. */
+export function removeSectionRefusal(count: number): string | null {
+  return count <= 1 ? PLATFORM_REFUSALS.oneSection : null;
+}
+
+/** The sections as they'd be saved (new ones keyed from their title), and what changes. */
+function planSections(current: readonly RequiredSection[], next: readonly RequiredSection[]) {
   const currentKeys = new Set(current.map((s) => s.key));
   const used = new Set(currentKeys);
   const kept = new Set<string>();
-  const requiredSections = input.next.map((s): RequiredSection => {
+  const requiredSections = next.map((s): RequiredSection => {
     const title = s.title.trim();
     if (currentKeys.has(s.key) && !kept.has(s.key)) {
       kept.add(s.key);
@@ -255,12 +288,61 @@ export function updateRequiredSections(input: {
   const renamed = requiredSections
     .filter((s) => before.has(s.key) && before.get(s.key)!.title !== s.title)
     .map((s) => ({ from: before.get(s.key)!.title, to: s.title }));
-  const keptOrder = (list: RequiredSection[]) => list.filter((s) => before.has(s.key) && after.has(s.key)).map((s) => s.key);
+  const keptOrder = (list: readonly RequiredSection[]) =>
+    list.filter((s) => before.has(s.key) && after.has(s.key)).map((s) => s.key);
   const reordered = keptOrder(current).join() !== keptOrder(requiredSections).join();
+  const changed = added.length > 0 || removed.length > 0 || renamed.length > 0 || reordered;
+  return { requiredSections, added, removed, renamed, reordered, changed };
+}
 
-  if (!added.length && !removed.length && !renamed.length && !reordered) {
-    return { ok: true, requiredSections: current, effects: [] };
+export interface SectionsChange {
+  /** The first reason the list can't be saved (`validateRequiredSections`), or null. */
+  problem: string | null;
+  /** Saving would change something: a section added, removed, renamed or moved. */
+  changed: boolean;
+  /** The strip's lines: the scope, said from the start, then what changes once something does. */
+  lines: string[];
+}
+
+/**
+ * The sections editor's strip as the admin edits `next` (a section being added has a key the type
+ * doesn't have): that only new templates take the change, then which sections new templates gain
+ * and which become ordinary headings.
+ */
+export function describeSectionsChange(input: {
+  contentTypeName: string;
+  current: readonly RequiredSection[];
+  next: readonly RequiredSection[];
+}): SectionsChange {
+  const type = input.contentTypeName;
+  const problem = validateRequiredSections(input.next);
+  const plan = planSections(input.current, input.next);
+  const lines = [`Applies to new ${type} templates only. Existing templates keep their sections.`];
+  if (plan.changed && !problem) {
+    if (plan.added.length) lines.push(`New templates start with ${joinWithAnd(plan.added)} added.`);
+    if (plan.removed.length) lines.push(`${joinWithAnd(plan.removed)} becomes an ordinary heading in new templates.`);
   }
+  return { problem, changed: plan.changed, lines };
+}
+
+/**
+ * The content type's required sections, replaced. `next` lists every section in order: an existing
+ * one by its key (its title may change: a rename keeps the key), a new one with any other key (the
+ * key is made from its title, never reusing one the type has or had in this list).
+ */
+export function updateRequiredSections(input: {
+  contentType: { id: string; name: string; requiredSections: RequiredSection[] };
+  next: RequiredSection[];
+  actor: Named;
+  now: Date;
+}): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused {
+  const { contentType } = input;
+  const current = contentType.requiredSections;
+  const problem = validateRequiredSections(input.next);
+  if (problem) return refuse(problem);
+
+  const { requiredSections, added, removed, renamed, reordered, changed } = planSections(current, input.next);
+  if (!changed) return { ok: true, requiredSections: current, effects: [] };
 
   const parts = [
     added.length ? `added ${joinWithAnd(added)}` : null,
@@ -332,6 +414,17 @@ export function channelOffConsequences(contentTypeName: string, channel: Channel
   return lines;
 }
 
+/**
+ * Why a content type allowing `allowedChannels` can't have `channel` set to `allowed`, or null: it
+ * must be a channel, and at least one channel stays on. The channel rules read model asks it for
+ * every switch, so the last one on shows disabled with the reason.
+ */
+export function channelRuleRefusal(allowedChannels: readonly Channel[], channel: Channel, allowed: boolean): string | null {
+  if (!(CHANNELS as readonly string[]).includes(channel)) return PLATFORM_REFUSALS.oneChannel;
+  const next = CHANNELS.filter((c) => (c === channel ? allowed : allowedChannels.includes(c)));
+  return next.length === 0 ? PLATFORM_REFUSALS.oneChannel : null;
+}
+
 /** Turns one channel on or off for a content type (the type × channel matrix). */
 export function setChannelRule(input: {
   contentType: { id: string; name: string; allowedChannels: Channel[] };
@@ -345,9 +438,10 @@ export function setChannelRule(input: {
   const current = contentType.allowedChannels;
   if (!(CHANNELS as readonly string[]).includes(channel)) return refuse(PLATFORM_REFUSALS.oneChannel);
   if (current.includes(channel) === allowed) return { ok: true, allowedChannels: current, consequences: [], effects: [] };
+  const refusal = channelRuleRefusal(current, channel, allowed);
+  if (refusal) return refuse(refusal);
 
   const next = CHANNELS.filter((c) => (c === channel ? allowed : current.includes(c)));
-  if (next.length === 0) return refuse(PLATFORM_REFUSALS.oneChannel);
 
   const label = CHANNEL_LABELS[channel];
   const consequences = allowed ? [] : channelOffConsequences(contentType.name, channel, input.activeUsing);
@@ -560,6 +654,18 @@ function reviewerProblem(
 }
 
 /**
+ * Why a stage can't be removed from a chain, or null: the chain keeps at least one stage
+ * (`remaining`, how many are left once it goes), and a stage some version in review still needs
+ * stays (`waiting`, from `versionsNeeding`). The chain editor shows it at the stage's Remove;
+ * `saveApprovalChain` refuses with it.
+ */
+export function removeStageRefusal(stage: { name: string; waiting: number }, remaining: number): string | null {
+  if (remaining < 1) return PLATFORM_REFUSALS.oneStage;
+  if (stage.waiting > 0) return PLATFORM_REFUSALS.stageWaiting(stage.waiting, stage.name);
+  return null;
+}
+
+/**
  * The whole chain, in order. Existing stages keep their id, so a new rule on a stage reaches the
  * versions that will reach it; new ones get `id: null`. Versions in review go through the stages they
  * recorded at submit, so no edit moves them. Refuses a stale stage id, then the first of
@@ -597,8 +703,8 @@ export function saveApprovalChain(input: {
   const needing = versionsNeeding(input.inReview, current);
   for (const s of current) {
     if (ids.has(s.id)) continue;
-    const count = needing[s.id] ?? 0;
-    if (count > 0) return refuse(PLATFORM_REFUSALS.stageWaiting(count, s.name));
+    const refusal = removeStageRefusal({ name: s.name, waiting: needing[s.id] ?? 0 }, input.next.length);
+    if (refusal) return refuse(refusal);
   }
 
   const stages = input.next.map((s, position) => ({
