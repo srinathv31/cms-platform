@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { unstable_rethrow } from "next/navigation";
 import { Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { useCopy } from "@/components/primitives/copy";
 import type { CopilotPrompt } from "@/domain/import-types";
 import { readTemplate } from "@/lib/template-reads";
 import { useWorkspaceSession } from "../session/workspace-session";
@@ -37,20 +38,17 @@ export function CopilotPromptButton({ templateId }: { templateId: string }) {
   const session = useWorkspaceSession();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<PromptState>({ status: "loading" });
-  const [copied, setCopied] = useState(false);
+  const { copied, copy: copyText, reset: resetCopied } = useCopy(COPIED_MS);
   const [copyFailed, setCopyFailed] = useState(false);
   const copyButton = useRef<HTMLButtonElement>(null);
   const promptBlock = useRef<HTMLPreElement>(null);
   // The latest request: an answer to an earlier open (or after a close) is dropped.
   const request = useRef(0);
-  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
   async function load() {
     const id = ++request.current;
     setState({ status: "loading" });
-    setCopied(false);
+    resetCopied();
     setCopyFailed(false);
     try {
       await session.flush();
@@ -74,22 +72,14 @@ export function CopilotPromptButton({ templateId }: { templateId: string }) {
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (next) void load();
-    else {
-      request.current++;
-      clearTimeout(copiedTimer.current);
-    }
+    else request.current++;
   }
 
   async function copy() {
     if (state.status !== "ready") return;
-    try {
-      await navigator.clipboard.writeText(state.text);
-      setCopyFailed(false);
-      setCopied(true);
-      clearTimeout(copiedTimer.current);
-      copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
-    } catch {
-      setCopyFailed(true);
+    const ok = await copyText(state.text);
+    setCopyFailed(!ok);
+    if (!ok) {
       // Select the prompt so ⌘C works.
       const block = promptBlock.current;
       if (block) window.getSelection()?.selectAllChildren(block);

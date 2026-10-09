@@ -113,9 +113,11 @@ Next.js API; Next's own note about it is at the end of this file.
 - Tokens only: no hex, rgb, or oklch values in components. Utilities come from `src/app/globals.css` and
   `src/styles/tokens.css`. Light theme only, so no `dark:` classes.
 - Use the shared primitives in `src/components/primitives/` (`StatusBadge` for any version state, `PageHeader`,
-  `Stream`, `Keycap`, `TemplateId`, `LinkPending`) rather than writing new ones. Run a server action with
-  `useActionRun` ([use-action-run.ts](src/components/primitives/use-action-run.ts)): one at a time, in a
-  transition, with the refusal's sentence to show.
+  `Stream`, `Keycap`, `TemplateId`, `LinkPending`, `BlockedButton`, `Segmented` for picking one of a few, `Tabs`
+  for a view switch, `StatCard`, `useCopy` for the clipboard, `TeamIcon`) rather than writing new ones. A channel's
+  name is `CHANNEL_LABELS` from `src/domain/render/errors.ts`. Run a server action with `useActionRun`
+  ([use-action-run.ts](src/components/primitives/use-action-run.ts)): one at a time, in a transition, with the
+  refusal's sentence to show.
 - Animate with `m.*` from `motion/react` (`LazyMotion` is strict), with timings from `@/components/motion/presets`.
 - One black primary button per screen. No hint or instruction text: explain only when an action is blocked, at the
   control. Show an unavailable control disabled, with its reason, rather than hiding it.

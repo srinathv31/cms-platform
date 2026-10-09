@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { Percent, Type } from "lucide-react";
-import { StatCard } from "@/components/primitives/stat-card";
+import { StatCard, StatLabel, StatTrend, StatValue } from "@/components/primitives/stat-card";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import type { VersionState } from "@/domain/types";
 
@@ -97,7 +97,10 @@ export function PairingSpecimen({ pairing }: { pairing: keyof typeof PAIRINGS })
         </p>
       </div>
 
-      <StatCard label="Renders this month" value={12480} trend="12% this month" />
+      <StatCard>
+        <StatValue value="12,480" trend={<StatTrend pct={12} />} />
+        <StatLabel className="mt-3">Renders this month</StatLabel>
+      </StatCard>
 
       <div className="flex flex-col gap-4">
         <h4 className="display-lg text-text">Recently edited</h4>

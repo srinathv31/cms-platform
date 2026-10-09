@@ -1,22 +1,11 @@
-import { Info, TrendingDown, TrendingUp } from "lucide-react";
+import { StatCard } from "@/components/primitives/stat-card";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-// The Usage screens' building blocks: one card, its heading, the "i" dot and the trend pill.
-// Server components all: the tooltips are the only client parts, and they come with `ui/tooltip`.
+// The Usage screens' building blocks: one card and its heading. The stat cards' numeral, label, lines
+// and trend pill are the shared ones (`@/components/primitives/stat-card`). Server components.
 
-/** The one card: a shadcn Card in the house look (tinted fill, hairline, no ring, 24px padding). */
-export function Panel({ children, className, ...props }: React.ComponentProps<typeof Card>) {
-  return (
-    <Card
-      {...props}
-      className={cn("min-w-0 gap-0 rounded-xl border border-hairline bg-surface-tinted p-6 ring-0", className)}
-    >
-      {children}
-    </Card>
-  );
-}
+/** The one card: the stat card's surface (tinted fill, hairline, no ring, 24px padding), for the charts and tables too. */
+export const Panel = StatCard;
 
 /** Title at left, tracked-caps aside at right ("Top templates … LAST 30 DAYS"). */
 export function PanelHead({
@@ -42,52 +31,5 @@ export function PanelHead({
       </h2>
       {aside ? <span className="caps-label shrink-0 text-right">{aside}</span> : null}
     </div>
-  );
-}
-
-export function InfoDot({ tip }: { tip: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={tip}
-            className="inline-grid size-4 cursor-default place-items-center rounded-full align-[-3px] text-text-subtle outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        }
-      >
-        <Info aria-hidden strokeWidth={1.75} className="size-4" />
-      </TooltipTrigger>
-      <TooltipContent>{tip}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/** "+12.4%" against the 30 days before. Up is green, down is red; a flat 0 reads as up. */
-export function TrendPill({ pct }: { pct: number }) {
-  const up = pct >= 0;
-  const Icon = up ? TrendingUp : TrendingDown;
-  const text = `${up ? "+" : "−"}${Math.abs(pct)}%`;
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={`${text} compared with the 30 days before`}
-            className={cn(
-              "inline-flex h-6 shrink-0 cursor-default items-center gap-1 rounded-md px-2 text-[12px] font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              // Ink on the soft green: the green text alone is 4.3:1; the arrow keeps the colour.
-              up ? "bg-positive-soft text-text" : "bg-danger-soft text-danger-text",
-            )}
-          />
-        }
-      >
-        <Icon aria-hidden strokeWidth={1.75} className={cn("size-3.5", up && "text-positive")} />
-        {text}
-      </TooltipTrigger>
-      <TooltipContent>Compared with the 30 days before</TooltipContent>
-    </Tooltip>
   );
 }

@@ -34,7 +34,7 @@ import { PALETTE_QUERY_MAX } from "@/domain/palette";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { NAV_ICON_STROKE, NAV_ITEMS } from "./nav";
 import { ScrimDialogContent } from "./scrim-dialog";
-import { TeamIcon } from "./team-icon";
+import { TeamIcon } from "@/components/primitives/team-icon";
 
 // ⌘K: go to a template, a page, a setting or another team, or start a new template. The items are
 // built in `components/palette/commands.ts`; this renders them and handles the keys. Templates and the

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { useCopy } from "@/components/primitives/copy";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -9,36 +9,8 @@ import { cn } from "@/lib/utils";
 // check and the word to "Copied" inside a box that is as wide as the longer word, so nothing shifts and
 // no toast appears. A polite status line carries the same confirmation for screen readers.
 
-const CONFIRM_MS = 1600;
-
-async function writeClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // The async clipboard can be unavailable (insecure context, permissions): fall back to a hidden textarea.
-    const el = document.createElement("textarea");
-    el.value = text;
-    el.setAttribute("readonly", "");
-    el.style.position = "fixed";
-    el.style.opacity = "0";
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand("copy");
-    el.remove();
-  }
-}
-
 export function CopyButton({ label, text, className }: { label: string; text: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const copy = useCallback(async () => {
-    await writeClipboard(text);
-    setCopied(true);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), CONFIRM_MS);
-  }, [text]);
+  const { copied, copy } = useCopy();
 
   const fade = "col-start-1 row-start-1 transition-opacity duration-(--dur-base) ease-(--ease-out-soft)";
   return (
@@ -47,7 +19,7 @@ export function CopyButton({ label, text, className }: { label: string; text: st
         type="button"
         variant="outline"
         aria-label={`Copy ${label}`}
-        onClick={copy}
+        onClick={() => void copy(text)}
         className={cn("h-8 shrink-0 gap-1.5 bg-surface px-3 text-[13px]", className)}
       >
         <span aria-hidden className="inline-grid size-3.5 place-items-center">

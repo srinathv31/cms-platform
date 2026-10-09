@@ -1,8 +1,9 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { Segmented } from "@/components/primitives/segmented";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { cn } from "@/lib/utils";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
@@ -11,56 +12,13 @@ import type { PreviewOutput } from "./render-preview";
 
 // The controls row under the rail's header: the channel at the left, the channel's own control at the
 // right. Every control in the rail is 32px tall with 8px corners (`h-8 rounded-lg`), so the row, and
-// the well under it, never move between channels.
-//
-// The rail's one segmented style, for the channel and for Desktop / Mobile: a white 32px track with a
-// hairline border, a 24px segment inside (6px corners) that is muted until it is chosen, and a tan
-// `bg-selected` fill under the chosen one: the same fill the pressed Preview button has in the tab bar.
+// the well under it, never move between channels. The channel and Desktop / Mobile are the app's one
+// segmented control (`Segmented`).
 
-const TRACK = "h-8 rounded-lg border border-hairline bg-surface p-0.5";
-const SEGMENT =
-  "h-6 min-w-0 rounded-md border-0 px-2.5 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text aria-pressed:hover:bg-selected";
-
-const CHANNEL_LABEL: Record<Channel, string> = { pdf: "PDF", web: "Web", email: "Email" };
 const DEVICES: readonly { value: PreviewDevice; label: string }[] = [
   { value: "desktop", label: "Desktop" },
   { value: "mobile", label: "Mobile" },
 ];
-
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  /** The group's accessible name. */
-  label: string;
-  value: T;
-  options: readonly { value: T; label: string }[];
-  onChange: (value: T) => void;
-  className?: string;
-}) {
-  return (
-    <ToggleGroup
-      aria-label={label}
-      value={[value]}
-      onValueChange={(next) => {
-        const picked = next[0] as T | undefined;
-        // A pressed segment can't be pressed off: there is always one chosen.
-        if (picked) onChange(picked);
-      }}
-      spacing={0.5}
-      className={cn(TRACK, className)}
-    >
-      {options.map((option) => (
-        <ToggleGroupItem key={option.value} value={option.value} className={SEGMENT}>
-          {option.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
-}
 
 /** Which channel's output is on screen. Only the channels that are on for the version are offered. */
 export function ChannelTabs({
@@ -78,7 +36,7 @@ export function ChannelTabs({
     <Segmented
       label="Channel"
       value={value}
-      options={channels.map((id) => ({ value: id, label: CHANNEL_LABEL[id] }))}
+      options={channels.map((id) => ({ value: id, label: CHANNEL_LABELS[id] }))}
       onChange={onChange}
       className={className}
     />

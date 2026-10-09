@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
+import { TAB, TAB_LABEL } from "@/components/primitives/tab-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { COLUMNS, FOLDS, ROW, ROW_HEIGHT } from "./columns";
 import { TAB_META } from "./format-row";
-import { TAB, TAB_BAR, TAB_CONTENT } from "./tab-styles";
+import { TAB_BAR } from "./tab-styles";
 
 /** Same geometry as the loaded list (tab bar, header row, four rows), so nothing shifts when it streams in. */
 export function QueueSkeleton() {
@@ -11,7 +12,7 @@ export function QueueSkeleton() {
       <div className={TAB_BAR}>
         {Object.values(TAB_META).map(({ label }) => (
           <span key={label} className={cn(TAB, "text-text-muted")}>
-            <span className={TAB_CONTENT}>
+            <span className={TAB_LABEL}>
               {label}
               <Skeleton className="h-4 w-2.5" />
             </span>

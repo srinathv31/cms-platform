@@ -1,46 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useCopy } from "./copy";
 
 /**
  * A template ID (`UC-4F7K2Q`): tracked-caps "TEMPLATE ID" over the mono value, with a copy button
  * that confirms with a check mark. (Style C, chosen by Sri on Oct 4.)
  */
-
-const CONFIRM_MS = 1600;
-
-function useCopy(value: string, withToast: boolean) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // Clipboard can be unavailable (insecure context, permissions). Fall back to a hidden textarea.
-      const el = document.createElement("textarea");
-      el.value = value;
-      el.setAttribute("readonly", "");
-      el.style.position = "fixed";
-      el.style.opacity = "0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      el.remove();
-    }
-    setCopied(true);
-    if (withToast) toast.success("Template ID copied");
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), CONFIRM_MS);
-  }, [value, withToast]);
-
-  return { copied, copy };
-}
 
 /** Copy glyph that crossfades into a check. Fixed size so nothing shifts. */
 function CopyGlyph({ copied, className }: { copied: boolean; className?: string }) {
@@ -76,7 +44,10 @@ export function TemplateId({
   toast?: boolean;
   className?: string;
 }) {
-  const { copied, copy } = useCopy(id, withToast);
+  const { copied, copy } = useCopy();
+  const onCopy = async () => {
+    if ((await copy(id)) && withToast) toast.success("Template ID copied");
+  };
   return (
     <div className={cn("inline-flex flex-col items-start gap-1", className)}>
       <span className="caps-label">{label}</span>
@@ -84,7 +55,7 @@ export function TemplateId({
         <span className="font-mono text-[14px] leading-6 text-text">{id}</span>
         <button
           type="button"
-          onClick={copy}
+          onClick={() => void onCopy()}
           aria-label={`Copy template ID ${id}`}
           title="Copy template ID"
           className="-my-1 inline-grid size-6 place-items-center rounded-md text-text-muted transition-colors duration-(--dur-fast) hover:bg-hover hover:text-text"

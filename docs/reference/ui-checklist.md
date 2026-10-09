@@ -4,8 +4,8 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
 
 ## Controls and states
 - **One selected-state idiom per kind.**
-  - View switches (tabs) are text with the 2px dark underline on a hairline, like the workspace tab bar (`workspace-tabs.tsx`).
-  - Option pickers (channel, device, and the like) use the one segmented style from `src/components/preview/controls.tsx`: a white 32px track with a hairline and `bg-selected` segments.
+  - View switches (tabs) are text with the 2px dark underline on a hairline, like the workspace tab bar: `Tabs` from `src/components/primitives/tabs.tsx`.
+  - Option pickers (channel, device, and the like) are the one segmented control, `Segmented` from `src/components/primitives/segmented.tsx` (`SegmentedRadio` in a form): a white 32px track with a hairline and `bg-selected` segments.
   - Never invent a third style.
 - **Sizes.**
   - Every control in a rail or panel is 32px tall with `rounded-lg` (8px): buttons, selects, segmented tracks, inputs.

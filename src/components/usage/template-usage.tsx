@@ -11,11 +11,11 @@ import type { TemplateUsageData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
+import { StatCard, StatLabel, StatTrend, StatValue } from "@/components/primitives/stat-card";
 import { Legend, SERIES, StackedBars, type StackSeries } from "./charts";
 import { ConsumersTable } from "./consumers-table";
 import { formatLastRender } from "./format";
-import { Panel, PanelHead, TrendPill } from "./panel";
-import { Numeral, StatLabel } from "./stat";
+import { Panel, PanelHead } from "./panel";
 
 // The workspace's Usage tab: which consumers render which version of this template. One chart, two
 // numbers, one table, and the last failures when there are any. The same rows feed the consequence line
@@ -122,16 +122,18 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
           </div>
         </Panel>
         <div className="grid grid-rows-[auto_1fr] gap-6">
-          <Panel>
-            <Numeral
+          <StatCard>
+            <StatValue
               value={formatCount(d.stats.renders.value)}
-              trend={d.stats.renders.trendPct === null ? null : <TrendPill pct={d.stats.renders.trendPct} />}
+              trend={d.stats.renders.trendPct === null ? null : <StatTrend pct={d.stats.renders.trendPct} />}
             />
-            <StatLabel tip="Live renders only. Previews aren't counted.">Renders · 30 days</StatLabel>
-          </Panel>
-          <Panel>
-            <Numeral value={d.success.pct === null ? "—" : `${d.success.pct}%`} />
-            <StatLabel>Succeeded</StatLabel>
+            <StatLabel tip="Live renders only. Previews aren't counted." className="mt-3">
+              Renders · 30 days
+            </StatLabel>
+          </StatCard>
+          <StatCard>
+            <StatValue value={d.success.pct === null ? "—" : `${d.success.pct}%`} />
+            <StatLabel className="mt-3">Succeeded</StatLabel>
             <div className="mt-4 flex flex-col gap-1 border-t border-hairline pt-3 text-[13px] text-text-muted">
               {d.success.errors > 0 ? (
                 <span>
@@ -144,7 +146,7 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
                 still.map((s) => <span key={s.versionNumber}>{s.pct}% still on v{s.versionNumber}</span>)
               )}
             </div>
-          </Panel>
+          </StatCard>
         </div>
       </div>
 

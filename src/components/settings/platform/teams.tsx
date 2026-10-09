@@ -1,29 +1,14 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import {
-  Briefcase,
-  Building2,
-  Car,
-  CreditCard,
-  Home,
-  Landmark,
-  Megaphone,
-  PiggyBank,
-  Plus,
-  ReceiptText,
-  Scale,
-  ShieldCheck,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import type { TeamsSection } from "@/domain/access-types";
 import { newTeamConsequences, validateNewTeam } from "@/domain/platform-config";
+import { Segmented } from "@/components/primitives/segmented";
+import { TeamIcon, teamIconLabel } from "@/components/primitives/team-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createTeam } from "@/server/actions/platform";
-import { cn } from "@/lib/utils";
 import { plural } from "@/domain/plural";
 import { Strip } from "../strip";
 import { HeaderRow, PersonLine, Pick, useFocusAfterCommit } from "./ui";
@@ -32,26 +17,6 @@ import { HeaderRow, PersonLine, Pick, useFocusAfterCommit } from "./ui";
 // that opens above it: name, an optional description, an icon, and the first Team Admin. The strip says
 // what creating it does before it is committed. The form is checked as the admin types with the domain's
 // `validateNewTeam`, the same check `createTeam` refuses with.
-
-const ICONS: Record<string, { Icon: LucideIcon; label: string }> = {
-  "credit-card": { Icon: CreditCard, label: "Credit card" },
-  "piggy-bank": { Icon: PiggyBank, label: "Piggy bank" },
-  "receipt-text": { Icon: ReceiptText, label: "Receipt" },
-  landmark: { Icon: Landmark, label: "Bank" },
-  wallet: { Icon: Wallet, label: "Wallet" },
-  home: { Icon: Home, label: "Home" },
-  car: { Icon: Car, label: "Car" },
-  briefcase: { Icon: Briefcase, label: "Briefcase" },
-  "shield-check": { Icon: ShieldCheck, label: "Shield" },
-  scale: { Icon: Scale, label: "Scale" },
-  megaphone: { Icon: Megaphone, label: "Megaphone" },
-  "building-2": { Icon: Building2, label: "Building" },
-};
-
-function GlyphFor({ name, className }: { name: string; className?: string }) {
-  const Icon = (ICONS[name]?.Icon ?? Building2) as LucideIcon;
-  return <Icon aria-hidden strokeWidth={1.75} className={className} />;
-}
 
 const COLS = "minmax(0,1.5fr) minmax(0,1.2fr) 5rem 5rem";
 
@@ -85,7 +50,7 @@ export function TeamsSectionView({ section }: { section: TeamsSection }) {
           <div key={team.id} role="row" className="grid min-h-16 items-center gap-x-4 border-b border-hairline py-2.5" style={{ gridTemplateColumns: COLS }}>
             <div role="cell" className="flex min-w-0 items-center gap-3">
               <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-chip text-chip-icon">
-                <GlyphFor name={team.icon} className="size-[18px]" />
+                <TeamIcon name={team.icon} className="size-[18px]" />
               </span>
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-medium text-text">{team.name}</div>
@@ -172,30 +137,16 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
           className="bg-surface"
         />
       </div>
-      <ToggleGroup
-        aria-label="Icon"
-        value={[icon]}
-        onValueChange={(next) => {
-          const picked = next[0];
-          if (picked) setIcon(picked);
-        }}
-        spacing={0.5}
-        className="h-8 w-fit rounded-lg border border-hairline bg-surface p-0.5"
-      >
-        {section.icons.map((key) => (
-          <ToggleGroupItem
-            key={key}
-            value={key}
-            aria-label={ICONS[key]?.label ?? key}
-            className={cn(
-              "size-6 min-w-0 rounded-md border-0 px-0 text-text-muted hover:bg-hover hover:text-text",
-              "aria-pressed:bg-selected aria-pressed:text-text aria-pressed:hover:bg-selected",
-            )}
-          >
-            <GlyphFor name={key} className="size-4" />
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <Segmented
+        label="Icon"
+        value={icon}
+        options={section.icons.map((key) => ({
+          value: key,
+          label: teamIconLabel(key),
+          icon: <TeamIcon name={key} className="size-4" />,
+        }))}
+        onChange={setIcon}
+      />
 
       {ready && admin ? (
         <Strip

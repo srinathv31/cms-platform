@@ -6,6 +6,7 @@ import { TemplateId } from "@/components/primitives/template-id";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IntegrationPanelData } from "@/domain/golive-types";
+import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { CodeBlock } from "./code-block";
 import { ContractChanges } from "./contract-changes";
@@ -13,8 +14,6 @@ import { ContractTable } from "./contract-table";
 import { CopyButton } from "./copy-button";
 import { Responses } from "./responses";
 import { SampleRequest } from "./sample-request";
-
-const CHANNEL_LABEL: Record<Channel, string> = { pdf: "PDF", web: "Web", email: "Email" };
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
@@ -51,7 +50,7 @@ export function IntegrationIdentity({
         <span className="caps-label">Channels</span>
         <span className="flex h-6 items-center gap-1.5">
           {channels ? (
-            channels.map((c) => <Chip key={c}>{CHANNEL_LABEL[c]}</Chip>)
+            channels.map((c) => <Chip key={c}>{CHANNEL_LABELS[c]}</Chip>)
           ) : (
             <>
               <Skeleton className="h-6 w-11" />

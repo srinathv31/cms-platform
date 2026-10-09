@@ -7,12 +7,12 @@ import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { UsageDashboard } from "@/domain/golive-types";
 import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
+import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/components/primitives/stat-card";
 import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, SERIES, StackedBars, type RatePoint, type StackSeries } from "./charts";
 import { ConsumersCard } from "./consumers-card";
 import { sunsetPhrase } from "./format";
 import { BARS_HEIGHT, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
-import { Panel, PanelHead, TrendPill } from "./panel";
-import { Lines, Numeral, StatLabel } from "./stat";
+import { Panel, PanelHead } from "./panel";
 import { UsageTabs } from "./usage-tabs";
 
 // /[team]/usage. Overview: three stat cards, Top templates beside the Daily renders heatmap, then
@@ -42,34 +42,36 @@ function Overview({ d }: { d: UsageDashboard }) {
   const soonest = stats.nearingSunset.soonest;
   return (
     <div className="grid gap-6 lg:grid-cols-6">
-      <Panel className={STAT_CARD}>
-        <Numeral
+      <StatCard className={STAT_CARD}>
+        <StatValue
           value={formatCount(stats.renders.value)}
-          trend={stats.renders.trendPct === null ? null : <TrendPill pct={stats.renders.trendPct} />}
+          trend={stats.renders.trendPct === null ? null : <StatTrend pct={stats.renders.trendPct} />}
         />
-        <StatLabel tip="Live renders only. Previews aren't counted.">Renders · 30 days</StatLabel>
+        <StatLabel tip="Live renders only. Previews aren't counted." className="mt-3">
+          Renders · 30 days
+        </StatLabel>
         <div className="mt-6 border-t border-hairline-strong pt-5">
           <ChannelMix
             parts={(["pdf", "web", "email"] as const).map((c) => ({ label: CHANNEL_LABELS[c], value: d.byChannel[c] }))}
           />
         </div>
-      </Panel>
+      </StatCard>
 
-      <Panel className={STAT_CARD}>
-        <Numeral value={onActive.pct === null ? "—" : `${onActive.pct}%`} />
-        <StatLabel tip="Of the last 30 days' renders, the share on a version that is Active now.">
+      <StatCard className={STAT_CARD}>
+        <StatValue value={onActive.pct === null ? "—" : `${onActive.pct}%`} />
+        <StatLabel tip="Of the last 30 days' renders, the share on a version that is Active now." className="mt-3">
           Renders on active versions
         </StatLabel>
         <Gauge pct={onActive.pct} label={onActive.pct === null ? "No renders" : `${onActive.pct}% on active versions`} className="mt-4 max-w-[13rem]">
           <span className="text-[14px] text-text-muted">{onOlder}</span>
           <span className="text-[22px] text-text tabular-nums">{formatCount(onActive.other)}</span>
         </Gauge>
-      </Panel>
+      </StatCard>
 
-      <Panel className={STAT_CARD}>
-        <Numeral value={stats.activeTemplates.display} />
-        <StatLabel>Active templates</StatLabel>
-        <Lines
+      <StatCard className={STAT_CARD}>
+        <StatValue value={stats.activeTemplates.display} />
+        <StatLabel className="mt-3">Active templates</StatLabel>
+        <StatLines
           rows={[
             ["Consumers", stats.consumers.display],
             ["Nearing sunset", plural(stats.nearingSunset.value, "version")],
@@ -78,7 +80,7 @@ function Overview({ d }: { d: UsageDashboard }) {
         <div className="mt-2 line-clamp-2 min-h-10 text-[13px] text-text-muted">
           {soonest ? `${soonest.templateName} v${soonest.versionNumber} ${sunsetPhrase(soonest.daysAway)}` : null}
         </div>
-      </Panel>
+      </StatCard>
 
       <Panel className="lg:col-span-3">
         <PanelHead title="Top templates" aside="Last 30 days" />
