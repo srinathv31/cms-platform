@@ -1,10 +1,9 @@
 import { rm } from "node:fs/promises";
-import { request as httpRequest } from "node:http";
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { asPersona, openDb } from "./helpers";
+import { asPersona, openDb, postChunked } from "./helpers";
 
 // The import API (Phase 7a): POST /api/imports with each kind of file, the refusals, the permission
 // check, and the two read routes (the original's bytes and the Original tab's view), called the way
@@ -182,35 +181,17 @@ test.describe("POST /api/imports", () => {
   });
 
   test("a chunked upload with no Content-Length: refused before the body for no permission (403), and once it passes 10 MB (413)", async ({ baseURL }) => {
-    /** POSTs `megabytes` of a multipart body in 1 MB chunks (Transfer-Encoding: chunked); stops when the answer comes. */
-    const chunked = (persona: string, megabytes: number) =>
-      new Promise<{ status: number; body: string; sentMb: number }>((resolve, reject) => {
-        const url = new URL("/api/imports?team=coral-offers", baseURL);
-        const boundary = "----ucomp-chunked";
-        const req = httpRequest(url, {
-          method: "POST",
-          headers: { Cookie: `ucomp_persona=${persona}`, "Content-Type": `multipart/form-data; boundary=${boundary}`, "Transfer-Encoding": "chunked" },
-        });
-        let sentMb = 0;
-        let answered = false;
-        req.on("response", (res) => {
-          answered = true;
-          let body = "";
-          res.on("data", (d: Buffer) => (body += d.toString()));
-          res.on("end", () => resolve({ status: res.statusCode ?? 0, body, sentMb }));
-        });
-        req.on("error", (error) => (answered ? undefined : reject(error)));
-        req.write(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\nContent-Type: text/plain\r\n\r\n`);
-        const chunk = Buffer.alloc(1024 * 1024, 0x61);
-        const pump = () => {
-          if (answered) return req.destroy();
-          if (sentMb >= megabytes) return req.end(`\r\n--${boundary}--\r\n`);
-          sentMb += 1;
-          if (req.write(chunk)) setImmediate(pump);
-          else req.once("drain", pump);
-        };
-        pump();
+    /** POSTs up to `megabytes` of a multipart body in 1 MB chunks as the persona; stops sending when the answer comes. */
+    const chunked = (persona: string, megabytes: number) => {
+      const boundary = "----ucomp-chunked";
+      return postChunked(new URL("/api/imports?team=coral-offers", baseURL), {
+        headers: { Cookie: `ucomp_persona=${persona}`, "Content-Type": `multipart/form-data; boundary=${boundary}` },
+        megabytes,
+        fill: 0x61,
+        head: `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\nContent-Type: text/plain\r\n\r\n`,
+        tail: `\r\n--${boundary}--\r\n`,
       });
+    };
 
     const taylor = await chunked("taylor", 64);
     expect(taylor.status).toBe(403);
