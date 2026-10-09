@@ -3,7 +3,9 @@
 //
 // Plain TypeScript, no React: the provider owns one store per workspace and the components read it
 // with useSyncExternalStore. It holds
-//   - the binding: which draft is being edited (versionId, rev). null on a read-only page.
+//   - the binding: which draft is being edited (versionId, rev). null on a read-only page. The
+//     header (in the layout, on every tab) binds the draft it shows, so a rename on Versions saves
+//     too; the Content page binds the draft it edits as well (see `bind`).
 //   - the autosave session for that draft, once the provider has mounted it (`attach`).
 //   - the document editor's handle, so the name field can move the caret into the document.
 //   - whether the rail overlay is open (narrow canvas).
@@ -23,8 +25,8 @@
 //     what gets frozen. The parts of the page that edit the draft read it and go read-only (the
 //     document, the variables, the email fields, the channels, the sample sets, the name, undo and
 //     redo, the revert menu), and revert, replace and restore refuse. Autosave keeps running: what
-//     was typed before the click still goes out. Anything that stops editing for a while (a save
-//     that can't go through, say) holds it the same way (decision 0012).
+//     was typed before the click still goes out. A save the server refuses for good (a conflict)
+//     holds it the same way, for as long as that draft stays bound (decision 0012).
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -33,7 +35,7 @@ import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
 import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
 
-/** The draft the Content page is editing. `rev` is where autosave starts; it is read once per version. */
+/** The draft the workspace is editing. `rev` is where autosave starts; it is read once per version. */
 export interface DraftBinding {
   versionId: string;
   rev: number;
@@ -42,6 +44,8 @@ export interface DraftBinding {
 export interface SessionStatus {
   status: SaveStatus;
   error?: string;
+  /** Saving stopped for good (a conflict, say): nothing more is saved, and the page is held inert. */
+  stopped?: boolean;
 }
 
 /**
@@ -133,7 +137,16 @@ export interface WorkspaceSession {
   /** Something holds the page still (`makeInert`): nothing on it may change the draft. */
   getInert: () => boolean;
 
-  /** The Content page says which draft is editable, or null when the page is read-only. Idempotent per version. */
+  /**
+   * Which draft is editable, or null when the page is read-only. Idempotent per version: binding
+   * the draft already bound changes nothing (its autosave keeps the rev it has reached), so the
+   * header and the Content page can both bind it, and one autosave session serves the version.
+   * The header binds on every tab and unbinds (null) when its version can't be edited. The Content
+   * page binds the draft it edits, and never unbinds: after a tab switch its data can be newer than
+   * the header's (the layout doesn't re-render), and an editable draft there must save; a read-only
+   * Content page under a header that still holds a draft leaves the session to the server, which
+   * refuses the next save and stops it.
+   */
   bind: (binding: DraftBinding | null) => void;
   /**
    * The provider's autosave host connects (and, with null, disconnects) the live `save` and its
@@ -360,7 +373,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     publishStatus(next) {
-      if (status.status === next.status && status.error === next.error) return;
+      if (status.status === next.status && status.error === next.error && !!status.stopped === !!next.stopped) return;
       // A save landing: the one transition a preview cares about. (A save that fails goes to "error".)
       if (status.status === "saving" && next.status === "saved") saveTick += 1;
       status = next;

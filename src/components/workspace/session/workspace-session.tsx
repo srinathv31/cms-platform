@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, use, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import { createContext, use, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { useDraftAutosave } from "../autosave/use-draft-autosave";
 import {
   createWorkspaceSession,
@@ -16,11 +16,12 @@ import {
 const SessionContext = createContext<WorkspaceSession | null>(null);
 
 /**
- * Wraps the workspace layout. It carries no data of its own: the Content page tells it which draft
- * is editable (`bind`), and the provider then runs ONE autosave session for that draft, which the
- * editor, the variables, the channels and the name field all save through. It sits in the layout, so
- * the session lives as long as the workspace does: switching tabs doesn't end it, and the pending
- * save of a hidden Content tab still goes out.
+ * Wraps the workspace layout. It carries no data of its own: the header tells it which draft is
+ * editable (`BindDraft`, on every tab; the Content page binds it too), and the provider then runs ONE
+ * autosave session for that draft, which the editor, the variables, the channels and the name field
+ * all save through. It sits in the layout, so the session lives as long as the workspace does:
+ * switching tabs doesn't end it, a rename on Versions saves like one on Content, and the pending save
+ * of a hidden Content tab still goes out.
  */
 export function WorkspaceSessionProvider({ children }: { children: React.ReactNode }) {
   const [session] = useState(createWorkspaceSession);
@@ -38,9 +39,14 @@ function SessionHostSlot({ session }: { session: WorkspaceSession }) {
   return binding ? <DraftSessionHost key={binding.versionId} session={session} binding={binding} /> : null;
 }
 
-/** Runs the autosave hook for one draft and hands its `save`, `flush` and status to the store. Renders nothing. */
+/**
+ * Runs the autosave hook for one draft and hands its `save`, `flush` and status to the store. Renders
+ * nothing. Once the server refuses a save for good (a conflict: the draft changed in another tab), it
+ * holds the page inert for as long as it lives, so nothing more can be typed that would be dropped;
+ * the header says why and offers Reload (`SaveStopped`).
+ */
 function DraftSessionHost({ session, binding }: { session: WorkspaceSession; binding: DraftBinding }) {
-  const { save, flush, status, error } = useDraftAutosave({ versionId: binding.versionId, initialRev: binding.rev });
+  const { save, flush, status, error, stopped } = useDraftAutosave({ versionId: binding.versionId, initialRev: binding.rev });
 
   // Layout effect: changes held while this host was mounting go out before the browser paints.
   useLayoutEffect(() => {
@@ -49,9 +55,27 @@ function DraftSessionHost({ session, binding }: { session: WorkspaceSession; bin
   }, [session, save, flush]);
 
   useLayoutEffect(() => {
-    session.publishStatus(error === undefined ? { status } : { status, error });
-  }, [session, status, error]);
+    session.publishStatus({ status, ...(error === undefined ? {} : { error }), ...(stopped ? { stopped } : {}) });
+  }, [session, status, error, stopped]);
 
+  // Stopped is for good: the hold goes only with this host (another draft bound, or none).
+  useLayoutEffect(() => (stopped ? session.makeInert() : undefined), [session, stopped]);
+
+  return null;
+}
+
+/**
+ * Binds the session to the draft the header shows (or to none, on a version that can't be edited).
+ * The header renders it in the layout, so autosave runs on every tab: the name field there saves
+ * wherever the author renames. Renders nothing.
+ */
+export function BindDraft({ draft }: { draft: DraftBinding | null }) {
+  const session = useWorkspaceSession();
+  const versionId = draft?.versionId ?? null;
+  const rev = draft?.rev ?? null;
+  useEffect(() => {
+    session.bind(versionId === null || rev === null ? null : { versionId, rev });
+  }, [session, versionId, rev]);
   return null;
 }
 
@@ -105,8 +129,9 @@ export function useCanRevert(): boolean {
 }
 
 /**
- * The page is held still (`session.makeInert`): Submit is reading or freezing the saved draft. Every
- * part that edits the draft shows it read-only meanwhile, and is editable again once it is let go.
+ * The page is held still (`session.makeInert`): Submit is reading or freezing the saved draft, or
+ * saving has stopped for good. Every part that edits the draft shows it read-only meanwhile, and is
+ * editable again once it is let go.
  */
 export function useInert(): boolean {
   const session = useWorkspaceSession();

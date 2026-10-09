@@ -43,6 +43,11 @@ export interface WorkspaceHeaderData {
   /** The shown version is an open draft and the viewer can edit it (the name is a field, autosave runs). */
   editable: boolean;
   /**
+   * The draft autosave saves to, when `editable`: its id, and its `rev` where autosave starts. The
+   * header binds the workspace session to it, so the name saves on every tab. Null otherwise.
+   */
+  draft: { versionId: string; rev: number } | null;
+  /**
    * "Edit" is offered: there's no open draft, the latest version is Active or Revoked (`planDraftStart`),
    * and the viewer can edit.
    */
@@ -81,6 +86,7 @@ export const getWorkspaceHeader = cache(
         name: versions.name,
         sunsetAt: versions.sunsetAt,
         basedOnVersionId: versions.basedOnVersionId,
+        rev: versions.rev,
       })
       .from(versions)
       .where(eq(versions.templateId, templateId));
@@ -95,6 +101,7 @@ export const getWorkspaceHeader = cache(
     const basedOnNumber = basedOn?.number ?? null;
     const versionLabel = isDraft ? (basedOnNumber !== null ? `Based on v${basedOnNumber}` : null) : `v${versionNumber}`;
     const canEdit = can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok;
+    const editable = canEdit && latest?.state === "draft";
 
     return {
       id: tpl.id,
@@ -109,7 +116,8 @@ export const getWorkspaceHeader = cache(
       activeNumber: active?.number ?? null,
       versionNumber,
       canEdit,
-      editable: canEdit && latest?.state === "draft",
+      editable,
+      draft: editable && latest ? { versionId: latest.id, rev: latest.rev } : null,
       canStartDraft: canEdit && planDraftStart(list).kind === "create",
       canSubmit: latest?.state === "draft" && can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
     };

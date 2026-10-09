@@ -96,8 +96,11 @@ variations to avoid.
 ### An autosave
 
 1. The workspace's autosave ([use-draft-autosave.ts](../src/components/workspace/autosave/use-draft-autosave.ts))
-   debounces edits (800 ms, at most 5 s), sends one request at a time, and flushes on page hide. It runs the
-   server's document check first, so a patch the server would refuse is never sent.
+   debounces edits (800 ms, at most 5 s), sends one request at a time, and flushes on page hide. While anything
+   typed isn't saved, closing or reloading the page asks first. It runs the server's document check first, so a
+   patch the server would refuse is never sent. The workspace header binds it to the draft on every tab. A
+   refusal retrying can't fix (a conflict) stops it for good: the page turns read-only and offers Reload
+   ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
    client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
    byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.

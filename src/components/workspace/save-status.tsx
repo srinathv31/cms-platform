@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, useTransition, type ComponentType, type ReactNode } from "react";
-import { ChevronDown, History, Redo2, RotateCcw, Undo2, type LucideProps } from "lucide-react";
+import { ChevronDown, History, Redo2, RotateCcw, RotateCw, Undo2, type LucideProps } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,16 +45,19 @@ export interface SaveStatusProps {
  *     opened it" once something has changed, and "Revert to v3" on a draft started from v3. Each
  *     toast has an Undo that puts the changes back, until anything else is edited or the content
  *     leaves the screen: then the toast goes, so Undo never drops a newer edit.
+ * Once saving has stopped for good, the status reads "Not saved." and `SaveStopped`, on its own line
+ * under it, says why and offers Reload.
  * Undo and redo come first, so nothing the status does moves them: it changes width as it saves, and
  * gains its menu's chevron once the Content tab is on screen. Before them, either would be a layout shift.
  */
 export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProps) {
-  const { status, error } = useSaveStatus();
+  const { status, error, stopped } = useSaveStatus();
   const canRevert = useCanRevert();
   // The content is on screen to take another version's fields: the Content tab, editable.
   const contentOnScreen = useOwnsFields(VERSION_FIELDS);
   const base = basedOn !== null && contentOnScreen ? { number: basedOn, active: basedOn === activeNumber } : null;
-  const indicator = <SaveIndicator status={status} error={error} />;
+  // Stopped, the reason is SaveStopped's: it needs more room than the status row has.
+  const indicator = <SaveIndicator status={status} error={stopped ? undefined : error} />;
   return (
     <span className="inline-flex items-center gap-1.5">
       <UndoRedo />
@@ -66,6 +69,34 @@ export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProp
         indicator
       )}
     </span>
+  );
+}
+
+/**
+ * Saving has stopped for good (the draft changed in another tab, or can't be edited any more): why,
+ * in a sentence that says plainly that the latest changes can't be saved, and Reload. The page is
+ * held read-only meanwhile (the session's inert hold), so nothing more is typed that would be
+ * dropped, and what is on screen can still be selected and copied. Reload shows the draft as it now
+ * is; the browser asks first, since the page still holds what wasn't saved (use-draft-autosave.ts).
+ *
+ * The header renders it on a line of its own under the status row, the full width of the header (the
+ * status row shares its line with the Template ID), so the sentence and its button fit on one line
+ * from 1000px up. It renders nothing until saving stops.
+ */
+export function SaveStopped({ className }: { className?: string }) {
+  const { error, stopped } = useSaveStatus();
+  if (!stopped) return null;
+  return (
+    <div data-slot="save-stopped" className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", className)}>
+      <p role="alert" className="text-[13px] leading-5 text-danger-text">
+        {error}
+      </p>
+      {/* A secondary action: the tab bar keeps the one black button. */}
+      <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+        <RotateCw data-icon="inline-start" aria-hidden strokeWidth={1.75} />
+        Reload
+      </Button>
+    </div>
   );
 }
 

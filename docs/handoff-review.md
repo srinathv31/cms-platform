@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 4 | 23 | 11 | 38 |
+| Open | 0 | 3 | 21 | 11 | 35 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 18 | 12 | 3 | 34 |
+| Fixed | 1 | 19 | 14 | 3 | 37 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -327,7 +327,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I1 · High: Renaming a draft outside the Content tab is never saved, but shows "Saved"
 
-- **Status:** Open
+- **Status:** Fixed. The workspace header, on every tab, binds the autosave session to the draft it shows (`getWorkspaceHeader` returns its id and `rev`); the Content page binds the same draft, which is one session ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 - **Where:** `src/components/workspace/name-field.tsx` line 103; `src/components/workspace/session/session-store.ts` line 329; `src/components/workspace/content/content-workspace.tsx` line 119
 - **What happens:** The name field sits in the header on every tab, but only the Content tab binds the autosave session. Reload or deep-link into Versions, Usage or Activity, rename the template, and the change is parked in `held`; `flush()` resolves at once and the status stays "Saved". Leaving the template discards it.
 - **Fix:** Bind the session from the template layout (the header query already knows the draft), or make the name read-only until a draft is bound.
@@ -367,7 +367,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I6 · Medium: After a save conflict the editor stays editable but nothing saves
 
-- **Status:** Open
+- **Status:** Fixed. A stopped save holds the workspace inert (`makeInert`) for as long as that draft is bound, and the header says plainly that the latest changes can't be saved, with a Reload button ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 - **Where:** `src/components/workspace/autosave/autosave-scheduler.ts` line 194
 - **What happens:** After `conflict`, `forbidden` or `not_draft`, the scheduler stops for good and drops every later edit. The only signal is a muted "Reload to continue", and reloading loses what was typed since. Found by two reviewers.
 - **Fix:** Switch the editor to read-only when saving stops and offer Reload in the page.
@@ -399,7 +399,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### I10 · Medium: Large drafts can lose the last edits on tab close
 
-- **Status:** Open
+- **Status:** Fixed. While anything typed isn't saved, closing or reloading the page asks first (`beforeunload`) and sends what is pending as it asks; once everything is saved the guard is gone ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 - **Where:** `src/components/workspace/autosave/save-transport.ts` line 13
 - **What happens:** Bodies over 60 KB aren't sent with `keepalive` on pagehide, and there is no `beforeunload` guard. Long disclosures pass 60 KB easily because every block carries a UUID.
 - **Fix:** A `beforeunload` prompt while the status isn't saved, or send diffs.

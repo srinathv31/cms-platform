@@ -177,9 +177,12 @@ answer, which the caller shows as its own failure. The Compare panel (`versions/
 **Other paths.** Some client code `fetch`es other route handlers: autosave (`workspace/autosave/save-transport.ts`),
 the preview render (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and the ⌘K palette.
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
+The workspace header, in the template layout, binds it to the draft it shows (`BindDraft`), so autosave runs on every
+tab and a rename on Versions saves like one on Content; the Content page binds the same draft, which is one session.
 The same store holds the workspace still (`makeInert`, read with `useInert`): Submit holds it from its click until its
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
-Anything else that has to stop edits for a while takes a hold the same way.
+A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the
+header's `SaveStopped` says why and offers Reload. Anything else that has to stop edits takes a hold the same way.
 
 ## Copy these
 

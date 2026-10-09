@@ -69,7 +69,7 @@ export interface ContentWorkspaceProps {
  * single autosave session. The preview lives in the rail (it widens into it), in that same root, so it
  * renders with the live variable list. The server component that renders this passes a key made of the version
  * and whether it is editable, so a different version, or the same one turning read-only (submitted),
- * is a fresh editor and a fresh session.
+ * is a fresh editor.
  *
  * Review comments (src/components/comments) live here too: the document gets highlights and markers
  * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
@@ -82,10 +82,11 @@ export interface ContentWorkspaceProps {
  * it mounted: the session hands the values over (`restore`), and everything inside the editor root
  * remounts with them (`shown.gen` is its key), since the root and the fields read their values once.
  *
- * While the session is inert (Submit is reading or freezing the saved draft), an editable page shows
- * read-only without remounting: the editor root (the document, the email fields, the variables panel,
- * undo and redo), the channels and the sample sets. It stays bound, so autosave keeps sending what was
- * typed before, and it is editable again, history and all, when the hold is let go.
+ * While the session is inert (Submit is reading or freezing the saved draft, or saving stopped for
+ * good), an editable page shows read-only without remounting: the editor root (the document, the
+ * email fields, the variables panel, undo and redo), the channels and the sample sets. Text can still
+ * be selected and copied. It stays bound, so autosave keeps sending what was typed before, and it is
+ * editable again, history and all, when the hold is let go.
  */
 export function ContentWorkspace({
   templateId,
@@ -124,10 +125,12 @@ export function ContentWorkspace({
     [importOriginal, templateId],
   );
 
-  // Tell the workspace which draft is being edited. It starts autosave for it, and the header's name
-  // field and save indicator follow. A read-only page binds nothing.
+  // The header binds the draft it shows, on every tab. This page binds the one it edits too: after a
+  // tab switch its data can be newer than the header's (the layout doesn't re-render), and what is
+  // typed here must save. The same draft bound twice is one session. It never unbinds: the header
+  // does, when its version can't be edited (see `bind` in session-store.ts).
   useEffect(() => {
-    session.bind(editable ? { versionId, rev } : null);
+    if (editable) session.bind({ versionId, rev });
   }, [session, editable, versionId, rev]);
 
   const [channels, setChannels] = useState(initialChannels);

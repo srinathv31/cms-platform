@@ -12,7 +12,8 @@
 //   - A new editing session starts (a new session key, so a new audit row) when the last saved
 //     change is more than 30 minutes old.
 //   - `conflict`, `forbidden`, `not_draft` and `not_found` stop saving for good: retrying cannot
-//     fix them, and a conflict must never be overwritten silently. `invalid` waits for the next change.
+//     fix them, and a conflict must never be overwritten silently. The state says so (`stopped`),
+//     so the page can stop taking edits it would drop. `invalid` waits for the next change.
 
 import type { DraftPatch, DraftSaveError, DraftSaveResponse } from "@/domain/types";
 
@@ -25,6 +26,11 @@ export interface AutosaveState {
   status: SaveStatus;
   /** A short message for the author, set when `status` is "error". */
   error?: string;
+  /**
+   * Set (true) once the server has refused in a way retrying can't fix. From then on nothing is
+   * sent: what was pending then, and anything changed after, can't be saved from this page.
+   */
+  stopped?: boolean;
 }
 
 export interface SendOptions {
@@ -81,17 +87,20 @@ export const DEFAULT_SESSION_GAP_MS = 30 * 60_000;
 export const RETRYING = "Not saved. Retrying…";
 export const OFFLINE = "Not saved. Check your connection.";
 
-/** What the author reads for each refusal that cannot be retried. */
+/**
+ * What the author reads for each refusal. All but `invalid` stop saving, and say plainly that the
+ * changes not yet saved never will be; the save status offers Reload beside them.
+ */
 export function failureMessage(error: DraftSaveError, serverMessage: string): string {
   switch (error) {
     case "conflict":
-      return "Not saved — this draft changed elsewhere. Reload to continue.";
+      return "Your latest changes can't be saved — this draft changed elsewhere.";
     case "forbidden":
-      return "Not saved — you can no longer edit this draft.";
+      return "Your latest changes can't be saved — you can no longer edit this draft.";
     case "not_draft":
-      return "Not saved — this version is no longer a draft. Reload to continue.";
+      return "Your latest changes can't be saved — this version is no longer a draft.";
     case "not_found":
-      return "Not saved — this draft no longer exists.";
+      return "Your latest changes can't be saved — this draft no longer exists.";
     case "invalid":
       return `Not saved. ${serverMessage}`;
   }
@@ -140,8 +149,8 @@ export function createAutosave(options: AutosaveOptions): Autosave {
   function emit() {
     const status: SaveStatus = error ? "error" : inflight ? "saving" : pending ? "unsaved" : "saved";
     const message = error ?? undefined;
-    if (status === state.status && message === state.error) return;
-    state = message === undefined ? { status } : { status, error: message };
+    if (status === state.status && message === state.error && stopped === (state.stopped ?? false)) return;
+    state = { status, ...(message === undefined ? {} : { error: message }), ...(stopped ? { stopped } : {}) };
     for (const listener of [...listeners]) listener();
   }
 

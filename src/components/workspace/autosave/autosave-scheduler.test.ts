@@ -83,11 +83,15 @@ describe("mergeFields", () => {
 
 describe("failureMessage", () => {
   it("says the same thing for each refusal, in a few words", () => {
-    expect(failureMessage("conflict", "x")).toBe("Not saved — this draft changed elsewhere. Reload to continue.");
-    expect(failureMessage("forbidden", "x")).toMatch(/^Not saved — /);
-    expect(failureMessage("not_draft", "x")).toMatch(/^Not saved — /);
-    expect(failureMessage("not_found", "x")).toMatch(/^Not saved — /);
+    expect(failureMessage("conflict", "x")).toBe("Your latest changes can't be saved — this draft changed elsewhere.");
     expect(failureMessage("invalid", "The name must be 1 to 120 characters.")).toBe("Not saved. The name must be 1 to 120 characters.");
+  });
+
+  it("says plainly that what wasn't saved never will be, when saving stops, with no instruction (Reload is a control)", () => {
+    for (const error of ["conflict", "forbidden", "not_draft", "not_found"] as const) {
+      expect(failureMessage(error, "x")).toMatch(/^Your latest changes can't be saved — /);
+      expect(failureMessage(error, "x")).not.toMatch(/reload/i);
+    }
   });
 });
 
@@ -550,23 +554,51 @@ describe("a request that never comes back", () => {
 
 describe("answers that stop saving", () => {
   it.each([
-    ["conflict", "Not saved — this draft changed elsewhere. Reload to continue."],
-    ["forbidden", "Not saved — you can no longer edit this draft."],
-    ["not_draft", "Not saved — this version is no longer a draft. Reload to continue."],
-    ["not_found", "Not saved — this draft no longer exists."],
-  ] as const)("%s: shows the message and never sends again", async (error, text) => {
+    ["conflict", "Your latest changes can't be saved — this draft changed elsewhere."],
+    ["forbidden", "Your latest changes can't be saved — you can no longer edit this draft."],
+    ["not_draft", "Your latest changes can't be saved — this version is no longer a draft."],
+    ["not_found", "Your latest changes can't be saved — this draft no longer exists."],
+  ] as const)("%s: shows the message, says it has stopped, and never sends again", async (error, text) => {
     const { autosave, calls, tick, answer } = setup();
     autosave.save({ body: doc("mine") });
     await tick(800);
     await answer(refused(error, "server words", 9));
 
-    expect(autosave.getState()).toEqual({ status: "error", error: text });
+    expect(autosave.getState()).toEqual({ status: "error", error: text, stopped: true });
 
     autosave.save({ body: doc("more typing") });
     await autosave.flush();
     await tick(120_000);
     expect(calls).toHaveLength(1);
-    expect(autosave.getState()).toEqual({ status: "error", error: text });
+    expect(autosave.getState()).toEqual({ status: "error", error: text, stopped: true });
+  });
+
+  it("tells listeners once when it stops, and keeps the same state object after", async () => {
+    const { autosave, tick, answer } = setup();
+    autosave.save({ name: "A" });
+    await tick(800);
+    const listener = vi.fn();
+    autosave.subscribe(listener);
+    await answer(refused("conflict"));
+    expect(listener).toHaveBeenCalledTimes(1);
+    const state = autosave.getState();
+
+    autosave.save({ name: "B" });
+    await autosave.flush();
+    expect(autosave.getState()).toBe(state);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("isn't stopped before anything happens, by a network failure, or by a refusal the next change can fix", async () => {
+    const { autosave, tick, answer, fail } = setup();
+    expect(autosave.getState().stopped).toBeUndefined();
+    autosave.save({ name: "A" });
+    await tick(800);
+    await fail();
+    expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
+    await tick(1_000);
+    await answer(refused("invalid", "The name must be 1 to 120 characters."));
+    expect(autosave.getState()).toEqual({ status: "error", error: "Not saved. The name must be 1 to 120 characters." });
   });
 
   it("does not adopt the rev from a conflict (that would overwrite the other edit)", async () => {
