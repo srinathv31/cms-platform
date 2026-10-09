@@ -246,6 +246,7 @@ export type ConsequenceAction =
 
 export interface ReviewQueueRow {
   templateId: string;
+  /** The row's version's name: what was submitted for review. */
   templateName: string;
   teamSlug: string;
   teamName: string;
@@ -267,11 +268,13 @@ export interface ReviewQueue {
 }
 
 export interface ReviewScreenData {
-  template: { id: string; name: string; teamId: string; teamSlug: string; teamName: string };
+  template: { id: string; teamId: string; teamSlug: string; teamName: string };
   version: {
     id: string;
     number: number;
     state: VersionState;
+    /** The template's name as this version has it: the header's title, and what goes live. */
+    name: string;
     body: JSONContent;
     variables: Variable[];
     channels: Channel[];
@@ -292,6 +295,12 @@ export interface ReviewScreenData {
    * Active (a first version, or after a revoke). The contract changes come from submit (`contractBaseline`).
    */
   baseline: { id: string; number: number; body: JSONContent; variables: Variable[] } | null;
+  /**
+   * The name customers get today, which the rail shows a rename against: the Active version's or, with
+   * none Active, the newest version that still renders (`contractBaseline`). Null when nothing else
+   * renders, or that is this version.
+   */
+  liveName: string | null;
   steps: StepView[];
   threads: ThreadView[];
   can: { approve: PermissionResult; requestChanges: PermissionResult; comment: PermissionResult };

@@ -136,7 +136,7 @@ describe("startDraft while another write holds the file", () => {
     const held = new Promise<void>((resolve) => (holding = resolve));
     const other = (async () => {
       const tx = await sim.transaction("write");
-      await tx.execute("UPDATE templates SET name = name WHERE id = 'nonexistent'");
+      await tx.execute("UPDATE templates SET starter_key = starter_key WHERE id = 'nonexistent'");
       holding();
       await new Promise((resolve) => setTimeout(resolve, 60));
       await tx.commit();

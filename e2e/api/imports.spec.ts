@@ -75,11 +75,11 @@ async function imported(res: APIResponse): Promise<Imported> {
 }
 
 async function rowsFor(templateId: string) {
-  const template = (await db.execute({ sql: "SELECT name, starter_key FROM templates WHERE id = ?", args: [templateId] })).rows[0];
-  const version = (await db.execute({ sql: "SELECT body, variables, import_upload_id FROM versions WHERE template_id = ?", args: [templateId] })).rows[0];
+  const template = (await db.execute({ sql: "SELECT starter_key FROM templates WHERE id = ?", args: [templateId] })).rows[0];
+  const version = (await db.execute({ sql: "SELECT name, body, variables, import_upload_id FROM versions WHERE template_id = ?", args: [templateId] })).rows[0];
   const upload = (await db.execute({ sql: "SELECT id, filename, mime, path FROM uploads WHERE template_id = ?", args: [templateId] })).rows[0];
   return {
-    name: String(template?.name),
+    name: String(version?.name),
     starterKey: template?.starter_key ?? null,
     body: JSON.stringify(JSON.parse(String(version?.body))),
     variables: (JSON.parse(String(version?.variables)) as { key: string; type: string; required: boolean }[]),

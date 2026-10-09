@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 import { ArrowRight } from "lucide-react";
+import { NameChangeLine } from "@/components/redline/name-change";
 import { RedlineDocument } from "@/components/redline/redline-document";
 import { redlineSummary } from "@/components/redline/blocks";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { diffDocuments } from "@/domain/redline";
+import { diffDocuments, nameChange } from "@/domain/redline";
+import type { RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
 import { loadVersionsToCompare, type CompareVersion } from "@/server/queries/compare";
@@ -24,6 +26,13 @@ type Loaded = { key: string; ok: true; from: CompareVersion; to: CompareVersion 
 // One line at every width: the pickers and the switch keep their size, and the summary, which is the
 // one part that can be long, gives way (it truncates, and says all of it on hover).
 const CONTROLS = "flex h-[3.75rem] shrink-0 items-center gap-x-4 border-b border-hairline px-8";
+
+/** The redline's summary, with a rename counted first. */
+function withRename(counts: RedlineDoc["counts"], renamed: boolean): string {
+  if (!renamed) return redlineSummary(counts);
+  const changed = counts.added + counts.removed + counts.changed + counts.moved > 0;
+  return changed ? `Renamed, ${redlineSummary(counts)}` : "Renamed";
+}
 
 function VersionSelect({
   labelId,
@@ -93,6 +102,10 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
 
   const ready = loaded?.key === key ? loaded : null;
   const redline = useMemo(() => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null), [ready]);
+  // The name is versioned, so a rename between the two shows with the redline, above the document, and
+  // the summary counts it ("Renamed", "Renamed, 2 added and 1 changed") rather than saying "No changes".
+  const rename = ready?.ok ? nameChange(ready.from.name, ready.to.name) : null;
+  const summary = redline ? withRename(redline.counts, rename !== null) : "";
   const variables = useMemo<Variable[]>(() => {
     if (!ready?.ok) return [];
     const known = new Set(ready.to.variables.map((v) => v.key));
@@ -120,12 +133,8 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
         <VersionSelect labelId={toLabel} value={toId} options={toOptions} onChange={setToId} />
         <div className="ml-auto flex min-w-0 items-center gap-4">
           {redline ? (
-            <span
-              data-slot="redline-summary"
-              title={redlineSummary(redline.counts)}
-              className="min-w-0 truncate text-[13px] text-text-muted"
-            >
-              {redlineSummary(redline.counts)}
+            <span data-slot="redline-summary" title={summary} className="min-w-0 truncate text-[13px] text-text-muted">
+              {summary}
             </span>
           ) : null}
           <div className="flex shrink-0 items-center gap-2">
@@ -139,7 +148,15 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
 
       <div data-slot="compare-body" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pt-6 pb-10">
         {redline ? (
-          <RedlineDocument doc={redline} variables={variables} changesOnly={changesOnly} className="[--ucomp-doc-gutter:3.5rem]" />
+          <>
+            {rename ? (
+              <div className="mx-auto mb-6 flex max-w-(--doc-width) flex-col gap-1">
+                <h3 className="caps-label">Name</h3>
+                <NameChangeLine change={rename} />
+              </div>
+            ) : null}
+            <RedlineDocument doc={redline} variables={variables} changesOnly={changesOnly} className="[--ucomp-doc-gutter:3.5rem]" />
+          </>
         ) : ready && !ready.ok ? (
           <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-[14px] text-text-muted">
             <p>Couldn&apos;t load these versions.</p>

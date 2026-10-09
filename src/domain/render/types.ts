@@ -167,8 +167,10 @@ export interface RenderRule {
 export type RenderBlock = RenderParagraph | RenderHeading | RenderList | RenderTable | RenderCallout | RenderRule;
 
 /**
- * What every channel adapter receives. `templateName` is internal metadata (PDF title, HTML <title>);
- * the adapters never print it in the body: the customer-facing title, if any, is in the document.
+ * What every channel adapter receives. `templateName` is the rendered version's name, used only as
+ * metadata (PDF title, HTML <title>). A browser tab and a PDF viewer show it, so it comes from the
+ * version being rendered and changes only with an approved version. The adapters never print it in
+ * the body: the title a customer reads on the page, if any, is in the document.
  * The top-level `blocks` never end with an empty paragraph (the editor's trailing line is dropped).
  */
 export interface RenderDoc {

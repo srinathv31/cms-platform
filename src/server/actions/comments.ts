@@ -53,10 +53,13 @@ const NOT_FOUND = {
 /** `db` outside the transaction, `tx` inside it. */
 type Reader = Pick<Db, "select">;
 
-/** What a thread's or a version's template is, and what on it takes comments right now. */
-async function loadTemplate(reader: Reader, templateId: string): Promise<CommentTemplate | undefined> {
+/**
+ * What a thread's or a version's template is, and what on it takes comments right now. `name` is the
+ * name of the version the comment is about (the name is versioned): its notifications call it that.
+ */
+async function loadTemplate(reader: Reader, templateId: string, name: string): Promise<CommentTemplate | undefined> {
   const template = await reader
-    .select({ id: templates.id, name: templates.name, teamId: templates.teamId, contentTypeId: templates.contentTypeId })
+    .select({ id: templates.id, teamId: templates.teamId, contentTypeId: templates.contentTypeId })
     .from(templates)
     .where(eq(templates.id, templateId))
     .limit(1)
@@ -70,6 +73,7 @@ async function loadTemplate(reader: Reader, templateId: string): Promise<Comment
   const review = list.find((v) => v.state === "in_review" && v.number !== null);
   return {
     ...template,
+    name,
     hasDraft: list.some((v) => v.state === "draft"),
     inReview: review
       ? { number: review.number!, stageApproverIds: await namedOnStage(reader, template.contentTypeId, review) }
@@ -100,7 +104,8 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
       currentStage: versions.currentStage,
       body: versions.body,
       templateId: templates.id,
-      templateName: templates.name,
+      // The version's own name: its notification names the version commented on.
+      templateName: versions.name,
       teamId: templates.teamId,
       contentTypeId: templates.contentTypeId,
     })
@@ -138,6 +143,7 @@ async function loadThread(reader: Reader, threadId: string): Promise<{ template:
       originState: versions.state,
       originCreatedBy: versions.createdBy,
       originSubmittedBy: versions.submittedBy,
+      originName: versions.name,
     })
     .from(commentThreads)
     .innerJoin(versions, eq(versions.id, commentThreads.originVersionId))
@@ -145,7 +151,8 @@ async function loadThread(reader: Reader, threadId: string): Promise<{ template:
     .limit(1)
     .then((rows) => rows[0]);
   if (!row) return undefined;
-  const template = await loadTemplate(reader, row.templateId);
+  // A reply's notification names the version the thread began on, by that version's name.
+  const template = await loadTemplate(reader, row.templateId, row.originName);
   if (!template) return undefined;
   return {
     template,

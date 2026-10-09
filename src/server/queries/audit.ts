@@ -39,6 +39,7 @@ import { formatDateTime } from "@/domain/dates";
 import { dayAgo } from "./format";
 import { dayOf, getPeople, iso, personOf, type People } from "./review-shared";
 import { requireSpace } from "./spaces";
+import { currentName } from "./template-name";
 
 // The Audit page (/{team}/audit) and its CSV export (/{team}/audit/export), from one read.
 //
@@ -148,12 +149,14 @@ async function readAudit(
   const knownPeople = new Map<string, Person>();
   const knownTemplates = new Map<string, { id: string; name: string; teamSlug: string }>();
   const knownActions = new Set<string>();
-  for (const row of universe) {
+  for (const [i, row] of universe.entries()) {
     for (const key of personKeysOf(row)) {
       if (!knownPeople.has(key)) knownPeople.set(key, key === SYSTEM_PERSON ? SYSTEM_PERSON_VIEW : personOf(people, key));
     }
     if (row.template && !knownTemplates.has(row.template.id)) {
-      knownTemplates.set(row.template.id, { ...row.template, teamSlug: row.team?.slug ?? "" });
+      // A row names its own version; the filter names the template once, as it is now.
+      const name = events[i]!.currentTemplateName ?? row.template.name;
+      knownTemplates.set(row.template.id, { id: row.template.id, name, teamSlug: row.team?.slug ?? "" });
     }
     knownActions.add(actionKeyOf(row));
   }
@@ -193,13 +196,21 @@ interface EventRow {
   actorId: string | null;
   teamId: string | null;
   templateId: string | null;
+  /** The name of the event's version when it has one, else the template's current name. */
   templateName: string | null;
+  /** The template's current name (`currentName`): the Template filter lists each template once by it. */
+  currentTemplateName: string | null;
   action: string;
   details: Record<string, unknown> | null;
   versionNumber: number | null;
 }
 
-/** The space's events, newest first (same-moment rows: newest written first). */
+/**
+ * The space's events, newest first (same-moment rows: newest written first). An event about a version
+ * names the template as that version had it, so the record (and its export) keeps the name the event
+ * happened under; an event about the template alone (its creation) names it as the Library does now
+ * (`currentName`).
+ */
 async function loadEvents(teamId: string | null): Promise<EventRow[]> {
   return db
     .select({
@@ -208,7 +219,8 @@ async function loadEvents(teamId: string | null): Promise<EventRow[]> {
       actorId: auditEvents.actorId,
       teamId: auditEvents.teamId,
       templateId: auditEvents.templateId,
-      templateName: templates.name,
+      templateName: sql<string | null>`coalesce(${versions.name}, ${currentName(templates.id)})`,
+      currentTemplateName: currentName(templates.id),
       action: auditEvents.action,
       details: auditEvents.details,
       versionNumber: versions.number,

@@ -16,7 +16,7 @@ import type { WorkspaceSession } from "./session/session-store";
 vi.mock("@/server/queries/base-version", () => ({ getBaseVersion: vi.fn() }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(() => "revert-toast"), { error: vi.fn(), dismiss: vi.fn() }) }));
 // The session's autosave host, without the network: what it is handed is the session's business.
-const autosave = vi.hoisted(() => ({ save: () => {}, flush: async () => {} }));
+const autosave = vi.hoisted(() => ({ save: vi.fn<(fields: SaveFields) => void>(), flush: async () => {} }));
 vi.mock("./autosave/use-draft-autosave", () => ({ useDraftAutosave: () => ({ ...autosave, status: "saved" }) }));
 
 const { SaveStatus } = await import("./save-status");
@@ -111,12 +111,25 @@ describe("SaveStatus, in the browser", () => {
 describe("Revert to v1", () => {
   const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
   const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
-  const V1: BaseVersionContent = { number: 1, body: doc("Version 1"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
+  const V1: BaseVersionContent = {
+    number: 1,
+    name: "Rate notice",
+    body: doc("Version 1"),
+    variables: [],
+    channels: ["pdf"],
+    emailSubject: null,
+    emailPreheader: null,
+    sampleSets: [],
+  };
 
   let root: Root;
   let container: HTMLElement;
   /** What the Content page would show: the session hands it new values to put on screen. */
   const content = vi.fn();
+  /** What the header's name field would show. */
+  const nameField = vi.fn();
+  /** What the session handed to autosave. */
+  const saved: SaveFields[] = [];
   let removeContent: () => void;
 
   const sleep = (ms: number) => act(async () => void (await new Promise((resolve) => setTimeout(resolve, ms))));
@@ -164,14 +177,21 @@ describe("Revert to v1", () => {
     vi.mocked(toast.error).mockClear();
     vi.mocked(toast.dismiss).mockClear();
     content.mockClear();
+    nameField.mockClear();
+    saved.length = 0;
+    autosave.save.mockImplementation((fields) => {
+      saved.push(fields);
+    });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
     await act(async () => root.render(page()));
-    // The Content page, editable: it binds the draft and can show the version's fields.
+    // The Content page, editable: it binds the draft and can show the version's fields. The header's
+    // name field shows the draft's name, renamed since it was started from v1.
     await act(async () => {
       session!.bind({ versionId: "v_draft", rev: 4 });
       removeContent = session!.addRestoreTarget({ opening: OPENING, restore: content });
+      session!.addRestoreTarget({ opening: { name: "Rate notice (renamed)" }, restore: nameField });
     });
   });
 
@@ -303,5 +323,20 @@ describe("Revert to v1", () => {
     content.mockClear();
     await undo();
     expect(content).not.toHaveBeenCalled();
+  });
+
+  // The name is a version field: reverting to v1 brings v1's name back too, and Undo the draft's.
+  it("puts v1's name in the name field and saves it, and Undo puts the draft's name back", async () => {
+    vi.mocked(getBaseVersion).mockResolvedValue({ ok: true, base: V1 });
+    await openMenu();
+    await click(item());
+    await until(() => !menu());
+    expect(nameField).toHaveBeenCalledTimes(1);
+    expect(nameField.mock.calls[0]![0]).toEqual(expect.objectContaining({ name: "Rate notice" }));
+    expect(saved.at(-1)).toMatchObject({ name: "Rate notice", body: doc("Version 1") });
+
+    await undoToast().undo();
+    expect(nameField.mock.calls.at(-1)![0]).toEqual(expect.objectContaining({ name: "Rate notice (renamed)" }));
+    expect(saved.at(-1)).toMatchObject({ name: "Rate notice (renamed)", body: doc("Opening") });
   });
 });

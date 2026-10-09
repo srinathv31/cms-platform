@@ -10,6 +10,7 @@ import { relativeTime } from "./format";
 
 export interface LibraryRow {
   id: string;
+  /** The latest version's name (`pickLatest`): the open draft's, otherwise the newest version's. */
   name: string;
   teamSlug: string;
   teamName: string;
@@ -22,7 +23,10 @@ export interface LibraryRow {
   owner: { name: string; initials: string; hue: number };
 }
 
-/** Latest = the open draft if there is one, otherwise the highest version number. */
+/**
+ * Latest = the open draft if there is one, otherwise the highest version number. The CMS shows a
+ * template by this version's name (`currentName` in template-name.ts is the same pick in SQL).
+ */
 export function pickLatest<T extends { number: number | null; state: VersionState }>(
   list: T[],
 ): T | undefined {
@@ -41,7 +45,6 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
   const templateRows = await db
     .select({
       id: templates.id,
-      name: templates.name,
       teamSlug: teams.slug,
       teamName: teams.name,
       ownerName: users.name,
@@ -61,6 +64,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
       templateId: versions.templateId,
       number: versions.number,
       state: versions.state,
+      name: versions.name,
       sunsetAt: versions.sunsetAt,
       updatedAt: versions.updatedAt,
     })
@@ -85,7 +89,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
     return {
       row: {
         id: t.id,
-        name: t.name,
+        name: latest?.name ?? t.id,
         teamSlug: t.teamSlug,
         teamName: t.teamName,
         status: latest?.state ?? ("draft" as VersionState),

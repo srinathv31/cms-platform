@@ -71,6 +71,7 @@ describe("getBaseVersion", () => {
       ok: true,
       base: {
         number: 1,
+        name: v1.name,
         body: v1.body,
         variables: v1.variables,
         channels: v1.channels,

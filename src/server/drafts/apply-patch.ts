@@ -14,7 +14,8 @@ import { NAME_MESSAGE, normalizeName } from "./parse-patch";
 // The database half of an autosave. `saveDraft` (save-draft.ts) supplies the real database and the
 // demo clock; this takes both as arguments so the tests can run it against a temporary database.
 // The body and the email fields are stored as src/server/documents/prepare.ts makes them (normalized,
-// checked, with block ids); a document it refuses is `invalid` with the check's sentence.
+// checked, with block ids); a document it refuses is `invalid` with the check's sentence. Every field,
+// the name too, is the draft's own: nothing here changes another version or what customers see.
 
 type Refusal = Extract<DraftSaveResponse, { ok: false }>;
 
@@ -172,6 +173,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       updatedAt: at,
       writers: withWriter(row.writers, viewer.userId),
     };
+    if (name !== undefined) set.name = name;
     if (body !== undefined) set.body = body;
     if (patch.variables !== undefined) set.variables = patch.variables;
     if (patch.channels !== undefined) set.channels = patch.channels;
@@ -188,8 +190,6 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       .returning({ rev: versions.rev });
     const saved = updated[0];
     if (!saved) return fail("conflict", "This draft changed elsewhere.", row.rev);
-
-    if (name !== undefined) await tx.update(templates).set({ name }).where(eq(templates.id, row.templateId));
 
     const merged = mergeDraftEdit(existing ?? null, changed, at, saved.rev);
     if (existing) {

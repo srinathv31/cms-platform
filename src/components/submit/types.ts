@@ -14,11 +14,16 @@ export interface SubmitSummary {
   rev: number;
   /** The number the version gets at submit: one above the template's highest. */
   number: number;
+  /** The draft's name, which goes live with it. */
+  name: string;
   /** The channels the version renders to, in the content type's order. */
   channels: Channel[];
   /** Names of every sample data set, defaults first. */
   sampleSetNames: string[];
   variables: Variable[];
-  /** The version the contract is compared with (`contractBaseline`: the newest that still renders); null when none does. */
-  baseline: { number: number; variables: Variable[] } | null;
+  /**
+   * The version the name and the contract are compared with (`contractBaseline`: the newest that still
+   * renders, so what customers get today); null when none does.
+   */
+  baseline: { number: number; name: string; variables: Variable[] } | null;
 }

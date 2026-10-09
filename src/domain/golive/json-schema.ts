@@ -95,6 +95,7 @@ function propertyOf(variable: Variable): ApiJsonSchemaProperty {
 /** JSON Schema for the render body's `values`: one property per variable, the required keys, unknown keys allowed. */
 export function contractJsonSchema(input: {
   templateId: string;
+  /** The name of the version whose contract this is (`versionNumber`'s), for the title. */
   templateName: string;
   versionNumber: number;
   variables: readonly Variable[];

@@ -104,7 +104,7 @@ async function expectReviewScreen(page: Page, number: number) {
 async function seededInReview() {
   const [seeded] = await rows(
     `SELECT v.id, v.template_id, v.number, v.state, v.current_stage, v.stages FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE t.name = ? AND v.state = 'in_review'`,
+     WHERE v.name = ? AND v.state = 'in_review'`,
     [NAME],
   );
   if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);

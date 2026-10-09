@@ -95,7 +95,7 @@ export interface ApiPage {
 /**
  * Search. ONLY templates with an Active version are returned (a consumer can't link anything else).
  * - `q` (optional, trimmed): a template id, case-insensitive, with or without "UC-" ("uc-4f7k2q",
- *   "4F7K2Q"); or words matched case-insensitively against the name (every word must appear).
+ *   "4F7K2Q"); or words matched case-insensitively against the Active version's name (every word must appear).
  *   Empty `q` lists every Active template.
  * - `limit` (optional): results per page, 1–50, default 20.
  * - `after` (optional): the `nextCursor` of an earlier page for the same `q` (ApiPage).
@@ -114,6 +114,7 @@ export interface ApiTemplateSearch extends ApiPage {
 
 export interface ApiTemplateSummary {
   id: string; // "UC-4F7K2Q"
+  /** The Active version's name. Each version keeps the name it was approved with; a rename arrives with a new version. */
   name: string;
   team: { id: string; name: string };
   contentType: { key: string; name: string }; // { key: "disclosure", name: "Disclosure" }
@@ -146,6 +147,11 @@ export interface ApiTemplateSummary {
  */
 export interface ApiTemplateDetail {
   id: string;
+  /**
+   * The Active version's name. With none Active (it was revoked), the name of the newest version that
+   * still renders; with nothing rendering, the newest released version's. `contract.jsonSchema.title`
+   * names the contract's own version.
+   */
   name: string;
   team: { id: string; name: string };
   contentType: { key: string; name: string };
@@ -262,6 +268,7 @@ export interface ApiNotice {
   id: string;
   kind: ApiNoticeKind;
   createdAt: string;
+  /** `name` is the name of the version the notice is about, as it was when the notice was written. */
   template: { id: string; name: string };
   /** The version the notice is about: the new one (new_version), the one being sunset, the revoked one. */
   versionNumber: number;

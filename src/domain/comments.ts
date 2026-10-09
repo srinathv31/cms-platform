@@ -60,6 +60,7 @@ export interface CommentVersion {
 /** The template a thread belongs to, and the versions on it that take comments right now. */
 export interface CommentTemplate {
   id: string;
+  /** What its notifications call it: the name of the version the comment is about (the name is versioned). */
   name: string;
   teamId: string;
   /** The template has an open draft. Its margin shows every thread of the template. */

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { TriangleAlert } from "lucide-react";
+import { NameChangeLine } from "@/components/redline/name-change";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { codeSegments } from "@/components/versions/format";
+import type { NameChange } from "@/domain/redline";
 import type { Person } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 
@@ -45,6 +47,16 @@ export function SubmitNote({ author, note }: { author: Person; note: string }) {
       <figcaption className="text-[12px] leading-4 text-text-subtle">Note from {author.name}</figcaption>
       <p className="mt-1 text-[14px] leading-5 [overflow-wrap:anywhere] text-text">{note}</p>
     </figure>
+  );
+}
+
+/** The rename the version brings: its name against the one customers get today, which they keep seeing until it goes live. */
+export function NameSection({ change, className }: { change: NameChange; className?: string }) {
+  return (
+    <section aria-labelledby="review-name" className={className}>
+      <SectionLabel id="review-name">Name</SectionLabel>
+      <NameChangeLine change={change} className="mt-3" />
+    </section>
   );
 }
 

@@ -83,7 +83,6 @@ export async function renderTemplate(input: RenderInput): Promise<RenderResult> 
 
 type TemplateRow = {
   id: string;
-  name: string;
   teamId: string;
   contentTypeId: string;
   contentTypeName: string;
@@ -106,7 +105,6 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
   const [template] = await db
     .select({
       id: templates.id,
-      name: templates.name,
       teamId: templates.teamId,
       contentTypeId: templates.contentTypeId,
       contentTypeName: contentTypes.name,
@@ -228,11 +226,12 @@ async function renderVersion(
     return fail(channelNotEnabled(version.number, input.channel, version.channels));
   }
 
-  // 6–9. The engine.
+  // 6–9. The engine. The title is the rendered version's own name: a draft's rename never reaches
+  // the Active version's output.
   const result = await runEngine(
     {
       templateId: template.id,
-      templateName: template.name,
+      templateName: version.name,
       versionNumber: version.number,
       variables: version.variables,
       values: input.values,

@@ -5,7 +5,7 @@ import { useReducedMotion } from "motion/react";
 import { COMPOSER_THREAD_ID, ThreadList, blockTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
 import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
-import { diffDocuments } from "@/domain/redline";
+import { diffDocuments, nameChange } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
 import type { Channel, VersionState } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
@@ -17,7 +17,7 @@ import { DecisionRail } from "./decision-rail";
 import { DocumentView } from "./document-view";
 import { GoLive } from "./go-live";
 import { PreviewView } from "./preview-view";
-import { SectionLabel, ContractSection, SubmitNote } from "./rail-sections";
+import { SectionLabel, ContractSection, NameSection, SubmitNote } from "./rail-sections";
 import { RequestChangesDialog } from "./request-dialog";
 import { ReviewHeader } from "./review-header";
 import { RV } from "./review-grid";
@@ -82,6 +82,8 @@ export function ReviewWorkspace({
     [baseline, version.body],
   );
   const changeCount = redline ? redline.counts.added + redline.counts.removed + redline.counts.changed + redline.counts.moved : 0;
+  // The name is versioned: a rename against what customers get today is reviewed like the rest.
+  const rename = nameChange(data.liveName, version.name);
 
   // ── Sample sets, for the Preview ────────────────────────────────
 
@@ -300,7 +302,7 @@ export function ReviewWorkspace({
       <ReviewHeader
         team={team}
         templateId={template.id}
-        templateName={template.name}
+        templateName={version.name}
         versionNumber={version.number}
         state={shownState}
         sunsetAt={version.sunsetAt ?? null}
@@ -372,8 +374,9 @@ export function ReviewWorkspace({
         regionRef={decisionRegion}
       >
         {version.submitNote ? <SubmitNote author={version.submittedBy} note={version.submitNote} /> : null}
+        {rename ? <NameSection className={version.submitNote ? "mt-8" : undefined} change={rename} /> : null}
         <ContractSection
-          className={version.submitNote ? "mt-8" : undefined}
+          className={version.submitNote || rename ? "mt-8" : undefined}
           changes={version.contractChanges}
           lines={version.contractLines}
           first={version.number === 1}

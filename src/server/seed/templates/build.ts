@@ -126,7 +126,6 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     id: templateId,
     teamId: spec.teamId,
     contentTypeId: CONTENT_TYPE_ID,
-    name: spec.name,
     createdBy: spec.createdBy,
     createdAt: ctx.at(spec.createdAt),
     starterKey: spec.starterKey ?? null,
@@ -148,6 +147,8 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       templateId,
       number: v.number,
       state: v.state,
+      // The name is a version field; no seeded template has been renamed, so every version has its name.
+      name: spec.name,
       basedOnVersionId: v.basedOn ? versionOf(v.basedOn).id : null,
       body: v.body,
       emailSubject: v.email?.subject ?? null,

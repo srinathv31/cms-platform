@@ -30,7 +30,6 @@ export async function getCopilotPrompt(input: { templateId: string }): Promise<A
   const template = await db
     .select({
       id: templates.id,
-      name: templates.name,
       teamId: templates.teamId,
       teamName: teams.name,
       contentTypeName: contentTypes.name,
@@ -48,7 +47,7 @@ export async function getCopilotPrompt(input: { templateId: string }): Promise<A
   if (!allowed.ok) return { ok: false, reason: allowed.reason };
 
   const draft = await db
-    .select({ body: versions.body, channels: versions.channels, variables: versions.variables })
+    .select({ name: versions.name, body: versions.body, channels: versions.channels, variables: versions.variables })
     .from(versions)
     .where(and(eq(versions.templateId, template.id), eq(versions.state, "draft")))
     .limit(1)
@@ -56,7 +55,7 @@ export async function getCopilotPrompt(input: { templateId: string }): Promise<A
   if (!draft) return { ok: false, reason: REASONS.noDraft };
 
   const prompt = buildCopilotPrompt({
-    templateName: template.name,
+    templateName: draft.name,
     teamName: template.teamName,
     contentTypeName: template.contentTypeName,
     channels: draft.channels,

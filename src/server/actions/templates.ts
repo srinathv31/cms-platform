@@ -83,6 +83,7 @@ export async function startDraft(input: { templateId: string }): Promise<void> {
       id: latest.id,
       number: latest.number,
       state: latest.state,
+      name: latest.name,
       body: latest.body,
       emailSubject: latest.emailSubject,
       emailPreheader: latest.emailPreheader,

@@ -105,7 +105,6 @@ describe("createDraft", () => {
     const { changes } = createDraft({ starter: EXAMPLE, createdBy: "maya", now: NOW });
 
     expect(changes.template).toEqual({
-      name: "Card offer terms",
       starterKey: "card_offer_terms",
       createdBy: "maya",
       createdAt: NOW,
@@ -114,6 +113,7 @@ describe("createDraft", () => {
       state: "draft",
       number: null,
       basedOnVersionId: null,
+      name: "Card offer terms",
       contractChanges: null,
       currentStage: 0,
       rev: 0,
@@ -150,7 +150,7 @@ describe("createDraft", () => {
 
   it("makes Blank untitled, with no starter key and no variables", () => {
     const { changes, effects } = createDraft({ starter: BLANK, createdBy: "maya", now: NOW });
-    expect(changes.template.name).toBe(UNTITLED_TEMPLATE_NAME);
+    expect(changes.draft.name).toBe(UNTITLED_TEMPLATE_NAME);
     expect(changes.template.starterKey).toBeNull();
     expect(changes.draft.variables).toEqual([]);
     expect(effects).toEqual([
@@ -239,6 +239,7 @@ describe("editLatest", () => {
     id: "v_active",
     number: 3,
     state: "active",
+    name: "Spring Travel Rewards — Terms",
     body: BODY,
     emailSubject: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Subject" }] }] },
     emailPreheader: null,
@@ -247,12 +248,13 @@ describe("editLatest", () => {
     sampleSets: SAMPLE_SETS,
   };
 
-  it("copies body, variables, channels, email fields and sample sets into a draft", () => {
+  it("copies the name, body, variables, channels, email fields and sample sets into a draft", () => {
     const { changes } = editLatest({ from: active, createdBy: "priya", now: NOW });
     expect(changes.draft).toEqual({
       state: "draft",
       number: null,
       basedOnVersionId: "v_active",
+      name: "Spring Travel Rewards — Terms",
       body: BODY,
       emailSubject: active.emailSubject,
       emailPreheader: null,
@@ -677,6 +679,7 @@ function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
     templateId: TEMPLATE.id,
     number: 1,
     state: "in_review",
+    name: TEMPLATE.name,
     body: BODY,
     emailSubject: EMAIL_SUBJECT,
     emailPreheader: null,
@@ -825,6 +828,7 @@ describe("requestChanges", () => {
         state: "draft",
         number: null,
         basedOnVersionId: "v_1",
+        name: TEMPLATE.name,
         body: BODY,
         emailSubject: EMAIL_SUBJECT,
         emailPreheader: null,
@@ -856,6 +860,11 @@ describe("requestChanges", () => {
         },
       ],
     });
+  });
+
+  it("carries the version's name into the new draft, a rename included", () => {
+    const result = run({ version: reviewVersion({ name: "Spring Travel Rewards — Card Terms" }) });
+    expect(result.ok && result.newDraft.name).toBe("Spring Travel Rewards — Card Terms");
   });
 
   it("keeps every block id in the new draft, so the review threads re-anchor in the editor", () => {

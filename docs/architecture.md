@@ -143,8 +143,10 @@ at Turso instead. Two schema files:
   - **Settings:** `settings` (demo clock offset, seed version).
   - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
-  - **Templates:** `templates`; `versions` (body as TipTap JSON, variables, channels, state, `rev`, `writers`,
-    the approval `stages` recorded at submit, sunset and revoke fields); `approvals` (each decision's stage id).
+  - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
+    variables, channels, state, `rev`, `writers`, the approval `stages` recorded at submit, sunset and revoke
+    fields); `approvals` (each decision's stage id). The name is a version field, so a rename goes through
+    review ([decision 0016](decisions/0016-the-name-is-versioned.md)).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
   - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it

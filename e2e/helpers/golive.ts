@@ -89,7 +89,7 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
   const [base] = await rows(
     db,
     `SELECT v.* FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE t.team_id = ? AND t.name = 'Cash Back Welcome Bonus — Terms' AND v.number = 2 AND v.state = 'active'`,
+     WHERE t.team_id = ? AND v.name = 'Cash Back Welcome Bonus — Terms' AND v.number = 2 AND v.state = 'active'`,
     [TEAM],
   );
   if (!base) throw new Error("The seed has no Cash Back Welcome Bonus v2 (Active) to clone. Run npm run db:reset.");
@@ -126,11 +126,10 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     values: Object.fromEntries(Object.entries(set.values).filter(([key]) => keys.includes(key))),
   }));
 
-  await run(db, "INSERT INTO templates (id, team_id, content_type_id, name, created_by, created_at, starter_key) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+  await run(db, "INSERT INTO templates (id, team_id, content_type_id, created_by, created_at, starter_key) VALUES (?, ?, ?, ?, ?, ?)", [
     templateId,
     TEAM,
     baseTemplate.content_type_id,
-    SPRING_NAME,
     "maya",
     at - 86_400_000,
     FIXTURE_MARK,
@@ -142,6 +141,7 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     template_id: templateId,
     number: 2,
     state: "active",
+    name: SPRING_NAME,
     based_on_version_id: null,
     body: JSON.stringify(body),
     email_subject: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [variable("first_name"), text(", your Spring Travel Rewards terms")] }] }),

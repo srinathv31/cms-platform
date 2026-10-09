@@ -8,8 +8,8 @@ import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
 import { getViewer } from "@/server/viewer";
 
-// What the Compare dialog needs and the Versions read model doesn't carry: the bodies and variable
-// lists of the versions being compared. A read, so it checks only that the viewer may see the
+// What the Compare dialog needs and the Versions read model doesn't carry: the names, bodies and
+// variable lists of the versions being compared. A read, so it checks only that the viewer may see the
 // template (as the Versions page itself does). The diff is computed in the dialog.
 
 export interface CompareVersion {
@@ -17,6 +17,8 @@ export interface CompareVersion {
   /** Null for the open draft. */
   number: number | null;
   state: VersionState;
+  /** The template's name as this version has it (a rename shows above the redline). */
+  name: string;
   body: JSONContent;
   variables: Variable[];
 }
@@ -40,7 +42,14 @@ export async function loadVersionsToCompare(input: {
   const ids = [...new Set(input.versionIds)].slice(0, 2);
   const rows = ids.length
     ? await db
-        .select({ id: versions.id, number: versions.number, state: versions.state, body: versions.body, variables: versions.variables })
+        .select({
+          id: versions.id,
+          number: versions.number,
+          state: versions.state,
+          name: versions.name,
+          body: versions.body,
+          variables: versions.variables,
+        })
         .from(versions)
         .where(and(eq(versions.templateId, input.templateId), inArray(versions.id, ids)))
     : [];

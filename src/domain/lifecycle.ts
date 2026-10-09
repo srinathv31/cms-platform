@@ -18,6 +18,10 @@
 //
 // The transitions the review phase added refuse with a one-line reason (`{ ok: false, reason }`)
 // rather than throwing: a second tab or a slower colleague gets there first, and the person reads why.
+//
+// The name is a version field, like the body: a new draft copies it, the author renames the draft, and
+// it freezes at submit. A transition's `templateName` is the name of the version it is about
+// (`version.name`): that is what its notifications call it.
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
 import { usageFromJSON } from "@/editor/model/usage";
@@ -96,6 +100,8 @@ export interface VersionSnapshot {
   id: string;
   number: number | null;
   state: VersionState;
+  /** The template's name as this version has it. A draft copies it; renaming the draft changes only the draft. */
+  name: string;
   body: JSONContent;
   emailSubject: JSONContent | null;
   emailPreheader: JSONContent | null;
@@ -110,6 +116,8 @@ export interface DraftFields {
   /** Null until the draft is submitted; the number is assigned at submit and then frozen. */
   number: null;
   basedOnVersionId: string | null;
+  /** The template's name in this draft: what the author renames, and what customers see once it goes live. */
+  name: string;
   body: JSONContent;
   emailSubject: JSONContent | null;
   emailPreheader: JSONContent | null;
@@ -141,8 +149,8 @@ export class LifecycleError extends Error {
 // ── New template ──────────────────────────────────────────────
 
 export interface NewTemplateChanges {
+  /** The template has no name of its own: the first draft carries it (`draft.name`). */
   template: {
-    name: string;
     /** Null for Blank, as in the seed. */
     starterKey: string | null;
     createdBy: string;
@@ -168,11 +176,12 @@ export function createDraft(input: {
 
   return {
     changes: {
-      template: { name, starterKey: isBlank ? null : starter.key, createdBy, createdAt: now },
+      template: { starterKey: isBlank ? null : starter.key, createdBy, createdAt: now },
       draft: {
         state: "draft",
         number: null,
         basedOnVersionId: null,
+        name,
         body: clone(starter.body),
         emailSubject: clone(starter.emailSubject ?? null),
         emailPreheader: clone(starter.emailPreheader ?? null),
@@ -232,8 +241,8 @@ export function planDraftStart(
 
 /**
  * A new draft copied from the version `planDraftStart` chose, the template's latest, Active or
- * Revoked: body (block ids included, so comments and the redline keep their anchors), variables,
- * channels, email fields and sample sets. `basedOnVersionId` is that version, revoked or not.
+ * Revoked: its name, body (block ids included, so comments and the redline keep their anchors),
+ * variables, channels, email fields and sample sets. `basedOnVersionId` is that version, revoked or not.
  * Contract changes are worked out at submit, against `contractBaseline`, so none are recorded here.
  * Its writers start afresh with the person who pressed Edit: who wrote a released version doesn't
  * keep anyone from deciding the next one.
@@ -1078,15 +1087,16 @@ function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string |
 }
 
 /**
- * A new draft copied from a version (Edit on the latest version, or a change request): body with every
- * block id (so comment threads and the redline keep their anchors), variables, channels, email fields
- * and sample sets. Contract changes are worked out at submit, so none are recorded here.
+ * A new draft copied from a version (Edit on the latest version, or a change request): its name, body
+ * with every block id (so comment threads and the redline keep their anchors), variables, channels,
+ * email fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */
 function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, writers: readonly string[]): DraftFields {
   return {
     state: "draft",
     number: null,
     basedOnVersionId: version.id,
+    name: version.name,
     body: clone(version.body),
     emailSubject: clone(version.emailSubject),
     emailPreheader: clone(version.emailPreheader),

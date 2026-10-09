@@ -43,6 +43,13 @@
       "when": 1791520021169,
       "tag": "0005_version_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791528731356,
+      "tag": "0006_versioned_name",
+      "breakpoints": true
     }
   ]
 }

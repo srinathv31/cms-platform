@@ -27,12 +27,14 @@ async function sampleConsumer(templateId: string): Promise<string> {
   return first?.id ?? "coral";
 }
 
-/** The panel's data, or null when the template doesn't exist or has no Active version. */
+/**
+ * The panel's data, or null when the template doesn't exist or has no Active version. Everything in it
+ * is what consumers get from `/api/v1`, the name included: the Active version's, not an open draft's.
+ */
 export async function getIntegrationPanel(templateId: string, origin: string): Promise<IntegrationPanelData | null> {
   const [row] = await db
     .select({
       id: templates.id,
-      name: templates.name,
       teamSlug: teams.slug,
       teamName: teams.name,
       allowedChannels: contentTypes.allowedChannels,
@@ -43,12 +45,13 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
     .where(eq(templates.id, templateId))
     .limit(1);
   if (!row) return null;
-  const { allowedChannels, ...template } = row;
+  const { allowedChannels, ...found } = row;
 
-  const all = await db.select().from(versions).where(eq(versions.templateId, template.id));
+  const all = await db.select().from(versions).where(eq(versions.templateId, found.id));
   const active = all.find((v) => v.state === "active" && v.number !== null);
   if (!active) return null;
   const activeNumber = active.number!;
+  const template = { ...found, name: active.name };
 
   // What the render route accepts: turned on for the version and still allowed by the content type
   // (Channel rules can turn a channel off after the version went Active).

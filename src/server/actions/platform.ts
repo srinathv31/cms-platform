@@ -313,7 +313,7 @@ export async function saveApprovalChain(input: {
         number: versions.number,
         writers: versions.writers,
         templateId: templates.id,
-        templateName: templates.name,
+        templateName: versions.name,
         teamId: templates.teamId,
       })
       .from(versions)

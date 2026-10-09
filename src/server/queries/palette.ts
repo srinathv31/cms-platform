@@ -8,9 +8,11 @@ import type { PaletteContext } from "@/domain/import-types";
 import type { VersionState } from "@/domain/types";
 import { getViewer } from "@/server/viewer";
 import { pickLatest } from "./library";
+import { currentName } from "./template-name";
 
 export interface PaletteTemplate {
   id: string;
+  /** As the Library shows it: the open draft's name, otherwise the newest version's. */
   name: string;
   teamSlug: string;
   teamName: string;
@@ -21,16 +23,17 @@ export interface PaletteTemplate {
 /** Templates the viewer can see across all their spaces; the palette narrows to the current space. */
 export const getPaletteTemplates = cache(async (): Promise<PaletteTemplate[]> => {
   const viewer = await getViewer();
+  const name = currentName(templates.id);
   const rows = await db
     .select({
       id: templates.id,
-      name: templates.name,
+      name,
       teamSlug: teams.slug,
       teamName: teams.name,
     })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
-    .orderBy(templates.name);
+    .orderBy(name);
   const visible = rows.filter((r) => canSeeSpace(viewer, r.teamSlug));
   if (visible.length === 0) return [];
 

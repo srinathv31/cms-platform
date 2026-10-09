@@ -83,10 +83,11 @@ describe("importTemplate", () => {
     expect(importStatus(res)).toBe(200);
 
     const tpl = await db.query.templates.findFirst({ where: eq(templates.id, res.templateId) });
-    expect(tpl).toMatchObject({ name: "Spring Balance Transfer Offer", teamId: "coral-offers", starterKey: null, createdBy: "maya" });
+    expect(tpl).toMatchObject({ teamId: "coral-offers", starterKey: null, createdBy: "maya" });
 
     const draft = await db.query.versions.findFirst({ where: eq(versions.templateId, res.templateId) });
     expect(draft?.state).toBe("draft");
+    expect(draft?.name).toBe("Spring Balance Transfer Offer");
     expect(draft?.variables).toEqual([
       { key: "first_name", label: "First name", type: "text", required: true, sample: "" },
       { key: "purchase_apr", label: "Purchase APR", type: "text", required: true, sample: "" },
@@ -123,7 +124,7 @@ describe("importTemplate", () => {
     const pdf = ok(await run("maya", { name: "rate-change-notice.pdf", bytes: fixture("rate-change-notice.pdf") }));
     const txt = ok(await run("maya", { name: "spring_offer_notes.txt", bytes: fixture("spring_offer_notes.txt") }));
     const names = await Promise.all(
-      [pdf, txt].map((r) => db.query.templates.findFirst({ where: eq(templates.id, r.templateId) }).then((t) => t?.name)),
+      [pdf, txt].map((r) => db.query.versions.findFirst({ where: eq(versions.templateId, r.templateId) }).then((v) => v?.name)),
     );
     expect(names).toEqual(["Rate Change Notice", "Spring offer notes"]);
   });

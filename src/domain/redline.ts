@@ -111,6 +111,20 @@ export function groupUnchanged(doc: RedlineDoc): (RedlineBlock | RedlineGap)[] {
   return out;
 }
 
+/** A rename between two versions: the name is versioned, so it goes through review like the body. */
+export interface NameChange {
+  from: string;
+  to: string;
+}
+
+/**
+ * The rename from `base` to `next`, or null when the name is the same or there is no base (nothing
+ * Active yet). Names compare exactly, as typed: a change of case or spacing is a rename customers see.
+ */
+export function nameChange(base: string | null | undefined, next: string): NameChange | null {
+  return base === null || base === undefined || base === next ? null : { from: base, to: next };
+}
+
 // ── Per-call caches ──────────────────────────────────────────────────────────
 
 interface Bag {

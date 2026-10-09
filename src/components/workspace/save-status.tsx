@@ -23,8 +23,8 @@ import { SaveIndicator } from "./autosave/save-indicator";
 import type { WorkspaceSession } from "./session/session-store";
 import { useCanRevert, useHistoryControls, useInert, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
 
-/** What "Revert to v3" replaces: the draft's versioned content (the name lives on the template, so it stays). */
-const VERSION_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
+/** What "Revert to v3" replaces: every versioned field of the draft, its name included. */
+const VERSION_FIELDS = ["name", "body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
 
 export interface SaveStatusProps {
   templateId: string;
