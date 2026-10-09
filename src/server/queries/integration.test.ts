@@ -9,11 +9,9 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
-import { getViewer } from "@/server/viewer";
-import { loadIntegrationPanel } from "@/server/actions/integration";
-import { getIntegrationPanel } from "./integration";
+import { getIntegrationPanel, loadIntegrationPanel } from "./integration";
 
-// The integration panel's data (query) and its loader (server action) against a temporary database
+// The integration panel's data and its viewer-checked loader (the GET route's read) against a temporary database
 // filled by the real seed. Balance Transfer: v2 Active (pdf, web), v1 Superseded with a sunset.
 
 const env = vi.hoisted(() => ({ dir: "", host: "localhost:3001", proto: null as string | null }));
@@ -24,7 +22,6 @@ vi.mock("@/server/db/client", async () => {
   env.dir = temp.dir;
   return temp;
 });
-vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Headers({ host: env.host, ...(env.proto ? { "x-forwarded-proto": env.proto } : {}) })),
 }));
@@ -138,49 +135,50 @@ describe("loadIntegrationPanel", () => {
     env.proto = null;
   });
 
-  const as = (userId: string) => vi.mocked(getViewer).mockResolvedValue(people[userId]!);
+  const as = (userId: string) => people[userId]!;
 
   it("an author and a viewer on the team can load it; the origin comes from the request", async () => {
-    as("maya");
-    const result = await loadIntegrationPanel({ templateId: id("balance-transfer") });
+    const result = await loadIntegrationPanel(as("maya"), { templateId: id("balance-transfer") });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.panel.endpoint.url).toBe(`http://localhost:3001/api/v1/templates/${id("balance-transfer")}/render`);
 
-    as("sam");
-    expect((await loadIntegrationPanel({ templateId: id("balance-transfer") })).ok).toBe(true);
+    expect((await loadIntegrationPanel(as("sam"), { templateId: id("balance-transfer") })).ok).toBe(true);
   });
 
   it("behind a proxy: the forwarded protocol; a public host defaults to https", async () => {
-    as("maya");
     env.host = "ucomp.example";
-    const https = await loadIntegrationPanel({ templateId: id("balance-transfer") });
+    const https = await loadIntegrationPanel(as("maya"), { templateId: id("balance-transfer") });
     expect(https.ok && https.panel.endpoint.url.startsWith("https://ucomp.example/")).toBe(true);
     env.proto = "http";
-    const http = await loadIntegrationPanel({ templateId: id("balance-transfer") });
+    const http = await loadIntegrationPanel(as("maya"), { templateId: id("balance-transfer") });
     expect(http.ok && http.panel.endpoint.url.startsWith("http://ucomp.example/")).toBe(true);
   });
 
   it("someone without the team is refused with the permission's reason", async () => {
-    as("morgan");
-    const result = await loadIntegrationPanel({ templateId: id("balance-transfer") });
-    expect(result.ok).toBe(false);
+    const result = await loadIntegrationPanel(as("morgan"), { templateId: id("balance-transfer") });
+    expect(result).toMatchObject({ ok: false, status: 403 });
     if (!result.ok) expect(result.reason).toMatch(/\S/);
   });
 
   it("no template, or nothing Active yet", async () => {
-    as("riley");
-    expect(await loadIntegrationPanel({ templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, reason: "This template no longer exists." });
-    expect(await loadIntegrationPanel({ templateId: "" })).toEqual({ ok: false, reason: "This template no longer exists." });
-    as("maya");
-    expect(await loadIntegrationPanel({ templateId: id("annual-fee-waiver") })).toEqual({ ok: false, reason: "This template has no Active version yet." });
+    expect(await loadIntegrationPanel(as("riley"), { templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, status: 404, reason: "This template no longer exists." });
+    expect(await loadIntegrationPanel(as("riley"), { templateId: "" })).toEqual({ ok: false, status: 400, reason: "This template no longer exists." });
+    expect(await loadIntegrationPanel(as("maya"), { templateId: id("annual-fee-waiver") })).toEqual({
+      ok: false,
+      status: 409,
+      reason: "This template has no Active version yet.",
+    });
   });
 
   it("a revoked-only template has no panel", async () => {
-    as("maya");
     const where = and(eq(versions.templateId, id("rate-change-notice")), eq(versions.number, 1));
     await db.update(versions).set({ state: "revoked" }).where(where);
     try {
-      expect(await loadIntegrationPanel({ templateId: id("rate-change-notice") })).toEqual({ ok: false, reason: "This template has no Active version yet." });
+      expect(await loadIntegrationPanel(as("maya"), { templateId: id("rate-change-notice") })).toEqual({
+        ok: false,
+        status: 409,
+        reason: "This template has no Active version yet.",
+      });
     } finally {
       await db.update(versions).set({ state: "active" }).where(where);
     }

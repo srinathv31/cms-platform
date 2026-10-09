@@ -14,12 +14,14 @@ import { diffDocuments, nameChange } from "@/domain/redline";
 import type { RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
-import { loadVersionsToCompare, type CompareVersion } from "@/server/queries/compare";
+import { readTemplate } from "@/lib/template-reads";
+import type { CompareVersion } from "@/server/queries/compare";
 import type { CompareOption } from "./compare-dialog";
 
 // The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline.
 // The pickers only offer pairs that read forward in time (From is the older one, always), so the
-// diff never runs backwards and no combination is empty.
+// diff never runs backwards and no combination is empty. Each pair is read from
+// GET /api/templates/[templateId]/compare.
 
 type Loaded = { key: string; ok: true; from: CompareVersion; to: CompareVersion } | { key: string; ok: false };
 
@@ -87,12 +89,10 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
   const key = `${fromId}:${toId}:${attempt}`;
   useEffect(() => {
     let live = true;
-    loadVersionsToCompare({ templateId, versionIds: [fromId, toId] })
+    readTemplate<{ from: CompareVersion; to: CompareVersion }>(templateId, "compare", { from: fromId, to: toId })
       .then((result) => {
         if (!live) return;
-        const from = result.ok ? result.versions.find((v) => v.id === fromId) : undefined;
-        const to = result.ok ? result.versions.find((v) => v.id === toId) : undefined;
-        setLoaded(from && to ? { key, ok: true, from, to } : { key, ok: false });
+        setLoaded(result.ok ? { key, ok: true, from: result.from, to: result.to } : { key, ok: false });
       })
       .catch(() => live && setLoaded({ key, ok: false }));
     return () => {

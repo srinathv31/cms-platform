@@ -85,6 +85,25 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // "use server" makes every export of a file (or the one function it opens) a public POST endpoint that
+    // takes any input and runs one at a time with the page's other actions. Only mutations are server
+    // actions, and they live in src/server/actions/, each parsing its input with zod. A read the browser
+    // asks for is a GET route handler (src/app/api/templates/[templateId]/) or props from a server component.
+    // The simulator, a separate app, keeps its own actions in src/simulator/actions.ts.
+    files: ["src/**/*.{ts,tsx,js,jsx,mjs}"],
+    ignores: ["src/server/actions/**", "src/simulator/actions.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ExpressionStatement[directive='use server']",
+          message:
+            '"use server" belongs only in src/server/actions/ (mutations, each parsing its input with zod). Serve a read through a GET route handler or a server component\'s props.',
+        },
+      ],
+    },
+  },
+  {
     // The simulator talks to UCOMP over /api/v1 only, like Coral would.
     files: ["src/simulator/**/*", "src/app/(simulator)/**/*"],
     rules: {

@@ -6,10 +6,9 @@ import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
-import { getViewer } from "@/server/viewer";
 import { getCopilotPrompt } from "./copilot";
 
-// The Copilot prompt action against a temporary database filled by the real seed. Annual Fee Waiver
+// The Copilot prompt read against a temporary database filled by the real seed. Annual Fee Waiver
 // has an open draft; Cash Back's latest version is in review (no draft).
 
 const env = vi.hoisted(() => ({ dir: "" }));
@@ -20,7 +19,6 @@ vi.mock("@/server/db/client", async () => {
   env.dir = temp.dir;
   return temp;
 });
-vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
 let db: Db;
 let libsql: Client;
@@ -39,12 +37,9 @@ afterAll(() => {
   rmSync(env.dir, { recursive: true, force: true });
 });
 
-const as = (userId: string) => vi.mocked(getViewer).mockResolvedValue(people[userId]!);
-
 describe("getCopilotPrompt", () => {
   it("builds the prompt from the saved draft for someone who may edit it", async () => {
-    as("maya");
-    const result = await getCopilotPrompt({ templateId: ids["annual-fee-waiver"]! });
+    const result = await getCopilotPrompt(people.maya!, { templateId: ids["annual-fee-waiver"]! });
     if (!result.ok) throw new Error(result.reason);
     expect(result.prompt.text).toContain("Help me write the body of a disclosure for Coral Offers.");
     expect(result.prompt.text).toContain("## Offer details\n## Rates and fees\n## Legal notices");
@@ -53,15 +48,14 @@ describe("getCopilotPrompt", () => {
   });
 
   it("refuses a viewer who can't edit drafts on the team", async () => {
-    as("taylor");
-    const result = await getCopilotPrompt({ templateId: ids["annual-fee-waiver"]! });
-    expect(result.ok).toBe(false);
+    const result = await getCopilotPrompt(people.taylor!, { templateId: ids["annual-fee-waiver"]! });
+    expect(result).toMatchObject({ ok: false, status: 403 });
   });
 
   it("says so when there is no draft, or no such template", async () => {
-    as("maya");
-    expect(await getCopilotPrompt({ templateId: ids["cash-back"]! })).toEqual({ ok: false, reason: "There is no draft to write." });
-    expect(await getCopilotPrompt({ templateId: "UC-NOPE00" })).toEqual({ ok: false, reason: "This template isn't available." });
-    expect(await getCopilotPrompt({ templateId: "" })).toEqual({ ok: false, reason: "This template isn't available." });
+    const maya = people.maya!;
+    expect(await getCopilotPrompt(maya, { templateId: ids["cash-back"]! })).toEqual({ ok: false, status: 409, reason: "There is no draft to write." });
+    expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, reason: "This template isn't available." });
+    expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, reason: "This template isn't available." });
   });
 });

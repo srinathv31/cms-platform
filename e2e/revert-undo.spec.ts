@@ -195,3 +195,26 @@ test("switching tabs after Revert to v2 takes the Undo away, and the content sho
   await liveEditor(page);
   await expect(documentEditor(page)).not.toContainText(AFTER);
 });
+
+// What Revert to v2 reads is a GET route, not a server action (handoff review A6), and it answers by the persona
+// cookie: Eli's session gets v2, and a request without it is refused. (Until real sign-in, a request with no cookie
+// acts as the default persona, Maya, who holds no role on Deposits.)
+test("the version Revert reads is a GET route that a request without Eli's session is refused", async ({ page, playwright, baseURL }) => {
+  await openDraft(page);
+  const [draft] = await rowsOf(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
+  const read = `/api/templates/${templateId}/base-version?draft=${String(draft!.id)}`;
+
+  const own = await page.request.get(read);
+  expect(own.status()).toBe(200);
+  expect(await own.json()).toMatchObject({ ok: true, base: { number: 2, name: NAME } });
+
+  const noSession = await playwright.request.newContext({ baseURL });
+  try {
+    const refused = await noSession.get(read);
+    expect(refused.status()).toBe(403);
+    expect(await refused.json()).toEqual({ ok: false, reason: expect.stringMatching(/\S/) });
+    expect((await noSession.post(read)).status(), "it isn't a POST endpoint").toBe(405);
+  } finally {
+    await noSession.dispose();
+  }
+});

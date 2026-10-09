@@ -10,6 +10,7 @@ and server actions in `src/server`. The portable editor is its own layer ([READM
 Lint-enforced ([eslint.config.mjs](../../eslint.config.mjs)):
 - Nothing under `src/components` may import the simulator (`@/simulator`, `@/server/db/schema/sim`).
 - `src/editor` may import only `@/components/ui` from this folder, so `ui/` is part of the editor's surface.
+- No `"use server"` here, at the top of a file or inside a function: server actions live in `src/server/actions/`.
 
 Convention only (nothing checks these):
 - Don't edit `ui/`. It is generated.
@@ -166,7 +167,14 @@ submit(invalid /* a known refusal, shown without sending */, () => requestChange
 `comments/thread-list.tsx` applies the mutation and calls the action in one `startTransition`. When it ends,
 the list is the server's again, and a refusal shows its reason on the card.
 
-**Other paths.** Some client code `fetch`es route handlers: autosave (`workspace/autosave/save-transport.ts`),
+**Reads on demand.** Data a dialog or a menu loads when it opens comes from a GET route, never a server action
+(an action queues with the page's mutations): `readTemplate(templateId, read, params)` from
+[src/lib/template-reads.ts](../lib/template-reads.ts) returns the route's `ActionResult`, and throws when there is no
+answer, which the caller shows as its own failure. The Compare panel (`versions/compare-panel.tsx`), Revert to v3
+(`workspace/save-status.tsx`), the submit summary (`workspace/workspace-actions.tsx`), the Copilot prompt
+(`workspace/copilot/copilot-prompt.tsx`) and the SHARE panel (`workspace/workspace-share.tsx`) read this way.
+
+**Other paths.** Some client code `fetch`es other route handlers: autosave (`workspace/autosave/save-transport.ts`),
 the preview render (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and the ⌘K palette.
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
 The same store holds the workspace still (`makeInert`, read with `useInert`): Submit holds it from its click until its
@@ -186,6 +194,7 @@ Anything else that has to stop edits for a while takes a hold the same way.
 | Stream viewer-dependent parts into a static frame | [app-shell/app-frame.tsx](app-shell/app-frame.tsx) with [sidebar-holes.tsx](app-shell/sidebar-holes.tsx) | |
 | Animate a tab underline | [workspace/workspace-tabs.tsx](workspace/workspace-tabs.tsx) | `m.span` with `layoutId`, `spring.soft`, `LinkPendingLabel`, matching skeleton. |
 | Load heavy code on demand | [versions/compare-dialog.tsx](versions/compare-dialog.tsx), [preview/pdf/load-pdfjs.ts](preview/pdf/load-pdfjs.ts) | `React.lazy` for a panel; dynamic `import()` for a library. |
+| Load data when a dialog opens | [versions/compare-panel.tsx](versions/compare-panel.tsx) | `readTemplate()` in an effect, a key per request so a late answer is dropped, Try again on failure. |
 
 ## Don't copy
 
@@ -199,10 +208,6 @@ Anything else that has to stop edits for a while takes a hold the same way.
   (`src/server/queries/format.ts`); "3 days ago" as `formatWhen` (`versions/format.ts`), `formatLastRender`
   (`usage/format.ts`), and `daysAgo` (`settings/team/format.ts`); a clipboard fallback in `primitives/template-id.tsx`
   and `integration/copy-button.tsx`. Take dates from `src/domain/dates.ts` and relative times from `versions/format.ts`.
-- **Reads through server actions.** `versions/compare-panel.tsx`, `workspace/save-status.tsx`,
-  `workspace/workspace-actions.tsx`, `workspace/workspace-share.tsx`, and `workspace/copilot/copilot-prompt.tsx`
-  read data through `"use server"` functions. For a new read, prefer props from a server component, or a route
-  handler when it must load on demand (as `app-shell/command-palette.tsx` reads `/api/palette/[space]`).
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`;
   `review/decision-model.ts` hides a control when the reason is `REASONS.generic`; `versions/version-actions.tsx`
   branches on `REASONS.ownRevoke`, and `submit/submit-dialog.tsx` offers Refresh summary on `REFUSALS.summaryStale`.
@@ -219,6 +224,8 @@ Anything else that has to stop edits for a while takes a hold the same way.
 
 - [src/hooks/use-mobile.ts](../hooks/use-mobile.ts): shadcn's `useIsMobile` (768px), used only by `ui/sidebar.tsx`.
 - [src/lib/utils.ts](../lib/utils.ts): `cn`, re-exported from the `cn` package. Import it from `@/lib/utils`.
+- [src/lib/template-reads.ts](../lib/template-reads.ts): `readTemplate()` and `templateReadUrl()`, the browser's
+  side of the on-demand template reads (see [Server and client](#server-and-client)).
 - [src/lib/serialized-writes.ts](../lib/serialized-writes.ts): not UI. A per-process write lock for the local
   SQLite file, used by `src/server/db/client.ts` and `src/simulator/db.ts`. It imports `node:fs`: server only.
 - [src/styles/tokens.css](../styles/tokens.css) (imported by `globals.css`) and [src/styles/fonts.ts](../styles/fonts.ts)
@@ -227,13 +234,14 @@ Anything else that has to stop edits for a while takes a hold the same way.
 ## Testing
 
 - Unit tests sit next to their code as `*.test.ts(x)`. `npx vitest run src/components src/lib` runs this
-  layer's 48 files in a few seconds; `npm test` runs everything.
+  layer's 62 files in a few seconds; `npm test` runs everything.
 - The default environment is `node` ([vitest.config.mts](../../vitest.config.mts)). A test that needs a DOM
   opts in with `// @vitest-environment happy-dom` on its first line.
 - No Testing Library. Markup tests use `renderToStaticMarkup` (`primitives/status-badge.test.tsx`); interaction
   tests use `createRoot` and `act` under happy-dom (`comments/thread-list.test.tsx`).
 - Mock server actions with `vi.mock("@/server/actions/…")`; a component that calls `unstable_rethrow` also needs
-  `next/navigation` mocked (`submit/submit-dialog.test.tsx`). Fixtures: `redline/redline-fixtures.ts`, and
+  `next/navigation` mocked (`submit/submit-dialog.test.tsx`). For a read, stub `fetch` with `vi.stubGlobal` and
+  check the URL it was given (`workspace/save-status.test.tsx`). Fixtures: `redline/redline-fixtures.ts`, and
   `src/editor/testing/editor.ts` to mount the editor (`workspace/copilot/copilot-roundtrip.test.ts`).
 - Keep logic in pure `.ts` modules so it tests without a DOM: `review/decision-model.ts`, `palette/commands.ts`,
   `comments/thread-state.ts`, `workspace/session/session-store.ts`, `workspace/autosave/autosave-scheduler.ts`.

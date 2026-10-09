@@ -23,6 +23,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0015](0015-a-version-keeps-the-stages-it-was-submitted-with.md) | A version goes through the approval stages it was submitted with | Accepted |
 | [0016](0016-the-name-is-versioned.md) | The template's name is a version field | Accepted |
 | [0018](0018-settings-screens-render-decisions.md) | Settings screens render decisions; the domain makes them | Accepted |
+| [0019](0019-on-demand-reads-are-get-routes.md) | Reads a screen loads on demand are GET routes; only mutations are server actions | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

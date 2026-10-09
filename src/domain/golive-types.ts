@@ -315,10 +315,11 @@ export interface IntegrationPanelData {
 
 // Signatures:
 //   getIntegrationPanel(templateId: string, origin: string): Promise<IntegrationPanelData | null>  // src/server/queries/integration.ts (S1)
-//   loadIntegrationPanel({ templateId }): Promise<ActionResult<{ panel: IntegrationPanelData }>>   // src/server/actions/integration.ts (S1)
-//     assertCan("integration.view") on the template's team; origin from headers() (x-forwarded-proto + host).
-//     WorkspaceShare keeps its props (templateId, templateName, activeVersion) and calls this on open
-//     (and on ring hover/focus as a prefetch), so workspace-header.tsx and review-header.tsx don't change.
+//   loadIntegrationPanel(viewer, { templateId }): Promise<ReadResult<{ panel: IntegrationPanelData }>>   // src/server/queries/integration.ts
+//     can("integration.view") on the template's team; origin from headers() (x-forwarded-proto + host).
+//     Served by GET /api/templates/[templateId]/integration. WorkspaceShare keeps its props (templateId,
+//     templateName, activeVersion) and fetches it on open (and on ring hover/focus as a prefetch), so
+//     workspace-header.tsx and review-header.tsx don't change.
 
 // Re-exports the slices use, so they import one module (the Api* types come through `export type *` above).
 export type { Channel, ContractChange, Variable };

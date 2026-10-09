@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { IntegrationPanelData } from "@/domain/golive-types";
-import { loadIntegrationPanel } from "@/server/actions/integration";
+import { readTemplate } from "@/lib/template-reads";
 
 /**
  * The SHARE signature on an Active template. Opens the integration panel for consumer teams: the
  * contract, the JSON Schema, a sample request, the response formats and what changed since older
- * versions. The data loads through a server action (on hover or focus of the ring as a prefetch, and on
- * open), so the headers that host the ring keep their props.
+ * versions. The data loads from GET /api/templates/[templateId]/integration (on hover or focus of the ring
+ * as a prefetch, and on open), so the headers that host the ring keep their props. A GET route, not a
+ * server action, so a prefetch never queues with the page's Edit or Submit.
  */
 
 const TABBABLE =
@@ -76,7 +77,7 @@ export function WorkspaceShare({
       const fresh = loadedAt.current.key === key && Date.now() - loadedAt.current.at < FRESH_MS;
       if (fresh && !force) return Promise.resolve();
       setState((s) => (s.key === key && s.kind === "ready" ? s : { key, kind: "loading" }));
-      const run = loadIntegrationPanel({ templateId })
+      const run = readTemplate<{ panel: IntegrationPanelData }>(templateId, "integration")
         .then((res) => {
           if (res.ok) {
             loadedAt.current = { key, at: Date.now() };

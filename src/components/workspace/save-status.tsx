@@ -17,7 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { runAction } from "@/components/versions/action-dialog";
 import { formatRelative } from "@/components/versions/format";
 import { isApple } from "@/editor/lib/platform";
-import { getBaseVersion } from "@/server/queries/base-version";
+import { readTemplate } from "@/lib/template-reads";
+import type { BaseVersionContent } from "@/server/queries/base-version";
 import type { SaveFields } from "./autosave/autosave-scheduler";
 import { SaveIndicator } from "./autosave/save-indicator";
 import type { WorkspaceSession } from "./session/session-store";
@@ -186,10 +187,10 @@ function offerUndo(session: WorkspaceSession, message: string, previous: SaveFie
 
 /**
  * The status, as the trigger of a small menu: Revert to when you opened it, Revert to v3.
- * "Revert to v3" reads the version from the server. While it does, the menu stays open with both
- * items greyed out and "Reverting…" under the one pressed, so a second press can't start another; a
- * failure shows in a toast. Both are greyed out too while the session is inert (Submit is reading
- * the saved draft), when a revert would be refused.
+ * "Revert to v3" reads the version from the server (GET /api/templates/[templateId]/base-version).
+ * While it does, the menu stays open with both items greyed out and "Reverting…" under the one
+ * pressed, so a second press can't start another; a failure shows in a toast. Both are greyed out too
+ * while the session is inert (Submit is reading the saved draft), when a revert would be refused.
  */
 function RevertMenu({
   templateId,
@@ -221,7 +222,9 @@ function RevertMenu({
     reading.current = true;
     start(async () => {
       try {
-        const result = await runAction(() => getBaseVersion({ templateId, versionId }));
+        const result = await runAction(() =>
+          readTemplate<{ base: BaseVersionContent }>(templateId, "base-version", { draft: versionId }),
+        );
         setOpen(false);
         if (!result.ok) {
           toast.error(result.reason);

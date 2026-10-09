@@ -889,7 +889,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(document.baseline).toEqual(v1.variables);
     expect(document.baseline?.map((v) => v.key)).not.toContain(PROMO.key);
 
-    const summary = await getSubmitSummary({ templateId });
+    const summary = await getSubmitSummary(people.maya!, { templateId });
     expect(summary).toMatchObject({ ok: true, summary: { number: 3, baseline: { number: 1, variables: v1.variables } } });
   });
 
@@ -952,7 +952,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     await startDraft({ templateId });
     expect((await draftOf(templateId))?.basedOnVersionId).toBe((await version(templateId, 3))!.id);
     expect((await getWorkspaceDocument("coral-offers", templateId)).baseline).toBeNull();
-    expect(await getSubmitSummary({ templateId })).toMatchObject({ ok: true, summary: { number: 4, baseline: null } });
+    expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({ ok: true, summary: { number: 4, baseline: null } });
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 4 });
     expect((await version(templateId, 4))?.contractChanges).toBeNull();
   });
@@ -966,7 +966,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
   it("refuses a summary the draft has moved past, and writes nothing", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     as("maya");
-    const read = await getSubmitSummary({ templateId });
+    const read = await getSubmitSummary(people.maya!, { templateId });
     if (!read.ok) throw new Error(read.reason);
     expect(read.summary.rev).toBe(0);
     expect(read.summary.variables.map((v) => v.key)).not.toContain(GIFT.key);
@@ -995,7 +995,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
     const draft = (await draftOf(templateId))!;
     await saveDraft(people.maya!, draft.id, { rev: draft.rev, sessionKey: "i8-early", variables: [...draft.variables, GIFT] });
 
-    const read = await getSubmitSummary({ templateId });
+    const read = await getSubmitSummary(people.maya!, { templateId });
     if (!read.ok) throw new Error(read.reason);
     expect(read.summary.rev).toBe(1);
     expect(read.summary.variables.map((v) => v.key)).toContain(GIFT.key);

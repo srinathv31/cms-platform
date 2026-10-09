@@ -2,9 +2,9 @@
 
 The Next.js App Router tree for Stencil, the Coral simulator, and the dev mocks. Files here are thin: a page
 renders static chrome and a `<Stream>` around a server component from `src/components/` that reads the request;
-a route handler parses HTTP and calls `src/server/`. No server actions live here, and outside `(dev)` the only
-client components are the three error boundaries, which Next requires to be client components. Business rules
-belong in `src/domain/` and `src/server/`.
+a route handler parses HTTP and calls `src/server/`. No server actions live here (lint allows `"use server"` only
+in `src/server/actions/`), and outside `(dev)` the only client components are the three error boundaries, which
+Next requires to be client components. Business rules belong in `src/domain/` and `src/server/`.
 
 ## Rules
 
@@ -95,6 +95,11 @@ persona; the mocks read their deep-link search params.
 | `POST /api/imports?team=` | [route.ts](./api/imports/route.ts) | Browser: Library import ([upload-import.ts](../components/library/upload-import.ts)). |
 | `GET /api/imports/[uploadId]/file`, `…/view` | [file](./api/imports/[uploadId]/file/route.ts), [view](./api/imports/[uploadId]/view/route.ts) | Browser: the rail's Original tab ([original-view.tsx](../components/import/original-view.tsx)). |
 | `GET /api/palette/[space]` | [route.ts](./api/palette/[space]/route.ts) | Browser: the command palette, once per space. |
+| `GET /api/templates/[templateId]/compare?from=&to=` | [route.ts](./api/templates/[templateId]/compare/route.ts) | Browser: the Compare dialog, per pair ([compare-panel.tsx](../components/versions/compare-panel.tsx)). |
+| `GET /api/templates/[templateId]/base-version?draft=` | [route.ts](./api/templates/[templateId]/base-version/route.ts) | Browser: "Revert to v3" ([save-status.tsx](../components/workspace/save-status.tsx)). |
+| `GET /api/templates/[templateId]/submit-summary` | [route.ts](./api/templates/[templateId]/submit-summary/route.ts) | Browser: the submit dialog and its Refresh summary ([workspace-actions.tsx](../components/workspace/workspace-actions.tsx)). |
+| `GET /api/templates/[templateId]/copilot-prompt` | [route.ts](./api/templates/[templateId]/copilot-prompt/route.ts) | Browser: the Copilot prompt dialog ([copilot-prompt.tsx](../components/workspace/copilot/copilot-prompt.tsx)). |
+| `GET /api/templates/[templateId]/integration` | [route.ts](./api/templates/[templateId]/integration/route.ts) | Browser: the SHARE panel, on open and as a prefetch ([workspace-share.tsx](../components/workspace/workspace-share.tsx)). |
 | `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV). |
 | `GET /api/v1/templates?q=&limit=&after=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/templates/[templateId]?version=&since=` | [route.ts](./api/v1/templates/[templateId]/route.ts) | Simulator and outside consumers. |
@@ -185,9 +190,22 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
 - Render adds `X-Stencil-Template-Id`, `X-Stencil-Version`, `X-Stencil-Newer-Version` and `X-Stencil-Preview`,
   and a strict CSP on web HTML.
 
-**Internal routes** answer errors in four shapes: `DraftSaveResponse` (status from `statusOf`), `ImportResponse`
-(status from `importStatus`), `{ error: "not_found" }` with 404 (import reads, palette), and plain text (audit
-export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read).
+**Internal routes** answer errors in five shapes: `DraftSaveResponse` (status from `statusOf`), `ImportResponse`
+(status from `importStatus`), `{ ok: false, reason }` (the `ActionResult` the template reads answer, with the status
+their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads, palette), and plain text (audit
+export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful import read and on
+every template read).
+
+**Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
+opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs
+one at a time with the page's mutations: a read would hold up Edit or Submit, or wait behind them. Each calls
+`getViewer()`, hands the viewer and the raw path and query values to its query in `src/server/queries/` (which
+parses them with zod and checks `can()`), and answers with `readResponse()` from
+[server/api/reads.ts](../server/api/reads.ts): 400 for values that don't parse, 403 for a viewer the permission
+refuses, 404 for an unknown template or version, 409 when there is nothing to read (no draft, no Active version).
+The browser calls them through `readTemplate()` in [lib/template-reads.ts](../lib/template-reads.ts). A request
+without a persona cookie acts as the default persona, as every page does, until real sign-in
+([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
 
 **Body caps.** Drafts: 2,000,000 bytes (`MAX_BODY_SIZE` in `src/server/drafts/parse-patch.ts`), 413 with the
 route's `invalid` body. Render: 1,000,000 bytes (`MAX_BODY_BYTES` in `src/domain/render/types.ts`), 413
@@ -219,11 +237,14 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   the headers first, `requireConsumer`, parse the query with the domain parsers, answer with `jsonResponse` or
   `errorResponse`. Add the wire type to `src/contracts/api-v1.ts`, any new error code to `API_ERROR_STATUS`,
   a co-located `route.test.ts`, and a case in `e2e/api/consumer.spec.ts`.
-- **Browser only.** Prefer a server action. Use a route handler when the body can pass 1 MB or requests must
-  not queue. Copy [api/palette/[space]/route.ts](./api/palette/[space]/route.ts) for a read, or
-  [api/drafts/[versionId]/route.ts](./api/drafts/[versionId]/route.ts) for a capped write. Call `getViewer()`
-  before the database and send `Cache-Control: no-store`. Type the context with `RouteContext<"/route">`, as
-  the audit export does.
+- **Browser only, a read.** Data a page shows comes from a server component's props. Data loaded on demand (a
+  dialog, a menu) is a GET route: copy
+  [api/templates/[templateId]/base-version/route.ts](./api/templates/[templateId]/base-version/route.ts) with its
+  query, and add the read to `TemplateRead` in `src/lib/template-reads.ts`. Never a server action.
+- **Browser only, a write.** A server action in `src/server/actions/`. Use a route handler when the body can pass
+  1 MB or requests must not queue: copy [api/drafts/[versionId]/route.ts](./api/drafts/[versionId]/route.ts) for
+  a capped write. Call `getViewer()` before the database and send `Cache-Control: no-store`. Type the context
+  with `RouteContext<"/route">`, as the audit export does.
 
 ## Don't copy
 
@@ -233,8 +254,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   Await `params` inside an async component instead.
 - **Permission logic in a page.** [request-access/page.tsx](./(product)/request-access/page.tsx) calls `can()`
   and picks a `REASONS` sentence itself. Let the query decide and return the result.
-- **A fifth error shape.** Internal routes already answer in four. A new public route uses `errorResponse`; a
-  new internal one reuses an existing shape.
+- **A sixth error shape.** Internal routes already answer in five. A new public route uses `errorResponse`; a
+  new internal one reuses an existing shape (a read, `readResponse`).
 - **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated and ship in
   production.
 
@@ -242,9 +263,10 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 
 - **Route handlers:** co-located `route.test.ts` files under `api/`, run with `npx vitest run src/app/api`. The
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
-  database (`tempDatabase` in `src/server/testing/review-fixtures.ts`) and mock `@/server/clock`. The drafts and
-  imports tests mock `getViewer` and the server function and test only the HTTP mapping. The palette, audit
-  export and delivery file routes have no unit test.
+  database (`tempDatabase` in `src/server/testing/review-fixtures.ts`) and mock `@/server/clock`. The template
+  reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
+  with `getViewer` mocked to each persona. The drafts and imports tests mock `getViewer` and the server function
+  and test only the HTTP mapping. The palette, audit export and delivery file routes have no unit test.
 - **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
   3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
   `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server
