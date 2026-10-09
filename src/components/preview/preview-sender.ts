@@ -3,9 +3,12 @@
 
 import type { VariableValues } from "@/editor/model/types";
 
-/** "Coral Offers" sends from "no-reply@coraloffers.example". */
+/**
+ * "Coral Offers" sends from "no-reply@coraloffers.example". A name with no ASCII letter or digit in it sends
+ * from Stencil's "no-reply@stencil.example". `.example` is reserved (RFC 2606), so no address here is real.
+ */
 export function senderOf(teamName: string): { name: string; address: string } {
-  const domain = teamName.toLowerCase().replace(/[^a-z0-9]+/g, "") || "ucomp";
+  const domain = teamName.toLowerCase().replace(/[^a-z0-9]+/g, "") || "stencil";
   return { name: teamName, address: `no-reply@${domain}.example` };
 }
 

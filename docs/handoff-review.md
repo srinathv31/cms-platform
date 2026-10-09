@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 19 | 10 | 32 |
-| Partly fixed | 0 | 4 | 3 | 1 | 8 |
+| Open | 0 | 3 | 19 | 9 | 31 |
+| Partly fixed | 0 | 4 | 3 | 2 | 9 |
 | Fixed | 1 | 19 | 16 | 4 | 40 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
@@ -811,7 +811,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H5 · Low: Rebrand leftovers, two of them customer-visible
 
-- **Status:** Open
+- **Status:** Partly fixed. The email preview's sender now falls back to `no-reply@stencil.example` ([decision 0023](decisions/0023-the-email-preview-sends-from-stencil.md)); the PDF font names wait for the enterprise font, and the internal names are unchanged.
 - **Where:** `src/server/render/channels/pdf-fonts.ts` line 18; `src/components/preview/preview-sender.ts` line 8
 - **What happens:** PDF font families are named "UCOMP Sans" and "UCOMP Serif", and the email sender falls back to `no-reply@ucomp.example`. Internal: the `UC-` template id prefix, the database file, three cookies, localStorage keys, `UCOMP_API_ORIGIN`, `.ucomp-*` classes and the drag MIME type.
 - **Fix:** Fix the two visible strings now; decide the id prefix; rename persisted names in one migration with a read-both fallback.
