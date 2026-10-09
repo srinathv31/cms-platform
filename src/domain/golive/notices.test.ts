@@ -100,6 +100,18 @@ describe("noticeView: sunset_scheduled", () => {
     });
   });
 
+  it("says the sunset's day as picked (sunsetDay), not its instant's UTC date", () => {
+    // 00:00 Eastern on March 1 is 05:00 UTC; in a zone ahead of UTC it is still February 28 in UTC.
+    const eastern = noticeView(
+      row("sunset_scheduled", { templateName: NAME, versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" }),
+    );
+    expect(eastern).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", message: `${NAME} v1 stops rendering on March 1, 2027. Move to v2.` });
+    const ahead = noticeView(
+      row("sunset_scheduled", { templateName: NAME, versionNumber: 1, activeVersion: 2, sunsetAt: "2027-02-28T18:30:00.000Z", sunsetDay: "2027-03-01" }),
+    );
+    expect(ahead.message).toBe(`${NAME} v1 stops rendering on March 1, 2027. Move to v2.`);
+  });
+
   it("with nothing Active there's nothing to move to", () => {
     const view = noticeView(row("sunset_scheduled", { templateName: NAME, versionNumber: 1, activeVersion: null, sunsetAt: "2027-03-01T00:00:00.000Z", contractChanges: [ANNUAL_FEE] }));
     expect(view).toMatchObject({ activeVersion: null, changes: [], message: `${NAME} v1 stops rendering on March 1, 2027.` });

@@ -6,13 +6,15 @@ import type {
   ApprovalChainsSection,
   ApprovalChainView,
   ApproverFacts,
+  BusinessZoneSection,
   ChannelRulesSection,
   ContentTypesSection,
   TeamsSection,
 } from "@/domain/access-types";
 import { versionsNeeding } from "@/domain/approval-chain";
+import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
-import { approverProblem, channelRuleRefusal, ruleLabel, TEAM_ICONS } from "@/domain/platform-config";
+import { approverProblem, channelRuleRefusal, ruleLabel, TEAM_ICONS, zoneChangeConsequences } from "@/domain/platform-config";
 import { CHANNELS, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
@@ -25,11 +27,13 @@ import {
   users,
   versions,
 } from "@/server/db/schema/ucomp";
+import { countPendingSunsets, getBusinessZone } from "@/server/business-zone";
 import { getViewer } from "@/server/viewer";
+import { demoNow } from "./dynamic";
 import { getPeople, iso, personOf } from "./review-shared";
 
-// The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules and
-// Approval chains. Read models: domain/access-types.ts. The consequences the UI shows before a change
+// The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
+// Approval chains and Time zone. Read models: domain/access-types.ts. The consequences the UI shows before a change
 // is committed come from the pure functions in domain/platform-config.ts, fed by these models:
 //   - a new team: `validateNewTeam({ name, description, icon, existing: section.teams })` as the
 //     admin types, and `newTeamConsequences(name, admin)`;
@@ -40,7 +44,9 @@ import { getPeople, iso, personOf } from "./review-shared";
 //   - a chain edit: `describeChainChange({ contentTypeName, current: chain.stages, next, people,
 //     waiting })`, the "Now / After" cards and the lines under them, and `validateChain({ stages,
 //     current: chain.stages, actorId: viewerId, people: approvers })`, the reason at each stage that
-//     can't be saved.
+//     can't be saved;
+//   - a new business time zone: `describeZoneChange({ current: section.zone, next })` as the admin
+//     picks, then the read model's `consequences` (what stays put, `zoneChangeConsequences`).
 
 /** Platform Admin only; anyone else gets a 404 (the Platform group isn't shown to them). */
 async function requireManage() {
@@ -218,5 +224,19 @@ export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSe
     people: choices.sort(byName),
     approvers: facts.filter((f) => relevant.has(f.id)),
     viewerId: viewer.userId,
+  };
+});
+
+// ── Business time zone ────────────────────────────────────────
+
+export const getBusinessZoneSection = cache(async (): Promise<BusinessZoneSection> => {
+  const viewer = await requireManage();
+  const nowDate = await demoNow();
+  const [zone, pendingSunsets] = await Promise.all([getBusinessZone(), countPendingSunsets(db, nowDate)]);
+  return {
+    zone,
+    zones: BUSINESS_ZONES.map((z) => ({ id: z.id, label: zoneLabel(z.id) })),
+    can: { change: can(viewer, "platform.manage", { teamId: null }) },
+    consequences: zoneChangeConsequences(pendingSunsets),
   };
 });

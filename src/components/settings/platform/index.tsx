@@ -1,6 +1,7 @@
 import type { PlatformSettingsSection } from "@/domain/access-types";
 import {
   getApprovalChainsSection,
+  getBusinessZoneSection,
   getChannelRulesSection,
   getContentTypesSection,
   getTeamsSection,
@@ -10,6 +11,7 @@ import { ApprovalChainsSectionView } from "./approval-chains";
 import { ChannelRulesSectionView } from "./channel-rules";
 import { ContentTypesSectionView } from "./content-types";
 import { TeamsSectionView } from "./teams";
+import { TimeZoneSectionView } from "./time-zone";
 
 // Platform group section bodies (Phase 6, slice U2). Each is an async server component that reads its
 // query (a 404 for anyone but a Platform Admin) inside the settings panel's Suspense, then hands the
@@ -31,9 +33,14 @@ async function ApprovalChains() {
   return <ApprovalChainsSectionView section={await getApprovalChainsSection()} />;
 }
 
+async function TimeZone() {
+  return <TimeZoneSectionView section={await getBusinessZoneSection()} />;
+}
+
 export const PLATFORM_SECTION_BODIES: Record<PlatformSettingsSection, SectionBody> = {
   teams: Teams,
   "content-types": ContentTypes,
   "channel-rules": ChannelRules,
   "approval-chains": ApprovalChains,
+  "time-zone": TimeZone,
 };

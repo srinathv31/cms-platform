@@ -7,9 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { ActionDialog, useActionDialog } from "@/components/versions/action-dialog";
 import { formatLong } from "@/components/versions/format";
-import { SunsetCalendarContent } from "@/components/versions/sunset-calendar";
+import { SunsetCalendarContent, SunsetZone } from "@/components/versions/sunset-calendar";
 import { defaultSunsetDate, validateSunsetDate } from "@/components/versions/validation";
-import type { ConsumerUsage } from "@/domain/review-types";
+import type { ConsumerUsage, SunsetCalendar } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 import { approveVersion } from "@/server/actions/review";
 import { approveLines, type ApprovalStageInfo } from "./decision-model";
@@ -46,7 +46,8 @@ function ConsequenceList({ lines }: { lines: readonly string[] }) {
  * shows at the button; the dialog closes only on success.
  *
  * The date picker is the Versions tab's sunset dialog's (versions/sunset-calendar.tsx): the same
- * calendar, the same earliest day, the same default (30 days out).
+ * calendar, the same earliest day in the business time zone, the same default (30 days out), and the same
+ * line naming the zone the day ends in.
  */
 export function ApproveDialog({
   open,
@@ -57,7 +58,7 @@ export function ApproveDialog({
   contractChanges,
   stage,
   usage,
-  today,
+  sunsetCalendar,
   nowIso,
   sampleSetsSeen,
   onBegin,
@@ -75,8 +76,8 @@ export function ApproveDialog({
   contractChanges: readonly ContractChange[];
   stage: ApprovalStageInfo;
   usage: readonly ConsumerUsage[];
-  /** YYYY-MM-DD, demo clock. */
-  today: string;
+  /** The business time zone and today in it, on the demo clock: the sunset picker's calendar. */
+  sunsetCalendar: SunsetCalendar;
   /** The demo clock's instant. */
   nowIso: string;
   /** The sample sets the approver looked at in Preview; the approval records them. */
@@ -89,6 +90,7 @@ export function ApproveDialog({
   onFailed?: () => void;
   finalFocus?: () => HTMLElement | null;
 }) {
+  const { today, zone } = sunsetCalendar;
   const [on, setOn] = useState(false);
   const [ymd, setYmd] = useState(() => defaultSunsetDate(null, today));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -108,6 +110,7 @@ export function ApproveDialog({
   const [lead = "", ...rest] = lines;
 
   const labelId = `approve-${versionNumber}-sunset`;
+  const zoneId = `approve-${versionNumber}-sunset-zone`;
 
   return (
     <ActionDialog
@@ -154,44 +157,48 @@ export function ApproveDialog({
         <>
           {rest.length > 0 ? <ConsequenceList lines={rest} /> : null}
           {canSunset ? (
-            <div className="flex h-8 items-center justify-between gap-3">
-              <label id={labelId} className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text">
-                <Checkbox
-                  ref={check}
-                  checked={on}
-                  readOnly={pending}
-                  onCheckedChange={(next) => {
-                    setOn(next);
-                    setError(null);
-                  }}
-                />
-                Set a sunset date for v{previousNumber}
-              </label>
-              <Popover open={pickerOpen} onOpenChange={(next) => !pending && setPickerOpen(next)}>
-                <PopoverTrigger
-                  aria-label={on && ymd ? `Sunset date, ${formatLong(ymd)}` : "Sunset date"}
-                  render={
-                    <Button
-                      variant="outline"
-                      disabled={!on}
-                      className="h-8 min-w-44 justify-start gap-2 bg-surface px-2.5 font-normal text-text"
-                    />
-                  }
-                >
-                  <CalendarDays aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                  {on && ymd ? formatLong(ymd) : "Pick a date"}
-                </PopoverTrigger>
-                <SunsetCalendarContent
-                  ymd={ymd}
-                  today={today}
-                  align="end"
-                  onPick={(next) => {
-                    setYmd(next);
-                    setError(null);
-                    setPickerOpen(false);
-                  }}
-                />
-              </Popover>
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex h-8 w-full items-center justify-between gap-3">
+                <label id={labelId} className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text">
+                  <Checkbox
+                    ref={check}
+                    checked={on}
+                    readOnly={pending}
+                    onCheckedChange={(next) => {
+                      setOn(next);
+                      setError(null);
+                    }}
+                  />
+                  Set a sunset date for v{previousNumber}
+                </label>
+                <Popover open={pickerOpen} onOpenChange={(next) => !pending && setPickerOpen(next)}>
+                  <PopoverTrigger
+                    aria-label={on && ymd ? `Sunset date, ${formatLong(ymd)}` : "Sunset date"}
+                    aria-describedby={zoneId}
+                    render={
+                      <Button
+                        variant="outline"
+                        disabled={!on}
+                        className="h-8 min-w-44 justify-start gap-2 bg-surface px-2.5 font-normal text-text"
+                      />
+                    }
+                  >
+                    <CalendarDays aria-hidden strokeWidth={1.75} className="text-text-muted" />
+                    {on && ymd ? formatLong(ymd) : "Pick a date"}
+                  </PopoverTrigger>
+                  <SunsetCalendarContent
+                    ymd={ymd}
+                    today={today}
+                    align="end"
+                    onPick={(next) => {
+                      setYmd(next);
+                      setError(null);
+                      setPickerOpen(false);
+                    }}
+                  />
+                </Popover>
+              </div>
+              <SunsetZone id={zoneId} zone={zone} />
             </div>
           ) : null}
         </>

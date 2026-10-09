@@ -2,12 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/domain/approval-chain";
+import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
+import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
@@ -18,7 +20,6 @@ import {
   getChains,
   getPeople,
   iso,
-  isoOrUndefined,
   loadChain,
   loadConsumerUsage,
   loadDecisions,
@@ -226,6 +227,7 @@ export const getReviewScreen = cache(
     const number = version.number!;
 
     const nowDate = await demoNow();
+    const zone = await getBusinessZone();
     const [active, others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
       db.query.versions.findFirst({
         columns: { id: true, number: true, body: true, variables: true },
@@ -283,7 +285,7 @@ export const getReviewScreen = cache(
         submittedBy: personOf(people, submittedBy),
         submittedAt: iso(version.submittedAt ?? version.createdAt),
         submitNote: version.submitNote,
-        sunsetAt: isoOrUndefined(version.sunsetAt) ?? null,
+        sunsetDay: version.sunsetAt ? sunsetDay(version.sunsetAt, zone) : null,
         contractChanges,
         contractLines: describeChanges(contractChanges, number),
       },
@@ -314,6 +316,7 @@ export const getReviewScreen = cache(
       },
       consumerUsage,
       today: dayOf(nowDate),
+      sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
     };
   },
 );

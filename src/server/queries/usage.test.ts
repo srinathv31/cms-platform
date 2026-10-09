@@ -143,10 +143,11 @@ describe("getUsageDashboard", () => {
     expect(d.stats.nearingSunset).toMatchObject({
       value: 1,
       display: "1",
-      soonest: { templateName: "Balance Transfer Intro — Terms", versionNumber: 1, sunsetAt: new Date(BASE.getTime() + 21 * DAY).toISOString() },
+      soonest: { templateName: "Balance Transfer Intro — Terms", versionNumber: 1, daysAway: 21 },
     });
     const v1 = d.rows.find((r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1)!;
-    expect(v1).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionState: "superseded", sunsetAt: d.stats.nearingSunset.soonest!.sunsetAt });
+    // The sunset is a day in the business time zone: October 25, 00:00 Eastern.
+    expect(v1).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionState: "superseded", sunsetDay: "2026-10-25" });
     expect(v1.tags).toEqual([{ tone: "warning", text: "sunset in 21 days" }]);
     expect(v1.spark).toHaveLength(USAGE_WINDOW_DAYS);
     expect(v1.spark.at(-1)).toBeGreaterThan(0); // the seed's latest v1 render was 37 minutes ago
@@ -266,7 +267,8 @@ describe("getUsageDashboard", () => {
   // Speed, deterministically: a wall-clock budget failed under full-suite load (the machine, not the code).
   // What keeps these fast is that each read model aggregates in a fixed number of SQL statements, however
   // many render_log rows there are (~27k in the seed), never one per template, consumer or day. So count
-  // the statements; the time is logged for information only.
+  // the statements; the time is logged for information only. Each count includes one read of the business
+  // time zone (a sunset's day and the days to it are read there).
   it("reads in a fixed number of SQL statements, whatever the volume", async () => {
     as("riley");
     await getUsageDashboard("all");
@@ -274,9 +276,9 @@ describe("getUsageDashboard", () => {
     const batch = vi.spyOn(libsql, "batch");
     try {
       for (const [name, run, most] of [
-        ["dashboard, all teams", () => getUsageDashboard("all"), 6],
-        ["dashboard, one team", () => getUsageDashboard("coral-offers"), 7],
-        ["template", () => getTemplateUsage("coral-offers", ids["balance-transfer"]!), 8],
+        ["dashboard, all teams", () => getUsageDashboard("all"), 7],
+        ["dashboard, one team", () => getUsageDashboard("coral-offers"), 8],
+        ["template", () => getTemplateUsage("coral-offers", ids["balance-transfer"]!), 9],
       ] as const) {
         execute.mockClear();
         batch.mockClear();

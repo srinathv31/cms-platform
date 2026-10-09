@@ -242,7 +242,13 @@ describe("SunsetDialog", () => {
   const onOpenChange = vi.fn();
   const open = (currentSunset: string | null = null) =>
     render(
-      <SunsetDialog open onOpenChange={onOpenChange} {...BASE} currentSunset={currentSunset} today="2026-10-05" />,
+      <SunsetDialog
+        open
+        onOpenChange={onOpenChange}
+        {...BASE}
+        currentSunset={currentSunset}
+        calendar={{ zone: "America/New_York", today: "2026-10-05" }}
+      />,
     );
 
   beforeEach(() => onOpenChange.mockReset());
@@ -261,6 +267,14 @@ describe("SunsetDialog", () => {
     await click(button("Change sunset"));
     expect(actions.setSunset).toHaveBeenCalledWith({ templateId: "UC-ABC123", versionNumber: 1, sunsetAt: "2026-12-01" });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("names the time zone the day ends in, at the picker", async () => {
+    await open();
+    const zone = dialog().querySelector('[data-slot="sunset-zone"]');
+    expect(zone?.textContent).toBe("Ends at 00:00 Eastern (America/New_York)");
+    const picker = dialog().querySelector<HTMLButtonElement>('button[aria-labelledby="sunset-1-label sunset-1-date"]');
+    expect(picker?.getAttribute("aria-describedby")).toBe(zone?.id);
   });
 
   it("is a change, with its own title and button, when a sunset is already set", async () => {

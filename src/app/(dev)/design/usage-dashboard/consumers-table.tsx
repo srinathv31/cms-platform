@@ -12,7 +12,7 @@ import { CONSUMERS, ROW_TOTALS, fmt, type RowTotals } from "./data";
  */
 
 // The seed's demo clock starts Feb 1, 2027; v1's sunset is 21 days on.
-export const SUNSET_AT = new Date(Date.UTC(2027, 1, 22));
+export const SUNSET_DAY = "2027-02-22";
 
 const HEAD = "h-10 text-[11px] font-medium tracking-[0.08em] text-label uppercase";
 
@@ -20,7 +20,7 @@ export function VersionCell({ row }: { row: RowTotals }) {
   return (
     <span className="flex items-center gap-2">
       <span className="font-mono text-[13px] text-text">v{row.version}</span>
-      <StatusBadge state={row.state} sunsetAt={row.state === "superseded" ? SUNSET_AT : null} />
+      <StatusBadge state={row.state} sunsetDay={row.state === "superseded" ? SUNSET_DAY : null} />
     </span>
   );
 }

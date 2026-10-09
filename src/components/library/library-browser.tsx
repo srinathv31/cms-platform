@@ -60,7 +60,7 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         </span>
         {showTeam ? <span className={cn("truncate text-text-muted", FOLDS)}>{row.teamName}</span> : null}
         <span>
-          <StatusBadge state={row.status} sunsetAt={row.sunsetAt} now={nowIso} />
+          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} now={nowIso} />
         </span>
         <span className="text-text tabular-nums">
           {row.activeNumber !== null ? `v${row.activeNumber}` : <span className="text-text-subtle">—</span>}
@@ -135,7 +135,7 @@ export function LibraryBrowser({
         : `No ${statusLabel(activeFilter).toLowerCase()} templates.`;
 
   return (
-    <div style={statusColumn(rows.some((row) => row.status === "superseded" && row.sunsetAt !== null))}>
+    <div style={statusColumn(rows.some((row) => row.status === "superseded" && row.sunsetDay !== null))}>
       <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
         <InputGroup className="h-9 w-72 rounded-full border-hairline bg-surface">
           <InputGroupAddon>

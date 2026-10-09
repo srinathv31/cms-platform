@@ -8,7 +8,7 @@ vi.hoisted(() => {
   process.env.TZ = "America/New_York";
 });
 
-const { formatDate, formatSunset, formatStamp, formatWhen, formatRelative, ymdOfIso } = await import("./format");
+const { formatDate, formatSunset, formatStamp, formatWhen, formatRelative } = await import("./format");
 const { dayGroups, dayLabel } = await import("../activity/day-groups");
 const { formatLongDate } = await import("@/domain/render/errors");
 import type { ActivityItem } from "@/domain/review-types";
@@ -39,9 +39,10 @@ describe("absolute dates are UTC days", () => {
     expect(formatDate("2026-03-05T12:00:00.000Z", NOW)).toBe("Mar 5");
   });
 
-  it("reads a sunset day (midnight UTC) as that day, as the header's badge does", () => {
-    expect(formatSunset("2026-11-21T00:00:00.000Z", NOW)).toBe("Nov 21");
-    expect(ymdOfIso("2026-11-21T00:00:00.000Z")).toBe("2026-11-21");
+  it("reads a sunset day (YYYY-MM-DD, in the business time zone) as that day, as the header's badge does", () => {
+    // Read as a local date, New York would say Nov 20: the day must not move with the viewer's zone.
+    expect(formatSunset("2026-11-21", NOW)).toBe("Nov 21");
+    expect(formatSunset("2027-03-01", NOW)).toBe("Mar 1, 2027");
   });
 
   it("puts the absolute time of a stamp in UTC, and says so", () => {

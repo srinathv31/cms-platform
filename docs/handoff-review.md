@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 21 | 11 | 35 |
+| Open | 0 | 3 | 20 | 11 | 34 |
 | Partly fixed | 0 | 4 | 3 | 1 | 8 |
-| Fixed | 1 | 19 | 14 | 3 | 37 |
+| Fixed | 1 | 19 | 15 | 3 | 38 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -277,7 +277,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D6 · Medium: A sunset date means midnight UTC
 
-- **Status:** Open
+- **Status:** Fixed. A sunset date now ends at 00:00 on that day in a Platform business time zone (`America/New_York` by default, Settings > Platform > Time zone), with the rule in `src/domain/business-zone.ts`, existing sunsets migrated, and the picker naming the zone ([decision 0017](decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
 - **Where:** `src/domain/lifecycle.ts` line 933; `src/domain/render/version-rules.ts` line 31
 - **What happens:** "Sunset on March 1" stops renders at 7 PM Eastern on February 28. The port needs an explicit rule.
 - **Fix:** Store a calendar date plus a business time zone, or an instant chosen in the UI, and document which.

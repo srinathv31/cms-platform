@@ -12,6 +12,12 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
   can also be lifted out or turned into an API description without bringing app code along.
 - Only what a consumer can see: `ApiVersionState` is `active | superseded | revoked`, and `ApiRenderRequest` has no
   `"draft"` version or `preview` flag (both CMS-only). Dates are ISO 8601 strings on the demo clock.
+- A sunset is an instant. `sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` notice) is when renders
+  of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in Stencil's business time
+  zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
+  `2027-03-01T05:00:00.000Z`. Compare it with the time; don't take its UTC date as the day, which is the day
+  before for a zone ahead of UTC. The notice's `message` and the 410's message name the day in that zone.
+  Changing the zone doesn't move a sunset already announced ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
 
 ## Endpoints
 

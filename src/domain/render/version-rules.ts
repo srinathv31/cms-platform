@@ -20,8 +20,14 @@ export interface VersionFacts {
 
 export type VersionCheck = { ok: true; newerVersion: number | null } | { ok: false; error: RenderError };
 
-export function checkVersion(input: { version: VersionFacts; activeNumber: number | null; now: Date }): VersionCheck {
-  const { version, activeNumber, now } = input;
+export function checkVersion(input: {
+  version: VersionFacts;
+  activeNumber: number | null;
+  now: Date;
+  /** The business time zone: a sunset's message names its day there. */
+  zone: string;
+}): VersionCheck {
+  const { version, activeNumber, now, zone } = input;
 
   switch (version.state) {
     case "active":
@@ -29,7 +35,7 @@ export function checkVersion(input: { version: VersionFacts; activeNumber: numbe
 
     case "superseded":
       if (version.sunsetAt && version.sunsetAt.getTime() <= now.getTime()) {
-        return { ok: false, error: versionSunset(version.number, version.sunsetAt, activeNumber) };
+        return { ok: false, error: versionSunset(version.number, version.sunsetAt, activeNumber, zone) };
       }
       return { ok: true, newerVersion: activeNumber };
 

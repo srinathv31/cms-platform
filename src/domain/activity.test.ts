@@ -69,6 +69,24 @@ describe("describeActivity: one sentence per audit action", () => {
       "Jordan Ellis set v1 to sunset on March 1, 2027.",
     ],
     [
+      "version.sunset_set, with the day and zone it was set in",
+      event("version.sunset_set", 1, {
+        number: 1,
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-03-01",
+        zone: "America/New_York",
+        previousSunsetAt: null,
+      }),
+      JORDAN,
+      "Jordan Ellis set v1 to sunset on March 1, 2027.",
+    ],
+    [
+      "version.sunset_set, a day whose instant is the UTC day before (a zone ahead of UTC)",
+      event("version.sunset_set", 1, { number: 1, sunsetAt: "2027-02-28T18:30:00.000Z", sunsetDay: "2027-03-01", previousSunsetAt: null }),
+      JORDAN,
+      "Jordan Ellis set v1 to sunset on March 1, 2027.",
+    ],
+    [
       "version.sunset_set, moved",
       event("version.sunset_set", 1, { sunsetAt: "2027-03-01T00:00:00.000Z", previousSunsetAt: "2026-10-25T00:00:00.000Z" }),
       JORDAN,

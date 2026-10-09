@@ -1,16 +1,17 @@
 import "server-only";
 import { cache } from "react";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { describeChanges } from "@/domain/contract";
 import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { VersionTimelineItem, VersionsData } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, RevokeRecord, VersionState, Viewer } from "@/domain/types";
+import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, renderLog, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import {
-  dayOf,
   getPeople,
   iso,
   loadConsumerUsage,
@@ -84,6 +85,7 @@ export function contractItems(changes: readonly ContractChange[], versionNumber:
 export const getVersions = cache(async (spaceSlug: string, templateId: string): Promise<VersionsData> => {
   const { space, template } = await requireTemplate(spaceSlug, templateId);
   const nowDate = await demoNow();
+  const zone = await getBusinessZone();
   const since = nowDate.getTime() - 30 * DAY_MS;
 
   const rows = await db
@@ -163,7 +165,7 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
       }
       if (v.activatedAt) item.activatedAt = iso(v.activatedAt);
       if (v.supersededAt) item.supersededAt = iso(v.supersededAt);
-      if (v.sunsetAt) item.sunsetAt = iso(v.sunsetAt);
+      if (v.sunsetAt) item.sunsetDay = sunsetDay(v.sunsetAt, zone);
       if (v.revoke) {
         item.revoke = {
           reason: v.revoke.reason,
@@ -180,6 +182,6 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
     template: { id: template.id, name: template.name, teamSlug: template.teamSlug },
     items,
     consumerUsage,
-    today: dayOf(nowDate),
+    sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
   };
 });

@@ -50,6 +50,13 @@
       "when": 1791528731356,
       "tag": "0006_versioned_name",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791530047115,
+      "tag": "0007_sunset_business_zone",
+      "breakpoints": true
     }
   ]
 }

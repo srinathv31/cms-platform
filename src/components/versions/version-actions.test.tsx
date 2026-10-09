@@ -20,7 +20,13 @@ vi.mock("@/server/actions/review", () => ({
 
 const { EntryActions } = await import("./version-actions");
 
-const CTX = { templateId: "UC-ABC123", activeNumber: 2, usage: [], today: "2026-10-30", nowIso: "2026-10-30T12:00:00.000Z" };
+const CTX = {
+  templateId: "UC-ABC123",
+  activeNumber: 2,
+  usage: [],
+  sunsetCalendar: { zone: "America/New_York", today: "2026-10-30" },
+  nowIso: "2026-10-30T12:00:00.000Z",
+};
 const OK = { ok: true } as const;
 const NO_REVOKE = { ok: false, reason: REFUSALS.noRevokePending } as const;
 
@@ -31,7 +37,7 @@ function superseded(over: Partial<VersionTimelineItem> = {}): VersionTimelineIte
     state: "superseded",
     createdAt: "2026-09-01T12:00:00.000Z",
     author: { id: "priya", name: "Priya Shah", initials: "PS", hue: 0 },
-    sunsetAt: "2026-10-25T00:00:00.000Z",
+    sunsetDay: "2026-10-25",
     sunsetPassed: false,
     contractLines: [],
     contractItems: [],

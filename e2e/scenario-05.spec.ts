@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
+import { sunsetInstant } from "@/domain/business-zone";
 import { expectError, longDate, openDb } from "./api/helpers";
 import {
   CUSTOMERS,
@@ -323,7 +324,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       const [v3] = await rows(db, "SELECT * FROM versions WHERE id = ?", [v3Id]);
       expect(v3.state).toBe("active");
       expect(v2.state).toBe("superseded");
-      expect(v2.sunset_at, "sunset at the start of the chosen day").toBe(Date.parse(`${sunsetDay}T00:00:00Z`));
+      expect(v2.sunset_at, "sunset at the start of the chosen day, Eastern").toBe(sunsetInstant(sunsetDay, "America/New_York").getTime());
       expect(v2.sunset_set_by).toBe("jordan");
 
       const notices = await rows(db, "SELECT * FROM consumer_notices WHERE template_id = ? ORDER BY created_at, id", [templateId]);

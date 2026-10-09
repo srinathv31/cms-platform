@@ -1,9 +1,9 @@
 import "server-only";
 import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
+import { daysUntilSunset, sunsetDay } from "@/domain/business-zone";
 import {
   addDays,
-  calendarDaysUntil,
   compactCount,
   compareUsageRows,
   consumerLabel,
@@ -29,6 +29,7 @@ import {
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
+import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { consumers, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -200,6 +201,8 @@ function buildRows(
   cells: readonly Cell[],
   ctx: {
     now: Date;
+    /** The business time zone: a sunset's day and the days to it are read there. */
+    zone: string;
     w: UsageWindows;
     templates: ReadonlyMap<string, TemplateInfo>;
     versions: ReadonlyMap<string, VersionInfo>;
@@ -238,8 +241,9 @@ function buildRows(
       tags: usageTags(
         { versionNumber: g.versionNumber, state, sunsetAt: version?.sunsetAt ?? null, revokedAt: version?.revokedAt ?? null, errors30d: g.err },
         ctx.now,
+        ctx.zone,
       ),
-      sunsetAt: version?.sunsetAt?.toISOString() ?? null,
+      sunsetDay: version?.sunsetAt ? sunsetDay(version.sunsetAt, ctx.zone) : null,
       spark: sparkDays.map((d) => spark?.get(d) ?? 0),
     });
   }
@@ -258,6 +262,7 @@ function trendWeeks(w: UsageWindows): string[] {
 export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageDashboard> => {
   const space = await requireSpace(spaceSlug);
   const nowDate = await now();
+  const zone = await getBusinessZone();
   const w = usageWindows(nowDate);
 
   const templateRows = await db
@@ -279,7 +284,7 @@ export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageD
     ids.length ? loadDailySeries(w, filter) : Promise.resolve([]),
   ]);
 
-  const rows = buildRows(cells, { now: nowDate, w, templates: templateMap, versions: versionMap, consumerNames, sparks });
+  const rows = buildRows(cells, { now: nowDate, zone, w, templates: templateMap, versions: versionMap, consumerNames, sparks });
 
   // Stats.
   let ok = 0;
@@ -301,7 +306,7 @@ export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageD
         v.state === "superseded" &&
         v.sunsetAt !== null &&
         v.sunsetAt.getTime() > w.until &&
-        calendarDaysUntil(v.sunsetAt, nowDate) <= NEARING_SUNSET_DAYS,
+        daysUntilSunset(v.sunsetAt, nowDate, zone) <= NEARING_SUNSET_DAYS,
     )
     .sort((a, b) => a.sunsetAt!.getTime() - b.sunsetAt!.getTime());
   const soonest = nearing[0];
@@ -358,7 +363,11 @@ export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageD
         value: nearing.length,
         display: compactCount(nearing.length),
         soonest: soonest
-          ? { templateName: templateMap.get(soonest.templateId)!.name, versionNumber: soonest.number, sunsetAt: soonest.sunsetAt!.toISOString() }
+          ? {
+              templateName: templateMap.get(soonest.templateId)!.name,
+              versionNumber: soonest.number,
+              daysAway: daysUntilSunset(soonest.sunsetAt!, nowDate, zone),
+            }
           : null,
       },
     },
@@ -395,6 +404,7 @@ async function loadDailySeries(w: UsageWindows, templateIds: readonly string[] |
 export const getTemplateUsage = cache(async (spaceSlug: string, templateId: string): Promise<TemplateUsageData> => {
   const { template } = await requireTemplate(spaceSlug, templateId);
   const nowDate = await now();
+  const zone = await getBusinessZone();
   const w = usageWindows(nowDate);
   const info: TemplateInfo = { id: template.id, name: template.name, teamSlug: template.teamSlug };
   const ids = [template.id];
@@ -424,7 +434,7 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
       .limit(10),
   ]);
 
-  const rows = buildRows(cells, { now: nowDate, w, templates: new Map([[info.id, info]]), versions: versionMap, consumerNames, sparks });
+  const rows = buildRows(cells, { now: nowDate, zone, w, templates: new Map([[info.id, info]]), versions: versionMap, consumerNames, sparks });
 
   let ok = 0;
   let errors = 0;
@@ -460,7 +470,7 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
       sunsetPassed: v.sunsetAt !== null && v.sunsetAt.getTime() <= w.until,
       revokedAt: v.revokedAt?.toISOString() ?? null,
       consumers: list,
-      tags: usageTags({ versionNumber: v.number, state: v.state, sunsetAt: v.sunsetAt, revokedAt: v.revokedAt, errors30d }, nowDate),
+      tags: usageTags({ versionNumber: v.number, state: v.state, sunsetAt: v.sunsetAt, revokedAt: v.revokedAt, errors30d }, nowDate, zone),
     };
   });
 

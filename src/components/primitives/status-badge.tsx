@@ -35,13 +35,17 @@ function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
 
 export function StatusBadge({
   state,
-  sunsetAt,
+  sunsetDay,
   now,
   className,
 }: {
   state: VersionState;
-  /** Superseded versions show "Sunset Mar 1" when a sunset date is set. A sunset is a calendar day (midnight UTC), shown as that day in every time zone. */
-  sunsetAt?: Date | null;
+  /**
+   * Superseded versions show "Sunset Mar 1" when a sunset date is set. YYYY-MM-DD: the sunset's day in the
+   * business time zone (`sunsetDay` in domain/business-zone.ts, decided by the read model), shown as that
+   * day in every viewer's time zone.
+   */
+  sunsetDay?: string | null;
   /** The demo clock's now: a sunset outside its year says the year ("Sunset Jan 3, 2027"). */
   now?: Date | string;
   className?: string;
@@ -55,8 +59,8 @@ export function StatusBadge({
     >
       <StatusIcon icon={meta.icon} />
       {meta.label}
-      {state === "superseded" && sunsetAt ? (
-        <span className="font-normal">· Sunset {formatShortDate(sunsetAt, now)}</span>
+      {state === "superseded" && sunsetDay ? (
+        <span className="font-normal">· Sunset {formatShortDate(sunsetDay, now)}</span>
       ) : null}
     </Badge>
   );

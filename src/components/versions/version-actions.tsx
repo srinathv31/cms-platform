@@ -7,11 +7,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { cn } from "@/lib/utils";
 import { REASONS } from "@/domain/permissions";
-import type { ConsumerUsage, VersionTimelineItem } from "@/domain/review-types";
+import type { ConsumerUsage, SunsetCalendar, VersionTimelineItem } from "@/domain/review-types";
 import { cancelRevoke } from "@/server/actions/review";
 import { DESTRUCTIVE_PRIMARY, GENERIC_FAILURE, runAction } from "./action-dialog";
 import { entryHeadingId, entryRevokeId } from "./entry-ids";
-import { ymdOfIso } from "./format";
 import { ConfirmRevokeDialog, StartRevokeDialog } from "./revoke-dialogs";
 import { SunsetDialog } from "./sunset-dialog";
 
@@ -30,13 +29,13 @@ export interface VersionContext {
   /** The Active version's number, if any. */
   activeNumber: number | null;
   usage: readonly ConsumerUsage[];
-  /** YYYY-MM-DD, demo clock. */
-  today: string;
+  /** The sunset picker's business time zone and today in it, on the demo clock. */
+  sunsetCalendar: SunsetCalendar;
   /** The demo clock's instant. */
   nowIso: string;
 }
 
-type Item = Pick<VersionTimelineItem, "id" | "number" | "state" | "sunsetAt" | "sunsetPassed" | "revoke" | "can">;
+type Item = Pick<VersionTimelineItem, "id" | "number" | "state" | "sunsetDay" | "sunsetPassed" | "revoke" | "can">;
 
 function pendingRevoke(item: Item): boolean {
   return !!item.revoke && !item.revoke.confirmedAt;
@@ -79,7 +78,7 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
   const canRevoke = (item.state === "active" || item.state === "superseded") && !revoking && item.can.startRevoke.ok;
   if (!showSunset && !canRevoke) return null;
 
-  const sunsetLabel = item.sunsetAt ? "Change sunset" : "Set sunset";
+  const sunsetLabel = item.sunsetDay ? "Change sunset" : "Set sunset";
 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -106,10 +105,10 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
             onOpenChange={setSunsetOpen}
             templateId={ctx.templateId}
             versionNumber={number}
-            currentSunset={item.sunsetAt ? ymdOfIso(item.sunsetAt) : null}
+            currentSunset={item.sunsetDay ?? null}
             activeNumber={ctx.activeNumber}
             usage={ctx.usage}
-            today={ctx.today}
+            calendar={ctx.sunsetCalendar}
             nowIso={ctx.nowIso}
             finalFocus={() => sunsetButton.current}
           />

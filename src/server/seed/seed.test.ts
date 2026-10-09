@@ -9,6 +9,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
 import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
@@ -246,10 +247,12 @@ describe("lifecycle states", () => {
     }
   });
 
-  it("sets the sunset 21 days out, by Jordan, on Balance Transfer v1", () => {
+  it("sets the sunset 21 days out, by Jordan, on Balance Transfer v1: 00:00 Eastern on that day", () => {
     const v1 = version("balance-transfer", 1);
     expect(v1.sunsetSetBy).toBe("jordan");
-    expect(v1.sunsetAt?.getTime()).toBe(base.getTime() + 21 * DAY);
+    const day = todayIn(new Date(base.getTime() + 21 * DAY), "America/New_York");
+    expect(v1.sunsetAt).toEqual(sunsetInstant(day, "America/New_York"));
+    expect(sunsetDay(v1.sunsetAt!, "America/New_York")).toBe(day);
     expect(version("balance-transfer", 2).sunsetAt).toBeNull();
     expect(version("cash-back", 1).sunsetAt).toBeNull();
   });
@@ -644,9 +647,10 @@ describe("determinism", () => {
           .sort((a, b) => a.id.localeCompare(b.id));
       expect(shape(otherVersions)).toEqual(shape(versions));
 
-      // Timestamps move with the base; offsets from it do not.
+      // Timestamps move with the base; offsets from it do not (a sunset is 00:00 Eastern on its day).
       const sunset = otherVersions.find((v) => v.sunsetAt)!;
-      expect(sunset.sunsetAt!.getTime()).toBe(base.getTime() + 37 * DAY + 21 * DAY);
+      const day = todayIn(new Date(base.getTime() + 37 * DAY + 21 * DAY), "America/New_York");
+      expect(sunset.sunsetAt).toEqual(sunsetInstant(day, "America/New_York"));
     } finally {
       other.client.close();
     }

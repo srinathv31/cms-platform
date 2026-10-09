@@ -26,7 +26,7 @@ export async function VersionsContent({
     templateId: data.template.id,
     activeNumber: data.items.find((v) => v.state === "active")?.number ?? null,
     usage: data.consumerUsage,
-    today: data.today,
+    sunsetCalendar: data.sunsetCalendar,
     nowIso: nowDate.toISOString(),
   };
   const options: CompareOption[] = data.items.map((v) => ({

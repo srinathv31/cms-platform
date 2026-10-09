@@ -65,7 +65,7 @@ export function ContractChanges({ since, activeNumber }: { since: readonly Since
       </div>
       <div className="flex items-center gap-2 text-[13px] text-text-muted">
         <span className="font-medium text-text">v{current.number}</span>
-        <StatusBadge state={current.state} sunsetAt={current.sunsetAt ? new Date(current.sunsetAt) : null} />
+        <StatusBadge state={current.state} sunsetDay={current.sunsetDay} />
         <span aria-hidden>to</span>
         <span className="font-medium text-text">v{activeNumber}</span>
       </div>

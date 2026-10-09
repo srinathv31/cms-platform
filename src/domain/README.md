@@ -48,14 +48,15 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [comments.ts](comments.ts) | Review comments: which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
 | Access and audit | [permissions.ts](permissions.ts) | `can`, `assertCan`, `REASONS`, and the team switcher's spaces. |
 | | [access.ts](access.ts) | Access requests, members, recertification, inactivity, and the clock-driven `sweepAccess`. Also what the Team settings sections say: each strip's line (`memberConsequences`, `requestConsequences`, `startRecertConsequence`), a review's footnote and settled rows (`recertFootnote`, `recertItemOutcome`), and the checks the forms run live (`describeRoleChange`, `validateDecisionNote`). |
-| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve). Each Platform screen's live check is the function its transition refuses with: `validateNewTeam`, `describeSectionsChange`, `channelRuleRefusal`, `removeStageRefusal`. |
+| | [platform-config.ts](platform-config.ts) | Teams, required sections, channel rules, approval chains (`validateChain`: what makes a chain one somebody can approve), the business time zone. Each Platform screen's live check is the function its transition refuses with: `validateNewTeam`, `describeSectionsChange`, `channelRuleRefusal`, `removeStageRefusal`, `describeZoneChange`. |
 | | [audit.ts](audit.ts), [activity.ts](activity.ts) | One sentence per audit event, the Audit page's filters and CSV, notification fallbacks. |
 | Contract and consequences | [contract.ts](contract.ts) | One sentence per contract change: "v2 adds required `annual_fee` (Currency)." |
 | | [consequences.ts](consequences.ts) | Who an approve, sunset, or revoke affects, from render usage. |
 | Consumer API and usage | [golive/](golive/) | `/api/v1` query parsing and errors (`api-errors.ts`), the paging cursors of search and notices and the search order (`cursor.ts`), published contract diffs (`contract-diff.ts`), the JSON Schema for `values` (`json-schema.ts`), notices as served (`notices.ts`), the integration panel's samples (`samples.ts`), and the Usage numbers (`usage.ts`). |
 | Render rules | [render/](render/) | Which versions render (`version-rules.ts`), value checks (`validate.ts`), TipTap JSON to `RenderDoc` (`resolve.ts`), JSON numbers kept as their exact source text (`json-number-text.ts`), and the exact error sentences (`errors.ts`). Specified in [docs/render-spec.md](../../docs/render-spec.md). [render/index.ts](render/index.ts) is the only barrel here. |
 | Import and Copilot | [import.ts](import.ts), [copilot.ts](copilot.ts) | What an imported file becomes as a draft; the prompt an author copies into Copilot. |
-| Dates | [dates.ts](dates.ts) | The one way to write a date or time: always UTC; short forms add the year only outside the demo clock's year. |
+| Dates | [dates.ts](dates.ts) | The one way to write a date or time: always UTC; short forms add the year only outside the demo clock's year. A calendar day (`YYYY-MM-DD`) formats as itself. |
+| | [business-zone.ts](business-zone.ts) | The business time zone and what a sunset date means in it: `sunsetInstant`, `sunsetDay`, `todayIn`, `daysUntilSunset`, the zones on offer (`BUSINESS_ZONES`, `DEFAULT_BUSINESS_ZONE`). Only `Intl`. See [The sunset rule](#the-sunset-rule). |
 
 ## Vocabulary
 
@@ -64,7 +65,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Template | A document consumers render, with a stable id like `UC-4F7K2Q`. Belongs to one team and one content type. | `templates` in [ucomp.ts](../server/db/schema/ucomp.ts) |
 | Version | One snapshot of a template: body (TipTap JSON), variables, channels, email fields, sample sets. `number` is null while it is a draft; `submit` sets it to the highest number + 1, and it never changes. | `VersionSnapshot`, `DraftFields` |
 | Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The database allows one open draft and one Active version per template. | [types.ts](types.ts), [status.ts](status.ts) |
-| Sunset | A date on a Superseded version. From then on, consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it. Not a state. | `setSunset`, `sunsetPassed`, `checkVersion` |
+| Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it. Not a state. | `setSunset`, `sunsetPassed`, `checkVersion` |
 | Revoke pending | An Active or Superseded version whose `revoke` record has no `confirmedAt`. Not a state: it renders until a different approver confirms. | `revokePending` |
 | Content type | Platform configuration a template follows: required sections, allowed channels, approval chain. | [platform-config.ts](platform-config.ts) |
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
@@ -135,6 +136,28 @@ submitter with `REASONS.ownVersion` and any other writer with `REASONS.wroteVers
 Bugs and drift throw: `LifecycleError` (a numbered state with no number), `ResolveError` (a node the renderer
 doesn't know).
 
+## The sunset rule
+
+A sunset date is a calendar day (`YYYY-MM-DD`). It ends at 00:00 on that day in the platform's business time
+zone: `settings.business_zone`, chosen in Settings > Platform > Time zone from the US zones and UTC, and
+`America/New_York` until someone changes it ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
+Every other date stays UTC. In [business-zone.ts](business-zone.ts):
+
+- `sunsetInstant(day, zone)` is the instant stored in `versions.sunset_at`: "2027-03-01" in New York is
+  `2027-03-01T05:00:00.000Z`. When the zone's clocks skip midnight, the day starts at the first instant after the
+  gap; when they show it twice, at the earlier one. In Java: `LocalDate.parse(day).atStartOfDay(zone).toInstant()`.
+- `sunsetDay(instant, zone)` is the day people read (the badge, the timeline, the 410 message). In Java:
+  `instant.atZone(zone).toLocalDate()`.
+- "After today" (`isAfterToday` in [lifecycle.ts](lifecycle.ts)) compares the day with `todayIn(now, zone)`, so at
+  23:30 Eastern the next day is still a valid date. The picker's today is the same day (`SunsetCalendar` in
+  [review-types.ts](review-types.ts)).
+- Passed is an instant comparison (`sunsetPassed`), unchanged.
+- Changing the zone moves no sunset already set. Audit rows and notices record the day picked and the zone
+  (`sunsetDay`, `zone`); `recordedSunsetDay` reads them, and reads a record from before the rule as the UTC date
+  of its `sunsetAt`, which is what it meant then.
+
+`setSunset` and `approve` take the day and the zone and return the instant, so the rule has one home.
+
 ## Rules that live outside `src/domain`
 
 Read these before you assume a rule is missing. When you change one, move it here instead of copying it.
@@ -178,8 +201,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 - **Local copies of small helpers.** "a, b and c" joins: `andList` in `copilot.ts` and `import.ts`, `listKeys` in
   `lifecycle.ts`; use `joinWithAnd` from [render/errors.ts](render/errors.ts). Count-and-noun `plural` in
   `import.ts`, `audit.ts`, and `golive/notices.ts`. `DAY_MS` in `access.ts`, `audit.ts`, `consequences.ts`, and
-  `golive/usage.ts`. Two `utcDay`s with different results (a number in `lifecycle.ts`, a `YYYY-MM-DD` string in
-  `golive/usage.ts`). Relative time as `ago` in `consequences.ts` and again in
+  `golive/usage.ts`. Relative time as `ago` in `consequences.ts` and again in
   [queries/format.ts](../server/queries/format.ts). Numbers and plurals have no shared helper yet.
 - **`STATUS_META.renders`** in [status.ts](status.ts). Nothing reads it; the render rule is `checkVersion` in
   [render/version-rules.ts](render/version-rules.ts).

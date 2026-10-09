@@ -24,6 +24,7 @@ import {
   versionNotReleased,
 } from "@/domain/render";
 import { CHANNELS, type Channel, type VersionState } from "@/domain/types";
+import { readBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { consumerNotices, consumers, contentTypes, settings, teams, templates, versions } from "@/server/db/schema/ucomp";
 
@@ -160,6 +161,7 @@ function versionSummary(
   activeNumber: number | null,
   allowed: readonly Channel[],
   now: Date,
+  zone: string,
 ): ApiVersionSummary {
   const revokedAt = v.revoke?.confirmedAt ?? null;
   return {
@@ -174,6 +176,7 @@ function versionSummary(
       version: { number: v.number!, state: v.state, sunsetAt: v.sunsetAt, revokedAt: revokedAt ? new Date(revokedAt) : null },
       activeNumber,
       now,
+      zone,
     }).ok,
     channels: published(v.channels, allowed),
   };
@@ -220,6 +223,7 @@ export async function getTemplateDetail(
   // The template's name is the Active version's. With none Active (it was revoked), the name of the
   // version consumers can still render (`contractBaseline`); with nothing rendering, the newest released one's.
   const name = (contractBaseline(released, now) ?? released[0]!).name;
+  const zone = await readBusinessZone(db);
 
   /** A version a consumer may read by number: 404 when there's none, 409 when it isn't released. */
   const readable = (number: number) => {
@@ -272,7 +276,7 @@ export async function getTemplateDetail(
     contentType: { key: template.contentTypeKey, name: template.contentTypeName },
     asOf: now.toISOString(),
     activeVersion: activeNumber,
-    versions: released.map((v) => versionSummary(v, activeNumber, template.allowedChannels, now)),
+    versions: released.map((v) => versionSummary(v, activeNumber, template.allowedChannels, now, zone)),
     contract,
     ...(changes ? { changes } : {}),
   };

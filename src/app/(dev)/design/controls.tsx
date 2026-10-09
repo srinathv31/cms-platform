@@ -21,7 +21,7 @@ const STATES: VersionState[] = [
 ];
 
 // A fixed date: `new Date()` with no arguments is not allowed while prerendering.
-const SUNSET = new Date("2027-03-01T12:00:00Z");
+const SUNSET = "2027-03-01";
 
 export function StatusBadges() {
   return (
@@ -33,7 +33,7 @@ export function StatusBadges() {
         </li>
       ))}
       <li className="flex flex-col items-start gap-3 bg-surface px-6 py-5">
-        <StatusBadge state="superseded" sunsetAt={SUNSET} />
+        <StatusBadge state="superseded" sunsetDay={SUNSET} />
         <Code>superseded + sunsetAt</Code>
       </li>
       <li aria-hidden className="bg-surface" />

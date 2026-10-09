@@ -90,7 +90,7 @@ function keyDates(item: VersionTimelineItem, now: Date): string[] {
   if (item.submittedAt) dates.push(`Submitted ${formatDate(item.submittedAt, now)}`);
   if (item.activatedAt) dates.push(`Activated ${formatDate(item.activatedAt, now)}`);
   if (item.supersededAt) dates.push(`Superseded ${formatDate(item.supersededAt, now)}`);
-  if (item.sunsetAt && item.sunsetPassed) dates.push(`Sunset passed ${formatSunset(item.sunsetAt, now)}`);
+  if (item.sunsetDay && item.sunsetPassed) dates.push(`Sunset passed ${formatSunset(item.sunsetDay, now)}`);
   if (item.revoke?.confirmedAt) dates.push(`Revoked ${formatDate(item.revoke.confirmedAt, now)}`);
   return dates;
 }
@@ -111,7 +111,7 @@ export function VersionEntry({
   const rendersForConsumers = item.state === "active" || item.state === "superseded" || item.state === "revoked";
   const revoke = item.revoke;
   const revokePending = !!revoke && !revoke.confirmedAt;
-  const status = <StatusBadge state={item.state} sunsetAt={item.sunsetAt ? new Date(item.sunsetAt) : null} now={now} />;
+  const status = <StatusBadge state={item.state} sunsetDay={item.sunsetDay} now={now} />;
   // Breaking changes first, then the rest, each group in the diff's order (as in the submit dialog).
   const contract = [...item.contractItems.filter((c) => c.breaking), ...item.contractItems.filter((c) => !c.breaking)];
 

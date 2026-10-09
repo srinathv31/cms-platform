@@ -10,7 +10,7 @@ const html = (since: Since) => renderToStaticMarkup(<ContractChanges since={sinc
 const v2: Since[number] = {
   number: 2,
   state: "superseded",
-  sunsetAt: "2026-12-01T00:00:00.000Z",
+  sunsetDay: "2026-12-01",
   diff: {
     breaking: true,
     items: [
@@ -19,7 +19,7 @@ const v2: Since[number] = {
     ],
   },
 };
-const v1: Since[number] = { number: 1, state: "revoked", sunsetAt: null, diff: { breaking: false, items: [] } };
+const v1: Since[number] = { number: 1, state: "revoked", sunsetDay: null, diff: { breaking: false, items: [] } };
 
 describe("ContractChanges", () => {
   it("names the version, marks breaking items and sets keys in mono", () => {

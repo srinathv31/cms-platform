@@ -143,7 +143,7 @@ One SQLite file, `data/ucomp.db`, through libSQL and Drizzle. `DATABASE_URL` and
 at Turso instead. Two schema files:
 
 - [schema/ucomp.ts](../src/server/db/schema/ucomp.ts), the CMS:
-  - **Settings:** `settings` (demo clock offset, seed version).
+  - **Settings:** `settings` (demo clock offset, seed version, business time zone).
   - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
   - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
@@ -169,6 +169,10 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 - **The demo clock.** `now()` in [clock.ts](../src/server/clock.ts) is real time plus `settings.clock_offset_days`.
   It is the only reader of the current time on the server; domain functions take `now` as an argument. The Demo
   pill's "Advance clock" moves the offset, and `/api/v1` responses carry it in their `Date` header.
+- **The business time zone.** A sunset date ends at 00:00 on that day in one platform time zone, a Platform
+  setting that is `America/New_York` by default
+  ([decision 0017](decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)). Every other date
+  the UI shows is UTC.
 - **Identity.** There is no login. `getViewer()` reads the `ucomp_persona` cookie. A missing or unknown cookie acts
   as Maya.
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:

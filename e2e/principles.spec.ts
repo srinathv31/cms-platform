@@ -341,7 +341,7 @@ const AUDIT: Route[] = [
 
 // The settings sections as hard navigations (reload or a shared link): the dialog over the library.
 const TEAM_SECTIONS = ["members", "access-requests", "recertification", "inactivity"];
-const PLATFORM_SECTIONS = ["teams", "content-types", "channel-rules", "approval-chains"];
+const PLATFORM_SECTIONS = ["teams", "content-types", "channel-rules", "approval-chains", "time-zone"];
 const SETTINGS_HARD: Route[] = [
   ...TEAM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["alex"] })),
   ...PLATFORM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["riley"] })),

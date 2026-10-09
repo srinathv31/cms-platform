@@ -6,17 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { consequences } from "@/domain/consequences";
-import type { ConsumerUsage } from "@/domain/review-types";
+import type { ConsumerUsage, SunsetCalendar } from "@/domain/review-types";
 import { setSunset } from "@/server/actions/review";
 import { ActionDialog, Consequences, useActionDialog } from "./action-dialog";
 import { formatLong } from "./format";
-import { SunsetCalendarContent } from "./sunset-calendar";
+import { SunsetCalendarContent, SunsetZone } from "./sunset-calendar";
 import { defaultSunsetDate, validateSunsetDate } from "./validation";
 
 /**
  * Set (or move) the sunset date of a Superseded version. The consequence lines follow the date as
  * it changes, from the render log's usage rows. With no sunset yet it is "Set sunset for vN" and the
- * primary is "Set sunset"; with one, "Change sunset for vN" and "Change sunset".
+ * primary is "Set sunset"; with one, "Change sunset for vN" and "Change sunset". The picker's today is
+ * the business time zone's, and the line under it names the zone the day ends in.
  */
 export function SunsetDialog({
   open,
@@ -26,7 +27,7 @@ export function SunsetDialog({
   currentSunset,
   activeNumber,
   usage,
-  today,
+  calendar,
   nowIso,
   finalFocus,
   onSucceeded,
@@ -39,14 +40,15 @@ export function SunsetDialog({
   currentSunset: string | null;
   activeNumber: number | null;
   usage: readonly ConsumerUsage[];
-  /** YYYY-MM-DD, demo clock. */
-  today: string;
+  /** The business time zone and today in it, on the demo clock. */
+  calendar: SunsetCalendar;
   /** The demo clock's instant. */
   nowIso: string;
   finalFocus?: () => HTMLElement | null;
   /** The sunset was saved (called before the dialog closes). */
   onSucceeded?: () => void;
 }) {
+  const { today, zone } = calendar;
   const [ymd, setYmd] = useState(() => defaultSunsetDate(currentSunset, today));
   const [pickerOpen, setPickerOpen] = useState(false);
   const dateButton = useRef<HTMLButtonElement>(null);
@@ -68,6 +70,7 @@ export function SunsetDialog({
 
   const labelId = `sunset-${versionNumber}-label`;
   const buttonId = `sunset-${versionNumber}-date`;
+  const zoneId = `sunset-${versionNumber}-zone`;
 
   return (
     <ActionDialog
@@ -98,6 +101,7 @@ export function SunsetDialog({
             ref={dateButton}
             id={buttonId}
             aria-labelledby={`${labelId} ${buttonId}`}
+            aria-describedby={zoneId}
             render={<Button variant="outline" className="h-8 w-56 justify-start gap-2 bg-surface px-2.5 font-normal text-text" />}
           >
             <CalendarDays aria-hidden strokeWidth={1.75} className="text-text-muted" />
@@ -113,6 +117,7 @@ export function SunsetDialog({
             }}
           />
         </Popover>
+        <SunsetZone id={zoneId} zone={zone} />
       </div>
       {lines.length > 0 ? <Consequences lines={lines} /> : null}
     </ActionDialog>

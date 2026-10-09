@@ -3,6 +3,7 @@ import type { Client } from "@libsql/client";
 import { and, eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { sunsetInstant } from "@/domain/business-zone";
 import { COMMENT_REFUSALS } from "@/domain/comments";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
@@ -266,7 +267,7 @@ describe("getVersions", () => {
       submittedAt: expect.stringMatching(ISO),
       activatedAt: expect.stringMatching(ISO),
       supersededAt: expect.stringMatching(ISO),
-      sunsetAt: expect.stringMatching(ISO),
+      sunsetDay: "2026-10-25",
       sunsetPassed: false,
       decisions: [expect.objectContaining({ kind: "approved", stageName: "Team approver", by: expect.objectContaining({ id: "jordan" }) })],
       lastRenderAt: expect.stringMatching(ISO),
@@ -284,7 +285,9 @@ describe("getVersions", () => {
       ["coral", 2],
       ["coral", 1],
     ]);
-    expect(data.today).toBe("2026-10-04");
+    // The sunset picker's calendar: the business time zone (Eastern until changed) and today there.
+    expect(data.sunsetCalendar).toEqual({ zone: "America/New_York", today: "2026-10-04" });
+    expect(data.items[1]!.sunsetDay).toBe("2026-10-25");
 
     as("maya");
     const author = await getVersions("coral-offers", ids["balance-transfer"]!);
@@ -294,7 +297,8 @@ describe("getVersions", () => {
   it("once Balance Transfer v1's sunset passes, its sunset is refused to everyone, with the reason", async () => {
     const templateId = ids["balance-transfer"]!;
     as("jordan");
-    const sunsetAt = new Date((await getVersions("coral-offers", templateId)).items[1]!.sunsetAt!);
+    // v1's sunset day ends at 00:00 Eastern: the instant renders stop.
+    const sunsetAt = sunsetInstant((await getVersions("coral-offers", templateId)).items[1]!.sunsetDay!, "America/New_York");
     try {
       env.now = new Date(sunsetAt.getTime() - 1);
       expect((await getVersions("coral-offers", templateId)).items[1]).toMatchObject({
@@ -522,9 +526,10 @@ describe("the review screen's version", () => {
     as("jordan");
     const superseded = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 1);
     expect(superseded.version.state).toBe("superseded");
-    expect(superseded.version.sunsetAt).toMatch(ISO);
+    expect(superseded.version.sunsetDay).toBe("2026-10-25");
+    expect(superseded.sunsetCalendar).toEqual({ zone: "America/New_York", today: "2026-10-04" });
     const active = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 2);
-    expect(active.version.sunsetAt).toBeNull();
+    expect(active.version.sunsetDay).toBeNull();
   });
 });
 

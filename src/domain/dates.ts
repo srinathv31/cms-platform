@@ -8,6 +8,9 @@
 //   formatDateTime   "Oct 4, 3:42 PM UTC", or "Oct 4, 2025, 3:42 PM UTC" outside the demo clock's year
 //   formatStamp      "Sun, Oct 4, 2026, 3:42 PM UTC": the full instant, for hover titles and the Demo pill
 //
+// A calendar day written YYYY-MM-DD (a sunset's day, which the read model takes in the business time zone,
+// domain/business-zone.ts) reads as UTC midnight, so it formats as itself: "2027-03-01" is "March 1, 2027".
+//
 // Pure and safe on the server and the client.
 
 const SHORT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

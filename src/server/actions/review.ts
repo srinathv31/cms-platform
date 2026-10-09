@@ -4,6 +4,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { canActOnStage, currentStageOf } from "@/domain/approval-chain";
+import { isCalendarDay, sunsetInstant } from "@/domain/business-zone";
 import {
   approve,
   cancelRevoke as cancelRevokeTransition,
@@ -22,6 +23,7 @@ import {
 import { PermissionError, assertCan } from "@/domain/permissions";
 import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
 import type { Action, PermissionResource, Viewer } from "@/domain/types";
+import { readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
@@ -221,13 +223,6 @@ function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
     createdAt: draft.createdAt,
     updatedAt: draft.updatedAt,
   };
-}
-
-/** "2027-03-01" → that day's midnight UTC (the transitions compare whole UTC days). */
-function parseDay(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
 }
 
 function effectContext(viewer: Viewer, found: { teamId: string; templateId: string }, versionId: string, at: Date) {
@@ -476,8 +471,9 @@ export async function approveVersion(input: {
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
 
-  const sunsetPrevious = parsed.data.sunsetPrevious ? parseDay(parsed.data.sunsetPrevious) : null;
-  if (parsed.data.sunsetPrevious && !sunsetPrevious) return { ok: false, reason: REASONS.badDate };
+  // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
+  const sunsetPrevious = parsed.data.sunsetPrevious || null;
+  if (sunsetPrevious !== null && !isCalendarDay(sunsetPrevious)) return { ok: false, reason: REASONS.badDate };
 
   const at = await now();
   const result = await transact<{ wentLive: boolean; number: number }>(async (tx) => {
@@ -494,6 +490,7 @@ export async function approveVersion(input: {
       now: at,
       active: active && active.id !== version.id && active.number !== null ? { id: active.id, number: active.number } : null,
       sunsetPrevious,
+      zone: await readBusinessZone(tx),
       sampleSetsSeen: parsed.data.sampleSetsSeen,
       templateName: version.name,
       decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
@@ -536,11 +533,13 @@ export async function approveVersion(input: {
 const SunsetInput = VersionRef.extend({ sunsetAt: z.string() });
 
 /**
- * Sets, or moves, the date a Superseded version stops rendering (YYYY-MM-DD, after today on the demo
- * clock). Consumers still rendering the template get a notice with the date and the contract changes
- * the Active version brought. Setting the date it already has writes nothing (a double click). Once
- * the sunset has passed, the transition refuses any date: the version is read again in the transaction,
- * so a sunset that passed while the dialog was open is refused too.
+ * Sets, or moves, the date a Superseded version stops rendering (YYYY-MM-DD, after today in the business
+ * time zone on the demo clock). It stops at 00:00 on that day there: the zone is read in the transaction
+ * and the transition stores that instant (decision 0017). Consumers still rendering the template get a
+ * notice with the instant and the contract changes the Active version brought. Setting the date it
+ * already has writes nothing (a double click). Once the sunset has passed, the transition refuses any
+ * date: the version is read again in the transaction, so a sunset that passed while the dialog was open
+ * is refused too.
  */
 export async function setSunset(input: {
   templateId: string;
@@ -553,14 +552,15 @@ export async function setSunset(input: {
   const refused = check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });
   if (refused) return refused;
   if (!parsed.success || !found) return { ok: false, reason: REASONS.noVersion };
-  const sunsetAt = parseDay(parsed.data.sunsetAt);
-  if (!sunsetAt) return { ok: false, reason: REASONS.badDate };
+  const sunsetDay = parsed.data.sunsetAt;
+  if (!isCalendarDay(sunsetDay)) return { ok: false, reason: REASONS.badDate };
 
   const at = await now();
   let wrote = false;
   const result = await transact(async (tx) => {
     const version = await loadVersion(tx, found, parsed.data.versionNumber);
-    const unchanged = version.sunsetAt?.getTime() === sunsetAt.getTime();
+    const zone = await readBusinessZone(tx);
+    const unchanged = version.sunsetAt?.getTime() === sunsetInstant(sunsetDay, zone).getTime();
     if (version.state === "superseded" && unchanged && !sunsetPassed(version, at)) return { ok: true };
     const active = await activeVersion(tx, found.templateId);
 
@@ -568,7 +568,8 @@ export async function setSunset(input: {
       version,
       actorId: viewer.userId,
       now: at,
-      sunsetAt,
+      sunsetDay,
+      zone,
       activeNumber: active?.number ?? null,
       templateName: version.name,
       contractChanges: active?.contractChanges ?? null,

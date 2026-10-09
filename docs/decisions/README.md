@@ -22,6 +22,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0014](0014-chart-values-never-hover-only.md) | Chart values are never hover-only, and series differ by hue | Accepted |
 | [0015](0015-a-version-keeps-the-stages-it-was-submitted-with.md) | A version goes through the approval stages it was submitted with | Accepted |
 | [0016](0016-the-name-is-versioned.md) | The template's name is a version field | Accepted |
+| [0017](0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md) | A sunset date ends at 00:00 in the business time zone (Eastern by default, a Platform setting) | Accepted |
 | [0018](0018-settings-screens-render-decisions.md) | Settings screens render decisions; the domain makes them | Accepted |
 | [0019](0019-on-demand-reads-are-get-routes.md) | Reads a screen loads on demand are GET routes; only mutations are server actions | Accepted |
 | [0020](0020-autosave-never-drops-edits-silently.md) | Autosave never drops an edit without saying so: the header binds it, a stopped save holds the page, leaving unsaved asks | Accepted |

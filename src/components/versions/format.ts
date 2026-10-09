@@ -1,13 +1,15 @@
 // Date and sentence helpers for the Versions tab. Pure, and safe on the server and the client.
 //
 // Timeline dates are formatted on the server (the page is a server component) and reach the client as
-// strings. Every absolute date the Versions and Activity tabs show is read in UTC, as the render API and
-// the domain's sentences read them ("March 1, 2027", `formatLongDate`) and as the workspace header's
-// "Sunset Mar 1" badge does: the same instant never reads as two different days on one page. Relative
-// times ("today", "3 days ago", "5 minutes ago") are not dates and stay as they are.
+// strings. Every absolute date the Versions and Activity tabs show is read in UTC, as the domain's
+// sentences read them ("March 1, 2027", `formatLongDate`): the same instant never reads as two different
+// days on one page. Relative times ("today", "3 days ago", "5 minutes ago") are not dates and stay as
+// they are.
 //
-// The sunset picker works in calendar dates (YYYY-MM-DD): `today` comes from the demo clock (the UTC
-// day), and what the picker sends is the same shape.
+// A sunset is the exception: it is a calendar day in the business time zone (decision 0017), and the
+// read model hands it over as that day (YYYY-MM-DD, `VersionTimelineItem.sunsetDay`). The sunset picker
+// works in the same calendar dates: its `today` is the business zone's day on the demo clock, and what it
+// sends is the same shape.
 
 import { formatDistanceStrict } from "date-fns";
 import { formatShortDate, formatStamp as formatFullStamp } from "@/domain/dates";
@@ -85,17 +87,9 @@ export function formatLong(ymd: string): string {
   return date ? LONG.format(date) : "";
 }
 
-// A sunset is a calendar day, stored as that day's midnight UTC (the server compares whole UTC days,
-// and `today` is the UTC day). So its date is read in UTC, whatever the viewer's time zone.
-
-/** The calendar day of a stored sunset, as the picker sends it: "2027-03-01". */
-export function ymdOfIso(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-/** "Mar 1", or "Mar 1, 2027" when it isn't this year: a sunset's day, in UTC like `formatLongDate`. */
-export function formatSunset(iso: string, now: Date): string {
-  return formatShortDate(new Date(iso), now);
+/** "Mar 1", or "Mar 1, 2027" when it isn't this year: a sunset's day (YYYY-MM-DD), the same in every viewer's time zone. */
+export function formatSunset(day: string, now: Date): string {
+  return formatShortDate(day, now);
 }
 
 // ── Sentences ────────────────────────────────────────────────────────────────

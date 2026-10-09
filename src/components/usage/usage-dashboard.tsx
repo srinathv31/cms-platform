@@ -26,7 +26,7 @@ const CHANNEL_SERIES: StackSeries[] = [
 
 const NF = new Intl.NumberFormat("en-US");
 
-function Overview({ d, nowDate }: { d: UsageDashboard; nowDate: Date }) {
+function Overview({ d }: { d: UsageDashboard }) {
   const { stats, onActive, heatmap } = d;
   const firstDay = heatmap.weeks[0]?.[0]?.date ?? d.today;
   const onOlder =
@@ -76,7 +76,7 @@ function Overview({ d, nowDate }: { d: UsageDashboard; nowDate: Date }) {
           ]}
         />
         <div className="mt-2 line-clamp-2 min-h-10 text-[13px] text-text-muted">
-          {soonest ? `${soonest.templateName} v${soonest.versionNumber} ${sunsetPhrase(soonest.sunsetAt, nowDate)}` : null}
+          {soonest ? `${soonest.templateName} v${soonest.versionNumber} ${sunsetPhrase(soonest.daysAway)}` : null}
         </div>
       </Panel>
 
@@ -180,5 +180,5 @@ export async function UsageDashboardContent({
   const { tab } = await searchParams;
   const d = await getUsageDashboard(team);
   const nowDate = await now();
-  return <UsageTabs initial={tab === "consumers" ? "consumers" : "overview"} overview={<Overview d={d} nowDate={nowDate} />} consumers={<Consumers d={d} nowIso={nowDate.toISOString()} />} />;
+  return <UsageTabs initial={tab === "consumers" ? "consumers" : "overview"} overview={<Overview d={d} />} consumers={<Consumers d={d} nowIso={nowDate.toISOString()} />} />;
 }

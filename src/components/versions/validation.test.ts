@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, codeSegments, formatLong, formatSunset, fromYmd, renderCount, toYmd, ymdOfIso } from "./format";
+import { addDays, codeSegments, formatLong, formatSunset, fromYmd, renderCount, toYmd } from "./format";
 import { REVOKE_REASON_MAX, defaultSunsetDate, validateRevokeReason, validateSunsetDate } from "./validation";
 
 describe("validateSunsetDate", () => {
@@ -60,13 +60,18 @@ describe("calendar dates", () => {
     expect(formatLong("2027-03-01")).toBe("March 1, 2027");
   });
 
-  it("reads a stored sunset as its UTC day, whatever the time zone", () => {
-    // Midnight UTC is the evening before in the Americas: the day is still the 17th.
-    expect(ymdOfIso("2026-10-17T00:00:00.000Z")).toBe("2026-10-17");
-    expect(formatSunset("2026-10-17T00:00:00.000Z", new Date("2026-10-04T12:00:00.000Z"))).toBe("Oct 17");
-    expect(formatSunset("2027-03-01T00:00:00.000Z", new Date("2026-10-04T12:00:00.000Z"))).toBe("Mar 1, 2027");
-    // The year check is on the UTC calendar too: the last evening of the year, in the Americas, is already next year.
-    expect(formatSunset("2027-01-01T00:00:00.000Z", new Date("2026-12-31T23:30:00.000Z"))).toBe("Jan 1, 2027");
+  it("reads a sunset's day as given (the business time zone's), whatever the viewer's time zone", () => {
+    // The read model sends the day itself; read as a local date it would be the 16th in the Americas.
+    expect(formatSunset("2026-10-17", new Date("2026-10-04T12:00:00.000Z"))).toBe("Oct 17");
+    expect(formatSunset("2027-03-01", new Date("2026-10-04T12:00:00.000Z"))).toBe("Mar 1, 2027");
+    // The year check is on the demo clock's UTC year: the last evening of the year, in the Americas, is already next year.
+    expect(formatSunset("2027-01-01", new Date("2026-12-31T23:30:00.000Z"))).toBe("Jan 1, 2027");
+  });
+
+  it("checks a date against the business time zone's today, as the read model gives it", () => {
+    // 23:30 Eastern on October 4 is October 5 in UTC; the picker's today is still the 4th, so the 5th is fine.
+    expect(validateSunsetDate("2026-10-05", "2026-10-04")).toBeNull();
+    expect(validateSunsetDate("2026-10-04", "2026-10-04")).toBe("Pick a date after October 4, 2026.");
   });
 });
 

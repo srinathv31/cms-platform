@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
+import { sunsetDay } from "@/domain/business-zone";
 import { typeLabel } from "@/domain/contract";
 import { contractDiff } from "@/domain/golive/contract-diff";
 import { contractJsonSchema, exampleOf } from "@/domain/golive/json-schema";
@@ -10,6 +11,7 @@ import type { IntegrationPanelData } from "@/domain/golive-types";
 import { can } from "@/domain/permissions";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import { refusal, type ReadResult } from "@/server/api/reads";
+import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
 
@@ -71,6 +73,7 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
     variables: active.variables,
   });
 
+  const zone = await getBusinessZone();
   const older = all
     .filter((v) => (v.state === "superseded" || v.state === "revoked") && v.number !== null && v.number < activeNumber)
     .sort((a, b) => b.number! - a.number!);
@@ -107,7 +110,7 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
       return {
         number: v.number!,
         state: v.state,
-        sunsetAt: v.sunsetAt?.toISOString() ?? null,
+        sunsetDay: v.sunsetAt ? sunsetDay(v.sunsetAt, zone) : null,
         diff: { breaking: diff.breaking, items: diff.items },
       };
     }),

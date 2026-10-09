@@ -1,6 +1,7 @@
 import { request as httpRequest } from "node:http";
 import type { Client } from "@libsql/client";
 import { expect, test } from "@playwright/test";
+import { sunsetDay, sunsetInstant } from "@/domain/business-zone";
 import {
   JUNK,
   LABEL,
@@ -469,20 +470,22 @@ test.describe("version rules for consumers", () => {
 
   test("a Superseded version past its sunset is a 410 version_sunset", async ({ request }) => {
     const at = await demoNow(db);
-    // A sunset the seed already passed, when it has one.
+    // A sunset the seed already passed, when it has one. The message names its day in the business
+    // time zone (Eastern, the default).
     const seeded = (await versions()).filter((v) => v.state === "superseded" && v.sunsetAt !== null && v.sunsetAt <= at);
     for (const v of seeded) {
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, v.channels[0]) });
-      await expectError(res, 410, "version_sunset", `Version ${v.number} was sunset on ${longDate(v.sunsetAt!)}. ${activeSentence(v.activeNumber, "No version is active.")}`);
+      const day = sunsetDay(new Date(v.sunsetAt!), "America/New_York");
+      await expectError(res, 410, "version_sunset", `Version ${v.number} was sunset on ${longDate(`${day}T00:00:00Z`)}. ${activeSentence(v.activeNumber, "No version is active.")}`);
     }
 
-    // And one set here: March 1, 2020.
+    // And one set here: March 1, 2020, which ends at 00:00 Eastern (05:00 UTC).
     const v = pick(await versions(), "Superseded version with an Active successor and no sunset", (x) => x.state === "superseded" && x.activeNumber !== null && x.sunsetAt === null);
-    const sunset = Date.UTC(2020, 2, 1);
+    const sunset = sunsetInstant("2020-03-01", "America/New_York").getTime();
     await withTemporarily(db, "versions", v.id, { sunset_at: sunset }, async () => {
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, v.channels[0]) });
       const error = await expectError(res, 410, "version_sunset", `Version ${v.number} was sunset on March 1, 2020. Version ${v.activeNumber} is active.`);
-      expect(error.details).toEqual({ version: v.number, activeVersion: v.activeNumber, at: "2020-03-01T00:00:00.000Z" });
+      expect(error.details).toEqual({ version: v.number, activeVersion: v.activeNumber, at: "2020-03-01T05:00:00.000Z" });
     });
   });
 

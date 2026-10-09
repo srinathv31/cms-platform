@@ -11,7 +11,8 @@
 //   submit         Draft → In review, numbered, with its contract changes against `contractBaseline`
 //   requestChanges In review → Changes requested, plus a new Draft carrying the block ids (and so the threads)
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
-//   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes
+//   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes.
+//                  A sunset date ends renders at 00:00 on that day in the business time zone (business-zone.ts).
 //   startRevoke    Active or Superseded → revoke pending (one approver)
 //   confirmRevoke  revoke pending → Revoked (a different approver)
 //   cancelRevoke   revoke pending → no revoke
@@ -34,6 +35,7 @@ import {
   stageRecipients,
   type RecordedDecision,
 } from "./approval-chain";
+import { sunsetInstant, todayIn } from "./business-zone";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { formatLongDate } from "./render/errors";
@@ -641,9 +643,9 @@ export type ApproveResult = Outcome<Approved>;
  * The caller checks who may act on the stage (`canActOnStage`); this refuses anyone who wrote the
  * version (maker-checker: its `writers` and submitter), a version no longer in review, someone who
  * already approved a stage of it (`approvedThisRound`: two stages need two people), a stage missing
- * from the chain, and a sunset date that isn't after today. The next stage's "review requested" goes
- * to nobody who approved a stage of it, this approver included. `sampleSetsSeen` records which sample
- * sets the approver previewed.
+ * from the chain, and a sunset date that isn't after today in the business time zone. The next stage's
+ * "review requested" goes to nobody who approved a stage of it, this approver included.
+ * `sampleSetsSeen` records which sample sets the approver previewed.
  */
 export function approve(input: {
   version: ReviewVersion;
@@ -656,7 +658,10 @@ export function approve(input: {
    * and after the Active version was revoked: nothing is superseded, and `sunsetPrevious` is ignored.
    */
   active: { id: string; number: number } | null;
-  sunsetPrevious: Date | null;
+  /** YYYY-MM-DD: the day the previous version stops rendering, at 00:00 in `zone`; null for none. */
+  sunsetPrevious: string | null;
+  /** The business time zone (`business-zone.ts`): what the sunset day and "today" are read in. */
+  zone: string;
   sampleSetsSeen: readonly string[];
   templateName: string;
   /**
@@ -665,7 +670,7 @@ export function approve(input: {
    */
   decisions?: readonly RecordedDecision[];
 }): ApproveResult {
-  const { version, chain, actorId, actorName, now, active, sunsetPrevious, templateName } = input;
+  const { version, chain, actorId, actorName, now, active, sunsetPrevious, zone, templateName } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
   const wrote = makerCheckerRefusal(actorId, version);
@@ -679,7 +684,7 @@ export function approve(input: {
   const isLast = index === stages.length - 1;
   const next = isLast ? null : stageOf(stages, index + 1, chain);
   if (!isLast && !next) return refuse(REFUSALS.stageMissing);
-  if (sunsetPrevious && !isAfterToday(sunsetPrevious, now)) return refuse(REFUSALS.sunsetAfterToday);
+  if (sunsetPrevious !== null && !isAfterToday(sunsetPrevious, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
 
   const number = numberOf(version);
   const approval: ApprovalRecord = {
@@ -739,7 +744,7 @@ export function approve(input: {
   // ── The last stage: the version goes live ──
   // The sunset goes on the version that is Active now (the action's compare-and-set checks it still is):
   // it is still rendering, so this starts a sunset and can't bring back one that has passed.
-  const sunsetAt = active && sunsetPrevious ? sunsetPrevious : null;
+  const sunset = active && sunsetPrevious !== null ? sunsetOn(sunsetPrevious, zone) : null;
   const contractChanges = [...(version.contractChanges ?? [])];
   const contractLines = describeChanges(contractChanges, number);
 
@@ -758,12 +763,12 @@ export function approve(input: {
       details: { number: active.number, supersededBy: number },
     });
   }
-  if (active && sunsetAt) {
+  if (active && sunset) {
     effects.push({
       kind: "audit",
       action: "version.sunset_set",
       versionId: active.id,
-      details: { number: active.number, sunsetAt: sunsetAt.toISOString(), previousSunsetAt: null },
+      details: { number: active.number, ...sunset.details, previousSunsetAt: null },
     });
   }
   if (version.submittedBy) {
@@ -783,7 +788,7 @@ export function approve(input: {
     versionId: version.id,
     payload: { versionNumber: number, activeVersion: number, contractChanges, contractLines },
   });
-  if (active && sunsetAt) {
+  if (active && sunset) {
     effects.push({
       kind: "consumer_notice",
       notice: "sunset_scheduled",
@@ -791,7 +796,8 @@ export function approve(input: {
       payload: {
         versionNumber: active.number,
         activeVersion: number,
-        sunsetAt: sunsetAt.toISOString(),
+        sunsetAt: sunset.details.sunsetAt,
+        sunsetDay: sunset.details.sunsetDay,
         contractChanges,
         contractLines,
       },
@@ -808,8 +814,8 @@ export function approve(input: {
   if (active) {
     result.previous = {
       id: active.id,
-      changes: sunsetAt
-        ? { state: "superseded", supersededAt: now, sunsetAt, sunsetSetBy: actorId }
+      changes: sunset
+        ? { state: "superseded", supersededAt: now, sunsetAt: sunset.at, sunsetSetBy: actorId }
         : { state: "superseded", supersededAt: now },
     };
   }
@@ -832,8 +838,9 @@ export function sunsetPassed(version: { sunsetAt: Date | null }, now: Date): boo
 }
 
 /**
- * Set, or move, the date a Superseded version stops rendering. Consumers still rendering it are
- * notified with the date and, when given, the contract changes the Active version brought
+ * Set, or move, the date a Superseded version stops rendering: `sunsetDay`, which ends at 00:00 in the
+ * business time zone (`zone`, decision 0017), and must come after today there. Consumers still rendering
+ * it are notified with the instant and, when given, the contract changes the Active version brought
  * (`contractChanges`, worded against `activeNumber`).
  *
  * Once the sunset has passed it is final: the version has stopped rendering and its consumers have
@@ -844,26 +851,29 @@ export function setSunset(input: {
   version: ReviewVersion;
   actorId: string;
   now: Date;
-  sunsetAt: Date;
+  /** YYYY-MM-DD. */
+  sunsetDay: string;
+  /** The business time zone (`business-zone.ts`). */
+  zone: string;
   activeNumber: number | null;
   templateName: string;
   contractChanges?: readonly ContractChange[] | null;
 }): SetSunsetResult {
-  const { version, actorId, now, sunsetAt, activeNumber, templateName } = input;
+  const { version, actorId, now, sunsetDay, zone, activeNumber, templateName } = input;
 
   if (version.state !== "superseded") return refuse(REFUSALS.sunsetNotSuperseded);
   if (sunsetPassed(version, now)) return refuse(REFUSALS.sunsetPassed);
-  if (!isAfterToday(sunsetAt, now)) return refuse(REFUSALS.sunsetAfterToday);
+  if (!isAfterToday(sunsetDay, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
 
   const number = numberOf(version);
-  const at = sunsetAt.toISOString();
+  const sunset = sunsetOn(sunsetDay, zone);
   const changes = [...(input.contractChanges ?? [])];
 
   const effects: LifecycleEffect[] = [
     {
       kind: "audit",
       action: "version.sunset_set",
-      details: { number, sunsetAt: at, previousSunsetAt: version.sunsetAt?.toISOString() ?? null },
+      details: { number, ...sunset.details, previousSunsetAt: version.sunsetAt?.toISOString() ?? null },
     },
     {
       kind: "consumer_notice",
@@ -872,7 +882,8 @@ export function setSunset(input: {
       payload: {
         versionNumber: number,
         activeVersion: activeNumber,
-        sunsetAt: at,
+        sunsetAt: sunset.details.sunsetAt,
+        sunsetDay,
         ...(changes.length > 0 && activeNumber !== null
           ? { contractChanges: changes, contractLines: describeChanges(changes, activeNumber) }
           : {}),
@@ -885,13 +896,23 @@ export function setSunset(input: {
       notify({
         notification: "sunset_scheduled",
         to: { kind: "user", userId: version.submittedBy },
-        title: `${templateName} v${number} will stop rendering on ${formatLongDate(sunsetAt)}.`,
+        title: `${templateName} v${number} will stop rendering on ${formatLongDate(sunsetDay)}.`,
         link: { to: "versions", templateId: version.templateId },
       }),
     );
   }
 
-  return { ok: true, changes: { sunsetAt, sunsetSetBy: actorId }, effects };
+  return { ok: true, changes: { sunsetAt: sunset.at, sunsetSetBy: actorId }, effects };
+}
+
+/**
+ * A sunset on `day`: the instant renders stop (00:00 there in `zone`) and what the audit row records
+ * beside it, the day as picked and the zone it was read in, so the record keeps saying "March 1" whatever
+ * the zone is later.
+ */
+function sunsetOn(day: string, zone: string) {
+  const at = sunsetInstant(day, zone);
+  return { at, details: { sunsetAt: at.toISOString(), sunsetDay: day, zone } };
 }
 
 // ── Revoke (two people) ───────────────────────────────────────
@@ -1065,15 +1086,12 @@ function trimmed(value: string | null | undefined): string | null {
 }
 
 /**
- * A sunset date must fall on a later (UTC) day than `now`, the demo clock. A date picked as
- * YYYY-MM-DD arrives as that day's midnight, so this is the same as "after now" for it.
+ * A sunset date (YYYY-MM-DD) must be a later day than today in the business time zone, on the demo clock.
+ * Its sunset is 00:00 on that day there, so this is the same as "after now" for it: at 23:30 Eastern on
+ * October 9 (03:30 UTC on the 10th), October 10 is still after today.
  */
-export function isAfterToday(date: Date, now: Date): boolean {
-  return utcDay(date) > utcDay(now);
-}
-
-function utcDay(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+export function isAfterToday(day: string, now: Date, zone: string): boolean {
+  return day > todayIn(now, zone);
 }
 
 function teamApproversExcept(...userIds: string[]): Recipients {

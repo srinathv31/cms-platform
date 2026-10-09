@@ -23,7 +23,7 @@ const DRAFT: WorkspaceHeaderData = {
   teamSlug: "coral-offers",
   teamName: "Coral Offers",
   status: "draft",
-  sunsetAt: null,
+  sunsetDay: null,
   versionLabel: "Based on v2",
   basedOnNumber: 2,
   activeNumber: 2,

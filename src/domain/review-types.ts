@@ -106,7 +106,9 @@ export interface ConsumerNoticeEffect {
   payload: {
     versionNumber: number;
     activeVersion?: number | null;
-    sunsetAt?: string; // ISO
+    sunsetAt?: string; // ISO: the instant renders stop
+    /** YYYY-MM-DD: the sunset day as picked, read in the business time zone (`sunsetAt` is 00:00 on it there). */
+    sunsetDay?: string;
     reason?: string; // revoke
     contractChanges?: ContractChange[];
     contractLines?: string[];
@@ -244,6 +246,14 @@ export type ConsequenceAction =
 
 // ── Read models (server/queries → UI) ────────────────────────────────────────
 
+/** The sunset picker's calendar: the business time zone and today's date in it (decision 0017). */
+export interface SunsetCalendar {
+  /** IANA id, "America/New_York". The picker names it: "Ends at 00:00 Eastern (America/New_York)". */
+  zone: string;
+  /** YYYY-MM-DD: today in `zone` on the demo clock. The earliest sunset date is the day after. */
+  today: string;
+}
+
 export interface ReviewQueueRow {
   templateId: string;
   /** The row's version's name: what was submitted for review. */
@@ -284,8 +294,8 @@ export interface ReviewScreenData {
     submittedBy: Person;
     submittedAt: string;
     submitNote: string | null;
-    /** ISO. The day a Superseded version stops rendering (the header's badge shows it). */
-    sunsetAt?: string | null;
+    /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (the header's badge shows it). */
+    sunsetDay?: string | null;
     contractChanges: ContractChange[];
     /** Plain-English lines from domain/contract.ts: "v2 adds required `annual_fee` (Currency)." */
     contractLines: string[];
@@ -306,8 +316,10 @@ export interface ReviewScreenData {
   can: { approve: PermissionResult; requestChanges: PermissionResult; comment: PermissionResult };
   /** For the approve dialog: computes consequences client-side as the sunset date changes. */
   consumerUsage: ConsumerUsage[];
-  /** YYYY-MM-DD, demo clock. */
+  /** YYYY-MM-DD, demo clock (UTC): the sample sets' "today". */
   today: string;
+  /** The approve dialog's sunset picker. */
+  sunsetCalendar: SunsetCalendar;
 }
 
 export interface VersionTimelineItem {
@@ -320,7 +332,8 @@ export interface VersionTimelineItem {
   submitNote?: string | null;
   activatedAt?: string;
   supersededAt?: string;
-  sunsetAt?: string;
+  /** YYYY-MM-DD: the sunset's day in the business time zone (it stops renders at 00:00 then). */
+  sunsetDay?: string;
   sunsetPassed: boolean;
   revoke?: {
     reason: string;
@@ -344,7 +357,8 @@ export interface VersionsData {
   template: { id: string; name: string; teamSlug: string };
   items: VersionTimelineItem[]; // newest first; the open draft first when there is one
   consumerUsage: ConsumerUsage[];
-  today: string;
+  /** The sunset dialog's picker. */
+  sunsetCalendar: SunsetCalendar;
 }
 
 export interface ActivityItem {
