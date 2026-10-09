@@ -10,6 +10,7 @@ import { runAccessSweep } from "@/server/access-sweep";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema/ucomp";
+import { runSunsetSweep } from "@/server/sunset-sweep";
 import { getPersonas, getViewer, PERSONA_COOKIE } from "@/server/viewer";
 
 const YEAR = 60 * 60 * 24 * 365;
@@ -23,7 +24,8 @@ function firstSegment(path: string): string | null {
 /**
  * Demo persona switch. There is no login: this sets the persona cookie, and counts as the persona's
  * sign-in. The access sweep runs FIRST (a member past a deadline lost access before signing in), then
- * the sign-in restarts their inactivity clock (`users.last_active_at`).
+ * the sign-in restarts their inactivity clock (`users.last_active_at`). The sunset sweep runs too, so
+ * the audit log records any sunset the clock has passed.
  * Stay on the same URL if the new persona can see it, otherwise go to their default space.
  */
 export async function switchPersona(personaId: string, currentPath: string): Promise<void> {
@@ -37,6 +39,7 @@ export async function switchPersona(personaId: string, currentPath: string): Pro
   });
 
   await runAccessSweep();
+  await runSunsetSweep();
   await db.update(users).set({ lastActiveAt: await now() }).where(eq(users.id, personaId));
   revalidatePath("/", "layout");
 

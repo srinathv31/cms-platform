@@ -3,14 +3,14 @@
 //
 //   "Jordan Ellis started revoking v1: Wrong APR in legal notices."
 //
-// It reads every AuditAction the lifecycle writes, plus the older spellings the seed uses
-// (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
+// It reads every AuditAction the lifecycle and the sunset sweep write, plus the older spellings the seed
+// uses (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
 
 import { recordedSunsetDay } from "./business-zone";
 import { formatLongDate } from "./render/errors";
 import type { AuditAction, Person } from "./review-types";
 
-/** Who a null actor is: the platform itself (the seed's activations, future scheduled jobs). */
+/** Who a null actor is: the platform itself (the seed's activations, the sunset sweep). */
 export const SYSTEM_ACTOR = "Stencil";
 export const SYSTEM_INITIALS = "S";
 
@@ -66,6 +66,11 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       return date(d.previousSunsetAt)
         ? `${who} moved the sunset of ${v} to ${at}.`
         : `${who} set ${v} to sunset on ${at}.`;
+    }
+    case "version.sunset_passed": {
+      // Written by the sweep (SunsetPassedDetails): the day is the sunset's, in the business time zone.
+      const day = recordedSunsetDay(d);
+      return day ? `${v} stopped rendering: its sunset passed on ${formatLongDate(day)}.` : `${v} stopped rendering: its sunset passed.`;
     }
     case "version.revoke_started":
       return withText(`${who} started revoking ${v}`, d.reason);

@@ -7,6 +7,7 @@
 //   in_review, changes_requested, draft
 //                               409 version_not_released
 
+import { sunsetPassed } from "../lifecycle";
 import type { VersionState } from "../types";
 import { versionNotReleased, versionRevoked, versionSunset } from "./errors";
 import type { RenderError } from "./types";
@@ -34,7 +35,7 @@ export function checkVersion(input: {
       return { ok: true, newerVersion: null };
 
     case "superseded":
-      if (version.sunsetAt && version.sunsetAt.getTime() <= now.getTime()) {
+      if (version.sunsetAt && sunsetPassed(version, now)) {
         return { ok: false, error: versionSunset(version.number, version.sunsetAt, activeNumber, zone) };
       }
       return { ok: true, newerVersion: activeNumber };

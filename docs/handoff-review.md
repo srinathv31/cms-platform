@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 17 | 9 | 29 |
+| Open | 0 | 3 | 16 | 9 | 28 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 18 | 4 | 42 |
+| Fixed | 1 | 19 | 19 | 4 | 43 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system).
@@ -285,7 +285,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D7 · Medium: Nothing records when a sunset passes
 
-- **Status:** Open
+- **Status:** Fixed. `sunsetPassed` is the one test of a passed sunset everywhere, and a sweep (`sweepSunsets`, `runSunsetSweep`) writes one `version.sunset_passed` audit row per passed sunset, dated at the sunset and naming its day in the business time zone, on Advance clock, a persona switch and access actions; its scheduled trigger comes with [S4](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep) ([decision 0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
 - **Where:** `src/domain/lifecycle.ts` line 712
 - **What happens:** The build plan's audit list includes "sunset set or passed" and the implementation plan lists a `sunsetPassed` transition. Neither exists, so the audit never shows when a version stopped rendering. The "sunset passed" test is also written out four times (`usage.ts`, `versions.ts`, `consumer-api.ts`, `version-rules.ts`).
 - **Fix:** One domain predicate and a sweep, like `sweepAccess`, that writes `version.sunset_passed`.

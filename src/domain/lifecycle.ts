@@ -13,6 +13,8 @@
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
 //   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes.
 //                  A sunset date ends renders at 00:00 on that day in the business time zone (business-zone.ts).
+//   sweepSunsets   the clock passed a sunset → its `version.sunset_passed` audit row, once, dated when renders
+//                  stopped. Not a state change: `sunsetPassed` alone decides whether a version renders.
 //   startRevoke    Active or Superseded → revoke pending (one approver)
 //   confirmRevoke  revoke pending → Revoked (a different approver)
 //   cancelRevoke   revoke pending → no revoke
@@ -36,7 +38,7 @@ import {
   stageRecipients,
   type RecordedDecision,
 } from "./approval-chain";
-import { sunsetInstant, todayIn } from "./business-zone";
+import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zone";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { refusal, refuse, type Refused } from "./refusals";
@@ -839,8 +841,9 @@ export type SetSunsetResult = Outcome<{
 }>;
 
 /**
- * True once a version's sunset has come: from that instant consumer renders of it fail
- * (`checkVersion` in render/version-rules.ts asks the same question).
+ * True once a version's sunset has come: from that instant consumer renders of it fail. The one test of
+ * "sunset passed": the render rule (`checkVersion`), the consumer API, the read models, `setSunset` and
+ * `sweepSunsets` all call it. An instant comparison on the demo clock; the day is in business-zone.ts.
  */
 export function sunsetPassed(version: { sunsetAt: Date | null }, now: Date): boolean {
   return version.sunsetAt !== null && version.sunsetAt.getTime() <= now.getTime();
@@ -922,6 +925,77 @@ export function setSunset(input: {
 function sunsetOn(day: string, zone: string) {
   const at = sunsetInstant(day, zone);
   return { at, details: { sunsetAt: at.toISOString(), sunsetDay: day, zone } };
+}
+
+/** A version with a sunset, as `sweepSunsets` reads it. */
+export interface SunsetFacts {
+  id: string;
+  templateId: string;
+  teamId: string;
+  number: number | null;
+  state: VersionState;
+  sunsetAt: Date | null;
+  /** When a revoke was confirmed (`revoke.confirmedAt`); null when it wasn't revoked. */
+  revokedAt: Date | null;
+  /** Whether a `version.sunset_passed` row already records it. */
+  passedRecorded: boolean;
+}
+
+/** One sunset the sweep found passed and unrecorded, with the row to write for it. */
+export interface PassedSunset {
+  versionId: string;
+  templateId: string;
+  teamId: string;
+  /** The instant renders stopped: the row is dated then, however late the sweep runs. */
+  at: Date;
+  effects: LifecycleEffect[];
+}
+
+/**
+ * The sunsets the clock has passed that nothing records yet, each with its `version.sunset_passed` audit
+ * row (actor: the system). The row is dated at the sunset and names its day in `zone`, the business time
+ * zone at the sweep, which is the day the Versions screen shows for it. Oldest first.
+ *
+ * - **Passed** is `sunsetPassed`, the render rule's own test, so the record says exactly when renders
+ *   stopped.
+ * - **Still rendering until then.** A version revoked at or before its sunset had already stopped, so its
+ *   sunset ends nothing and isn't recorded. One revoked after its sunset (the only change a passed
+ *   sunset allows) is.
+ * - **Once.** A version with a record is skipped, so a second sweep writes nothing. A passed sunset never
+ *   moves (decision 0002), so one record per version is the whole story.
+ *
+ * No consumer notice and no notification: the `sunset_scheduled` notice, and the author's notification,
+ * gave the instant when it was set ([decision 0026](../../docs/decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
+ */
+export function sweepSunsets(input: { versions: readonly SunsetFacts[]; now: Date; zone: string }): PassedSunset[] {
+  const { now, zone } = input;
+  const endedRenders = (v: SunsetFacts): v is SunsetFacts & { sunsetAt: Date; number: number } => {
+    if (v.sunsetAt === null || v.number === null || !sunsetPassed(v, now)) return false;
+    if (v.state === "superseded") return true;
+    return v.state === "revoked" && v.revokedAt !== null && v.revokedAt.getTime() > v.sunsetAt.getTime();
+  };
+  return input.versions
+    .filter((v) => !v.passedRecorded)
+    .filter(endedRenders)
+    .sort((a, b) => a.sunsetAt.getTime() - b.sunsetAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((v) => ({
+      versionId: v.id,
+      templateId: v.templateId,
+      teamId: v.teamId,
+      at: v.sunsetAt,
+      effects: [
+        {
+          kind: "audit",
+          action: "version.sunset_passed",
+          details: {
+            number: v.number,
+            sunsetAt: v.sunsetAt.toISOString(),
+            sunsetDay: sunsetDayIn(v.sunsetAt, zone),
+            zone,
+          },
+        },
+      ],
+    }));
 }
 
 // ── Revoke (two people) ───────────────────────────────────────

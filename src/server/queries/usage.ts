@@ -26,6 +26,7 @@ import {
   type UsageDashboard,
   type UsageRow,
 } from "@/domain/golive-types";
+import { sunsetPassed } from "@/domain/lifecycle";
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
@@ -305,7 +306,7 @@ export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageD
       (v) =>
         v.state === "superseded" &&
         v.sunsetAt !== null &&
-        v.sunsetAt.getTime() > w.until &&
+        !sunsetPassed(v, nowDate) &&
         daysUntilSunset(v.sunsetAt, nowDate, zone) <= NEARING_SUNSET_DAYS,
     )
     .sort((a, b) => a.sunsetAt!.getTime() - b.sunsetAt!.getTime());
@@ -467,7 +468,7 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
       state: v.state,
       activatedAt: v.activatedAt?.toISOString() ?? null,
       sunsetAt: v.sunsetAt?.toISOString() ?? null,
-      sunsetPassed: v.sunsetAt !== null && v.sunsetAt.getTime() <= w.until,
+      sunsetPassed: sunsetPassed(v, nowDate),
       revokedAt: v.revokedAt?.toISOString() ?? null,
       consumers: list,
       tags: usageTags({ versionNumber: v.number, state: v.state, sunsetAt: v.sunsetAt, revokedAt: v.revokedAt, errors30d }, nowDate, zone),

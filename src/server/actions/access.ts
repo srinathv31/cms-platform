@@ -36,6 +36,7 @@ import { db } from "@/server/db/client";
 import { accessRequests, memberships, recertifications, recertItems, teams, users } from "@/server/db/schema/ucomp";
 import { inTransaction, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
+import { runSunsetSweep } from "@/server/sunset-sweep";
 import { getViewer } from "@/server/viewer";
 
 // Team access: requesting and deciding access, members, inactivity and recertification.
@@ -78,11 +79,12 @@ function check(viewer: Viewer, action: Action, resource: PermissionResource): Re
 /**
  * The action's transaction. The access sweep runs first, on its own (a refusal mustn't roll it back), so
  * a deadline the demo clock already crossed (a past-due review, day 120) takes effect before the action
- * reads its facts.
+ * reads its facts. The sunset sweep runs beside it, in its own transaction too.
  */
 async function transact<T extends object>(run: (tx: Tx) => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
   const swept = await runAccessSweep();
-  const sweptSomething = swept.membershipChanges.length > 0 || swept.recertsClosed.length > 0;
+  const sunsets = await runSunsetSweep();
+  const sweptSomething = swept.membershipChanges.length > 0 || swept.recertsClosed.length > 0 || sunsets.length > 0;
   try {
     return await inTransaction(db, run);
   } catch (error) {

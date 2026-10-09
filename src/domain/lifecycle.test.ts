@@ -20,8 +20,10 @@ import {
   startRevoke,
   submit,
   sunsetPassed,
+  sweepSunsets,
   withWriter,
   type ReviewVersion,
+  type SunsetFacts,
   type StarterContent,
   type SubmitDraft,
   type VersionSnapshot,
@@ -1658,6 +1660,89 @@ describe("review helpers", () => {
 
   it("throws, rather than refuses, on a reviewed version with no number (a data bug)", () => {
     expect(() => tryApprove(reviewVersion({ number: null }))).toThrow(LifecycleError);
+  });
+});
+
+describe("sweepSunsets", () => {
+  // 00:00 Eastern on October 4 (EDT): eight hours before NOW. 21:00 on October 3 in Pacific.
+  const SUNSET = new Date("2026-10-04T04:00:00.000Z");
+  const MS_PER_DAY = 86_400_000;
+  const facts = (over: Partial<SunsetFacts> = {}): SunsetFacts => ({
+    id: "v_bt1",
+    templateId: "UC-4F7K2Q",
+    teamId: "coral-offers",
+    number: 1,
+    state: "superseded",
+    sunsetAt: SUNSET,
+    revokedAt: null,
+    passedRecorded: false,
+    ...over,
+  });
+  const sweep = (versions: SunsetFacts[], now = NOW, zone = ZONE) => sweepSunsets({ versions, now, zone });
+
+  it("records a passed sunset as the system, dated at the sunset, with its day and the zone", () => {
+    expect(sweep([facts()])).toEqual([
+      {
+        versionId: "v_bt1",
+        templateId: "UC-4F7K2Q",
+        teamId: "coral-offers",
+        at: SUNSET,
+        effects: [
+          {
+            kind: "audit",
+            action: "version.sunset_passed",
+            details: { number: 1, sunsetAt: "2026-10-04T04:00:00.000Z", sunsetDay: "2026-10-04", zone: ZONE },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("passed is sunsetPassed: from the sunset's instant, not a millisecond before", () => {
+    expect(sweep([facts()], SUNSET)).toHaveLength(1);
+    expect(sweep([facts()], new Date(SUNSET.getTime() - 1))).toEqual([]);
+    expect(sweep([facts({ sunsetAt: TOMORROW })])).toEqual([]);
+    expect(sweep([facts({ sunsetAt: null })])).toEqual([]);
+  });
+
+  it("finds exactly the passed sunsets nothing records yet, oldest first", () => {
+    const versions = [
+      facts({ id: "v_later", sunsetAt: new Date(SUNSET.getTime() - MS_PER_DAY) }),
+      facts({ id: "v_recorded", passedRecorded: true }),
+      facts({ id: "v_ahead", sunsetAt: TOMORROW }),
+      facts({ id: "v_none", sunsetAt: null }),
+      facts({ id: "v_earlier", sunsetAt: new Date(SUNSET.getTime() - 3 * MS_PER_DAY) }),
+      facts({ id: "v_same_b" }),
+      facts({ id: "v_same_a" }),
+    ];
+    // Same instant: by id.
+    expect(sweep(versions).map((p) => p.versionId)).toEqual(["v_earlier", "v_later", "v_same_a", "v_same_b"]);
+  });
+
+  it("is idempotent: once its row is written, the next sweep, now or later, finds nothing", () => {
+    expect(sweep([facts()]).map((p) => p.versionId)).toEqual(["v_bt1"]);
+    const recorded = facts({ passedRecorded: true });
+    expect(sweep([recorded])).toEqual([]);
+    expect(sweep([recorded], new Date(NOW.getTime() + 30 * MS_PER_DAY))).toEqual([]);
+  });
+
+  it("names the day in the business time zone it reads at the sweep", () => {
+    const [passed] = sweep([facts()], NOW, "America/Los_Angeles");
+    expect(passed!.effects[0]).toMatchObject({ details: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" } });
+  });
+
+  it("skips a version revoked at or before its sunset (its renders had already stopped); records one revoked after", () => {
+    expect(sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() - MS_PER_DAY) })])).toEqual([]);
+    expect(sweep([facts({ state: "revoked", revokedAt: SUNSET })])).toEqual([]);
+    expect(sweep([facts({ state: "revoked", revokedAt: null })])).toEqual([]);
+    expect(sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() + 1) })]).map((p) => p.at)).toEqual([SUNSET]);
+  });
+
+  it("records nothing for a state that never carries a sunset, or an unnumbered version", () => {
+    for (const state of VERSION_STATES.filter((x) => x !== "superseded" && x !== "revoked")) {
+      expect(sweep([facts({ state })]), state).toEqual([]);
+    }
+    expect(sweep([facts({ number: null })])).toEqual([]);
   });
 });
 

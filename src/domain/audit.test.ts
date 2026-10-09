@@ -41,6 +41,7 @@ const LIFECYCLE: AuditAction[] = [
   "version.activated",
   "version.superseded",
   "version.sunset_set",
+  "version.sunset_passed",
   "version.revoke_started",
   "version.revoke_cancelled",
   "version.revoked",
@@ -137,6 +138,7 @@ describe("the action catalog", () => {
   it("labels every action, aliases with their canonical label", () => {
     for (const a of [...LIFECYCLE, ...ACCESS]) expect(actionLabel(a)).toMatch(/^[A-Z][a-z]/);
     expect(actionLabel("version.submitted")).toBe("Submitted");
+    expect(actionLabel("version.sunset_passed")).toBe("Sunset passed");
     expect(actionLabel("access.granted")).toBe("Access granted");
     expect(actionLabel("platform.config_changed")).toBe("Configuration changed");
     expect(actionLabel("version.revoke_confirmed")).toBe("Revoked");
@@ -187,6 +189,12 @@ describe("describeAuditEvent", () => {
       "Maya Chen submitted v3 for review: Ready.",
     );
     expect(describeAuditEvent({ action: "version.activated", details: {}, versionNumber: 2 }, null)).toBe("v2 became Active.");
+    expect(
+      describeAuditEvent(
+        { action: "version.sunset_passed", details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" }, versionNumber: 1 },
+        null,
+      ),
+    ).toBe("v1 stopped rendering: its sunset passed on March 1, 2027.");
   });
 
   it("reads the details the access rules write", () => {

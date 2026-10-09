@@ -93,6 +93,19 @@ describe("describeActivity: one sentence per audit action", () => {
       "Jordan Ellis moved the sunset of v1 to March 1, 2027.",
     ],
     [
+      "version.sunset_passed (the sweep, no actor): the day in the zone it was read in",
+      event("version.sunset_passed", 1, { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" }),
+      null,
+      "v1 stopped rendering: its sunset passed on March 1, 2027.",
+    ],
+    [
+      "version.sunset_passed, Pacific: the day, not the UTC date of the instant",
+      event("version.sunset_passed", 2, { number: 2, sunsetAt: "2027-03-02T08:00:00.000Z", sunsetDay: "2027-03-02", zone: "America/Los_Angeles" }),
+      null,
+      "v2 stopped rendering: its sunset passed on March 2, 2027.",
+    ],
+    ["version.sunset_passed, no day recorded", event("version.sunset_passed", 1, { number: 1 }), null, "v1 stopped rendering: its sunset passed."],
+    [
       "version.revoke_started (the read model's example)",
       event("version.revoke_started", 1, { number: 1, reason: REVOKE_REASON }),
       JORDAN,

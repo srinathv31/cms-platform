@@ -141,7 +141,7 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
         state: v.state,
         createdAt: iso(v.createdAt),
         author: personOf(people, v.submittedBy ?? v.createdBy),
-        sunsetPassed: v.sunsetAt !== null && v.sunsetAt.getTime() <= nowDate.getTime(),
+        sunsetPassed: sunsetPassed(v, nowDate),
         contractLines: v.number !== null && v.contractChanges ? describeChanges(v.contractChanges, v.number) : [],
         contractItems: v.number !== null && v.contractChanges ? contractItems(v.contractChanges, v.number) : [],
         decisions: decisionRows

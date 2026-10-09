@@ -7,6 +7,7 @@
 // ones are counted apart as errors.
 
 import { daysUntilSunset } from "../business-zone";
+import { sunsetPassed } from "../lifecycle";
 import type { RenderErrorCode } from "../render/types";
 import type { VersionState } from "../types";
 import {
@@ -233,7 +234,7 @@ export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag
     tags.push({ tone: "danger", text: "renders fail" });
     failing = true;
   } else if (row.state === "superseded" && row.sunsetAt) {
-    if (row.sunsetAt.getTime() <= now.getTime()) {
+    if (sunsetPassed(row, now)) {
       tags.push({ tone: "danger", text: "renders fail" });
       failing = true;
     } else {

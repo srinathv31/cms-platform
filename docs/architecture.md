@@ -203,8 +203,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
 - Demo controls are ungated: reset, advance clock, and persona switch work in any build, for anyone.
 - `/design/*`, `/editor-lab`, and `/pdf-lab` are prerendered into production builds and answer by URL.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
-- Access deadlines (recertification, inactivity) apply only when the sweep runs: on a clock advance, a persona
-  switch, or an access action. There is no scheduled job.
+- Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log, only when the sweeps
+  run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops
+  renders on time: the render rule reads the clock.)
 - Several invariants rely on SQLite's single writer and would need constraints or locks on another database.
 - No CI, no Node version pin, no `.env.example`, and no machine-readable API description (OpenAPI).
 

@@ -31,9 +31,10 @@ export const CONSUMER_NOTICE_WINDOW_DAYS = 90;
 const DAY_MS = 86_400_000;
 
 export interface EffectContext {
-  /** The demo clock, read once by the action. */
+  /** The demo clock, read once by the action. The sunset sweep passes the instant the sunset passed. */
   at: Date;
-  actorId: string;
+  /** Who acted; null for the system (the sunset sweep). */
+  actorId: string | null;
   teamId: string;
   templateId: string;
   /** The version the transition is about. An effect may name another one (`versionId`). */
