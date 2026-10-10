@@ -1,17 +1,51 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ExternalLink, Mail, X } from "lucide-react";
+import { PushPreview, ScreenPreview, SmsPreview, type DeviceSettings, type PushScreen } from "@/components/device";
 import type { ApiChannel } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
-import type { SimDeliveryResult, SimDeliveryView } from "@/simulator/types";
+import type { SimDeliveryResult, SimDeliveryView, SimPlatform } from "@/simulator/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { assertNever } from "../assert-never";
 import { Btn, Strip, btnClass } from "./bits";
-import { CHANNEL_LABEL, VIEW_LABEL, whenLabel } from "./format";
+import { CHANNEL_LABEL, PLATFORM_LABEL, VIEW_LABEL, messageStamp, phoneClock, phoneLabel, plural, whenLabel } from "./format";
 
 export type ViewState = { status: "loading" } | { status: "ready"; view: SimDeliveryView } | { status: "error"; reason: string };
 
-const CHANNEL_ORDER: ApiChannel[] = ["web", "email", "pdf"];
+/** A delivery that came in while the drawer was open, and the one it replaces on screen until it loads. */
+export interface Arrival {
+  deliveryId: string;
+  previous: string | null;
+}
+
+type View = NonNullable<SimDeliveryView["view"]>;
+
+const CHANNEL_ORDER: ApiChannel[] = ["web", "email", "pdf", "push", "sms"];
+
+/** Whether the channel shows on the customer's phone (the drawer then fills its height with it). */
+function onPhone(channel: ApiChannel): boolean {
+  switch (channel) {
+    case "web":
+    case "push":
+    case "sms":
+      return true;
+    case "email":
+    case "pdf":
+      return false;
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
+/** The customer's phone: their platform at its standard width, light, with previews shown. */
+const phoneSettings = (platform: SimPlatform): DeviceSettings => ({
+  platform,
+  appearance: "light",
+  previewsHidden: false,
+  textSize: "default",
+  width: "standard",
+});
 
 /** Small segmented control (Coral's one picker style). */
 function Seg({ label, value, options, onChange }: { label: string; value: ApiChannel; options: { value: ApiChannel; label: string }[]; onChange: (v: ApiChannel) => void }) {
@@ -35,25 +69,73 @@ function Seg({ label, value, options, onChange }: { label: string; value: ApiCha
   );
 }
 
-function PhoneFrame({ view, name }: { view: Extract<NonNullable<SimDeliveryView["view"]>, { kind: "phone" }>; name: string }) {
+/** The web page on the customer's phone, under Coral's own app bar. */
+function WebPhone({ view, delivery }: { view: Extract<View, { kind: "phone" }>; delivery: SimDeliveryView }) {
   return (
-    <div className="mx-auto w-[286px] rounded-[40px] border-[7px] border-(--sim-device) bg-(--sim-device)">
-      <div className="relative flex h-[560px] flex-col overflow-hidden rounded-[32px] bg-(--sim-paper)">
-        <div aria-hidden className="absolute top-2 left-1/2 h-[18px] w-20 -translate-x-1/2 rounded-full bg-(--sim-device)" />
-        <div aria-hidden className="flex h-9 shrink-0 items-end px-5 pb-1 text-[11px] font-semibold text-(--sim-device)">
-          9:41
-        </div>
-        <div aria-hidden className="flex h-11 shrink-0 items-center gap-1 border-b border-(--sim-paper-line) px-3">
-          <ChevronLeft className="size-5 text-(--sim-device)" strokeWidth={1.75} />
-          <span className="flex-1 pr-5 text-center text-[14px] font-semibold text-(--sim-device)">Offer terms</span>
-        </div>
-        <iframe title={`${name} · Web`} src={view.src} sandbox="" className="min-h-0 w-full flex-1 border-0 bg-(--sim-paper)" />
+    <ScreenPreview settings={phoneSettings(delivery.customer.platform)} caption="Web page from Coral" clock={phoneClock(delivery.at)}>
+      <div aria-hidden className="flex h-11 shrink-0 items-center gap-1 border-b border-(--sim-paper-line) px-3">
+        <ChevronLeft className="size-5" strokeWidth={1.75} />
+        <span className="flex-1 pr-5 text-center text-[14px] font-semibold">Offer terms</span>
       </div>
-    </div>
+      <iframe title={`${delivery.customer.name} · Web`} src={view.src} sandbox="" className="min-h-0 w-full flex-1 border-0 bg-(--sim-paper)" />
+    </ScreenPreview>
   );
 }
 
-function InboxFrame({ view, to, name }: { view: Extract<NonNullable<SimDeliveryView["view"]>, { kind: "inbox" }>; to: string; name: string }) {
+/**
+ * The push on the customer's lock screen. One that arrived while the drawer was open drops in as a banner
+ * (a heads-up on Android) instead, once. Clicking the notification opens it, as on a phone.
+ */
+function PushPhone({ view, delivery, screen, onScreen }: { view: Extract<View, { kind: "push" }>; delivery: SimDeliveryView; screen: PushScreen; onScreen: (s: PushScreen) => void }) {
+  const { push, appName } = view;
+  return (
+    <PushPreview
+      settings={phoneSettings(view.platform)}
+      screen={screen}
+      onScreenChange={onScreen}
+      clock={phoneClock(delivery.at)}
+      content={{ appName, appMark: { monogram: Array.from(appName)[0] ?? "" }, title: push.title, subtitle: push.subtitle, body: push.body, time: "now" }}
+    />
+  );
+}
+
+/** The customer's thread with Coral's short code, opened on the newest text. */
+function SmsPhone({ view, delivery }: { view: Extract<View, { kind: "sms" }>; delivery: SimDeliveryView }) {
+  const newest = view.thread[view.thread.length - 1]!;
+  const stamps = view.thread.map((sms) => messageStamp(sms.at, newest.at));
+  return (
+    <SmsPreview
+      settings={phoneSettings(delivery.customer.platform)}
+      clock={phoneClock(newest.at)}
+      content={{
+        sender: view.sender,
+        text: newest.text,
+        ...stamps[stamps.length - 1]!,
+        earlier: view.thread.slice(0, -1).map((sms, i) => ({ text: sms.text, ...stamps[i]! })),
+      }}
+    />
+  );
+}
+
+/** What Stencil reported about what is on the phone: a push's size, a text's encoding and parts. */
+function measured(view: View): string | null {
+  switch (view.kind) {
+    case "push":
+      return `${view.push.payloadBytes.toLocaleString("en-US")} bytes`;
+    case "sms": {
+      const newest = view.thread[view.thread.length - 1];
+      return newest ? `${newest.encoding} · ${plural(newest.parts, "part", "parts")} · ${plural(newest.characters, "character", "characters")}` : null;
+    }
+    case "phone":
+    case "inbox":
+    case "pdf":
+      return null;
+    default:
+      return assertNever(view, "view");
+  }
+}
+
+function InboxFrame({ view, to, name }: { view: Extract<View, { kind: "inbox" }>; to: string; name: string }) {
   return (
     <div className="overflow-hidden rounded-lg border border-(--sim-line) bg-(--sim-paper) text-(--sim-paper-text)">
       <div aria-hidden className="flex h-8 items-center gap-1.5 border-b border-(--sim-paper-line) bg-(--sim-panel2) px-3 text-[11px] text-(--sim-paper-muted)">
@@ -70,7 +152,7 @@ function InboxFrame({ view, to, name }: { view: Extract<NonNullable<SimDeliveryV
   );
 }
 
-function PdfFrame({ view, name }: { view: Extract<NonNullable<SimDeliveryView["view"]>, { kind: "pdf" }>; name: string }) {
+function PdfFrame({ view, name }: { view: Extract<View, { kind: "pdf" }>; name: string }) {
   return (
     <div className="rounded-lg bg-(--sim-viewer) p-2">
       <div className="mb-2 flex h-8 items-center justify-between gap-2 px-1 text-[12px] text-(--sim-paper)">
@@ -86,14 +168,16 @@ function PdfFrame({ view, name }: { view: Extract<NonNullable<SimDeliveryView["v
 
 /**
  * The customer view: a right-hand drawer, a dialog named "{Customer} · {Channel}". One customer at a time,
- * with the channels the send rendered as a Phone / Inbox / PDF switch. The documents are Coral's stored
- * copies of what UCOMP rendered, served by /sim/deliveries/[id]/file.
+ * with the channels the send rendered as a switch. The web page, the push and the texts show on the
+ * customer's own phone (the phone kit, on their platform); the email in an inbox and the PDF in a viewer.
+ * Everything is Coral's stored copy of what Stencil rendered.
  */
 export function CustomerDrawer({
   customerName,
   results,
   channel,
   views,
+  arrival,
   onChannel,
   onClose,
 }: {
@@ -101,6 +185,7 @@ export function CustomerDrawer({
   results: SimDeliveryResult[];
   channel: ApiChannel;
   views: Record<string, ViewState>;
+  arrival: Arrival | null;
   onChannel: (c: ApiChannel) => void;
   onClose: () => void;
 }) {
@@ -121,10 +206,57 @@ export function CustomerDrawer({
   }, []);
 
   const result = results.find((r) => r.channel === channel) ?? results[0];
-  const state = result ? views[result.deliveryId] : undefined;
+  let state = result ? views[result.deliveryId] : undefined;
+  // A delivery that just came in keeps the one before it on the phone until it loads.
+  if (result && arrival?.deliveryId === result.deliveryId && state?.status !== "ready" && arrival.previous) {
+    const previous = views[arrival.previous];
+    if (previous?.status === "ready") state = previous;
+  }
   const ready = state?.status === "ready" ? state.view : null;
+
+  // The push screen the person chose, for the delivery on screen; else the lock screen, or the banner for
+  // one that arrived while the drawer was open.
+  const [chosen, setChosen] = useState<{ id: string; screen: PushScreen } | null>(null);
+  const screen: PushScreen = ready && chosen?.id === ready.id ? chosen.screen : ready && arrival?.deliveryId === ready.id ? "banner" : "lock";
+
   const options = CHANNEL_ORDER.filter((c) => results.some((r) => r.channel === c)).map((c) => ({ value: c, label: VIEW_LABEL[c] }));
   const filename = ready ? `${ready.templateName} · v${ready.versionNumber}`.replace(/\s+/g, " ") : "Offer terms";
+  const phone = onPhone(result?.channel ?? channel);
+  const view = ready?.view ?? null;
+  const platform = view?.kind === "push" ? view.platform : ready?.customer.platform;
+
+  let body: React.ReactNode;
+  if (!state || state.status === "loading") {
+    body = phone ? (
+      <Skeleton aria-hidden className="mx-auto h-full w-full max-w-[26rem] rounded-[3.5rem] bg-(--sim-line)" />
+    ) : (
+      <Skeleton aria-hidden className="h-[34rem] w-full rounded-lg bg-(--sim-line)" />
+    );
+  } else if (state.status === "error") body = <Strip tone="bad">{state.reason}</Strip>;
+  else if (view === null) body = <Strip tone="bad">{state.view.error?.message ?? "Nothing was delivered."}</Strip>;
+  else {
+    const delivery = state.view;
+    switch (view.kind) {
+      case "phone":
+        body = <WebPhone view={view} delivery={delivery} />;
+        break;
+      case "push":
+        body = <PushPhone view={view} delivery={delivery} screen={screen} onScreen={(s) => setChosen({ id: delivery.id, screen: s })} />;
+        break;
+      case "sms":
+        body = view.thread.length > 0 ? <SmsPhone view={view} delivery={delivery} /> : <Strip tone="bad">Nothing was delivered.</Strip>;
+        break;
+      case "inbox":
+        body = <InboxFrame view={view} to={delivery.customer.email} name={delivery.customer.name} />;
+        break;
+      case "pdf":
+        body = <PdfFrame view={view} name={filename} />;
+        break;
+      default:
+        body = assertNever(view, "view");
+    }
+  }
+  const measure = view ? measured(view) : null;
 
   return (
     <aside
@@ -146,21 +278,23 @@ export function CustomerDrawer({
       <div className="flex h-12 shrink-0 items-center justify-center border-b border-(--sim-line)">
         <Seg label="Customer view" value={channel} options={options} onChange={onChannel} />
       </div>
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-(--sim-bg) p-4 pb-14">
-        {!state || state.status === "loading" ? (
-          <Skeleton aria-hidden className="mx-auto h-[574px] w-[286px] rounded-[40px] bg-(--sim-line)" />
-        ) : state.status === "error" ? (
-          <Strip tone="bad">{state.reason}</Strip>
-        ) : state.view.view === null ? (
-          <Strip tone="bad">{state.view.error?.message ?? "Nothing was delivered."}</Strip>
-        ) : state.view.view.kind === "phone" ? (
-          <PhoneFrame view={state.view.view} name={state.view.customer.name} />
-        ) : state.view.view.kind === "inbox" ? (
-          <InboxFrame view={state.view.view} to={state.view.customer.email} name={state.view.customer.name} />
-        ) : (
-          <PdfFrame view={state.view.view} name={filename} />
-        )}
-      </div>
+      {phone ? (
+        <div className="flex min-h-0 flex-1 flex-col bg-(--sim-bg) px-4 pt-3 pb-14">
+          <p className="m-0 mb-3 flex h-5 shrink-0 items-center justify-between gap-3 text-[12px] text-(--sim-muted)">
+            <span className="truncate">
+              {ready && platform ? (
+                <>
+                  {PLATFORM_LABEL[platform]} · <span className="tabular-nums">{phoneLabel(ready.customer.phone)}</span>
+                </>
+              ) : null}
+            </span>
+            <span className="shrink-0 tabular-nums">{measure}</span>
+          </p>
+          <div className="min-h-0 flex-1">{body}</div>
+        </div>
+      ) : (
+        <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-(--sim-bg) p-4 pb-14">{body}</div>
+      )}
     </aside>
   );
 }

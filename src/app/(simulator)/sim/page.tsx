@@ -14,7 +14,7 @@ const HOME_NOTICES = 3;
 
 export default function SimHomePage() {
   return (
-    <Stream fallback={<PageSkeleton panels={[4, 3]} />}>
+    <Stream fallback={<PageSkeleton panels={[4, 2, 3]} />}>
       <Home />
     </Stream>
   );
@@ -27,7 +27,8 @@ async function Home() {
     <PageScroll>
       <PageHeader crumbs="Coral Offers" title="Offers" />
       {home.apiError ? <Strip tone="bad">{home.apiError.message}</Strip> : null}
-      <OffersTable offers={home.offers} />
+      <OffersTable offers={home.offers.filter((o) => o.kind === "offer")} />
+      <OffersTable kind="alert" offers={home.offers.filter((o) => o.kind === "alert")} />
       <NoticesPanel
         notices={home.notices.slice(0, HOME_NOTICES)}
         offerNames={offerNames}

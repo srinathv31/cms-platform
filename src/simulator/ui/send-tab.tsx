@@ -3,7 +3,7 @@ import type { ApiChannel } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
 import type { SimApiError, SimBatch, SimCustomerRow, SimDeliveryResult, SimLinkSummary } from "@/simulator/types";
 import { Mono, Panel, Pill, TableWrap, TD, TH, btnClass } from "./bits";
-import { CHANNEL_LABEL, channelList, linkStatus, plural, resultsHeadline, whenLabel } from "./format";
+import { CHANNEL_LABEL, PLATFORM_LABEL, channelList, linkStatus, phoneLabel, plural, resultsHeadline, whenLabel } from "./format";
 
 function Checkbox({ on, label, onClick }: { on: boolean; label: string; onClick?: () => void }) {
   return (
@@ -69,6 +69,8 @@ export function SendTab({
   // The consequence, before the commitment: what this send makes, and when the pin already fails (the
   // button stays enabled: the failure is the demo).
   const documents = selected.length * link.channels.length;
+  // An alert goes to phones: the picker shows each customer's phone and card instead of their terms.
+  const toPhones = link.channels.some((c) => c === "push" || c === "sms");
   const failing = linkStatus(link);
   const stopped =
     link.pinnedState === "revoked" || link.revokedAt ? `v${link.pinnedVersion} was revoked.` : `v${link.pinnedVersion} stopped rendering.`;
@@ -86,9 +88,18 @@ export function SendTab({
                       <Checkbox on={all} label="Select all customers" onClick={() => onSelect(all ? [] : customers.map((c) => c.id))} />
                     </th>
                     <th className={TH}>Customer</th>
-                    <th className={TH}>State</th>
-                    <th className={cn(TH, "text-right")}>Purchase APR</th>
-                    <th className={cn(TH, "text-right")}>Annual fee</th>
+                    {toPhones ? (
+                      <>
+                        <th className={TH}>Phone</th>
+                        <th className={cn(TH, "text-right")}>Number</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className={TH}>State</th>
+                        <th className={cn(TH, "text-right")}>Purchase APR</th>
+                        <th className={cn(TH, "text-right")}>Annual fee</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -100,9 +111,18 @@ export function SendTab({
                       <td className="max-w-[16rem] truncate px-4 py-2 text-[13px]" title={c.name}>
                         {c.name}
                       </td>
-                      <td className={cn(TD, "py-2 text-(--sim-muted)")}>{c.homeState}</td>
-                      <td className={cn(TD, "py-2 text-right tabular-nums")}>{c.purchaseApr}%</td>
-                      <td className={cn(TD, "py-2 text-right tabular-nums")}>{fee(c.annualFee)}</td>
+                      {toPhones ? (
+                        <>
+                          <td className={cn(TD, "py-2 text-(--sim-muted)")}>{PLATFORM_LABEL[c.platform]}</td>
+                          <td className={cn(TD, "py-2 text-right whitespace-nowrap tabular-nums")}>{phoneLabel(c.phone)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={cn(TD, "py-2 text-(--sim-muted)")}>{c.homeState}</td>
+                          <td className={cn(TD, "py-2 text-right tabular-nums")}>{c.purchaseApr}%</td>
+                          <td className={cn(TD, "py-2 text-right tabular-nums")}>{fee(c.annualFee)}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -118,7 +138,8 @@ export function SendTab({
                 <p className="m-0 mt-0.5 text-[12px] text-(--sim-muted)">
                   {selected.length > 0 ? (
                     <>
-                      {plural(documents, "document", "documents")} · {channelList(link.channels)} · <Mono>v{link.pinnedVersion}</Mono>
+                      {toPhones ? plural(documents, "message", "messages") : plural(documents, "document", "documents")} · {channelList(link.channels)} ·{" "}
+                      <Mono>v{link.pinnedVersion}</Mono>
                     </>
                   ) : (
                     <>
@@ -198,6 +219,12 @@ function Results({ batch, onView, viewing }: { batch: SimBatch; onView: (custome
           <span className="sr-only">, view {customerName} · {CHANNEL_LABEL[r.channel]}</span>
         </button>
         {r.newerVersion ? <p className="m-0 mt-1 text-[11px] text-(--sim-warn)">Newer: v{r.newerVersion}</p> : null}
+        {r.platform ? <p className="m-0 mt-1 text-[11px] text-(--sim-muted)">{PLATFORM_LABEL[r.platform]}</p> : null}
+        {r.sms ? (
+          <p className="m-0 mt-1 text-[11px] text-(--sim-muted) tabular-nums">
+            {r.sms.encoding} · {plural(r.sms.parts, "part", "parts")}
+          </p>
+        ) : null}
       </div>
     );
   };

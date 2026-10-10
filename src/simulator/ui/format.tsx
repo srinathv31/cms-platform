@@ -1,5 +1,5 @@
 import type { ApiChannel, ApiVariableType } from "@/contracts/api-v1";
-import type { SimBatch, SimLinkSummary, SimUpgrade } from "@/simulator/types";
+import type { SimBatch, SimLinkSummary, SimPlatform, SimUpgrade } from "@/simulator/types";
 import { Mono, type Tone } from "./bits";
 
 // Pure display helpers shared by server and client components. Dates are ISO strings; they are always
@@ -15,7 +15,41 @@ export const whenLabel = (iso: string) => `${WHEN.format(new Date(iso))} UTC`;
 
 export const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
 /** How the customer meets each channel. */
-export const VIEW_LABEL: Record<ApiChannel, string> = { web: "Phone", email: "Inbox", pdf: "PDF", push: "Lock screen", sms: "Messages" };
+export const VIEW_LABEL: Record<ApiChannel, string> = { web: "Phone", email: "Inbox", pdf: "PDF", push: "Notification", sms: "Messages" };
+
+export const PLATFORM_LABEL: Record<SimPlatform, string> = { ios: "iPhone", android: "Android" };
+
+/** "+12015550142" → "(201) 555-0142"; anything that isn't a US number as stored. */
+export function phoneLabel(e164: string): string {
+  const us = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return us ? `(${us[1]}) ${us[2]}-${us[3]}` : e164;
+}
+
+const CLOCK = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hourCycle: "h12", timeZone: "UTC" });
+const CLOCK_DATE = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+const STAMP_TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+const STAMP_WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+const STAMP_DAY = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** The phone's clock at a moment, for its status bar and lock screen: { time: "2:02", date: "Friday, October 9" }. */
+export function phoneClock(iso: string): { time: string; date: string } {
+  const at = new Date(iso);
+  return { time: CLOCK.format(at).replace(/\s?[AP]M$/, ""), date: CLOCK_DATE.format(at) };
+}
+
+const dayNumber = (at: Date) => Math.floor(at.getTime() / 86_400_000);
+
+/**
+ * When a text arrived, as the thread prints it on a phone whose day is `today`'s: "Today", "Yesterday",
+ * the weekday within a week, else "Mon, Oct 5"; and the time, "2:02 PM".
+ */
+export function messageStamp(iso: string, today: string): { day: string; time: string } {
+  const at = new Date(iso);
+  const ago = dayNumber(new Date(today)) - dayNumber(at);
+  const day = ago <= 0 ? "Today" : ago === 1 ? "Yesterday" : ago < 7 ? STAMP_WEEKDAY.format(at) : STAMP_DAY.format(at);
+  // Newer ICU puts a narrow no-break space before AM/PM; a phone prints a plain one.
+  return { day, time: STAMP_TIME.format(at).replace(/\s/g, " ") };
+}
 
 export const TYPE_LABEL: Record<ApiVariableType, string> = {
   text: "Text",

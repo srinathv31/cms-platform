@@ -1,18 +1,26 @@
 import type { Route } from "next";
 import Link from "next/link";
-import type { SimOfferCard } from "@/simulator/types";
+import type { SimOfferCard, SimOfferKind } from "@/simulator/types";
 import { Mono, Panel, Pill, TableWrap, TD, TH } from "./bits";
 import { dayLabel, linkStatus, resultsHeadline, upgradeLabel } from "./format";
 
-/** Coral's offers: one row each, with the link's state, any upgrade badge and the last send. */
-export function OffersTable({ offers }: { offers: SimOfferCard[] }) {
+const KIND = {
+  offer: { table: "Offers", column: "Offer" },
+  alert: { table: "Alerts", column: "Alert" },
+} as const;
+
+/**
+ * Coral's offers, or its alerts: one row each, with the link's state, any upgrade badge and the last send.
+ * The alerts' table has a title; the offers' is the page's.
+ */
+export function OffersTable({ offers, kind = "offer" }: { offers: SimOfferCard[]; kind?: SimOfferKind }) {
   return (
-    <Panel>
+    <Panel title={kind === "alert" ? KIND.alert.table : undefined} label={kind === "alert" ? KIND.alert.table : undefined}>
       <TableWrap>
-        <table aria-label="Offers" className="w-full min-w-[44rem] border-collapse">
+        <table aria-label={KIND[kind].table} className="w-full min-w-[44rem] border-collapse">
           <thead>
             <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
-              <th className={TH}>Offer</th>
+              <th className={TH}>{KIND[kind].column}</th>
               <th className={TH}>Linked template</th>
               <th className={TH}>Pin</th>
               <th className={TH}>Link status</th>

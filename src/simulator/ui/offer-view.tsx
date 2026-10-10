@@ -11,7 +11,7 @@ import { simField } from "@/simulator/fields";
 import { blockedSentence } from "@/simulator/mapping";
 import type { SimBatch, SimFieldPath, SimMappingRow, SimOfferPage } from "@/simulator/types";
 import { Mono, PageHeader, Pill, Strip } from "./bits";
-import { CustomerDrawer, type ViewState } from "./customer-drawer";
+import { CustomerDrawer, type Arrival, type ViewState } from "./customer-drawer";
 import { dayLabel, linkStatus, resultsHeadline, upgradeLabel } from "./format";
 import { NavButton } from "./nav-button";
 import { NoticesPanel } from "./notices-panel";
@@ -72,7 +72,15 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
       if (result.ok) {
         setSent(result.batch);
         setSendError(null);
-        setViewing(null);
+        // The open drawer stays on its customer when the send reached them: the new delivery comes in on
+        // their phone (a push drops in as a banner). Otherwise it closes.
+        const find = (b: SimBatch | null) =>
+          viewing ? b?.rows.find((r) => r.customerId === viewing.customerId)?.results.find((r) => r.channel === viewing.channel) : undefined;
+        const next = find(result.batch);
+        if (next) {
+          setArrival({ deliveryId: next.deliveryId, previous: find(batch)?.deliveryId ?? null });
+          ensureView(next.deliveryId);
+        } else setViewing(null);
       } else setSendError(result.reason);
     });
 
@@ -87,6 +95,8 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   // ── Customer drawer ────────────────────────────────────────────────────────
   const [viewing, setViewing] = useState<{ customerId: string; channel: ApiChannel } | null>(null);
   const [views, setViews] = useState<Record<string, ViewState>>({});
+  // A delivery that came in while the drawer showed its customer; any other view ends it.
+  const [arrival, setArrival] = useState<Arrival | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
 
   const ensureView = (deliveryId: string) => {
@@ -97,11 +107,13 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   const openView = (customerId: string, channel: ApiChannel) => {
     if (!viewing) trigger.current = document.activeElement as HTMLElement | null;
     setViewing({ customerId, channel });
+    setArrival(null);
     const delivery = batch?.rows.find((r) => r.customerId === customerId)?.results.find((r) => r.channel === channel);
     if (delivery) ensureView(delivery.deliveryId);
   };
   const closeView = () => {
     setViewing(null);
+    setArrival(null);
     trigger.current?.focus();
   };
   const viewRow = viewing ? batch?.rows.find((r) => r.customerId === viewing.customerId) : undefined;
@@ -162,7 +174,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
           crumbs={
             <>
               <Link href={"/sim" as Route} className="text-(--sim-muted) no-underline hover:underline">
-                Offers
+                {offer.kind === "alert" ? "Alerts" : "Offers"}
               </Link>
               {"  /  "}
               {offer.name}
@@ -253,6 +265,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
           results={viewRow.results}
           channel={viewing.channel}
           views={views}
+          arrival={arrival}
           onChannel={(c) => openView(viewing.customerId, c)}
           onClose={closeView}
         />
