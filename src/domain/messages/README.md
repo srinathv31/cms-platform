@@ -1,7 +1,7 @@
-# `src/domain/messages`: what a text message costs
+# `src/domain/messages`: what a text message or push notification costs
 
-The measurements behind the message channels: which characters an SMS can carry and how many parts it is sent
-in. Facts in, numbers out. They are written for the composer to run on every keystroke and for Submit, render and `/api/v1` to run
+The measurements behind the message channels, Push and SMS: which characters an SMS can carry, how many parts it
+is sent in, and how many bytes a push payload weighs. Facts in, numbers out. They are written for the composer to run on every keystroke and for Submit, render and `/api/v1` to run
 on the server, so that the numbers an author sees are the numbers a consumer gets.
 
 They follow the [domain rules](../README.md#rules): pure TypeScript, no clock, no framework, safe in the browser.
@@ -12,6 +12,7 @@ They use two built-ins, `Intl.Segmenter` (grapheme clusters) and `String.prototy
 | Module | Answers | Exports |
 | --- | --- | --- |
 | [gsm7.ts](gsm7.ts) | Is this SMS GSM-7 or UCS-2? How many units, characters and parts? Where are the parts cut? Which characters are outside GSM-7, and what can replace them? | `smsEncoding`, `smsLength`, `smsParts`, `nonGsmCharacters`, `gsm7Septets`, the two tables, the limits |
+| [push.ts](push.ts) | What JSON does a push send on iOS and on Android, and how many UTF-8 bytes is it? | `pushPayload`, `pushPayloadBytes`, `utf8ByteLength`, `PUSH_MAX_BYTES`, `PUSH_PLATFORMS` |
 
 ## Constants
 
@@ -22,6 +23,7 @@ They use two built-ins, `Intl.Segmenter` (grapheme clusters) and `String.prototy
 | `UCS2_SINGLE_PART` | 70 | UTF-16 code units in a one-part UCS-2 SMS: 140 octets ÷ 2. |
 | `UCS2_PER_PART` | 67 | UTF-16 code units in each part of a split UCS-2 SMS. |
 | `SMS_MAX_PARTS` | 10 | The most parts render produces. Past it, render refuses; it never truncates. |
+| `PUSH_MAX_BYTES` | 4096 | The payload limit on APNs and FCM. Past it, render refuses. |
 
 ## SMS: characters and parts
 
@@ -71,6 +73,25 @@ differences are deliberate:
 Consumers must turn off provider rewriting such as Twilio's Smart Encoding, which replaces ’ – … with ASCII before
 sending: the counts here are for the text exactly as rendered.
 
+## Push: payload size
+
+`pushPayload` builds the JSON Stencil's text makes: `{"aps":{"alert":{"title","subtitle","body"}}}` for APNs and
+`{"message":{"notification":{"title","body"}}}` for FCM HTTP v1. Android never carries a subtitle, and an empty
+subtitle is left out on iOS too. `pushPayloadBytes` is the UTF-8 length of that JSON as `JSON.stringify` writes it:
+compact, non-ASCII as raw UTF-8 (é 2 bytes, ’ and € 3, an emoji 4), and only `"`, `\` and control characters
+escaped (a line break is the 2 bytes `\n`).
+
+The number is a **lower bound** on what a consumer sends. It counts only Stencil's text. The consumer's own keys (a
+deep link, a data payload, badge, sound, category, thread id) add to it, so their payload is `pushPayloadBytes` plus
+the bytes of their keys, and they have `PUSH_MAX_BYTES − pushPayloadBytes` left for them. Device tokens aren't in
+the count, and don't need to be: APNs takes the token in the request path, and FCM's limit counts the payload's keys
+and values. On Android the count does include the request's `message` envelope, which FCM may not count against
+the limit, so there it errs a few bytes high: the safe side. Two caveats for consumers:
+
+- A serializer that escapes non-ASCII as `\uXXXX` (Python's `json.dumps` by default) makes é 6 bytes and an emoji
+  12, so it can take a payload Stencil measured as fitting over the limit.
+- An FCM message sent to a topic has 2,048 bytes, not 4,096.
+
 ## Sources
 
 - 3GPP TS 23.038 §6.2.1 and §6.2.1.1: the GSM 7-bit default alphabet and its extension table.
@@ -81,3 +102,7 @@ sending: the counts here are for the text exactly as rendered.
   at 0x09.
 - Twilio's [message-segment-calculator](https://github.com/TwilioDevEd/message-segment-calculator): the split
   cross-check above.
+- Apple, [Sending notification requests to APNs](https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns):
+  the payload is limited to 4 KB (4,096 bytes).
+- Firebase, [FCM error codes](https://firebase.google.com/docs/cloud-messaging/error-codes): 4,096 bytes for most
+  messages, 2,048 for topic messages, keys and values included.
