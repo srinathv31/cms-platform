@@ -40,7 +40,7 @@ Feature folders:
 | `access/` | Request-access cards and `RolePicker`. | `/request-access` |
 | `activity/` | The template's Activity tab. | `/[team]/templates/[templateId]/activity` |
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
-| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). | `workspace/`, `review/` |
+| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block, or on a message to a channel field (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
 | `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's phone next |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
@@ -48,8 +48,8 @@ Feature folders:
 | `library/` | Library view and browser, New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, sample sets, and the output on its well. PDF, Web and Email come from the render route (`render-preview.ts`, `use-preview-render.ts`; pdf.js viewer in `pdf/`). Push and SMS render in the browser on every keystroke through the route's own `renderMessage` (`message-preview.ts`, [decision 0035](../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)) and show on the phone kit (`phone-output.tsx`), with iPhone · Android and the Device options in the controls row (`phone-controls.tsx`). See [The preview](#the-preview). | `workspace/`, `review/` |
-| `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
-| `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
+| `redline/` | `RedlineDocument`, a version diff painted like the document; `FieldsDocument`, a version's channel fields painted as the composer shows them (a message's push and SMS under display headings, a document's email details under a caps label), clean or with their redline (`diffChannelFields`); and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
+| `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. The Document view is a document's body under its email details, or a message's fields alone (`fields-view.tsx`), each with its redline and comments. | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
@@ -271,7 +271,14 @@ What it measures, shown only when it matters and never animated:
   subtitle and body on iPhone only (Android's one-line body is how Android shows it).
 
 The composer hands the session a document-editor handle whose `focus` puts the caret in the first field on screen, so
-the name field's Enter lands there.
+the name field's Enter lands there. A message has no blocks, so its review threads are on its fields (a field's id is
+the thread's block, `commentAnchors`): the handle finds a field by `data-field` (the redline's DOM handle with its own
+`anchor`), so the markers sit beside the fields and choosing a card scrolls to its field. A thread on a field is
+started on the review screen (the hover marker beside a field, or the rail's "Comment on a field" menu); the
+composer has no selection to comment on.
+
+The composer's field label and the SMS's locked footer (`content/field-chrome.tsx`) are shared with the review's and
+Compare's read-only fields (`redline/fields-document.tsx`), so a field looks the same written, reviewed and compared.
 
 ## Copy these
 

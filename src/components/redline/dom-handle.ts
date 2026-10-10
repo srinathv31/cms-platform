@@ -6,13 +6,23 @@
 // hidden in a caption or a "4 unchanged blocks" count: its box is then that line's (`redlineAnchorElement`),
 // and the count's own key (`data-collapsed`, from blocks.ts `hostKey`) answers as a block id too.
 //
-// Plain DOM, no React: the review screen puts it behind a ref (review/redline-view.tsx).
+// A message's channel fields are found the same way: in the review they are frames with `data-block-id`
+// too (fields-document.tsx), and the message composer passes its own `anchor`, its fields' `data-field`.
+//
+// Plain DOM, no React: the review screen puts it behind a ref (review/redline-view.tsx and, for a
+// message's fields, review/fields-view.tsx), and so does the message composer.
 
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 
 export interface RedlineHandleSource {
   /** The element the redline renders in (null before it mounts). */
   root: () => HTMLElement | null;
+  /**
+   * Where a block (or a field) is on screen, inside `root`. By default a redline's block frame, or the
+   * caption or count it is hidden in (`redlineAnchorElement`); the message composer finds its fields by
+   * `data-field`.
+   */
+  anchor?: (root: HTMLElement | null, blockId: string) => HTMLElement | null;
   /** The block a thread (or the comment being written) is about, or null. */
   blockOfThread: (threadId: string) => string | null;
   /** A comment on a whole block was asked for (the hover button, the keyboard path). */
@@ -81,14 +91,15 @@ export function revealInContainer(element: HTMLElement): void {
 }
 
 export function createRedlineHandle(source: RedlineHandleSource): DocumentEditorHandle {
-  const blockRect = (blockId: string) => rectOf(redlineAnchorElement(source.root(), blockId));
+  const anchor = source.anchor ?? redlineAnchorElement;
+  const blockRect = (blockId: string) => rectOf(anchor(source.root(), blockId));
 
   return {
     // Nothing in the redline takes a caret.
     focus: () => {},
     focusThread: (threadId) => {
       const blockId = source.blockOfThread(threadId);
-      const element = blockId ? redlineAnchorElement(source.root(), blockId) : null;
+      const element = blockId ? anchor(source.root(), blockId) : null;
       if (element && rectOf(element)) revealInContainer(element);
     },
     getBlockRect: blockRect,

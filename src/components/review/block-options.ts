@@ -1,8 +1,10 @@
 // The document's blocks as a short list of names, for choosing which block to comment on without a
 // pointer: a heading is its text, a table its header cells ("Table: Rate or fee, What you pay"), a list
-// its first item ("List: Purchases must post…"), anything else its first words. Pure TypeScript.
+// its first item ("List: Purchases must post…"), anything else its first words. A message's fields are
+// listed by name ("Push title"). Pure TypeScript.
 
-import type { JSONContent, Variable } from "@/domain/types";
+import { fieldName, fieldsOfChannels } from "@/domain/channel-fields";
+import type { Channel, JSONContent, Variable } from "@/domain/types";
 
 export interface BlockOption {
   id: string;
@@ -74,4 +76,9 @@ export function blockOptions(body: JSONContent, variables: readonly Variable[]):
     if (label) out.push({ id, label, heading: block.type === "heading" });
   }
   return out;
+}
+
+/** A message's fields that can carry a comment, by their full name ("Push title"): its channels', in registry order. */
+export function fieldOptions(channels: readonly Channel[]): BlockOption[] {
+  return fieldsOfChannels(channels).map((field) => ({ id: field.id, label: fieldName(field), heading: false }));
 }

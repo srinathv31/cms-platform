@@ -1,7 +1,8 @@
-// What a block says, as one line of plain text: the muted anchor line on a card about a whole block
-// (a thread with no quote). Pure; it reads the document's JSON, so it works on the saved body and on
-// the live one alike.
+// What a block (or a channel field) says, as one line of plain text: the muted anchor line on a card
+// about a whole block or field (a thread with no quote). Pure; it reads the document's JSON, so it works
+// on the saved body and on the live one alike.
 
+import { ALL_CHANNEL_FIELDS, fieldName, type ChannelFieldValues } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
 
 /** Enough for any one-line truncation; keeps a huge block from putting its whole text in the DOM. */
@@ -38,6 +39,19 @@ function findBlock(doc: JSONContent, blockId: string): JSONContent | null {
     return null;
   };
   return walk(doc);
+}
+
+/**
+ * A channel field's name and text on one line, for a card about a field (a message's threads are on its
+ * fields): "Push title: Was this you?", or the name alone when the field is empty. Null when `id` isn't
+ * a field's, so the caller asks the body next (`fieldTextOf(…) ?? blockTextOf(…)`).
+ */
+export function fieldTextOf(values: Partial<ChannelFieldValues> | null | undefined, id: string, labels?: VariableLabels): string | null {
+  const field = ALL_CHANNEL_FIELDS.find((f) => f.id === id);
+  if (!field) return null;
+  const value = values?.[field.id] ?? null;
+  const text = value ? collect(value, labels).replace(/\s+/g, " ").trim() : "";
+  return text === "" ? fieldName(field) : `${fieldName(field)}: ${text}`.slice(0, MAX);
 }
 
 /** The text of a block on one line (whitespace runs as one space, chips as their label), or null when the block isn't there or says nothing. */

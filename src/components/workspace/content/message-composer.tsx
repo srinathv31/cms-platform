@@ -1,15 +1,18 @@
 "use client";
 
-import { Lock, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { PushContent } from "@/components/device";
 import { monogramOf } from "@/components/preview/phone-output";
 import { findSet, listSets, resolveSetValues } from "@/components/preview/sample-sets/model";
+import { createRedlineHandle } from "@/components/redline/dom-handle";
 import {
   channelFieldsFrom,
+  channelFieldsHeading,
   channelFieldsOf,
   fieldLines,
   fieldName,
+  fieldPlatformTag,
   type ChannelField,
   type ChannelFieldValues,
   type ChannelFieldsPatch,
@@ -26,6 +29,7 @@ import type { DocumentEditorHandle, TextFlagger } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { useLiveFields, useLiveSampleSets, type LiveDraft } from "../session/live-draft";
 import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
+import { FieldLabel, LockedFooter } from "./field-chrome";
 import { usePushFit } from "./push-fit";
 import { smsMeta, smsMetaSegments } from "./sms-meta";
 
@@ -44,8 +48,13 @@ export interface MessageComposerProps {
   rules: MessageTypeRules;
   /** The push's app name, for the phones the cuts are measured on. */
   appName: string;
-  /** Receives the composer's handle: the name field's Enter puts the caret in the first field shown. */
+  /**
+   * Receives the composer's handle: the name field's Enter puts the caret in the first field shown, and
+   * the comment markers and the list find a thread's field through it.
+   */
   editorRef: (handle: DocumentEditorHandle | null) => void;
+  /** The field a review thread is on (its id, "push.title"), or null: what the handle places a thread by. */
+  threadField: (threadId: string) => string | null;
 }
 
 /**
@@ -64,7 +73,17 @@ export interface MessageComposerProps {
  *     with its reason and, for a character, a one-click fix (domain/messages/flags.ts).
  * Nothing counts up or moves: the numbers change in place.
  */
-export function MessageComposer({ channels, editable, values, draft, today, rules, appName, editorRef }: MessageComposerProps) {
+export function MessageComposer({
+  channels,
+  editable,
+  values,
+  draft,
+  today,
+  rules,
+  appName,
+  editorRef,
+  threadField,
+}: MessageComposerProps) {
   const session = useWorkspaceSession();
   const { variables } = useContractState();
   const { setId } = usePreviewState();
@@ -103,19 +122,24 @@ export function MessageComposer({ channels, editable, values, draft, today, rule
     [smsOn, live, variables, sampleValues, stored, today, rules],
   );
 
-  // The name field's Enter: the caret goes to the first field on screen.
+  // The composer's handle. The name field's Enter: the caret goes to the first field on screen. Review
+  // comments on a message are on its fields (each field is a thread's block, by its id): the markers beside
+  // them and the scroll to a thread's field find the field by `data-field`, as the redline finds a block.
+  const latestThreadField = useRef(threadField);
+  useLayoutEffect(() => {
+    latestThreadField.current = threadField;
+  });
   useEffect(() => {
     const handle: DocumentEditorHandle = {
+      ...createRedlineHandle({
+        root: () => root.current,
+        anchor: (el, id) => el?.querySelector<HTMLElement>(`[data-field="${id.replace(/["\\]/g, "\\$&")}"]`) ?? null,
+        blockOfThread: (id) => latestThreadField.current(id),
+      }),
       focus: () => {
         const first = [...(root.current?.querySelectorAll<HTMLElement>(".ProseMirror") ?? [])].find((el) => el.getClientRects().length > 0);
         first?.focus({ preventScroll: true });
       },
-      // A message has no blocks for comments to anchor to.
-      focusThread: () => {},
-      getBlockRect: () => null,
-      getThreadRect: () => null,
-      subscribeBlockRects: () => () => {},
-      requestComment: () => {},
     };
     editorRef(handle);
     return () => editorRef(null);
@@ -134,7 +158,7 @@ export function MessageComposer({ channels, editable, values, draft, today, rule
 
   return (
     <div ref={root} data-slot="message-composer" className="flex flex-col gap-12 pt-1">
-      <Section heading="Push notification" hidden={!pushOn}>
+      <Section heading={channelFieldsHeading("push")} hidden={!pushOn}>
         <ComposerField field={title!} value={values[title!.id]} hidden={!pushOn} editable={editable} onField={onField} warning={warnings.title} />
         <ComposerField
           field={subtitle!}
@@ -142,14 +166,13 @@ export function MessageComposer({ channels, editable, values, draft, today, rule
           hidden={!pushOn}
           editable={editable}
           onField={onField}
-          tag="iPhone only"
           warning={warnings.subtitle}
         />
         <ComposerField field={body!} value={values[body!.id]} hidden={!pushOn} editable={editable} onField={onField} warning={warnings.body} />
         {probe}
       </Section>
 
-      <Section heading="Text message" hidden={!smsOn}>
+      <Section heading={channelFieldsHeading("sms")} hidden={!smsOn}>
         <ComposerField
           field={message!}
           value={values[message!.id]}
@@ -194,8 +217,8 @@ function Section({ heading, hidden, children }: { heading: string; hidden: boole
 }
 
 /**
- * One field: its label (and a quiet tag, "iPhone only"), the editor its shape takes, then what the
- * composer measured: a cut warning on the left, the SMS's meta line on the right.
+ * One field: its label (and a quiet tag, "iPhone only", from the registry), the editor its shape takes,
+ * then what the composer measured: a cut warning on the left, the SMS's meta line on the right.
  */
 function ComposerField({
   field,
@@ -203,7 +226,6 @@ function ComposerField({
   hidden,
   editable,
   onField,
-  tag,
   warning = null,
   footer,
   meta,
@@ -213,7 +235,6 @@ function ComposerField({
   hidden: boolean;
   editable: boolean;
   onField: (field: ChannelField, doc: JSONContent) => void;
-  tag?: string;
   warning?: string | null;
   footer?: React.ReactNode;
   meta?: React.ReactNode;
@@ -233,12 +254,7 @@ function ComposerField({
   return (
     <div data-field={field.id} className="flex flex-col">
       {/* The field names itself to assistive tech ("Push subtitle"); this is its visible label. */}
-      <div aria-hidden className="mb-2 flex h-5 items-center gap-2 text-[13px] leading-5 font-medium text-text-muted">
-        {field.label}
-        {tag ? (
-          <span className="rounded-sm border border-hairline px-1.5 text-[11px] leading-4 font-normal text-text-subtle">{tag}</span>
-        ) : null}
-      </div>
+      <FieldLabel label={field.label} tag={fieldPlatformTag(field)} />
       <InlineVariableField
         label={fieldName(field)}
         value={value}
@@ -261,15 +277,5 @@ function ComposerField({
         </div>
       ) : null}
     </div>
-  );
-}
-
-/** The content type's SMS footer, under the message in the same box: sent as written, never edited here. */
-function LockedFooter({ text }: { text: string }) {
-  return (
-    <p data-slot="sms-footer" className="mt-0.5 flex items-start gap-1.5 text-text-muted select-none">
-      <Lock role="img" aria-label="Locked" strokeWidth={1.75} className="mt-[5px] size-3.5 shrink-0 text-text-subtle" />
-      <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</span>
-    </p>
   );
 }

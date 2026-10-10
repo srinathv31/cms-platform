@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { blockTextOf } from "@/components/comments/block-text";
+import { blockTextOf, fieldTextOf } from "@/components/comments/block-text";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-list";
 import { openCount } from "@/components/comments/thread-state";
@@ -234,13 +234,14 @@ export function ContentWorkspace({
           sampleSets: values.sampleSets ?? opening.sampleSets,
         };
         liveBody.current = next.body;
-        trackDocument(next.body);
+        // A message has no body: its threads are on its fields, which a revert puts back with it.
+        if (!message) trackDocument(next.body);
         setChannels(next.channels);
         keptScroll.current = canvasElement()?.scrollTop ?? null;
         setShown((prev) => ({ gen: prev.gen + 1, ...next }));
       },
     });
-  }, [session, editable, opening, trackDocument]);
+  }, [session, editable, opening, trackDocument, message]);
 
   const open = openCount(review.threads);
   const hasComments = review.threads.length > 0 || review.composer !== null;
@@ -304,7 +305,17 @@ export function ContentWorkspace({
   );
   const blockPosition = useCallback((blockId: string) => editorHandle.current?.getBlockRect(blockId)?.top ?? null, []);
   const labels = useMemo(() => new Map(shown.variables.map((v) => [v.key, v.label])), [shown.variables]);
-  const blockText = useCallback((blockId: string) => blockTextOf(liveBody.current, blockId, labels), [labels]);
+  // A card about a whole block quotes the start of its text; one about a channel field, the field as typed.
+  const blockText = useCallback(
+    (blockId: string) => fieldTextOf(liveDraft.getFields(), blockId, labels) ?? blockTextOf(liveBody.current, blockId, labels),
+    [labels, liveDraft],
+  );
+  // The field a thread is on, for the composer's handle (a message's threads are on its fields).
+  const latestThreads = useRef(review.threadsForEditor);
+  useLayoutEffect(() => {
+    latestThreads.current = review.threadsForEditor;
+  });
+  const threadField = useCallback((id: string) => latestThreads.current.find((t) => t.id === id)?.blockId ?? null, []);
 
   return (
     <EditorScope
@@ -319,16 +330,29 @@ export function ContentWorkspace({
       <div data-slot="editor" className={cn(WS.doc, "relative")}>
         {message ? (
           // A message has no document: its channels' own fields, in the same root.
-          <MessageComposer
-            channels={channels}
-            editable={editable}
-            values={shown}
-            draft={liveDraft}
-            today={today}
-            rules={messageRules}
-            appName={phoneSenders(senders, teamName).appName}
-            editorRef={setEditor}
-          />
+          <>
+            <MessageComposer
+              channels={channels}
+              editable={editable}
+              values={shown}
+              draft={liveDraft}
+              today={today}
+              rules={messageRules}
+              appName={phoneSenders(senders, teamName).appName}
+              editorRef={setEditor}
+              threadField={threadField}
+            />
+            {/* A message's threads are on its fields: their markers sit beside them (a new one starts in the review). */}
+            <GutterMarkers
+              editor={editorHandle}
+              threads={review.threads}
+              activeThreadId={activeThreadId}
+              onActivate={showThread}
+              compact={previewOpen}
+              className="hidden @min-[53rem]/ws:block"
+              noun="field"
+            />
+          </>
         ) : (
           <>
             <DocumentBody

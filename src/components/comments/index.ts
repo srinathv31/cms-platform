@@ -9,5 +9,5 @@ export {
   type ComposerState,
   type ReviewThreads,
 } from "./use-review-threads";
-export { blockTextOf, type VariableLabels } from "./block-text";
+export { blockTextOf, fieldTextOf, type VariableLabels } from "./block-text";
 export { type ThreadMutation } from "./thread-state";

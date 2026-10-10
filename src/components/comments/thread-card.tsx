@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { duration, ease } from "@/components/motion/presets";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Button } from "@/components/ui/button";
+import { ALL_CHANNEL_FIELDS } from "@/domain/channel-fields";
 import type { CommentView, Person, ThreadView } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
 import { formatAgo } from "@/domain/dates";
@@ -240,7 +241,7 @@ export function ThreadCard({
       data-active={active ? "" : undefined}
       // Not a tab stop: the list moves focus here (a new thread's card) and it can be focused from script.
       tabIndex={-1}
-      aria-label={isChange ? "Change request" : thread.quote ? `Comment on “${thread.quote}”` : "Comment on a block"}
+      aria-label={isChange ? "Change request" : thread.quote ? `Comment on “${thread.quote}”` : wholeAnchorLabel(thread.blockId)}
       onClick={(event) => {
         if (!onSelect || !selectable) return;
         if ((event.target as HTMLElement).closest("button, textarea, input, a")) return;
@@ -325,6 +326,12 @@ export function ThreadCard({
       ) : null}
     </article>
   );
+}
+
+/** A thread on a whole block, or on a message's field (its threads are on its fields): "Comment on the push title". */
+function wholeAnchorLabel(blockId: string): string {
+  const field = ALL_CHANNEL_FIELDS.find((f) => f.id === blockId);
+  return field ? `Comment on the ${field.name}` : "Comment on a block";
 }
 
 /** The new-thread composer, as a card: what it will attach to, a field, Cancel and Comment. */

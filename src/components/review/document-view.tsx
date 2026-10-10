@@ -2,12 +2,15 @@
 
 import { useMemo, type RefObject } from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
+import { FieldsDocument } from "@/components/redline/fields-document";
 import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot } from "@/editor/components/editor-root";
 import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 import type { JSONContent } from "@/domain/types";
-import type { RedlineDoc, ThreadView } from "@/domain/review-types";
+import type { FieldRedline, RedlineDoc, ThreadView } from "@/domain/review-types";
+import type { ChannelFamily } from "@/domain/types";
+import { FieldsView } from "./fields-view";
 import { RedlineView } from "./redline-view";
 import { RV } from "./review-grid";
 
@@ -21,6 +24,11 @@ import { RV } from "./review-grid";
  * has no highlights and no selection to comment on; it has the rest (markers in the gutter, the scroll
  * to a thread's block with a tint on it, a comment on a whole block), through the same handle ref
  * (redline-view.tsx). Opening a thread never turns the changes off.
+ *
+ * Each channel's own fields show here too, as the composer shows them (redline/fields-document.tsx),
+ * with their redline while Show changes is on. A document's (its email subject and preheader) sit above
+ * its body. A message (an Alert) has no body: its fields are its whole content, with its comments beside
+ * them (fields-view.tsx).
  */
 
 /** The version's variables, plus any the baseline had that this one dropped (a deleted chip needs its label). */
@@ -32,6 +40,9 @@ function labelsFor(variables: readonly Variable[], baseline: readonly Variable[]
 
 export function DocumentView({
   versionId,
+  family,
+  fields,
+  smsFooter,
   body,
   variables,
   baselineVariables,
@@ -48,6 +59,12 @@ export function DocumentView({
   onRequestBlockComment,
 }: {
   versionId: string;
+  /** A document shows its body (and its email details); a message, its fields alone. */
+  family: ChannelFamily;
+  /** The fields of the channels that are on: their redline while Show changes is on, else as they stand. */
+  fields: readonly FieldRedline[];
+  /** The content type's SMS footer, locked under the message. */
+  smsFooter: string | null;
   body: JSONContent;
   variables: Variable[];
   baselineVariables: Variable[] | null;
@@ -78,7 +95,32 @@ export function DocumentView({
       data-slot="editor"
       className={RV.doc}
     >
-      {redline ? (
+      {family === "message" ? (
+        <FieldsView
+          fields={fields}
+          variables={labels}
+          changesOnly={changesOnly}
+          smsFooter={smsFooter}
+          editorRef={editorRef}
+          anchors={anchors}
+          threads={threads}
+          activeThreadId={activeThreadId}
+          activeBlockId={activeBlockId}
+          onActivate={onActivate}
+          onRequestComment={onRequestComment}
+          onRequestBlockComment={onRequestBlockComment}
+        />
+      ) : (
+        <FieldsDocument
+          fields={fields}
+          variables={labels}
+          layout="details"
+          changesOnly={changesOnly}
+          align="start"
+          className="mb-6 border-b border-hairline pb-4"
+        />
+      )}
+      {family === "message" ? null : redline ? (
         <RedlineView
           doc={redline}
           variables={labels}
