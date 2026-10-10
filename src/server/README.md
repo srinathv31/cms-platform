@@ -120,7 +120,7 @@ Reads a screen makes on demand, when a dialog or a menu opens, are GET route han
 
 | Route (`/api/templates/[templateId]/…`) | Query | For |
 | --- | --- | --- |
-| `compare?from=&to=` | `loadVersionsToCompare` ([queries/compare.ts](queries/compare.ts)) | The Compare dialog, per pair of versions (`template.view`). |
+| `compare?from=&to=` | `loadVersionsToCompare` ([queries/compare.ts](queries/compare.ts)) | The Compare dialog, per pair of versions: names, bodies, channel fields, and the content type's SMS footer (`template.view`). |
 | `base-version?draft=` | `getBaseVersion` ([queries/base-version.ts](queries/base-version.ts)) | "Revert to v3" (`draft.edit`). |
 | `submit-summary` | `getSubmitSummary` ([queries/submit-summary.ts](queries/submit-summary.ts)) | The submit dialog, and its Refresh summary (`version.submit`). |
 | `copilot-prompt` | `getCopilotPrompt` ([queries/copilot.ts](queries/copilot.ts)) | The Copilot prompt dialog (`draft.edit`). |

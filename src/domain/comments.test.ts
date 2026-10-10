@@ -6,6 +6,7 @@ import {
   addComment,
   canActOnThread,
   canComment,
+  commentAnchors,
   commentText,
   reopenThread,
   reply,
@@ -168,8 +169,16 @@ describe("commentText: what a comment may say", () => {
   });
 });
 
+describe("commentAnchors: where a thread can anchor", () => {
+  it("is the fields of the channels that are on, in registry order, then the body's blocks", () => {
+    expect(commentAnchors(["b_one", "b_two"], ["pdf", "email"])).toEqual(["email.subject", "email.preheader", "b_one", "b_two"]);
+    expect(commentAnchors([], ["sms", "push"])).toEqual(["push.title", "push.subtitle", "push.body", "sms.text"]);
+    expect(commentAnchors(["b_one"], ["pdf", "web"])).toEqual(["b_one"]);
+  });
+});
+
 describe("addComment", () => {
-  const input = (patch: Partial<Parameters<typeof addComment>[0]> = {}) => ({
+  const input =(patch: Partial<Parameters<typeof addComment>[0]> = {}) => ({
     viewer: jordan,
     template: TEMPLATE,
     version: version(),
@@ -227,6 +236,12 @@ describe("addComment", () => {
     expect(addComment(input({ blockId: DOCUMENT_THREAD }))).toMatchObject({ ok: true });
     const draft = version({ id: "v_draft", number: null, state: "draft", submittedBy: null });
     expect(addComment(input({ version: draft, blockId: "b_not_saved_yet" }))).toMatchObject({ ok: true });
+  });
+
+  it("takes a thread on a field of a channel that is on (a message's threads are on its fields), not of one that is off", () => {
+    const blockIds = commentAnchors([], ["push", "sms"]);
+    expect(addComment(input({ blockIds, blockId: "push.title", quote: null }))).toMatchObject({ ok: true, thread: { blockId: "push.title", quote: null } });
+    expect(addComment(input({ blockIds, blockId: "email.subject", quote: null }))).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
   });
 
   it("cuts a long quote to QUOTE_MAX characters, and keeps none when it is blank", () => {

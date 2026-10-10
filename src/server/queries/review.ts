@@ -17,6 +17,7 @@ import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import {
+  anchorIdsOf,
   chainFor,
   decideCheck,
   getChains,
@@ -222,16 +223,16 @@ function decideOnScreen(check: PermissionResult, state: string): PermissionResul
   return state === "in_review" ? check : refuse(REFUSALS.notInReview);
 }
 
-/** The baseline's document, for the redline: only the chosen version's body is read. */
+/** The baseline's content, for the redline: only the chosen version's body and channel fields are read. */
 async function loadBaseline(
   base: { id: string; number: number | null; state: VersionState } | null,
 ): Promise<ReviewScreenData["baseline"]> {
   if (!base || base.number === null) return null;
   const row = await db.query.versions.findFirst({
-    columns: { body: true, variables: true },
+    columns: { body: true, variables: true, channels: true, channelFields: true },
     where: eq(versions.id, base.id),
   });
-  return row ? { id: base.id, number: base.number, state: base.state, body: row.body, variables: row.variables } : null;
+  return row ? { id: base.id, number: base.number, state: base.state, ...row } : null;
 }
 
 /** Everything `/{team}/review/{templateId}/{n}` shows. 404 when the version doesn't exist or isn't visible. */
@@ -262,7 +263,7 @@ export const getReviewScreen = cache(
         .where(eq(approvals.versionId, version.id))
         .orderBy(asc(approvals.decidedAt), asc(approvals.id)),
       // A submitted version is a record: the threads that began after it are not part of it.
-      loadThreads(template.id, version.body, { throughVersion: number }),
+      loadThreads(template.id, anchorIdsOf(version), { throughVersion: number }),
       loadConsumerUsage(db, template.id, nowDate),
       loadMessageSetup(template),
     ]);

@@ -37,9 +37,13 @@
 //     renderer does, so that line coming and going is never a change.
 //   - Blocks without an id get `next:<index>` (or `base:<index>` when removed) as their RedlineBlock id.
 //   - Unchanged nodes are the input objects, not copies. Nothing here mutates its input.
+//
+// A version's channel fields (an email's subject, a push's title, an SMS's message) are redlined with the
+// same engine, one field at a time (`diffChannelFields`): for an alert they are the whole content.
 
-import type { RedlineBlock, RedlineDoc, RedlineMark, RedlineStatus } from "./review-types";
-import type { JSONContent } from "./types";
+import { channelFieldValue, fieldsOfChannels, type ChannelField, type ChannelFields } from "./channel-fields";
+import type { FieldRedline, RedlineBlock, RedlineDoc, RedlineMark, RedlineStatus } from "./review-types";
+import { CHANNELS, type Channel, type JSONContent } from "./types";
 
 type Mark = NonNullable<JSONContent["marks"]>[number];
 type RedlineOp = RedlineMark["attrs"]["op"];
@@ -123,6 +127,67 @@ export interface NameChange {
  */
 export function nameChange(base: string | null | undefined, next: string): NameChange | null {
   return base === null || base === undefined || base === next ? null : { from: base, to: next };
+}
+
+// ── Channel fields ───────────────────────────────────────────────────────────
+
+/** A version's channel fields as the redline reads them: the channels that are on, and what they store. */
+export interface FieldsSide {
+  channels: readonly Channel[];
+  channelFields: ChannelFields;
+}
+
+/** Every field's redline, in registry order, and how many fields were added, removed or changed. */
+export interface FieldsRedline {
+  fields: FieldRedline[];
+  counts: RedlineDoc["counts"];
+}
+
+/**
+ * The redline of each channel field (the email's subject and preheader, a push's title, subtitle and
+ * body, an SMS's message) from `base` to `next`, over the registry, so a new field or channel needs
+ * nothing here. A field's text is diffed with `diffDocuments`, its paragraph given the same id on both
+ * sides so the two always pair and the change is a word diff, however much was rewritten.
+ *
+ * A field counts only while its channel is on: it keeps its value while its channel is off, but nothing
+ * renders it. So the fields shown are those of every channel on in either version, and turning a channel
+ * on adds its fields, off removes them. A field with no text on either side is "unchanged" (an optional
+ * subtitle left empty). No base (a first version): `next`'s fields, all "unchanged", counts zero, as
+ * `diffDocuments` does.
+ */
+export function diffChannelFields(base: FieldsSide | null, next: FieldsSide): FieldsRedline {
+  const counts = { added: 0, removed: 0, changed: 0, moved: 0 };
+  const channels = base ? CHANNELS.filter((c) => base.channels.includes(c) || next.channels.includes(c)) : next.channels;
+  const fields = fieldsOfChannels(channels).map((field): FieldRedline => {
+    const after = fieldDoc(next, field);
+    if (!base) return { field, status: "unchanged", doc: diffDocuments(null, after) };
+    const doc = diffDocuments(fieldDoc(base, field), after);
+    const status = fieldStatus(doc);
+    if (status !== "unchanged") counts[status]++;
+    return { field, status, doc };
+  });
+  return { fields, counts };
+}
+
+/** The two counts together: the body's and the fields', for one "N changes" and its summary. */
+export function addCounts(a: RedlineDoc["counts"], b: RedlineDoc["counts"]): RedlineDoc["counts"] {
+  return { added: a.added + b.added, removed: a.removed + b.removed, changed: a.changed + b.changed, moved: a.moved + b.moved };
+}
+
+/** The field as a document to diff: empty while its channel is off, each block keyed by the field (they pair across versions). */
+function fieldDoc(side: FieldsSide, field: ChannelField): JSONContent {
+  const value = side.channels.includes(field.channel) ? channelFieldValue(side.channelFields, field) : null;
+  const blocks = (value?.content ?? []).filter(isNode);
+  return { type: "doc", content: blocks.map((block, i) => ({ ...block, attrs: { ...block.attrs, id: `${field.id}:${i}` } })) };
+}
+
+/** The field's status from its blocks': all added is added, all removed removed, none changed unchanged. */
+function fieldStatus(doc: RedlineDoc): FieldRedline["status"] {
+  const { blocks } = doc;
+  if (blocks.every((b) => b.status === "unchanged")) return "unchanged";
+  if (blocks.every((b) => b.status === "added")) return "added";
+  if (blocks.every((b) => b.status === "removed")) return "removed";
+  return "changed";
 }
 
 // ── Per-call caches ──────────────────────────────────────────────────────────

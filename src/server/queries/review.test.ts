@@ -16,6 +16,7 @@ import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "./review";
+import { anchorIdsOf } from "./review-shared";
 import { getThreads, loadThreads } from "./threads";
 import { getVersions } from "./versions";
 import { getWorkspaceDocument } from "./workspace";
@@ -286,7 +287,15 @@ describe("getReviewScreen", () => {
         async () => {},
         async () => {
           const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
-          expect(screen.baseline).toEqual({ id: v2.id, number: 2, state: "revoked", body: v2.body, variables: v2.variables });
+          expect(screen.baseline).toEqual({
+            id: v2.id,
+            number: 2,
+            state: "revoked",
+            body: v2.body,
+            variables: v2.variables,
+            channels: v2.channels,
+            channelFields: v2.channelFields,
+          });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
         },
       );
@@ -557,8 +566,8 @@ describe("threads on a submitted version", () => {
       expect(mine(await screen(2))).toEqual(["th_f3a_v1"]);
       expect(mine(await screen(3))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
       // Without a version, everything on the template (the editor's margin).
-      const body = (await db.query.versions.findFirst({ where: eq(versions.id, await versionId(templateId, 3)) }))!.body;
-      expect(mine(await loadThreads(templateId, body))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
+      const v3 = (await db.query.versions.findFirst({ where: eq(versions.id, await versionId(templateId, 3)) }))!;
+      expect(mine(await loadThreads(templateId, anchorIdsOf(v3)))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
       // By id: the same rule.
       expect(mine(await getThreads("coral-offers", templateId, await versionId(templateId, 2)))).toEqual(["th_f3a_v1"]);
     } finally {
@@ -614,5 +623,30 @@ describe("the workspace's comment permission", () => {
     const document = await getWorkspaceDocument("coral-offers", ids["rate-change-notice"]!);
     expect(document.versionNumber).toBe(1);
     expect(document.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+  });
+});
+
+describe("an alert's threads, on its fields", () => {
+  it("lists a thread on a field in the fields' order, not as orphaned, on the review screen and in the workspace", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const v1 = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) }))!;
+    const rows = [
+      { id: "th_alert_sms", blockId: "sms.text" },
+      { id: "th_alert_title", blockId: "push.title" },
+    ].map((r, i) => ({ ...r, templateId, originVersionId: v1.id, createdAt: new Date(BASE.getTime() - i * 1000) }));
+    await db.insert(commentThreads).values(rows);
+    try {
+      as("jordan");
+      const threads = (await getReviewScreen("coral-offers", templateId, 1)).threads.filter((t) => t.id.startsWith("th_alert"));
+      expect(threads.map((t) => [t.id, t.orphaned])).toEqual([
+        ["th_alert_title", false],
+        ["th_alert_sms", false],
+      ]);
+      as("priya");
+      const margin = (await getWorkspaceDocument("coral-offers", templateId)).threads.filter((t) => t.id.startsWith("th_alert"));
+      expect(margin.map((t) => t.orphaned)).toEqual([false, false]);
+    } finally {
+      await db.delete(commentThreads).where(inArray(commentThreads.id, rows.map((r) => r.id)));
+    }
   });
 });

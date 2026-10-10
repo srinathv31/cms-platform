@@ -15,7 +15,7 @@ import type {
   Variable,
   VersionState,
 } from "./types";
-import type { ChannelFields } from "./channel-fields";
+import type { ChannelField, ChannelFields } from "./channel-fields";
 import type { MessageTypeRules, TeamSenders } from "./platform-config";
 import type { Refused } from "./refusals";
 
@@ -240,6 +240,17 @@ export interface RedlineDoc {
   counts: { added: number; removed: number; changed: number; moved: number };
 }
 
+/**
+ * One channel field in a redline (`diffChannelFields`): the field, how it changed as a whole, and its
+ * text diffed as a document's blocks are (`doc`, normally one paragraph). A field is one block, so it is
+ * never "moved". Counted once in the screen's change count, by `status`.
+ */
+export interface FieldRedline {
+  field: ChannelField;
+  status: Exclude<RedlineStatus, "moved">;
+  doc: RedlineDoc;
+}
+
 // ── Consequences (domain/consequences.ts) ─────────────────────────────────────
 
 /** Render-log aggregate per consumer and version (non-preview renders only). */
@@ -334,8 +345,17 @@ export interface ReviewScreenData {
    * version; with none Active (after a revoke), the released version the draft was based on, then the
    * newest version that still renders. Null for a first version, or when that would be this version.
    * `state` is for the label ("vs v3 (revoked)"). The contract changes come from submit (`contractBaseline`).
+   * Its channels and channel fields are what the fields' redline compares with (`diffChannelFields`).
    */
-  baseline: { id: string; number: number; state: VersionState; body: JSONContent; variables: Variable[] } | null;
+  baseline: {
+    id: string;
+    number: number;
+    state: VersionState;
+    body: JSONContent;
+    variables: Variable[];
+    channels: Channel[];
+    channelFields: ChannelFields;
+  } | null;
   /**
    * The Active version this one would replace, for the Approve dialog's consequences and its sunset
    * offer. Null when nothing is Active, or this is the Active version. Not `baseline`: after a revoke the

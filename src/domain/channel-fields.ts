@@ -29,6 +29,7 @@ import type { FieldLines } from "@/editor/model/normalize";
 import { assertNever } from "./assert-never";
 import type { PushPlatform } from "./messages/push";
 import { withArticle } from "./plural";
+import { PLATFORM_LABELS } from "./render/errors";
 import { CHANNELS, type Channel, type JSONContent } from "./types";
 
 // ── The registry ──────────────────────────────────────────────
@@ -129,6 +130,32 @@ export function fieldName(field: Pick<ChannelFieldSpec, "name">): string {
 /** The field with its article, for a sentence: "an email subject". */
 export function fieldNoun(field: Pick<ChannelFieldSpec, "name">): string {
   return withArticle(field.name);
+}
+
+/**
+ * The heading over a channel's fields where they show together, as a message's sections (the composer,
+ * the review, Compare) or a document's email details: "Push notification", "Text message", "Email".
+ */
+export function channelFieldsHeading(channel: Channel): string {
+  switch (channel) {
+    case "email":
+      return "Email";
+    case "push":
+      return "Push notification";
+    case "sms":
+      return "Text message";
+    case "pdf":
+    case "web":
+      throw new Error(`The ${channel} channel has no fields`);
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
+/** The quiet tag beside a field only some push platforms show: "iPhone only". Null when every platform shows it. */
+export function fieldPlatformTag(field: Pick<ChannelFieldSpec, "platforms">): string | null {
+  if (field.platforms === undefined) return null;
+  return `${field.platforms.map((platform) => PLATFORM_LABELS[platform]).join(" and ")} only`;
 }
 
 // ── Shapes ────────────────────────────────────────────────────

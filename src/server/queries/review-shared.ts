@@ -3,13 +3,14 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } from "@/domain/approval-chain";
+import { commentAnchors } from "@/domain/comments";
 import { DAY_MS } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { DEFAULT_SMS_MAX_PARTS, type MessageTypeRules } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
-import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
+import type { Channel, JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
 import {
@@ -272,6 +273,14 @@ export async function loadConsumerUsage(reader: Reader, templateId: string, nowD
 }
 
 // ── Documents ─────────────────────────────────────────────────
+
+/**
+ * Where a thread on this version can anchor, in reading order (`commentAnchors`): the fields of its
+ * channels that are on, then every block id in its body.
+ */
+export function anchorIdsOf(version: { body: JSONContent | null | undefined; channels: readonly Channel[] }): string[] {
+  return commentAnchors(blockIdsOf(version.body), version.channels);
+}
 
 /** Every block id in a document, in reading order (top-level blocks and any nested ones that carry an id). */
 export function blockIdsOf(doc: JSONContent | null | undefined): string[] {

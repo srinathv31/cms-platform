@@ -5,11 +5,13 @@ import {
   channelFieldValue,
   channelFieldValues,
   channelFieldsFrom,
+  channelFieldsHeading,
   channelFieldsOf,
   fieldLines,
   fieldName,
   fieldNoun,
   fieldOnPlatform,
+  fieldPlatformTag,
   fieldsOfChannels,
   normalizeAndCheckChannelField,
   typedText,
@@ -90,6 +92,24 @@ describe("the registry", () => {
     expect(fieldLines("line")).toBe("line");
     expect(fieldLines("paragraph")).toBe("line");
     expect(fieldLines("lines")).toBe("lines");
+  });
+});
+
+describe("how the fields are shown together", () => {
+  it("heads each channel's fields with what it sends, and has nothing to head for PDF or Web", () => {
+    expect((["email", "push", "sms"] as const).map((c) => channelFieldsHeading(c))).toEqual(["Email", "Push notification", "Text message"]);
+    expect(() => channelFieldsHeading("pdf")).toThrow();
+  });
+
+  it("tags a field only some push platforms show, and no other", () => {
+    expect(ALL_CHANNEL_FIELDS.map((f) => [f.id, fieldPlatformTag(f)])).toEqual([
+      ["email.subject", null],
+      ["email.preheader", null],
+      ["push.title", null],
+      ["push.subtitle", "iPhone only"],
+      ["push.body", null],
+      ["sms.text", null],
+    ]);
   });
 });
 

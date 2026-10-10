@@ -25,6 +25,7 @@ import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
+import { anchorIdsOf } from "./review-shared";
 import { loadThreads } from "./threads";
 import type { ThreadView } from "@/domain/review-types";
 import type { ImportOriginalRef } from "@/domain/import-types";
@@ -237,7 +238,7 @@ export const getWorkspaceDocument = cache(
     if (!shown) notFound();
     const at = await now();
     const today = at.toISOString().slice(0, 10);
-    const threads = await loadThreads(header.id, shown.body);
+    const threads = await loadThreads(header.id, anchorIdsOf(shown));
     const importOriginal = await getImportOriginalRef(header.id);
 
     return {

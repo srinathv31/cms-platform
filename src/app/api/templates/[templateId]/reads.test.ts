@@ -95,11 +95,17 @@ describe("GET /api/templates/[templateId]/compare", () => {
       as(persona);
       const { status, body } = await answer(get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`));
       expect(status).toBe(200);
-      expect(body).toEqual({
-        ok: true,
-        from: { id: v1.id, number: 1, state: "superseded", name: v1.name, body: v1.body, variables: v1.variables },
-        to: { id: v2.id, number: 2, state: "active", name: v2.name, body: v2.body, variables: v2.variables },
+      const side = (v: typeof v1, number: number, state: string) => ({
+        id: v.id,
+        number,
+        state,
+        name: v.name,
+        body: v.body,
+        channels: v.channels,
+        channelFields: v.channelFields,
+        variables: v.variables,
       });
+      expect(body).toEqual({ ok: true, from: side(v1, 1, "superseded"), to: side(v2, 2, "active"), smsFooter: null });
     }
   });
 

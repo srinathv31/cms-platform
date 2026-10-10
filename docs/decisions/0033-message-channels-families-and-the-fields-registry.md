@@ -62,4 +62,7 @@ nothing stopped a long body from flowing into a text message. The owner confirme
   registry entry. A sixth channel joins one family or makes a third.
 - A content type can't be converted from documents to messages; a new content type is made instead.
 - The usage charts have five channel hues (`--series-1…5`, [0014](0014-chart-values-never-hover-only.md)).
+- Review and Compare show and redline every channel's fields over the registry (`diffChannelFields`), so an email
+  subject's change is redlined like the body's, and an alert's fields are its whole content there. A message has no
+  blocks, so its comment threads anchor to its fields' ids (`commentAnchors`).
 - Coral, the simulated consumer, delivers PDF, Web and Email only until it learns to show a phone.
