@@ -4,7 +4,12 @@ import { useState, type ReactNode } from "react";
 import {
   PushPreview,
   SCREEN_SIZES,
+  SIZE_UNIT,
   SmsPreview,
+  frameWidth,
+  pushScreenLabel,
+  type DeviceAppearance,
+  type DevicePlatform,
   type DeviceSettings,
   type FieldFit,
   type PushContent,
@@ -20,8 +25,8 @@ import { CLOCK, PUSH, PUSH_LONG, SETTINGS, SMS } from "./fixtures";
 import { ControlsRow, Well, type RailState } from "./rail-mock";
 
 // The phone kit (src/components/device) on fixture data: a working rail mock to try every option in,
-// then each view side by side at 1:1, in light and dark, at each text size and width, and inside the
-// tightest preview well (469 × 581, a 1280 × 800 window).
+// iPhone and Android side by side, then each view at 1:1 per platform, in light and dark, at each text size
+// and width, and inside the tightest preview well (469 × 581, a 1280 × 800 window).
 
 /** The preview wells measured in the running app: 1440 × 900 and 1280 × 800 windows. */
 const WELLS = { wide: { width: 563, height: 681 }, tight: { width: 469, height: 581 } } as const;
@@ -29,20 +34,33 @@ const WELLS = { wide: { width: 563, height: 681 }, tight: { width: 469, height: 
 /** How tall a 1:1 specimen is: about the wide well's inner height. */
 const SPECIMEN_HEIGHT = 640;
 
-type View = { key: string; label: string; screen: PushScreen | "sms"; hidden?: boolean };
+const PLATFORMS: DevicePlatform[] = ["ios", "android"];
+const PLATFORM_NAMES: Record<DevicePlatform, string> = { ios: "iPhone", android: "Android" };
+const APPEARANCES: DeviceAppearance[] = ["light", "dark"];
+
+type ViewKey = "lock" | "hidden" | "banner" | "expanded" | "sms";
+type View = { key: ViewKey; screen: PushScreen | "sms"; hidden?: boolean };
 
 const VIEWS: View[] = [
-  { key: "lock", label: "Lock screen", screen: "lock" },
-  { key: "hidden", label: "Lock screen, previews hidden", screen: "lock", hidden: true },
-  { key: "banner", label: "Banner", screen: "banner" },
-  { key: "expanded", label: "Expanded", screen: "expanded" },
-  { key: "sms", label: "Messages", screen: "sms" },
+  { key: "lock", screen: "lock" },
+  { key: "hidden", screen: "lock", hidden: true },
+  { key: "banner", screen: "banner" },
+  { key: "expanded", screen: "expanded" },
+  { key: "sms", screen: "sms" },
 ];
+const view = (key: ViewKey) => VIEWS.find((v) => v.key === key)!;
+
+/** A view's name on a platform: "Banner" on iPhone is "Heads-up" on Android. */
+function viewLabel(platform: DevicePlatform, v: View): string {
+  if (v.screen === "sms") return "Messages";
+  const name = pushScreenLabel(platform, v.screen);
+  return v.hidden ? `${name}, previews hidden` : name;
+}
 
 /** A phone at 1:1: its container is exactly the frame's width, so one point is one pixel. */
 function Specimen({
   settings,
-  view,
+  view: v,
   content = PUSH,
   height = SPECIMEN_HEIGHT,
   onMeasure,
@@ -53,15 +71,20 @@ function Specimen({
   height?: number;
   onMeasure?: (m: PushMeasure) => void;
 }) {
-  const size = SCREEN_SIZES[settings.platform][settings.width];
   return (
-    <div data-specimen={view.key} style={{ width: size.width + 20, height }} className="shrink-0">
-      {view.screen === "sms" ? (
+    <div
+      data-specimen={v.key}
+      data-platform={settings.platform}
+      data-appearance={settings.appearance}
+      style={{ width: frameWidth(SCREEN_SIZES[settings.platform][settings.width]), height }}
+      className="shrink-0"
+    >
+      {v.screen === "sms" ? (
         <SmsPreview settings={settings} content={SMS} clock={CLOCK} />
       ) : (
         <PushPreview
-          settings={{ ...settings, previewsHidden: Boolean(view.hidden) }}
-          screen={view.screen}
+          settings={{ ...settings, previewsHidden: Boolean(v.hidden) }}
+          screen={v.screen}
           content={content}
           clock={CLOCK}
           onMeasure={onMeasure}
@@ -75,6 +98,12 @@ function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-start gap-x-8 gap-y-10">{children}</div>;
 }
 
+const settingsFor = (platform: DevicePlatform, patch: Partial<DeviceSettings> = {}): DeviceSettings => ({
+  ...SETTINGS,
+  platform,
+  ...patch,
+});
+
 export function DeviceGallery() {
   return (
     <div className="min-h-screen bg-app p-(--canvas-inset)">
@@ -82,8 +111,8 @@ export function DeviceGallery() {
         <div className="mx-auto max-w-[82.5rem]">
           <PageHeader title="Phone previews" className="pb-12">
             <p className="mt-2 max-w-xl text-[15px] leading-6 text-text-muted">
-              Push and SMS on an iOS-style phone, from <code className="font-mono text-[13px]">src/components/device</code>.
-              Fixture data only.
+              Push and SMS on iOS-style and Android-style phones, from{" "}
+              <code className="font-mono text-[13px]">src/components/device</code>. Fixture data only.
             </p>
           </PageHeader>
 
@@ -91,70 +120,101 @@ export function DeviceGallery() {
             <Playground />
           </Section>
 
-          {(["light", "dark"] as const).map((appearance) => (
-            <Section
-              key={appearance}
-              id={`views-${appearance}`}
-              label={appearance === "light" ? "Views, light" : "Views, dark"}
-              note="At 1:1 on a 402pt phone."
-            >
-              <Row>
-                {VIEWS.map((view) => (
-                  <Group key={view.key} title={view.label}>
-                    <Specimen settings={{ ...SETTINGS, appearance }} view={view} />
-                  </Group>
-                ))}
-              </Row>
-            </Section>
-          ))}
-
-          <Section id="truncation" label="Truncation" note="One long notification on each screen, with what onMeasure reports.">
+          <Section id="compare" label="Side by side" note="One alert on both phones. Android shows a single line of text and never the subtitle.">
             <Row>
-              {VIEWS.slice(0, 4)
-                .filter((v) => !v.hidden)
-                .map((view) => (
-                  <MeasuredSpecimen key={view.key} view={view} />
-                ))}
-            </Row>
-          </Section>
-
-          <Section id="text-size" label="Text size" note="Default (Large), Large (xxxLarge) and AX (AX1). The clock doesn't scale.">
-            <Row>
-              {(["default", "large", "ax"] as const).flatMap((textSize) =>
-                [VIEWS[0]!, VIEWS[4]!].map((view) => (
-                  <Group key={`${textSize}-${view.key}`} title={`${view.label}, ${textSize === "ax" ? "AX" : textSize}`}>
-                    <Specimen settings={{ ...SETTINGS, textSize }} view={view} content={PUSH_LONG} />
+              {[view("lock"), view("sms")].flatMap((v) =>
+                PLATFORMS.map((platform) => (
+                  <Group key={`${v.key}-${platform}`} title={`${viewLabel(platform, v)}, ${PLATFORM_NAMES[platform]}`}>
+                    <div data-compare={`${v.key}-${platform}`}>
+                      <Specimen settings={settingsFor(platform)} view={v} />
+                    </div>
                   </Group>
                 )),
               )}
             </Row>
           </Section>
 
-          <Section id="width" label="Width" note="375, 402 and 440 points.">
-            <Row>
-              {(["compact", "standard", "large"] as const).map((width) => (
-                <Group key={width} title={`${width[0]!.toUpperCase()}${width.slice(1)}, ${SCREEN_SIZES.ios[width].width}pt`}>
-                  <Specimen settings={{ ...SETTINGS, width }} view={VIEWS[0]!} content={PUSH_LONG} />
-                </Group>
+          {PLATFORMS.flatMap((platform) =>
+            APPEARANCES.map((appearance) => (
+              <Section
+                key={`${platform}-${appearance}`}
+                id={`views-${platform}-${appearance}`}
+                label={`${PLATFORM_NAMES[platform]}, ${appearance}`}
+                note={`At 1:1 on a ${SCREEN_SIZES[platform].standard.width}${SIZE_UNIT[platform]} phone.`}
+              >
+                <Row>
+                  {VIEWS.map((v) => (
+                    <Group key={v.key} title={viewLabel(platform, v)}>
+                      <Specimen settings={settingsFor(platform, { appearance })} view={v} />
+                    </Group>
+                  ))}
+                </Row>
+              </Section>
+            )),
+          )}
+
+          <Section id="truncation" label="Truncation" note="One long notification on each screen, with what onMeasure reports.">
+            <div className="flex flex-col gap-14">
+              {PLATFORMS.map((platform) => (
+                <Row key={platform}>
+                  {[view("lock"), view("hidden"), view("banner"), view("expanded")].map((v) => (
+                    <MeasuredSpecimen key={v.key} platform={platform} view={v} />
+                  ))}
+                </Row>
               ))}
-            </Row>
+            </div>
           </Section>
 
-          <Section id="tight-well" label="Tightest well" note="469 × 581, a 1280 × 800 window. The large width scales down to fit.">
+          <Section id="text-size" label="Text size" note="iPhone: Large, xxxLarge, AX1. Android: 100%, 130%, 200% (non-linear). The clock doesn't scale.">
+            <div className="flex flex-col gap-14">
+              {PLATFORMS.map((platform) => (
+                <Row key={platform}>
+                  {(["default", "large", "ax"] as const).flatMap((textSize) =>
+                    [view("lock"), view("sms")].map((v) => (
+                      <Group key={`${textSize}-${v.key}`} title={`${PLATFORM_NAMES[platform]}, ${viewLabel(platform, v)}, ${textSize === "ax" ? "AX" : textSize}`}>
+                        <Specimen settings={settingsFor(platform, { textSize })} view={v} content={PUSH_LONG} />
+                      </Group>
+                    )),
+                  )}
+                </Row>
+              ))}
+            </div>
+          </Section>
+
+          <Section id="width" label="Width" note="iPhone 375, 402 and 440pt; Android 360, 412 and 448dp.">
+            <div className="flex flex-col gap-14">
+              {PLATFORMS.map((platform) => (
+                <Row key={platform}>
+                  {(["compact", "standard", "large"] as const).map((width) => (
+                    <Group key={width} title={`${PLATFORM_NAMES[platform]}, ${SCREEN_SIZES[platform][width].width}${SIZE_UNIT[platform]}`}>
+                      <Specimen settings={settingsFor(platform, { width })} view={view("lock")} content={PUSH_LONG} />
+                    </Group>
+                  ))}
+                </Row>
+              ))}
+            </div>
+          </Section>
+
+          <Section id="tight-well" label="Tightest well" note="469 × 581, a 1280 × 800 window. A large phone scales down to fit.">
             <Row>
               {[
-                { view: VIEWS[0]!, settings: SETTINGS },
-                { view: VIEWS[2]!, settings: SETTINGS },
-                { view: VIEWS[3]!, settings: SETTINGS },
-                { view: VIEWS[4]!, settings: SETTINGS },
-                { view: VIEWS[0]!, settings: { ...SETTINGS, appearance: "dark" as const } },
-                { view: VIEWS[4]!, settings: { ...SETTINGS, appearance: "dark" as const } },
-                { view: VIEWS[0]!, settings: { ...SETTINGS, width: "large" as const } },
-                { view: VIEWS[0]!, settings: { ...SETTINGS, textSize: "ax" as const } },
-              ].map(({ view, settings }, i) => (
-                <Group key={i} title={`${view.label}, ${settings.appearance}, ${settings.width}${settings.textSize === "ax" ? ", AX" : ""}`}>
-                  <div data-tight-well={i}>
-                    <TightWell view={view} settings={settings} />
+                ...PLATFORMS.flatMap((platform) => [
+                  { platform, v: view("lock"), settings: settingsFor(platform) },
+                  { platform, v: view("hidden"), settings: settingsFor(platform, { previewsHidden: true }) },
+                  { platform, v: view("banner"), settings: settingsFor(platform) },
+                  { platform, v: view("expanded"), settings: settingsFor(platform) },
+                  { platform, v: view("sms"), settings: settingsFor(platform) },
+                  { platform, v: view("lock"), settings: settingsFor(platform, { appearance: "dark" }) },
+                  { platform, v: view("sms"), settings: settingsFor(platform, { appearance: "dark" }) },
+                  { platform, v: view("lock"), settings: settingsFor(platform, { width: "large", textSize: "ax" }) },
+                ]),
+              ].map(({ platform, v, settings }, i) => (
+                <Group
+                  key={i}
+                  title={`${PLATFORM_NAMES[platform]}, ${viewLabel(platform, v)}, ${settings.appearance}${settings.width === "large" ? ", large, AX" : ""}`}
+                >
+                  <div data-tight-well={`${platform}-${v.key}-${settings.appearance}${settings.width === "large" ? "-large-ax" : ""}`}>
+                    <TightWell view={v} settings={settings} />
                   </div>
                 </Group>
               ))}
@@ -166,11 +226,11 @@ export function DeviceGallery() {
   );
 }
 
-/** A view in the 469 × 581 well, under a static controls row. */
-function TightWell({ view, settings }: { view: View; settings: DeviceSettings }) {
+/** A view in the 469 × 581 well, under the controls row (which works). */
+function TightWell({ view: v, settings }: { view: View; settings: DeviceSettings }) {
   const [state, setState] = useState<RailState>({
-    channel: view.screen === "sms" ? "sms" : "push",
-    screen: view.screen === "sms" ? "lock" : view.screen,
+    channel: v.screen === "sms" ? "sms" : "push",
+    screen: v.screen === "sms" ? "lock" : v.screen,
     settings,
   });
   return (
@@ -265,12 +325,13 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** A long notification on one screen, with its measurement under it. */
-function MeasuredSpecimen({ view }: { view: View }) {
+function MeasuredSpecimen({ platform, view: v }: { platform: DevicePlatform; view: View }) {
   const [measure, setMeasure] = useState<PushMeasure | null>(null);
+  const settings = settingsFor(platform);
   return (
-    <Group title={view.label}>
-      <Specimen settings={SETTINGS} view={view} content={PUSH_LONG} onMeasure={setMeasure} height={560} />
-      <div style={{ width: SCREEN_SIZES.ios.standard.width + 20 }}>{measure ? <MeasureTable measure={measure} /> : null}</div>
+    <Group title={`${PLATFORM_NAMES[platform]}, ${viewLabel(platform, v)}`}>
+      <Specimen settings={settings} view={v} content={PUSH_LONG} onMeasure={setMeasure} height={560} />
+      <div style={{ width: frameWidth(SCREEN_SIZES[platform].standard) }}>{measure ? <MeasureTable measure={measure} /> : null}</div>
     </Group>
   );
 }
@@ -279,7 +340,7 @@ const FIELDS = ["title", "subtitle", "body"] as const;
 
 function MeasureTable({ measure }: { measure: PushMeasure }) {
   return (
-    <table data-measure={measure.screen} className="w-full text-left text-[13px] leading-5">
+    <table data-measure={`${measure.platform}-${measure.screen}`} className="w-full text-left text-[13px] leading-5">
       <thead className="text-text-muted">
         <tr>
           <th className="py-1 pr-3 font-normal">Field</th>

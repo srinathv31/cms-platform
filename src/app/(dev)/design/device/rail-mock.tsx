@@ -2,7 +2,15 @@
 
 import { SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
-import type { DeviceSettings, PushScreen } from "@/components/device";
+import {
+  SCREEN_SIZES,
+  SIZE_UNIT,
+  pushScreenLabel,
+  type DevicePlatform,
+  type DeviceSettings,
+  type DeviceWidth,
+  type PushScreen,
+} from "@/components/device";
 import { Segmented } from "@/components/primitives/segmented";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,11 +28,18 @@ export interface RailState {
   settings: DeviceSettings;
 }
 
-const SCREENS: { value: PushScreen; label: string }[] = [
-  { value: "lock", label: "Lock screen" },
-  { value: "banner", label: "Banner" },
-  { value: "expanded", label: "Expanded" },
-];
+const SCREENS: PushScreen[] = ["lock", "banner", "expanded"];
+const WIDTHS: DeviceWidth[] = ["compact", "standard", "large"];
+
+/** The screens in the platform's words: Banner on iPhone, Heads-up on Android. */
+function screenOptions(platform: DevicePlatform) {
+  return SCREENS.map((value) => ({ value, label: pushScreenLabel(platform, value) }));
+}
+
+/** The widths in the platform's own sizes: 375pt · 402pt · 440pt, or 360dp · 412dp · 448dp. */
+function widthOptions(platform: DevicePlatform) {
+  return WIDTHS.map((value) => ({ value, label: `${SCREEN_SIZES[platform][value].width}${SIZE_UNIT[platform]}` }));
+}
 
 /** The rail's controls row: Push · SMS, then iPhone · Android and the Device options. */
 export function ControlsRow({ state, onChange }: { state: RailState; onChange: (next: RailState) => void }) {
@@ -87,7 +102,12 @@ function DeviceOptions({ state, onChange }: { state: RailState; onChange: (next:
         className="w-auto gap-3 rounded-xl border border-hairline bg-popover p-3 shadow-pop ring-0"
       >
         <Row label="Screen" blocked={channel === "sms" ? "Push only" : null}>
-          <Segmented label="Screen" value={screen} options={SCREENS} onChange={(next) => onChange({ ...state, screen: next })} />
+          <Segmented
+            label="Screen"
+            value={screen}
+            options={screenOptions(settings.platform)}
+            onChange={(next) => onChange({ ...state, screen: next })}
+          />
         </Row>
         <Row label="Appearance">
           <Segmented
@@ -127,11 +147,7 @@ function DeviceOptions({ state, onChange }: { state: RailState; onChange: (next:
           <Segmented
             label="Width"
             value={settings.width}
-            options={[
-              { value: "compact", label: "Compact" },
-              { value: "standard", label: "Standard" },
-              { value: "large", label: "Large" },
-            ]}
+            options={widthOptions(settings.platform)}
             onChange={(width) => set({ width })}
           />
         </Row>
