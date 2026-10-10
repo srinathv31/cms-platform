@@ -8,6 +8,7 @@ import { describeChanges } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
 import { REFUSALS, contractBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
@@ -24,6 +25,7 @@ import {
   loadChain,
   loadConsumerUsage,
   loadDecisions,
+  loadMessageRules,
   personOf,
   requireReviewVersion,
   stageApproverIds,
@@ -240,7 +242,7 @@ export const getReviewScreen = cache(
 
     const nowDate = await demoNow();
     const zone = await getBusinessZone();
-    const [others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
+    const [others, chain, people, decisionRows, threads, consumerUsage, messages] = await Promise.all([
       db
         .select({
           id: versions.id,
@@ -262,6 +264,7 @@ export const getReviewScreen = cache(
       // A submitted version is a record: the threads that began after it are not part of it.
       loadThreads(template.id, version.body, { throughVersion: number }),
       loadConsumerUsage(db, template.id, nowDate),
+      loadMessageSetup(template),
     ]);
 
     const submittedBy = version.submittedBy ?? version.createdBy;
@@ -333,6 +336,23 @@ export const getReviewScreen = cache(
       consumerUsage,
       today: utcDay(nowDate),
       sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
+      messageRules: messages.rules,
+      senders: messages.senders,
     };
   },
 );
+
+/**
+ * What the phone preview renders a message version with: its content type's SMS footer and part budget,
+ * and who the team's messages come from (the push's app, the SMS's short code).
+ */
+async function loadMessageSetup(template: { teamId: string; contentTypeId: string }): Promise<{
+  rules: MessageTypeRules;
+  senders: TeamSenders;
+}> {
+  const [rules, team] = await Promise.all([
+    loadMessageRules(db, template.contentTypeId),
+    db.query.teams.findFirst({ where: eq(teams.id, template.teamId), columns: { appName: true, smsSender: true } }),
+  ]);
+  return { rules, senders: { appName: team?.appName ?? null, smsSender: team?.smsSender ?? null } };
+}

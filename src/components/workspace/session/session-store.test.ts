@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkspaceSession, INITIAL_PREVIEW } from "./session-store";
+import { createWorkspaceSession, INITIAL_PHONE, INITIAL_PREVIEW } from "./session-store";
 
 describe("workspace session", () => {
   it("holds changes made before the autosave host connects, then hands them over merged", () => {
@@ -154,7 +154,7 @@ describe("workspace session", () => {
     });
   });
   describe("preview", () => {
-    it("starts closed on the Preview view, PDF, the Typical set and the desktop width", () => {
+    it("starts closed on the Preview view, PDF, the Typical set, the desktop width and a standard iPhone's lock screen", () => {
       const session = createWorkspaceSession();
       expect(session.getPreview()).toEqual({
         open: false,
@@ -162,6 +162,8 @@ describe("workspace session", () => {
         channel: "pdf",
         setId: "typical",
         device: "desktop",
+        phone: { platform: "ios", appearance: "light", previewsHidden: false, textSize: "default", width: "standard" },
+        pushScreen: "lock",
       });
       expect(session.getPreview()).toBe(INITIAL_PREVIEW);
     });
@@ -180,6 +182,7 @@ describe("workspace session", () => {
       const session = createWorkspaceSession();
       session.openPreview();
       session.setPreview({ channel: "email", setId: "long", device: "mobile" });
+      session.setPreview({ phone: { ...INITIAL_PHONE, platform: "android", appearance: "dark" }, pushScreen: "expanded" });
       session.closePreview();
       session.openPreview();
       expect(session.getPreview()).toEqual({
@@ -188,7 +191,22 @@ describe("workspace session", () => {
         channel: "email",
         setId: "long",
         device: "mobile",
+        phone: { ...INITIAL_PHONE, platform: "android", appearance: "dark" },
+        pushScreen: "expanded",
       });
+    });
+
+    it("treats the same phone settings as no change, though they are a new object", () => {
+      const session = createWorkspaceSession();
+      const listener = vi.fn();
+      session.subscribe(listener);
+      const before = session.getPreview();
+      session.setPreview({ phone: { ...INITIAL_PHONE } });
+      expect(session.getPreview()).toBe(before);
+      expect(listener).not.toHaveBeenCalled();
+      session.setPreview({ phone: { ...INITIAL_PHONE, textSize: "ax" } });
+      expect(session.getPreview().phone.textSize).toBe("ax");
+      expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it("hands out a new snapshot only when something changed, and tells subscribers once", () => {

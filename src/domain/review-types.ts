@@ -16,6 +16,7 @@ import type {
   VersionState,
 } from "./types";
 import type { ChannelFields } from "./channel-fields";
+import type { MessageTypeRules, TeamSenders } from "./platform-config";
 import type { Refused } from "./refusals";
 
 // ── People ───────────────────────────────────────────────────────────────────
@@ -356,6 +357,10 @@ export interface ReviewScreenData {
   today: string;
   /** The approve dialog's sunset picker. */
   sunsetCalendar: SunsetCalendar;
+  /** The content type's SMS footer and part budget: what the phone preview renders a message version with. */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from on the phone preview. */
+  senders: TeamSenders;
 }
 
 export interface VersionTimelineItem {

@@ -1,7 +1,9 @@
 "use client";
 
-// Keeps the preview's output current. One request in flight at a time: a newer one aborts the older
-// (AbortController), and the last good output of each channel stays on screen until the next arrives.
+// Keeps the preview's output current for the document channels (PDF, Web, Email), which come from the
+// render route. One request in flight at a time: a newer one aborts the older (AbortController), and
+// the last good output of each channel stays on screen until the next arrives. Push and SMS never come
+// through here: they render in the browser (message-preview.ts), and their `channel` is null.
 //
 // What re-renders it, while `enabled`:
 //   - it turns on (the preview opens, or the rail comes back to its Preview view),
@@ -22,7 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { assertNever } from "@/domain/assert-never";
 import type { RenderError } from "@/domain/render/types";
 import { validateValues } from "@/domain/render/validate";
-import type { Channel, Variable, VariableValues } from "@/domain/types";
+import type { DocumentChannel, Variable, VariableValues } from "@/domain/types";
 import type { WorkspaceSession } from "@/components/workspace/session/session-store";
 import { renderPreview, type PreviewOutput } from "./render-preview";
 
@@ -39,7 +41,11 @@ export interface PreviewSlot {
 export interface UsePreviewRenderOptions {
   templateId: string;
   version: "draft" | number;
-  channel: Channel;
+  /**
+   * The document channel on screen, or null when it is a message channel: Push and SMS render in the
+   * browser (message-preview.ts), so nothing is asked of the route for them.
+   */
+  channel: DocumentChannel | null;
   values: VariableValues;
   /**
    * The version's variables as the editor has them now (live, ahead of the save). The values are
@@ -55,7 +61,7 @@ export interface UsePreviewRenderOptions {
 
 export interface UsePreviewRender {
   /** The latest state per channel. */
-  slots: Readonly<Partial<Record<Channel, PreviewSlot>>>;
+  slots: Readonly<Partial<Record<DocumentChannel, PreviewSlot>>>;
   /** A render is on its way (the output on screen is about to change). */
   rendering: boolean;
   /** Renders again now. */
@@ -72,7 +78,7 @@ export function usePreviewRender({
   saveTick,
   session,
 }: UsePreviewRenderOptions): UsePreviewRender {
-  const [slots, setSlots] = useState<Partial<Record<Channel, PreviewSlot>>>({});
+  const [slots, setSlots] = useState<Partial<Record<DocumentChannel, PreviewSlot>>>({});
   const [pending, setPending] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -84,10 +90,11 @@ export function usePreviewRender({
   const last = useRef<{ key: string; rest: string } | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || channel === null) {
       last.current = null;
       return;
     }
+    const target: DocumentChannel = channel;
 
     // Is it only the values that changed since the last render? Those wait a moment for more typing.
     const rest = JSON.stringify([templateId, version, channel, saveTick, attempt]);
@@ -103,7 +110,7 @@ export function usePreviewRender({
       // The route would refuse these values: say so here, in its words, and send nothing.
       const checked = validateValues(JSON.parse(variablesKey) as Variable[], sending);
       if (!checked.ok) {
-        setSlots((all) => ({ ...all, [channel]: { output: all[channel]?.output ?? null, error: checked.error } }));
+        setSlots((all) => ({ ...all, [target]: { output: all[target]?.output ?? null, error: checked.error } }));
         setPending(false);
         return;
       }
@@ -115,16 +122,16 @@ export function usePreviewRender({
         await session.flush();
         if (signal.aborted) return;
 
-        const result = await renderPreview({ templateId, version, channel, values: sending, signal });
+        const result = await renderPreview({ templateId, version, channel: target, values: sending, signal });
 
         if (result.kind === "error") {
-          setSlots((all) => ({ ...all, [channel]: { output: all[channel]?.output ?? null, error: result.error } }));
+          setSlots((all) => ({ ...all, [target]: { output: all[target]?.output ?? null, error: result.error } }));
         } else {
           setSlots((all) => {
-            const before = all[channel];
+            const before = all[target];
             // The same output again keeps the object, so nothing downstream reloads for nothing.
             const output = before?.output && sameOutput(before.output, result) ? before.output : result;
-            return { ...all, [channel]: { output, error: null } };
+            return { ...all, [target]: { output, error: null } };
           });
         }
         setPending(false);
@@ -143,7 +150,7 @@ export function usePreviewRender({
   }, [enabled, templateId, version, channel, valuesKey, variablesKey, saveTick, attempt, session]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { slots, rendering: enabled && pending, retry };
+  return { slots, rendering: enabled && channel !== null && pending, retry };
 }
 
 /** Two renders of the same thing: equal text, or equal bytes. */
@@ -160,9 +167,6 @@ export function sameOutput(a: PreviewOutput, b: PreviewOutput): boolean {
       const other = b as typeof a;
       return a.subject === other.subject && a.preheader === other.preheader && a.html === other.html;
     }
-    case "push":
-    case "sms":
-      return JSON.stringify(a) === JSON.stringify(b);
     default:
       return assertNever(a, "preview output");
   }

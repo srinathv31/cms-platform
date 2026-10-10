@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RenderError } from "@/domain/render/types";
 import { validateValues } from "@/domain/render/validate";
-import type { Channel, Variable } from "@/domain/types";
+import type { DocumentChannel, Variable } from "@/domain/types";
 import { renderPreview, type PreviewOutput, type RenderPreviewResult } from "./render-preview";
 import { sameOutput, usePreviewRender, VALUES_DEBOUNCE_MS, type UsePreviewRender, type UsePreviewRenderOptions } from "./use-preview-render";
 
@@ -148,7 +148,7 @@ describe("usePreviewRender", () => {
   it("does not wait when the channel changes", async () => {
     await mount(base);
     await settle();
-    await mount({ ...base, channel: "email" as Channel });
+    await mount({ ...base, channel: "email" as DocumentChannel });
     await settle();
     expect(render).toHaveBeenCalledTimes(2);
     expect(render.mock.calls[1]![0].channel).toBe("email");

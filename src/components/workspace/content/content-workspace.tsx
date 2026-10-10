@@ -7,19 +7,23 @@ import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-l
 import { openCount } from "@/components/comments/thread-state";
 import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
+import { phoneSenders } from "@/components/preview/preview-sender";
 import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type ChannelFields } from "@/domain/channel-fields";
 import type { ImportOriginalRef } from "@/domain/import-types";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import type { Person, ThreadView } from "@/domain/review-types";
-import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
+import type { Channel, ChannelFamily, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";
+import { createLiveDraft } from "../session/live-draft";
 import { useInert, usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
 import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
 import { EmailDetails } from "./email-details";
+import { MessageComposer } from "./message-composer";
 import { Rail } from "./rail";
 
 /** The fields this page shows, which a revert can put back: every channel field among them, by id. */
@@ -43,8 +47,14 @@ export interface ContentWorkspaceProps {
   requiredSections: RequiredSection[];
   channels: Channel[];
   allowedChannels: Channel[];
+  /** A document (the editor) or a message (the composer): the content type's family, for the template's whole life. */
+  family: ChannelFamily;
   /** Each channel's own fields, as the version stores them (src/domain/channel-fields.ts). */
   channelFields: ChannelFields;
+  /** The content type's SMS footer and part budget (a message's composer and preview). */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from on the phone preview. */
+  senders: TeamSenders;
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD. */
   today: string;
@@ -71,6 +81,11 @@ export interface ContentWorkspaceProps {
  * renders with the live variable list. The server component that renders this passes a key made of the version
  * and whether it is editable, so a different version, or the same one turning read-only (submitted),
  * is a fresh editor.
+ *
+ * A message template (an Alert, `family` "message") has no document: the first cell is the message
+ * composer instead (message-composer.tsx), its fields in the same root. The fields as typed and the
+ * sample sets live in a live draft (session/live-draft.ts) the composer writes and the preview reads,
+ * so Push and SMS render in the browser on every keystroke (decision 0035).
  *
  * Review comments (src/components/comments) live here too: the document gets highlights and markers
  * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
@@ -101,7 +116,10 @@ export function ContentWorkspace({
   requiredSections,
   channels: initialChannels,
   allowedChannels,
+  family,
   channelFields,
+  messageRules,
+  senders,
   sampleSets,
   today,
   editable,
@@ -146,6 +164,18 @@ export function ContentWorkspace({
     sampleSets,
   }));
   const [shown, setShown] = useState(() => ({ gen: 0, ...opening }));
+
+  // The draft as typed, ahead of autosave: what the phone preview and the composer's measurements read.
+  // A new one when a revert remounts the fields with other values.
+  const liveDraft = useMemo(
+    () =>
+      createLiveDraft({
+        fields: Object.fromEntries(CHANNEL_FIELD_IDS.map((id) => [id, shown[id]])) as ChannelFieldValues,
+        sampleSets: shown.sampleSets,
+      }),
+    [shown],
+  );
+  const message = family === "message";
 
   // A revert is pressed from a button, so it must not scroll the page. The old editor leaving shortens
   // the page for a moment, and the browser clamps the canvas's scroll: put it back as the new one lands.
@@ -287,28 +317,44 @@ export function ContentWorkspace({
     >
       {editable ? <HistoryBridge onChange={session.setHistory} /> : null}
       <div data-slot="editor" className={cn(WS.doc, "relative")}>
-        <DocumentBody
-          content={shown.body}
-          onChange={editable ? onBodyChange : undefined}
-          editorRef={setEditor}
-          comments={{
-            threads: review.threadsForEditor,
-            activeThreadId: review.editorActiveThreadId,
-            onThreadClick,
-            onCaretThreadChange,
-            onRequestComment: canComment ? requestComment : undefined,
-          }}
-        />
-        <GutterMarkers
-          editor={editorHandle}
-          threads={review.threads}
-          activeThreadId={activeThreadId}
-          onActivate={showThread}
-          onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
-          compact={previewOpen}
-          // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
-          className="hidden @min-[53rem]/ws:block"
-        />
+        {message ? (
+          // A message has no document: its channels' own fields, in the same root.
+          <MessageComposer
+            channels={channels}
+            editable={editable}
+            values={shown}
+            draft={liveDraft}
+            today={today}
+            rules={messageRules}
+            appName={phoneSenders(senders, teamName).appName}
+            editorRef={setEditor}
+          />
+        ) : (
+          <>
+            <DocumentBody
+              content={shown.body}
+              onChange={editable ? onBodyChange : undefined}
+              editorRef={setEditor}
+              comments={{
+                threads: review.threadsForEditor,
+                activeThreadId: review.editorActiveThreadId,
+                onThreadClick,
+                onCaretThreadChange,
+                onRequestComment: canComment ? requestComment : undefined,
+              }}
+            />
+            <GutterMarkers
+              editor={editorHandle}
+              threads={review.threads}
+              activeThreadId={activeThreadId}
+              onActivate={showThread}
+              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+              compact={previewOpen}
+              // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
+              className="hidden @min-[53rem]/ws:block"
+            />
+          </>
+        )}
       </div>
       <Rail
         comments={
@@ -359,7 +405,9 @@ export function ContentWorkspace({
             teamName={teamName}
             channels={channels}
             editable={editing}
-            sampleSets={shown.sampleSets}
+            draft={liveDraft}
+            messageRules={messageRules}
+            senders={senders}
             today={today}
             commentsCount={hasComments ? open : null}
             original={importOriginal}

@@ -7,7 +7,7 @@ import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
 import { diffDocuments, nameChange } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
-import type { Channel, VersionState } from "@/domain/types";
+import { familyOf, type Channel, type VersionState } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { ApproveDialog, type Approved } from "./approve-dialog";
 import { BlockCommentMenu } from "./block-comment-menu";
@@ -71,9 +71,11 @@ export function ReviewWorkspace({
 
   // ── Views ───────────────────────────────────────────────────────
 
-  const [view, setView] = useState<ReviewView>("document");
+  // A message (an Alert) has no document: what the approver decides on is the phone, so the screen opens on it.
+  const opensOnPreview = familyOf(version.channels) === "message";
+  const [view, setView] = useState<ReviewView>(opensOnPreview ? "preview" : "document");
   // The output is built the first time it is looked at, then kept (its last render stays up).
-  const [previewVisited, setPreviewVisited] = useState(false);
+  const [previewVisited, setPreviewVisited] = useState(opensOnPreview);
   const [showChanges, setShowChanges] = useState(false);
   const [changesOnly, setChangesOnly] = useState(false);
 
@@ -345,6 +347,10 @@ export function ReviewWorkspace({
             teamName={template.teamName}
             channels={channels}
             variables={version.variables}
+            channelFields={version.channelFields}
+            messageRules={data.messageRules}
+            senders={data.senders}
+            today={today}
             values={values}
             setId={selectedSet.id}
             enabled={view === "preview"}

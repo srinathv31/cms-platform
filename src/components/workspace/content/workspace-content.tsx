@@ -36,7 +36,10 @@ export async function WorkspaceContent({
       requiredSections={doc.requiredSections}
       channels={doc.channels}
       allowedChannels={doc.allowedChannels}
+      family={doc.family}
       channelFields={doc.channelFields}
+      messageRules={doc.messageRules}
+      senders={doc.senders}
       sampleSets={doc.sampleSets}
       today={doc.today}
       editable={doc.editable}

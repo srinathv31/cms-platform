@@ -2,28 +2,23 @@
 // the same route (and so the same output) the review screen and the consumer simulator get. The
 // contract is src/domain/render/types.ts.
 //
+// Only the document channels (PDF, Web, Email) come from the route. Push and SMS are plain text, so
+// the preview renders them in the browser with the route's own function (message-preview.ts,
+// decision 0035): no request.
+//
 // `renderPreview` resolves with something the UI can show in every case: the output, or `{ error }`
 // carrying the route's own message. It rejects only when `signal` aborts (a newer request replaced
 // this one), with the AbortError fetch throws, so a caller can drop the result without a branch.
 
 import { assertNever } from "@/domain/assert-never";
-import type { PushPlatform } from "@/domain/messages/push";
-import type {
-  EmailResponseBody,
-  PushRender,
-  PushResponseBody,
-  RenderError,
-  RenderErrorBody,
-  SmsRender,
-  SmsResponseBody,
-} from "@/domain/render/types";
-import type { Channel, VariableValues } from "@/domain/types";
+import type { EmailResponseBody, RenderError, RenderErrorBody } from "@/domain/render/types";
+import type { DocumentChannel, VariableValues } from "@/domain/types";
 
 export interface RenderPreviewRequest {
   templateId: string;
   /** The open draft, or a version number. */
   version: "draft" | number;
-  channel: Channel;
+  channel: DocumentChannel;
   values: VariableValues;
   signal?: AbortSignal;
 }
@@ -32,10 +27,7 @@ export type PreviewOutput =
   /** The exact bytes, and the file name the route gave them (Content-Disposition), for Download PDF. */
   | { kind: "pdf"; bytes: Uint8Array; filename: string }
   | { kind: "web"; html: string }
-  | { kind: "email"; subject: string; preheader: string; html: string; text: string }
-  /** The push for each platform (two requests: Android's never has the subtitle). */
-  | { kind: "push"; ios: PushRender; android: PushRender }
-  | { kind: "sms"; sms: SmsRender };
+  | { kind: "email"; subject: string; preheader: string; html: string; text: string };
 
 export type RenderPreviewResult = PreviewOutput | { kind: "error"; error: RenderError };
 
@@ -50,32 +42,13 @@ const UNREADABLE: RenderError = {
   message: "The preview couldn't be rendered. Try again.",
 };
 
-export async function renderPreview(request: RenderPreviewRequest): Promise<RenderPreviewResult> {
-  // Temporary, until the message composer renders push and SMS in the browser (Phase 2b): a push
-  // asks the route once per platform, and the first refusal is the answer.
-  if (request.channel === "push") {
-    const [ios, android] = await Promise.all([callRoute(request, "ios"), callRoute(request, "android")]);
-    if (ios.kind === "error") return ios;
-    if (android.kind === "error") return android;
-    if (ios.kind !== "push-platform" || android.kind !== "push-platform") return { kind: "error", error: UNREADABLE };
-    return { kind: "push", ios: ios.push, android: android.push };
-  }
-  const result = await callRoute(request);
-  return result.kind === "push-platform" ? { kind: "error", error: UNREADABLE } : result;
-}
-
-type RouteResult = RenderPreviewResult | { kind: "push-platform"; push: PushRender };
-
-async function callRoute(
-  { templateId, version, channel, values, signal }: RenderPreviewRequest,
-  platform?: PushPlatform,
-): Promise<RouteResult> {
+export async function renderPreview({ templateId, version, channel, values, signal }: RenderPreviewRequest): Promise<RenderPreviewResult> {
   let response: Response;
   try {
     response = await fetch(`/api/v1/templates/${encodeURIComponent(templateId)}/render`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, channel, ...(platform ? { platform } : {}), values, preview: true }),
+      body: JSON.stringify({ version, channel, values, preview: true }),
       signal,
     });
   } catch (error) {
@@ -96,15 +69,6 @@ async function callRoute(
       case "email": {
         const body = (await response.json()) as EmailResponseBody;
         return { kind: "email", subject: body.subject, preheader: body.preheader, html: body.html, text: body.text };
-      }
-      case "push": {
-        const body = (await response.json()) as PushResponseBody;
-        const push: PushRender = { title: body.title, body: body.body, payloadBytes: body.payloadBytes };
-        return { kind: "push-platform", push: body.subtitle === undefined ? push : { ...push, subtitle: body.subtitle } };
-      }
-      case "sms": {
-        const body = (await response.json()) as SmsResponseBody;
-        return { kind: "sms", sms: { text: body.text, encoding: body.encoding, parts: body.parts, characters: body.characters } };
       }
       default:
         return assertNever(channel, "channel");

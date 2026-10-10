@@ -10,8 +10,9 @@
 //   - the document editor's handle, so the name field can move the caret into the document.
 //   - whether the rail overlay is open (narrow canvas).
 //   - which tab the rail shows when it has comments (Comments | Variables), until the author picks one.
-//   - the preview's state (open, which view the widened rail shows, channel, sample set, device), so the
-//     tab bar's Preview button and the rail agree.
+//   - the preview's state (open, which view the widened rail shows, channel, sample set, Web's device,
+//     and the phone Push and SMS show on, with Push's screen), so the tab bar's Preview button and the
+//     rail agree, and the author's choices last while the workspace is open.
 //   - a save "tick" that counts the saves that have landed, so an open preview knows when to re-render.
 //   - undo and redo for the header's buttons, from the Content page's editor root while it is on screen.
 //   - what changed since the page opened (the latest value of every field saved), and the parts of
@@ -33,6 +34,7 @@
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
 
+import type { DeviceSettings, PushScreen } from "@/components/device";
 import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
 import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
@@ -66,7 +68,8 @@ export type PreviewDevice = "desktop" | "mobile";
  * The preview, as the tab bar and the rail share it. `channel` is the one the author last picked; the
  * preview shows it only while that channel is on for the version, otherwise the first one that is.
  * `setId` is the selected sample set ("typical" until another is picked; a set that no longer exists
- * falls back to "typical" in the preview).
+ * falls back to "typical" in the preview). `device` is Web's width; `phone` is the phone Push and SMS
+ * show on (iPhone or Android, and the Device options), and `pushScreen` the screen a push shows on.
  */
 export interface PreviewState {
   open: boolean;
@@ -74,7 +77,18 @@ export interface PreviewState {
   channel: Channel;
   setId: string;
   device: PreviewDevice;
+  phone: DeviceSettings;
+  pushScreen: PushScreen;
 }
+
+/** The phone the message previews start on: an iPhone in light mode, at the standard width and text size. */
+export const INITIAL_PHONE: DeviceSettings = {
+  platform: "ios",
+  appearance: "light",
+  previewsHidden: false,
+  textSize: "default",
+  width: "standard",
+};
 
 /** Undo and redo for the header's buttons: the Content page's editor root, while it is on screen. */
 export interface HistoryControls {
@@ -104,6 +118,8 @@ export const INITIAL_PREVIEW: PreviewState = {
   channel: "pdf",
   setId: "typical",
   device: "desktop",
+  phone: INITIAL_PHONE,
+  pushScreen: "lock",
 };
 
 export interface WorkspaceSession {
@@ -243,6 +259,14 @@ export interface WorkspaceSession {
 
 const SAVED: SessionStatus = { status: "saved" };
 
+/** One preview field unchanged: equal, or (the phone's settings) equal field by field. */
+function samePreviewValue(a: PreviewState[keyof PreviewState], b: PreviewState[keyof PreviewState]): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const keys = Object.keys(a) as (keyof typeof a)[];
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+}
+
 export function createWorkspaceSession(): WorkspaceSession {
   let binding: DraftBinding | null = null;
   let status: SessionStatus = SAVED;
@@ -274,7 +298,7 @@ export function createWorkspaceSession(): WorkspaceSession {
   };
   const setPreview = (patch: Partial<PreviewState>) => {
     const next = { ...preview, ...patch };
-    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => next[key] === preview[key])) return;
+    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => samePreviewValue(next[key], preview[key]))) return;
     preview = next;
     emit();
   };

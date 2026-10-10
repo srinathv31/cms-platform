@@ -155,8 +155,11 @@ The platform ([seed/platform.ts](seed/platform.ts)) has two content types, each 
 (documents: PDF, Web and Email, three required sections) and Alert (messages: Push and SMS, no sections, the SMS
 footer "Coral Offers: Reply STOP to opt out, HELP for help." and a 3-part budget). Coral Offers sends its messages as
 the app "Coral" and from the short code 26725 ([seed/teams.ts](seed/teams.ts)). The submit action reads the content
-type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)), and the
-workspace's read model carries them and the team's senders (`messageRules`, `senders`) for the message preview.
+type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)). The
+workspace's and the review screen's read models carry them and the team's senders (`messageRules`, `senders`) for
+the message composer and the phone preview, which render in the browser
+([decision 0035](../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)); the workspace's also says
+which family the template is (`family`), which picks the editor or the composer.
 
 **The `sim` schema** belongs to the simulator ("Coral — simulated"). In this layer only `seed/**` and `reset.ts` may import it (lint). `src/simulator/**` and `src/app/(simulator)/**` may import it and nothing else from `@/server`.
 

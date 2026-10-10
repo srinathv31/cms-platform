@@ -10,7 +10,17 @@ import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
-import type { Channel, JSONContent, PermissionResult, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
+import {
+  familyOf,
+  type Channel,
+  type ChannelFamily,
+  type JSONContent,
+  type PermissionResult,
+  type RequiredSection,
+  type SampleSet,
+  type Variable,
+  type VersionState,
+} from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
@@ -151,6 +161,11 @@ export interface WorkspaceDocumentData {
   /** The channels the content type allows: what the Channels selector offers. */
   allowedChannels: Channel[];
   /**
+   * The template's family, fixed by its content type: a document (the Content tab is the editor) or a
+   * message (the Content tab is the message composer). Decision 0033.
+   */
+  family: ChannelFamily;
+  /**
    * The content type's SMS footer and part budget: what the message preview renders an SMS with
    * (`renderMessage`'s `rules.smsFooter`) and the parts submit allows with the long sample values.
    */
@@ -236,6 +251,7 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
+      family: familyOf(tpl.allowedChannels) ?? familyOf(shown.channels) ?? "document",
       messageRules: { smsFooter: tpl.smsFooter, smsMaxParts: tpl.smsMaxParts },
       senders: { appName: tpl.appName, smsSender: tpl.smsSender },
       channelFields: shown.channelFields,

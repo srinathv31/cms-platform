@@ -1,5 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { PushContent, SmsContent } from "@/components/device";
+import { INITIAL_PHONE } from "@/components/workspace/session/session-store";
+import type { MessageOutput } from "./message-preview";
 import type { PreviewOutput } from "./render-preview";
 import type { PreviewPaneProps } from "./preview-pane";
 import { PreviewPane } from "./preview-pane";
@@ -7,11 +10,28 @@ import { PreviewPane } from "./preview-pane";
 // The PDF viewer loads pdf.js; what it draws isn't under test here.
 vi.mock("./pdf/pdf-viewer", () => ({ PdfViewer: () => <div role="region" aria-label="PDF preview" /> }));
 
+// The phone kit loads its fonts through next/font; the pane's part is what it hands the kit.
+vi.mock("@/components/device", async () => {
+  const kit = await vi.importActual<typeof import("@/components/device/labels")>("@/components/device/labels");
+  return {
+    pushScreenLabel: kit.pushScreenLabel,
+    SCREEN_SIZES: { ios: { compact: { width: 375 }, standard: { width: 402 }, large: { width: 440 } }, android: { compact: { width: 360 }, standard: { width: 412 }, large: { width: 448 } } },
+    SIZE_UNIT: { ios: "pt", android: "dp" },
+    PushPreview: ({ content, screen }: { content: PushContent; screen: string }) => (
+      <figure data-phone="push" data-screen={screen}>
+        {[content.appName, content.appMark.monogram, content.title, content.subtitle, content.body, content.time].join("|")}
+      </figure>
+    ),
+    SmsPreview: ({ content }: { content: SmsContent }) => <figure data-phone="sms">{`${content.sender}|${content.text}`}</figure>,
+  };
+});
+
 const noop = () => {};
 /** The attribute, not the `disabled:` utility classes. */
 const DISABLED = /\sdisabled(=""|\s|>)/;
 
 const PDF: PreviewOutput = { kind: "pdf", bytes: new Uint8Array([1]), filename: "UC-4F7K2Q-draft.pdf" };
+const SMS: MessageOutput = { kind: "sms", text: "Hi Maya.\nReply STOP to opt out.", refusal: null };
 const VARIABLES = [
   { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
   { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
@@ -32,6 +52,11 @@ function show(props: Partial<PreviewPaneProps>) {
       onRetry={noop}
       sender={{ name: "Coral Offers", address: "no-reply@coraloffers.example" }}
       recipient={null}
+      phone={{ settings: INITIAL_PHONE, screen: "lock" }}
+      onPhone={noop}
+      message={null}
+      senders={{ appName: "Coral", smsSender: "26725" }}
+      clock={{ time: "9:41", date: "Friday, October 9" }}
       {...props}
     />,
   );
@@ -80,5 +105,48 @@ describe("PreviewPane", () => {
     const email = show({ channel: "email" });
     expect(email).not.toContain('aria-label="Device"');
     expect(email).not.toContain('aria-label="Download PDF"');
+    for (const channel of ["push", "sms"] as const) {
+      const html = show({ channels: ["push", "sms"], channel, message: { ok: true, output: SMS } });
+      expect(html, channel).toContain('aria-label="Phone"');
+      expect(html, channel).toContain('aria-label="Device options"');
+      expect(html, channel).not.toContain('aria-label="Download PDF"');
+    }
+  });
+});
+
+describe("PreviewPane: Push and SMS", () => {
+  const PUSH: MessageOutput = {
+    kind: "push",
+    platform: "ios",
+    push: { title: "Payment due", subtitle: "Coral Card", body: "Hi Maya, $35 is due." },
+    refusal: null,
+  };
+
+  it("draws the push on the phone, from the app the team sends as, on the screen chosen", () => {
+    const html = show({ channels: ["push", "sms"], channel: "push", message: { ok: true, output: PUSH } });
+    expect(html).toContain('data-phone="push"');
+    expect(html).toContain('data-screen="lock"');
+    expect(html).toContain("Coral|C|Payment due|Coral Card|Hi Maya, $35 is due.|now");
+  });
+
+  it("draws the SMS in the messages app, from the team's short code", () => {
+    const html = show({ channels: ["push", "sms"], channel: "sms", message: { ok: true, output: SMS } });
+    expect(html).toContain('data-phone="sms"');
+    expect(html).toContain("26725|Hi Maya.\nReply STOP to opt out.");
+  });
+
+  it("still draws a message the route would refuse, with the route's sentence over it", () => {
+    const refusal = { code: "sms_too_long", message: "The SMS is 11 parts in GSM-7. It can be at most 10 parts." } as const;
+    const html = show({ channels: ["push", "sms"], channel: "sms", message: { ok: true, output: { ...SMS, refusal } } });
+    expect(html).toContain('data-phone="sms"');
+    expect(html).toContain("The SMS is 11 parts in GSM-7. It can be at most 10 parts.");
+  });
+
+  it("shows values that don't render as any channel does, in the author's words, with no phone", () => {
+    const error = { code: "missing_variables", message: "Missing required variables: first_name.", details: { missing: ["first_name"], invalid: [] } } as const;
+    const html = show({ channels: ["push", "sms"], channel: "push", message: { ok: false, error } });
+    expect(html).toContain("First name needs a value.");
+    expect(html).toContain("Edit values");
+    expect(html).not.toContain("data-phone");
   });
 });
