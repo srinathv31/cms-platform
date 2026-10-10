@@ -110,8 +110,11 @@ const sampleSets = z
   .max(MAX_SAMPLE_SETS)
   .refine((list) => new Set(list.map((s) => s.id)).size === list.length, { message: "has a repeated id" });
 
+// At least one: the channel chips never turn off the last one, and a version with none would render
+// nothing and skip every channel's rules at submit.
 const channels = z
   .array(z.enum(CHANNELS))
+  .min(1, { message: "must have at least one channel" })
   .max(CHANNELS.length)
   .refine((list) => new Set(list).size === list.length, { message: "has a repeated channel" });
 

@@ -30,6 +30,7 @@
 // (`version.name`): that is what its notifications call it.
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
+import { withoutInvisible } from "@/editor/model/links";
 import { usageFromJSON } from "@/editor/model/usage";
 import {
   approvedThisRound,
@@ -73,6 +74,7 @@ import {
 } from "./review-types";
 import {
   TEMPLATE_KIND_LABELS,
+  contentTypeFamily,
   familyOf,
   type Channel,
   type ChannelFamily,
@@ -114,12 +116,23 @@ export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel
  * the first channel it allows. A content type is one family, so these never mix.
  */
 export function newTemplateChannels(wanted: readonly Channel[] | undefined, allowed: readonly Channel[]): Channel[] {
-  const family = familyOf(allowed) ?? "document";
+  const family = contentTypeFamily(allowed);
   const fits = (channels: readonly Channel[]) => channels.filter((c) => allowed.includes(c));
   const fromStarter = fits(wanted ?? []);
   if (fromStarter.length > 0) return fromStarter;
   const defaults = fits(DEFAULT_CHANNELS[family]);
   return defaults.length > 0 ? defaults : allowed.slice(0, 1);
+}
+
+/**
+ * Why a draft can't be saved with these channels, or null: at least one is on (the channel chips never turn
+ * off the last one, so only a crafted save sends none), and every one is a channel its content type allows,
+ * which keeps a template in its content type's family.
+ */
+export function draftChannelsRefusal(channels: readonly Channel[], allowed: readonly Channel[]): Refusal | null {
+  if (channels.length === 0) return REFUSALS.noChannels;
+  if (!channels.every((channel) => allowed.includes(channel))) return REFUSALS.channelNotAllowed;
+  return null;
 }
 
 // ── Shapes ────────────────────────────────────────────────────
@@ -447,10 +460,25 @@ export interface SubmitChanges {
   currentStage: 0;
   /** How the variable list differs from the baseline's (`contractBaseline`); null when there is no baseline. */
   contractChanges: ContractChange[] | null;
+  /**
+   * The content type's SMS footer as it stands now, frozen into the version with the rest of what was
+   * submitted (`versions.sms_footer`): every render of this version prints it, whatever the content type's
+   * footer becomes later. Null when the content type has none (a document's never does).
+   */
+  smsFooter: string | null;
 }
 
 /** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
 export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
+
+/**
+ * The SMS footer a version prints (decision 0034): a draft's is its content type's as it stands, since it
+ * isn't submitted yet; every submitted version's is the one frozen into it at submit (`SubmitChanges.smsFooter`),
+ * so a later change to the content type's footer never reaches a version that was already reviewed.
+ */
+export function smsFooterOf(version: { state: VersionState; smsFooter: string | null }, contentTypeFooter: string | null): string | null {
+  return version.state === "draft" ? contentTypeFooter : version.smsFooter;
+}
 
 export interface SubmitInput {
   draft: SubmitDraft;
@@ -482,13 +510,16 @@ export interface SubmitInput {
 
 /**
  * Draft → In review, as the template's next version: a version number, the contract changes, the note,
- * the stages it will go through (the chain as it is now), an audit event, and a `review_requested`
- * notification to the first stage's approvers (never anyone who wrote it, the submitter included).
+ * the stages it will go through (the chain as it is now), the content type's SMS footer (frozen with it),
+ * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone who
+ * wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
  *   - the draft changed after the submitter's summary was read (`seenRev`): a save that landed
  *     meanwhile, from this page or another, would otherwise be frozen without being shown;
+ *   - no channel is on (only a crafted save can store that: it would render nothing and skip every
+ *     channel's rules);
  *   - a chip names a key the variable list doesn't have: in the document, and in the fields of the
  *     channels that are on (channel-fields.ts; a field isn't part of the output while its channel is off);
  *   - a required field of a channel that is on is blank (Email's subject): the first such field;
@@ -506,6 +537,7 @@ export function submit(input: SubmitInput): SubmitResult {
   if (draft.state === "in_review") return refuse(REFUSALS.alreadyInReview);
   if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
   if (draft.rev !== input.seenRev) return refuse(REFUSALS.summaryStale);
+  if (draft.channels.length === 0) return refuse(REFUSALS.noChannels);
 
   const fields = fieldsOfChannels(draft.channels);
 
@@ -539,6 +571,7 @@ export function submit(input: SubmitInput): SubmitResult {
       stages,
       currentStage: 0,
       contractChanges,
+      smsFooter: input.messageRules.smsFooter,
     },
     effects: [
       {
@@ -574,8 +607,9 @@ export function submit(input: SubmitInput): SubmitResult {
  *   3. Public shorteners: no link the author typed in a push body or SMS (`refusesShorteners`) is on a
  *      public URL shortener.
  *   4. Push size: with the long sample values, the push is at most PUSH_MAX_BYTES on each platform.
- * The long values are the draft's "long" sample set (its defaults when the draft has none); when they
- * aren't valid values, 2 and 4 have nothing to measure and pass, and the preview shows why.
+ * The long values are the draft's "long" sample set (its defaults when the draft has none). A value in
+ * it that no longer validates (its variable changed type since) gives way to the generated long value
+ * (`longSampleValues`), so 2 and 4 always measure something, as the composer's meta line does.
  */
 function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date): Refusal | null {
   const on = (channel: Channel) => draft.channels.includes(channel);
@@ -589,9 +623,8 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     }
   }
 
-  const long = longSampleValues(draft, utcDay(now));
-  const input = long && { fields: draft.channelFields, variables: draft.variables, values: long, rules };
-  if (on("sms") && input) {
+  const input = { fields: draft.channelFields, variables: draft.variables, values: longSampleValues(draft, utcDay(now)), rules };
+  if (on("sms")) {
     const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
     if (parts > rules.smsMaxParts) return REFUSALS.smsParts(parts, rules.smsMaxParts);
   }
@@ -602,7 +635,7 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     if (links.length > 0) return REFUSALS.publicShortener(field, links.map((link) => link.domain));
   }
 
-  if (on("push") && input) {
+  if (on("push")) {
     for (const platform of PUSH_PLATFORMS) {
       const bytes = pushPayloadBytes(platform, resolveMessage({ channel: "push", platform }, input));
       if (bytes > PUSH_MAX_BYTES) return REFUSALS.pushTooLarge(platform, bytes);
@@ -622,11 +655,14 @@ function listKeys(keys: readonly string[]): string {
   return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
-/** True when a one-line field has no text (spaces don't count) and no chip. */
+/**
+ * True when a field has no text and no chip. Spaces don't count, and neither do invisible characters, which a
+ * message's field keeps (src/editor/model/characters.ts): a push title of a zero-width space shows nothing.
+ */
 function isBlankField(doc: JSONContent | null): boolean {
   if (!doc) return true;
   if (doc.type === "variable") return false;
-  if (typeof doc.text === "string" && doc.text.trim() !== "") return false;
+  if (typeof doc.text === "string" && withoutInvisible(doc.text).trim() !== "") return false;
   return (doc.content ?? []).every(isBlankField);
 }
 
@@ -655,6 +691,10 @@ export const REFUSALS = {
   notEditable: refusal("not_editable", "Only an Active or Revoked template can be edited."),
   alreadyInReview: refusal("already_in_review", "This version is already in review."),
   notDraft: refusal("not_draft", "Only a draft can be submitted."),
+  /** `submit` and a draft save (`draftChannelsRefusal`): a version with no channel renders nothing and skips every channel's rules. */
+  noChannels: refusal("no_channels", "Turn on at least one channel."),
+  /** A draft save (`draftChannelsRefusal`): a channel its content type doesn't allow, which would mix families. */
+  channelNotAllowed: refusal("channel_unavailable", "That channel isn't available for this content type."),
   /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */
   summaryStale: refusal("summary_stale", "This draft changed after this summary was made."),
   undefinedVariables: refusal(

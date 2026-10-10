@@ -13,7 +13,23 @@ export const LINE_BREAKS = /\r\n|[\r\n\u2028\u2029]/g;
  */
 export const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 
-/** One line's characters as every channel shows them: a tab becomes one space; control and invisible characters go. */
-export function cleanCharacters(text: string): string {
-  return withoutInvisible(text.replace(/\t/g, " ").replace(CONTROL_CHARACTERS, ""));
+/**
+ * Which characters a text keeps, by where it prints (docs/render-spec.md §4):
+ *   - `"document"`: a document's body and the email's subject and preheader. Control characters go, and so do the
+ *     invisible characters (links.ts, INVISIBLE_CHARACTERS): the editor shows nothing for them and a PDF font
+ *     can't draw most of them.
+ *   - `"message"`: a push's and an SMS's fields and values. Only control characters go. The invisible
+ *     characters stay, because a phone draws with them: the joiner in 👨‍👩‍👧, the emoji selector in ❤️, the
+ *     tags of a subdivision flag, the non-joiner in a Persian name. An SMS's typed text is still flagged for
+ *     every character outside GSM-7, these among them (src/domain/messages/gsm7.ts).
+ */
+export type CharacterRules = "document" | "message";
+
+/**
+ * One line's characters as a channel shows them: a tab becomes one space and control characters go; for a
+ * document (the default) invisible characters go too.
+ */
+export function cleanCharacters(text: string, rules: CharacterRules = "document"): string {
+  const visible = text.replace(/\t/g, " ").replace(CONTROL_CHARACTERS, "");
+  return rules === "document" ? withoutInvisible(visible) : visible;
 }

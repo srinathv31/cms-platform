@@ -22,7 +22,8 @@ import { createClient } from "@libsql/client";
 import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
-import { familyChannels, familyOf } from "@/domain/types";
+import { smsFooterOf } from "@/domain/lifecycle";
+import { contentTypeFamily, familyChannels } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
@@ -68,10 +69,11 @@ async function main() {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`"${slug}" is not a usable case name (lowercase letters, digits and dashes).`);
     if (existsSync(inputPath(slug))) throw new Error(`cases/${slug}/input.json exists. Delete the folder to freeze it again, or pick another name.`);
 
-    // Every channel of the version's family, on or not, so the case checks all of them; and for a
-    // message, its content type's SMS footer.
+    // Every channel of the template's family (its content type's), on or not, so the case checks all of
+    // them; and for a message, the SMS footer the version prints (frozen at submit; a draft's the content type's).
     const [contentType] = await db.select().from(schema.contentTypes).where(eq(schema.contentTypes.id, template.contentTypeId)).limit(1);
-    const family = familyOf(row.channels) ?? "document";
+    const family = contentTypeFamily(contentType?.allowedChannels ?? []);
+    const smsFooter = smsFooterOf(row, contentType?.smsFooter ?? null);
     const input: RenderFixture = {
       templateId: id,
       templateName: row.name,
@@ -82,7 +84,7 @@ async function main() {
       body: row.body,
       channelFields: row.channelFields,
       channels: [...familyChannels(family)],
-      ...(family === "message" && contentType?.smsFooter ? { smsFooter: contentType.smsFooter } : {}),
+      ...(family === "message" && smsFooter ? { smsFooter } : {}),
     };
     mkdirSync(caseDir(slug), { recursive: true });
     writeFileSync(inputPath(slug), json(input));

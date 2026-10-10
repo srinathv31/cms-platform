@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 
 // What a channel field wears around its text, wherever a message's fields are shown: the label over it
@@ -18,12 +19,24 @@ export function FieldLabel({ label, tag }: { label: string; tag?: string | null 
   );
 }
 
-/** The content type's SMS footer, under the message in the same box: sent as written, never edited here. */
-export function LockedFooter({ text }: { text: string }) {
+/**
+ * The SMS footer, under the message in the same box: sent as written, never edited here. The composer shows
+ * the content type's; a review or Compare shows the version's own (frozen at submit), and when it changed
+ * between two versions, its redline as `children` (`<del>` and `<ins>`) with the change as `status`.
+ */
+export function LockedFooter({
+  text,
+  status,
+  children,
+}: {
+  text?: string;
+  status?: "added" | "removed" | "changed";
+  children?: ReactNode;
+}) {
   return (
-    <p data-slot="sms-footer" className="mt-0.5 flex items-start gap-1.5 text-text-muted select-none">
+    <p data-slot="sms-footer" data-redline={status} className="mt-0.5 flex items-start gap-1.5 text-text-muted select-none">
       <Lock role="img" aria-label="Locked" strokeWidth={1.75} className="mt-[5px] size-3.5 shrink-0 text-text-subtle" />
-      <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</span>
+      <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{children ?? text}</span>
     </p>
   );
 }

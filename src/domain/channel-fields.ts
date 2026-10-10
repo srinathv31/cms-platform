@@ -25,12 +25,13 @@ import {
   type FieldCheck,
   type FieldProblem,
 } from "@/editor/model/document-check";
+import type { CharacterRules } from "@/editor/model/characters";
 import type { FieldLines } from "@/editor/model/normalize";
 import { assertNever } from "./assert-never";
 import type { PushPlatform } from "./messages/push";
 import { withArticle } from "./plural";
 import { PLATFORM_LABELS } from "./render/errors";
-import { CHANNELS, type Channel, type JSONContent } from "./types";
+import { CHANNELS, channelFamily, type Channel, type JSONContent } from "./types";
 
 // ── The registry ──────────────────────────────────────────────
 
@@ -178,7 +179,16 @@ export function channelFieldProblem(field: FieldOf, doc: JSONContent): FieldProb
 export type FieldOf = Pick<ChannelField, "channel" | "shape">;
 
 function fieldCheck(field: FieldOf): FieldCheck {
-  return { lines: fieldLines(field.shape), problem: fieldProblemFor(field.channel) };
+  return { lines: fieldLines(field.shape), problem: fieldProblemFor(field.channel), characters: fieldCharacters(field) };
+}
+
+/**
+ * Which characters a field's text keeps (src/editor/model/characters.ts): a message's fields (Push, SMS) keep
+ * the invisible characters a phone draws with (the joiner in 👨‍👩‍👧, the non-joiner in a Persian name) and lose
+ * only control characters; the email's fields lose both, as the document does.
+ */
+export function fieldCharacters(field: Pick<ChannelField, "channel">): CharacterRules {
+  return channelFamily(field.channel) === "message" ? "message" : "document";
 }
 
 /** How a field of this shape holds its lines: only `lines` keeps line breaks. */

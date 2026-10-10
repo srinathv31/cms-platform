@@ -10,6 +10,7 @@ import {
   confirmRevoke,
   contractBaseline,
   createDraft,
+  draftChannelsRefusal,
   editLatest,
   initialTemplateName,
   isAfterToday,
@@ -18,6 +19,7 @@ import {
   reviewBaseline,
   revokePending,
   setSunset,
+  smsFooterOf,
   startRevoke,
   submit,
   sunsetPassed,
@@ -191,6 +193,12 @@ describe("createDraft", () => {
     expect(newTemplateChannels(["pdf", "web"], ["push", "sms"])).toEqual(["push", "sms"]);
     expect(newTemplateChannels(undefined, ["sms"])).toEqual(["sms"]);
     expect(newTemplateChannels(["sms"], ["push", "sms"])).toEqual(["sms"]);
+  });
+
+  it("saves a draft's channels only when one is on and its content type allows each (draftChannelsRefusal)", () => {
+    expect(draftChannelsRefusal(["push"], ["push", "sms"])).toBeNull();
+    expect(draftChannelsRefusal([], ["push", "sms"])).toBe(REFUSALS.noChannels);
+    expect(draftChannelsRefusal(["push", "pdf"], ["push", "sms"])).toBe(REFUSALS.channelNotAllowed);
   });
 
   it("makes Blank untitled, with no starter key and no variables", () => {
@@ -536,6 +544,7 @@ describe("submit", () => {
         stages: [{ id: "st_team", name: "Team approver" }],
         currentStage: 0,
         contractChanges: null,
+        smsFooter: null,
       },
       effects: [submitted(1), reviewRequested(1)],
     });
@@ -761,6 +770,15 @@ describe("submit", () => {
       expect(alert().ok).toBe(true);
     });
 
+    it("freezes the content type's SMS footer into the version, which every render of it prints from then on", () => {
+      const result = alert();
+      expect(result.ok && result.changes.smsFooter).toBe(ALERT.smsFooter);
+      // A draft shows the content type's footer as it stands; a submitted version keeps its own.
+      expect(smsFooterOf({ state: "draft", smsFooter: null }, "Now")).toBe("Now");
+      expect(smsFooterOf({ state: "active", smsFooter: "Then" }, "Now")).toBe("Then");
+      expect(smsFooterOf({ state: "superseded", smsFooter: null }, "Now"), "frozen as none").toBeNull();
+    });
+
     it("needs every required field of each channel that is on, from the registry", () => {
       expect(alert({ channelFields: { push: { body: push.body }, sms } })).toEqual({
         ok: false,
@@ -770,6 +788,25 @@ describe("submit", () => {
       expect(alert({ channelFields: { push } })).toEqual({ ok: false, code: "field_missing", reason: "Add an SMS message before submitting." });
       // The subtitle is optional, and SMS's fields don't matter while SMS is off.
       expect(alert({ channels: ["push"], channelFields: { push } }).ok).toBe(true);
+    });
+
+    it("counts a field of only invisible characters as blank: the phone shows nothing for it", () => {
+      // A message's field keeps its invisible characters (an emoji's joiner), so one can hold only those.
+      const invisible = oneLine(text(" ​⁠ "));
+      expect(alert({ channelFields: { push: { ...push, title: invisible }, sms } })).toEqual({
+        ok: false,
+        code: "field_missing",
+        reason: "Add a push title before submitting.",
+      });
+      expect(alert({ channelFields: { push: { ...push, title: oneLine(text("❤️")) }, sms } }).ok).toBe(true);
+    });
+
+    it("refuses a zero-width space or a joiner the author typed in an SMS: they aren't GSM-7", () => {
+      expect(alert({ channelFields: { push, sms: { text: lines(text("Pay​ now")) } } })).toEqual({
+        ok: false,
+        code: "sms_characters",
+        reason: "Replace U+200B in the SMS message before submitting. It isn't in the SMS character set.",
+      });
     });
 
     it("refuses characters the author typed outside GSM-7, naming each once", () => {
@@ -799,6 +836,22 @@ describe("submit", () => {
       });
       // Without the long set, its defaults stand in.
       expect(alert({ channelFields: { push, sms: long }, sampleSets: [] }, { ...ALERT, smsMaxParts: 1 }).ok).toBe(false);
+    });
+
+    it("measures a long value that no longer validates with the generated one, so a stale set can't skip the checks", () => {
+      // Edited while purchase_apr was text; it's a percent now, so the stored value isn't one any more.
+      const stale = [{ id: "long", name: "Long", values: { purchase_apr: "about twenty percent" } }];
+      const long = { text: lines(text("x".repeat(120)), chip("first_name"), text(" "), chip("purchase_apr")) };
+      const parts = { ...ALERT, smsMaxParts: 1 };
+      const refused = { ok: false, code: "sms_too_many_parts", reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer." };
+      expect(alert({ channelFields: { push, sms: long }, sampleSets: [] }, parts)).toEqual(refused);
+      expect(alert({ channelFields: { push, sms: long }, sampleSets: stale }, parts)).toEqual(refused);
+      // And the push size: a body over 4,096 bytes with the long values is refused whatever the stored set holds.
+      const huge = oneLine(text("é".repeat(2040)), chip("purchase_apr"), chip("first_name"), chip("first_name"));
+      expect(alert({ channels: ["push"], channelFields: { push: { ...push, body: huge } }, sampleSets: stale })).toMatchObject({
+        ok: false,
+        code: "push_too_large",
+      });
     });
 
     it("refuses a public link shortener in an SMS or a push body", () => {
@@ -831,6 +884,16 @@ describe("submit", () => {
       const result = alert({ channels: ["push"], channelFields: { push: { ...push, body: near, subtitle } } });
       expect(result).toMatchObject({ ok: false, code: "push_too_large" });
       expect(result.ok || result.reason).toContain("on iPhone");
+    });
+
+    it("refuses a draft with no channel on, which would skip every message rule", () => {
+      // A crafted save could store one: the SMS here breaks every rule, and nothing would look at it.
+      const typed = { text: lines(text("’ bit.ly/x ".repeat(80))) };
+      expect(alert({ channels: [], channelFields: { push, sms: typed } })).toEqual({
+        ok: false,
+        code: "no_channels",
+        reason: "Turn on at least one channel.",
+      });
     });
 
     it("never runs the message rules on a document", () => {

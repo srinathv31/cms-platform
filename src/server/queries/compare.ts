@@ -2,20 +2,22 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { smsFooterOf } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
+import type { Channel, ChannelFamily, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
-import { loadMessageRules } from "./review-shared";
+import { loadFamily, loadMessageRules } from "./review-shared";
 
 // What the Compare dialog needs and the Versions read model doesn't carry: the names, bodies, channel
-// fields and variable lists of the two versions being compared, and the content type's SMS footer (an
-// alert's message shows it locked under the text, as the composer does). Served by GET /api/templates/[templateId]/compare
-// when the dialog opens and on each change of pair. A read, so it checks only that the viewer may see
-// the template (as the Versions page itself does). The diff is computed in the dialog.
+// fields, SMS footers and variable lists of the two versions being compared (an alert's message shows its
+// footer locked under the text, as the composer does, and a footer that changed between them is redlined).
+// Served by GET /api/templates/[templateId]/compare when the dialog opens and on each change of pair. A
+// read, so it checks only that the viewer may see the template (as the Versions page itself does). The diff
+// is computed in the dialog.
 
 export interface CompareVersion {
   id: string;
@@ -28,14 +30,19 @@ export interface CompareVersion {
   /** The channels that are on, and each channel's own fields: an alert's whole content, an email's subject. */
   channels: Channel[];
   channelFields: ChannelFields;
+  /**
+   * The SMS footer this version prints (`smsFooterOf`): the one frozen into it at submit, or for the open
+   * draft the content type's as it stands. Null: none.
+   */
+  smsFooter: string | null;
   variables: Variable[];
 }
 
-/** The pair, and the footer every SMS of the template's content type ends with (null when it has none). */
+/** The pair, and the template's family (its content type's: an alert compares only its fields). */
 export interface ComparePair {
+  family: ChannelFamily;
   from: CompareVersion;
   to: CompareVersion;
-  smsFooter: string | null;
 }
 
 const Id = z.string().min(1).max(64);
@@ -59,27 +66,32 @@ export async function loadVersionsToCompare(
   if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
   if (!can(viewer, "template.view", { teamId: template.teamId }).ok) return refusal(403, REQUEST_REFUSALS.templateUnavailable);
 
-  const rows = await db
-    .select({
-      id: versions.id,
-      number: versions.number,
-      state: versions.state,
-      name: versions.name,
-      body: versions.body,
-      channels: versions.channels,
-      channelFields: versions.channelFields,
-      variables: versions.variables,
-    })
-    .from(versions)
-    .where(and(eq(versions.templateId, templateId), inArray(versions.id, [from, to])));
+  const [rows, family, rules] = await Promise.all([
+    db
+      .select({
+        id: versions.id,
+        number: versions.number,
+        state: versions.state,
+        name: versions.name,
+        body: versions.body,
+        channels: versions.channels,
+        channelFields: versions.channelFields,
+        smsFooter: versions.smsFooter,
+        variables: versions.variables,
+      })
+      .from(versions)
+      .where(and(eq(versions.templateId, templateId), inArray(versions.id, [from, to]))),
+    loadFamily(db, template.contentTypeId),
+    loadMessageRules(db, template.contentTypeId),
+  ]);
 
   const pick = (id: string): CompareVersion | undefined => {
     const row = rows.find((r) => r.id === id);
-    return row ? { ...row, number: row.state === "draft" ? null : row.number } : undefined;
+    if (!row) return undefined;
+    return { ...row, number: row.state === "draft" ? null : row.number, smsFooter: smsFooterOf(row, rules.smsFooter) };
   };
   const older = pick(from);
   const newer = pick(to);
   if (!older || !newer) return refusal(404, REQUEST_REFUSALS.versionUnavailable);
-  const { smsFooter } = await loadMessageRules(db, template.contentTypeId);
-  return { ok: true, from: older, to: newer, smsFooter };
+  return { ok: true, family, from: older, to: newer };
 }

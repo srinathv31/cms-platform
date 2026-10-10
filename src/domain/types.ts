@@ -75,6 +75,16 @@ export function familyOf(channels: readonly Channel[]): ChannelFamily | null {
   return first === undefined ? null : channelFamily(first);
 }
 
+/**
+ * A template's family, from its content type's allowed channels: what decides whether it is written in the
+ * editor or the composer, reviewed as a document or as fields, and whether Copilot drafts it. Always the
+ * content type's, never a version's channels: a content type always allows one channel, and keeps its
+ * family for life, while a version's channels are the author's to change (and a crafted save could empty them).
+ */
+export function contentTypeFamily(allowedChannels: readonly Channel[]): ChannelFamily {
+  return familyOf(allowedChannels) ?? "document";
+}
+
 /** True for PDF, Web and Email. */
 export function isDocumentChannel(channel: Channel): channel is DocumentChannel {
   return channelFamily(channel) === "document";

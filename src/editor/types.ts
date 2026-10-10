@@ -15,6 +15,7 @@
 // root from its own `variables`, `requiredSections`, `readOnly` and `onVariablesChange` props.
 
 import type { ReactNode, Ref } from "react";
+import type { CharacterRules } from "./model/characters";
 import type { FieldLines } from "./model/normalize";
 import type { ContractChange, JSONContent, RequiredSection, Variable } from "./model/types";
 
@@ -197,6 +198,12 @@ export interface InlineVariableFieldProps {
    * as hard breaks (Enter adds one, a paste keeps its lines). Read once, like `value`.
    */
   lines?: FieldLines;
+  /**
+   * Which characters a paste keeps (model/characters.ts). `"document"` (default): the email's fields, which
+   * lose invisible characters as the document does. `"message"`: a push's or an SMS's field, which keeps
+   * them (the joiner in an emoji sequence, the non-joiner in a Persian name). Read once, like `value`.
+   */
+  characters?: CharacterRules;
   onChange?: (value: JSONContent) => void;
   /**
    * Not shown for now (the email subject while Email is off), but still part of the root: its chips

@@ -33,7 +33,8 @@ const frame = (root: HTMLElement, id: string) => root.querySelector<HTMLElement>
 
 describe("FieldsDocument", () => {
   it("heads each channel's section and frames every field by its id, as a block is, with the label and tag", () => {
-    const root = render({ fields: diffChannelFields(null, V1).fields, smsFooter: "Reply STOP to opt out." });
+    const clean = diffChannelFields(null, { ...V1, smsFooter: "Reply STOP to opt out." });
+    const root = render({ fields: clean.fields, footer: clean.footer });
     expect([...root.querySelectorAll('[role="heading"][aria-level="2"]')].map((h) => h.textContent)).toEqual(["Push notification", "Text message"]);
     expect([...root.querySelectorAll(".ucomp-doc > [data-block-id]")].map((el) => el.getAttribute("data-block-id"))).toEqual([
       "push.title",
@@ -67,6 +68,20 @@ describe("FieldsDocument", () => {
     const active = render({ fields, changesOnly: true, activeBlockId: "push.title" });
     expect(frame(active, "push.title")?.hasAttribute("data-active")).toBe(true);
     expect(frame(active, "push.title")?.querySelector('[data-slot="field-text"]')?.textContent).toBe("Was this you?");
+  });
+
+  it("redlines the SMS footer each version was submitted with, and keeps the SMS in full with Changes only", () => {
+    const before = { ...V1, smsFooter: "Coral: Reply STOP to opt out." };
+    const after = { ...V1, smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." };
+    const redline = diffChannelFields(before, after);
+    expect(redline.counts).toEqual({ added: 0, removed: 0, changed: 1, moved: 0 });
+    const root = render({ fields: redline.fields, footer: redline.footer, changesOnly: true });
+    const footer = frame(root, "sms.text")?.querySelector('[data-slot="sms-footer"]');
+    expect(footer?.getAttribute("data-redline")).toBe("changed");
+    expect(footer?.querySelector("del")?.textContent).toBe("Coral: Reply STOP to opt out.");
+    expect(footer?.querySelector("ins")?.textContent).toBe("Coral Offers: Reply STOP to opt out, HELP for help.");
+    expect(frame(root, "sms.text")?.querySelector('[data-slot="field-unchanged"]'), "shown in full").toBeNull();
+    expect(frame(root, "push.title")?.querySelector('[data-slot="field-unchanged"]')).not.toBeNull();
   });
 
   it("lays a document's email details out under a caps label, at the heading level it is given", () => {

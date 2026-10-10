@@ -23,7 +23,7 @@ import {
   zoneChangeConsequences,
 } from "@/domain/platform-config";
 import { refuse, type Refusal } from "@/domain/refusals";
-import { CHANNELS, familyOf, type Channel, type PermissionResult } from "@/domain/types";
+import { CHANNELS, contentTypeFamily, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -131,7 +131,7 @@ export const getContentTypesSection = cache(async (): Promise<ContentTypesSectio
       id: t.id,
       key: t.key,
       name: t.name,
-      family: familyOf(t.allowedChannels) ?? "document",
+      family: contentTypeFamily(t.allowedChannels),
       requiredSections: t.requiredSections,
       allowedChannels: CHANNELS.filter((c) => t.allowedChannels.includes(c)),
       smsFooter: t.smsFooter,

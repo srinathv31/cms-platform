@@ -1,0 +1,102 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Emoji and joiners in a push",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "nickname",
+      "label": "Nickname",
+      "type": "text",
+      "required": true,
+      "sample": "Zoë"
+    }
+  ],
+  "values": {
+    "first_name": "علی‌رضا",
+    "nickname": "Zoë 👩‍💻"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "push": {
+      "title": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Family ❤️ 👨‍👩‍👧 🏴󠁧󠁢󠁥󠁮󠁧󠁿 1️⃣"
+              }
+            ]
+          }
+        ]
+      },
+      "subtitle": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "For "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "body": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "nickname"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", your family plan is ready."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "push"
+  ]
+}

@@ -54,5 +54,9 @@ database: the route's engine and the golden files already run it as is.
 - When the backend moves to the Java API, the browser still runs the TypeScript renderer for the preview. The
   golden files are what keep the two engines byte for byte the same; a Java change to message output must land with
   the same change here.
-- The preview can't catch what only the server knows. Today nothing about a message is: the content type's footer
-  and part budget, and the team's app name and short code, come with the page's read model.
+- The preview can't catch what only the server knows. Today nothing about a message is: the SMS footer (a draft's
+  is the content type's, a submitted version's the one frozen into it), the part budget, and the team's app name and
+  short code, come with the page's read model.
+- The browser and the server cut an SMS into the same parts because the grapheme clusters are pinned to one Unicode
+  version in the domain (`src/domain/messages/graphemes.ts`), not taken from the browser's `Intl.Segmenter`
+  ([0034](0034-sms-characters-and-length.md)).

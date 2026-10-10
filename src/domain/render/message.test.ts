@@ -132,19 +132,72 @@ describe("renderMessage: SMS", () => {
 describe("resolveChannelField", () => {
   const ctx = { variables: VARIABLES, values: { first_name: "Maya" } };
   const typed = field(t("  Hi "), chip("first_name"), br, br, t("Line\tthree  "));
+  const TITLE = { channel: "push", shape: "line" } as const;
+  const BODY = { channel: "push", shape: "paragraph" } as const;
+  const SMS = { channel: "sms", shape: "lines" } as const;
+  const SUBJECT = { channel: "email", shape: "line" } as const;
 
   it("puts a one-line or paragraph field on one line, trimmed at the ends", () => {
-    expect(resolveChannelField(typed, "line", ctx)).toBe("Hi Maya  Line three");
-    expect(resolveChannelField(typed, "paragraph", ctx)).toBe("Hi Maya  Line three");
+    expect(resolveChannelField(typed, TITLE, ctx)).toBe("Hi Maya  Line three");
+    expect(resolveChannelField(typed, BODY, ctx)).toBe("Hi Maya  Line three");
   });
 
   it("keeps a `lines` field's line breaks as \\n, blank lines included", () => {
-    expect(resolveChannelField(typed, "lines", ctx)).toBe("Hi Maya\n\nLine three");
-    expect(resolveChannelField(field(t("a\r\nb")), "lines", ctx)).toBe("a\nb");
+    expect(resolveChannelField(typed, SMS, ctx)).toBe("Hi Maya\n\nLine three");
+    expect(resolveChannelField(field(t("a\r\nb")), SMS, ctx)).toBe("a\nb");
   });
 
   it("gives nothing for a field with no value", () => {
-    expect(resolveChannelField(null, "lines", ctx)).toBe("");
+    expect(resolveChannelField(null, SMS, ctx)).toBe("");
+  });
+
+  // A phone draws with the invisible characters: the joiner in an emoji sequence, the emoji presentation
+  // selector, a subdivision flag's tags, the keycap's selector, the non-joiner in a Persian name.
+  const EMOJI = "Family ❤\uFE0F 👨\u200D👩\u200D👧 🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} 1\uFE0F\u20E3";
+  const PERSIAN = "علی\u200Cرضا"; // Alireza, with a zero-width non-joiner between its two words
+
+  it("keeps a message's typed emoji sequences and joiners exactly", () => {
+    expect(resolveChannelField(field(t(EMOJI)), TITLE, ctx)).toBe(EMOJI);
+    expect(resolveChannelField(field(t(EMOJI)), SMS, ctx)).toBe(EMOJI);
+    expect(resolveChannelField(field(t(PERSIAN)), BODY, ctx)).toBe(PERSIAN);
+  });
+
+  it("keeps the joiners in a message's values exactly", () => {
+    const values = { first_name: "Zoë 👩\u200D💻", card_last4: PERSIAN };
+    const zoe = { variables: VARIABLES, values };
+    expect(resolveChannelField(field(t("Hi "), chip("first_name")), BODY, zoe)).toBe("Hi Zoë 👩\u200D💻");
+    expect(resolveChannelField(field(t("Hi "), chip("first_name"), t(" "), chip("card_last4")), SMS, zoe)).toBe(`Hi Zoë 👩\u200D💻 ${PERSIAN}`);
+  });
+
+  it("still removes a message's control characters, in text and values, and turns a tab into a space", () => {
+    const zoe = { variables: VARIABLES, values: { first_name: "Zo\u0007ë\u0085" } };
+    expect(resolveChannelField(field(t("A\u0000B\tC "), chip("first_name")), SMS, zoe)).toBe("AB C Zoë");
+  });
+
+  it("removes invisible characters from the email's fields, as from the document", () => {
+    expect(resolveChannelField(field(t(EMOJI)), SUBJECT, ctx)).toBe("Family ❤ 👨👩👧 🏴 1⃣");
+  });
+});
+
+describe("renderMessage: emoji sequences and joiners print as typed and as sent", () => {
+  const title = "Family ❤\uFE0F 👨\u200D👩\u200D👧 🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} 1\uFE0F\u20E3";
+  const fields: ChannelFields = {
+    push: { title: field(t(title)), body: field(t("Hi "), chip("first_name")) },
+    sms: { text: field(t("Hi "), chip("first_name")) },
+  };
+  const zoe = input({ ...MAYA, first_name: "Zoë 👩\u200D💻" }, { fields, rules: { smsFooter: null } });
+
+  it("in a push, on both platforms", () => {
+    for (const platform of ["ios", "android"] as const) {
+      const result = renderMessage({ channel: "push", platform }, zoe);
+      expect(result.ok && result.output.title).toBe(title);
+      expect(result.ok && result.output.body).toBe("Hi Zoë 👩\u200D💻");
+    }
+  });
+
+  it("in an SMS, measured with the joined emoji as one character", () => {
+    const result = renderMessage({ channel: "sms" }, zoe);
+    expect(result).toEqual({ ok: true, output: { text: "Hi Zoë 👩\u200D💻", encoding: "UCS-2", parts: 1, characters: 8 } });
   });
 });
 
@@ -163,8 +216,18 @@ describe("longSampleValues", () => {
     expect(longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY)?.first_name).toBe("Alexandria-Marguerite");
   });
 
-  it("is null when the long values don't validate: there is nothing to measure", () => {
-    const broken = { id: "long", name: "Long", values: { due_date: "not a date" } };
-    expect(longSampleValues({ variables: VARIABLES, sampleSets: [broken] }, TODAY)).toBeNull();
+  it("measures a stored value that no longer validates with the generated long value for its key", () => {
+    // The set was edited while amount_due was text; it is a currency now. The other stored values stand.
+    const stale = { id: "long", name: "Long", values: { first_name: "Bartholomew", amount_due: "about ten dollars", due_date: "not a date" } };
+    const generated = longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY);
+    expect(longSampleValues({ variables: VARIABLES, sampleSets: [stale] }, TODAY)).toEqual({
+      ...generated,
+      first_name: "Bartholomew",
+    });
+    expect(generated.amount_due).toBe("1000000");
+  });
+
+  it("has a value for every variable, the optional ones included", () => {
+    expect(Object.keys(longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY))).toEqual(VARIABLES.map((v) => v.key));
   });
 });

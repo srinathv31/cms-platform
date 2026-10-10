@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionResult } from "@/domain/review-types";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel } from "@/domain/types";
+import type { Channel, ChannelFamily } from "@/domain/types";
 import type { ComparePair, CompareVersion } from "@/server/queries/compare";
 import type { CompareOption } from "./compare-dialog";
 
@@ -41,15 +41,20 @@ const version = (
   name,
   body: doc(text),
   ...fields,
+  smsFooter: null,
   variables: [],
 });
-const pair = (from: CompareVersion, to: CompareVersion, smsFooter: string | null = null): CompareAnswer => ({ ok: true, from, to, smsFooter });
-/** An alert's version: no body, a push title and an SMS. */
-const alert = (id: string, number: number, title: string, sms: string): CompareVersion =>
-  version(id, number, "", "Card used abroad", {
+/** The route's answer: the template's family is its content type's, whatever the versions' channels. */
+const pair = (from: CompareVersion, to: CompareVersion, family: ChannelFamily = "document"): CompareAnswer => ({ ok: true, family, from, to });
+const FOOTER = "Reply STOP to opt out.";
+/** An alert's version: no body, a push title and an SMS, ending with the footer it was submitted with. */
+const alert = (id: string, number: number, title: string, sms: string, smsFooter: string | null = FOOTER): CompareVersion => ({
+  ...version(id, number, "", "Card used abroad", {
     channels: ["push", "sms"],
     channelFields: { push: { title: doc(title) }, sms: { text: doc(sms) } },
-  });
+  }),
+  smsFooter,
+});
 const marks = (op: "ins" | "del") => [...container.querySelectorAll(op)].map((el) => el.textContent);
 const OPTIONS: CompareOption[] = [
   { id: "v_2", label: "v2", state: "active" },
@@ -103,7 +108,7 @@ describe("ComparePanel", () => {
 
   it("shows an alert's fields as its whole content, with the footer locked under the SMS, and no body", async () => {
     compareRoute.mockResolvedValue(
-      pair(alert("v_1", 1, "Was this you?", "Coral: card used."), alert("v_2", 2, "Was this you?", "Coral: card used abroad."), "Reply STOP to opt out."),
+      pair(alert("v_1", 1, "Was this you?", "Coral: card used."), alert("v_2", 2, "Was this you?", "Coral: card used abroad."), "message"),
     );
     await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
     await tick();
@@ -115,6 +120,28 @@ describe("ComparePanel", () => {
     expect(marks("ins")).toEqual([" abroad"]);
     expect(container.querySelector('[data-slot="sms-footer"]')?.textContent).toBe("Reply STOP to opt out.");
     expect(container.querySelector("[data-redline-document]"), "no body to redline").toBeNull();
+    expect(container.querySelector('[data-slot="redline-summary"]')?.textContent).toBe("1 changed");
+  });
+
+  it("knows an alert by its content type, not its channels: one with none still shows no body", async () => {
+    const emptied = { ...alert("v_2", 2, "Was this you?", "Coral: card used abroad."), channels: [] };
+    compareRoute.mockResolvedValue(pair(alert("v_1", 1, "Was this you?", "Coral: card used."), emptied, "message"));
+    await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
+    await tick();
+    expect(container.querySelector("[data-redline-document]"), "no body to redline").toBeNull();
+  });
+
+  it("redlines a footer that changed between the two versions, and counts it", async () => {
+    const newFooter = "Coral Offers: Reply STOP to opt out, HELP for help.";
+    compareRoute.mockResolvedValue(
+      pair(alert("v_1", 1, "Was this you?", "Coral: card used."), alert("v_2", 2, "Was this you?", "Coral: card used.", newFooter), "message"),
+    );
+    await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
+    await tick();
+    const footer = container.querySelector('[data-slot="sms-footer"]');
+    expect(footer?.getAttribute("data-redline")).toBe("changed");
+    expect(marks("del")).toEqual([FOOTER]);
+    expect(marks("ins")).toEqual([newFooter]);
     expect(container.querySelector('[data-slot="redline-summary"]')?.textContent).toBe("1 changed");
   });
 

@@ -8,7 +8,7 @@ import { EditorRoot } from "@/editor/components/editor-root";
 import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 import type { JSONContent } from "@/domain/types";
-import type { FieldRedline, RedlineDoc, ThreadView } from "@/domain/review-types";
+import type { FieldRedline, FooterRedline, RedlineDoc, ThreadView } from "@/domain/review-types";
 import type { ChannelFamily } from "@/domain/types";
 import { FieldsView } from "./fields-view";
 import { RedlineView } from "./redline-view";
@@ -42,7 +42,7 @@ export function DocumentView({
   versionId,
   family,
   fields,
-  smsFooter,
+  footer,
   body,
   variables,
   baselineVariables,
@@ -63,8 +63,8 @@ export function DocumentView({
   family: ChannelFamily;
   /** The fields of the channels that are on: their redline while Show changes is on, else as they stand. */
   fields: readonly FieldRedline[];
-  /** The content type's SMS footer, locked under the message. */
-  smsFooter: string | null;
+  /** The SMS footer locked under the message: the version's own (frozen at submit), and its redline with Show changes. */
+  footer: FooterRedline | null;
   body: JSONContent;
   variables: Variable[];
   baselineVariables: Variable[] | null;
@@ -100,7 +100,7 @@ export function DocumentView({
           fields={fields}
           variables={labels}
           changesOnly={changesOnly}
-          smsFooter={smsFooter}
+          footer={footer}
           editorRef={editorRef}
           anchors={anchors}
           threads={threads}

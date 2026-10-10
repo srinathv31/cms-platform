@@ -60,7 +60,10 @@ export interface EngineInput {
   body: JSONContent;
   /** Each channel's own fields (src/domain/channel-fields.ts). Only the rendered channel's are read. */
   channelFields: ChannelFields;
-  /** The content type's SMS footer, printed after an SMS on its own line. Null: none. */
+  /**
+   * The version's SMS footer, printed after an SMS on its own line (`smsFooterOf`): the one frozen into it at
+   * submit, or for a draft the content type's as it stands. Null: none.
+   */
   smsFooter: string | null;
 }
 
@@ -158,7 +161,7 @@ async function renderDocument(
     fields = Object.fromEntries(
       channelFieldsOf(channel).map((field) => [
         field.key,
-        resolveChannelField(channelFieldValue(input.channelFields, field), field.shape, ctx),
+        resolveChannelField(channelFieldValue(input.channelFields, field), field, ctx),
       ]),
     );
   } catch (error) {

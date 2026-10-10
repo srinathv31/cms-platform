@@ -42,7 +42,7 @@
 // same engine, one field at a time (`diffChannelFields`): for an alert they are the whole content.
 
 import { channelFieldValue, fieldsOfChannels, type ChannelField, type ChannelFields } from "./channel-fields";
-import type { FieldRedline, RedlineBlock, RedlineDoc, RedlineMark, RedlineStatus } from "./review-types";
+import type { FieldRedline, FooterRedline, RedlineBlock, RedlineDoc, RedlineMark, RedlineStatus } from "./review-types";
 import { CHANNELS, type Channel, type JSONContent } from "./types";
 
 type Mark = NonNullable<JSONContent["marks"]>[number];
@@ -131,16 +131,24 @@ export function nameChange(base: string | null | undefined, next: string): NameC
 
 // ── Channel fields ───────────────────────────────────────────────────────────
 
-/** A version's channel fields as the redline reads them: the channels that are on, and what they store. */
+/**
+ * A version's channel fields as the redline reads them: the channels that are on, what they store, and the
+ * SMS footer it prints (`smsFooterOf`: frozen at submit, a draft's the content type's; absent: none).
+ */
 export interface FieldsSide {
   channels: readonly Channel[];
   channelFields: ChannelFields;
+  smsFooter?: string | null;
 }
 
-/** Every field's redline, in registry order, and how many fields were added, removed or changed. */
+/**
+ * Every field's redline, in registry order, how many fields were added, removed or changed (a changed footer
+ * among them), and the SMS's footer: null while SMS is off on both sides.
+ */
 export interface FieldsRedline {
   fields: FieldRedline[];
   counts: RedlineDoc["counts"];
+  footer: FooterRedline | null;
 }
 
 /**
@@ -154,6 +162,10 @@ export interface FieldsRedline {
  * on adds its fields, off removes them. A field with no text on either side is "unchanged" (an optional
  * subtitle left empty). No base (a first version): `next`'s fields, all "unchanged", counts zero, as
  * `diffDocuments` does.
+ *
+ * The SMS's footer isn't a field (the author doesn't write it), but it is part of what each version sends:
+ * its `footer` says what it was and is. A footer that changed while SMS stayed on counts as one change, so
+ * a version whose only difference is its footer never reads "No changes".
  */
 export function diffChannelFields(base: FieldsSide | null, next: FieldsSide): FieldsRedline {
   const counts = { added: 0, removed: 0, changed: 0, moved: 0 };
@@ -166,7 +178,19 @@ export function diffChannelFields(base: FieldsSide | null, next: FieldsSide): Fi
     if (status !== "unchanged") counts[status]++;
     return { field, status, doc };
   });
-  return { fields, counts };
+  const footer = channels.includes("sms") ? footerRedline(base, next) : null;
+  if (footer && footer.status !== "unchanged" && base?.channels.includes("sms") && next.channels.includes("sms")) counts[footer.status]++;
+  return { fields, counts, footer };
+}
+
+/** The SMS footer each side prints while its SMS is on, and how it changed. */
+function footerRedline(base: FieldsSide | null, next: FieldsSide): FooterRedline {
+  const footerOf = (side: FieldsSide) => (side.channels.includes("sms") ? side.smsFooter || null : null);
+  const to = footerOf(next);
+  if (!base) return { from: null, to, status: "unchanged" };
+  const from = footerOf(base);
+  const status = from === to ? "unchanged" : from === null ? "added" : to === null ? "removed" : "changed";
+  return { from, to, status };
 }
 
 /** The two counts together: the body's and the fields', for one "N changes" and its summary. */

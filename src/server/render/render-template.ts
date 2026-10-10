@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { currentStageOf } from "@/domain/approval-chain";
+import { smsFooterOf } from "@/domain/lifecycle";
 import { can, hasActiveTeamAccess } from "@/domain/permissions";
 import {
   BAD_REQUEST_MESSAGES,
@@ -252,7 +253,8 @@ async function renderVersion(
       values: input.values,
       body: version.body,
       channelFields: version.channelFields,
-      smsFooter: template.smsFooter,
+      // The footer frozen into the version at submit; a draft preview takes the content type's as it stands.
+      smsFooter: smsFooterOf(version, template.smsFooter),
     },
     target,
     at,

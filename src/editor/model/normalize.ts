@@ -13,8 +13,9 @@
 //   CR LF, CR, LF, U+2028, U+2029 in text   → a hardBreak
 //   other control characters                → removed (U+0000–U+0008, U+000B, U+000C, U+000E–U+001F, U+007F–U+009F)
 //   invisible characters                    → removed (links.ts, INVISIBLE_CHARACTERS: soft hyphen,
-//                                             zero-width and bidirectional marks, variation selectors, …)
-//   a link mark                             → its href normalized (links.ts), or the mark removed (text kept)
+//                                             zero-width and bidirectional marks, variation selectors, …),
+//                                             except in a push's or an SMS's field (kept)
+//   a link mark                            → its href normalized (links.ts), or the mark removed (text kept)
 //   a heading in a table cell               → a paragraph with the same content
 //   a callout in a table cell               → its paragraphs
 //   a rule in a table cell                  → an empty paragraph (it held no text)
@@ -36,9 +37,11 @@
 // rules, marks removed (a field has none), and the paragraphs joined into one. A one-line field
 // (`"line"`) turns each line break (character or hardBreak) into one space and joins paragraphs with a
 // space; a field that keeps its line breaks (`"lines"`, an SMS message) keeps each as a hardBreak and
-// joins paragraphs with one, so an empty paragraph stays a blank line.
+// joins paragraphs with one, so an empty paragraph stays a blank line. A message's field (a push's, an
+// SMS's: `characters: "message"`) keeps its invisible characters, which a phone draws with (the joiner in
+// an emoji sequence, the non-joiner in a Persian name); only its control characters go (characters.ts).
 
-import { LINE_BREAKS, cleanCharacters } from "./characters";
+import { LINE_BREAKS, cleanCharacters, type CharacterRules } from "./characters";
 import { normalizeLink } from "./links";
 import { LIST_START_MAX, LIST_START_MIN } from "./list-markers";
 import { MAX_TABLE_COLUMNS, linesUp, tableGrid, type GridCell } from "./table-grid";
@@ -78,6 +81,8 @@ interface Options {
   field: FieldLines | false;
   /** A paste into the editor: what the author will see is brought inside the limits (a list's start). */
   paste?: boolean;
+  /** Which characters text keeps (characters.ts): a document's (the default) or a message field's. */
+  characters?: CharacterRules;
 }
 
 const CLOSED: Edges = { openStart: 0, openEnd: 0 };
@@ -87,24 +92,29 @@ export function normalizeDocument(doc: JSONContent): JSONContent {
   return normalizeNode(doc, CLOSED, { field: false })[0] ?? doc;
 }
 
-/** A channel field, normalized: on one line (the email subject, a push title), or keeping its line breaks (an SMS message). */
-export function normalizeField(doc: JSONContent, lines: FieldLines = "line"): JSONContent {
-  return normalizeNode(doc, CLOSED, { field: lines })[0] ?? doc;
+/**
+ * A channel field, normalized: on one line (the email subject, a push title), or keeping its line breaks (an SMS
+ * message). `characters`: `"message"` for a push's or an SMS's field, which keeps its invisible characters.
+ */
+export function normalizeField(doc: JSONContent, lines: FieldLines = "line", characters: CharacterRules = "document"): JSONContent {
+  return normalizeNode(doc, CLOSED, { field: lines, characters })[0] ?? doc;
 }
 
 /**
  * A pasted fragment's nodes (a ProseMirror slice as JSON), normalized. `openStart` / `openEnd` are
  * the slice's: nodes on an open edge keep their structure, so the slice still fits where it lands.
  * `inCell`: the paste lands inside a table cell (at any depth), so its blocks become what a cell
- * holds. A table is the exception: the table plugin pastes it as cells into the grid.
+ * holds. A table is the exception: the table plugin pastes it as cells into the grid. `characters`:
+ * as `normalizeField`'s, for a paste into a message's field.
  */
 export function normalizeFragment(
   nodes: readonly JSONContent[],
   edges: Edges,
   field: FieldLines | false = false,
   inCell = false,
+  characters: CharacterRules = "document",
 ): JSONContent[] {
-  const out = normalizeChildren(nodes, edges, { field, paste: true }, null, inCell);
+  const out = normalizeChildren(nodes, edges, { field, paste: true, characters }, null, inCell);
   return inCell ? cellContent(out, edges, { keepTables: true, fill: false }) : out;
 }
 
@@ -194,7 +204,7 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
 function normalizeText(node: JSONContent, options: Options): JSONContent[] {
   if (typeof node.text !== "string") return [node]; // the check refuses it
   const marks = normalizeMarks(node.marks, options);
-  let text = cleanCharacters(node.text);
+  let text = cleanCharacters(node.text, options.characters);
   if (options.field === "line") text = text.replace(LINE_BREAKS, " ");
   const out: JSONContent[] = [];
   text.split(LINE_BREAKS).forEach((part, i) => {

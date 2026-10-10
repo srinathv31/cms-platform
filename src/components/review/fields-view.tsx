@@ -3,7 +3,7 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type RefObject } from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { FieldsDocument, createRedlineHandle } from "@/components/redline";
-import type { FieldRedline, ThreadView } from "@/domain/review-types";
+import type { FieldRedline, FooterRedline, ThreadView } from "@/domain/review-types";
 import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 
@@ -20,7 +20,7 @@ export function FieldsView({
   fields,
   variables,
   changesOnly,
-  smsFooter,
+  footer,
   editorRef,
   anchors,
   threads,
@@ -33,7 +33,7 @@ export function FieldsView({
   fields: readonly FieldRedline[];
   variables: readonly Variable[];
   changesOnly: boolean;
-  smsFooter: string | null;
+  footer: FooterRedline | null;
   editorRef: RefObject<DocumentEditorHandle | null>;
   /** Every thread the screen can name, and the comment being written: what a thread id resolves to. */
   anchors: readonly ThreadAnchor[];
@@ -72,7 +72,7 @@ export function FieldsView({
         layout="sections"
         changesOnly={changesOnly}
         activeBlockId={activeBlockId}
-        smsFooter={smsFooter}
+        footer={footer}
         align="start"
       />
       <GutterMarkers

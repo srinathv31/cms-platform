@@ -1,0 +1,79 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Emoji and joiners in an SMS",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "plan",
+      "label": "Plan",
+      "type": "text",
+      "required": true,
+      "sample": "Family"
+    }
+  ],
+  "values": {
+    "first_name": "علی‌رضا",
+    "plan": "👨‍👩‍👧 🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Coral Offers: "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", your plan "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "plan"
+                }
+              },
+              {
+                "type": "text",
+                "text": " is ready."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ],
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."
+}

@@ -163,6 +163,8 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       body: v.body,
       channelFields: v.channelFields ?? {},
       channels: v.channels,
+      // Submit freezes the content type's SMS footer into the version; a draft shows the content type's as it stands.
+      smsFooter: isDraft ? null : type.smsFooter,
       variables: v.variables,
       sampleSets: ctx.vars.sampleSets(v.variables),
       contractChanges: v.contractChanges ?? null,

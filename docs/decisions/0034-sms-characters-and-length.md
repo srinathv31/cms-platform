@@ -23,14 +23,29 @@ exactly what the author typed and every value as sent.
   letter the reader sees.
 - **Values are never transliterated.** A value prints exactly as sent. If it switches the message to UCS-2, the API
   says so (`encoding`, `parts`), and the consumer pays for the parts.
+- **A message keeps its invisible characters.** A document drops the zero-width and format characters, because the
+  editor shows nothing for them and a PDF font can't draw them. A phone draws with them: the joiner in 👨‍👩‍👧, the
+  emoji selector in ❤️ and 1️⃣, a subdivision flag's tags, the non-joiner Persian and Indic names are spelled with.
+  So a push's and an SMS's fields, and the values they print, lose only control characters, at save and at render
+  (docs/render-spec.md §4). In an SMS the author's own invisible characters are still outside GSM-7: flagged, with a
+  one-click removal, and refused at submit; in a value they print as sent.
 - **Render never truncates.** It refuses only what can't be delivered at all: an SMS over 10 parts
   (`sms_too_long`, `SMS_MAX_PARTS`). Twilio accepts about 1,600 characters, so 10 parts is a product limit, set where
   a text stops being a text.
 - **Submit holds a budget.** Each message content type has a part budget (`content_types.sms_max_parts`, 3 unless
   set); submit measures the SMS with the draft's "long" sample values and the content type's footer, and refuses it
-  over the budget. Typical values usually fit in fewer.
+  over the budget. Typical values usually fit in fewer. A stored long value that no longer validates (the set was
+  edited before its variable changed type) gives way to the generated long value for that key, in submit and in the
+  composer's "Long values" line alike, so a stale sample set can never switch the budget or the push size check off.
 - **The footer counts.** The content type's footer (the brand and "Reply STOP to opt out", which CTIA asks of a US
   sender) is printed on its own last line, exactly as written, and counts toward the parts.
+- **The footer is frozen into the version at submit** (`versions.sms_footer`), like the version's name and its
+  stages. It is regulated text the approver reviewed, so a later change to the content type's footer must not rewrite
+  every Active alert without approval: render, the review screen, Compare and Coral print each submitted version's own
+  footer, and the new one reaches a template only through its next submitted version. A draft shows the content
+  type's footer as it stands (`smsFooterOf`). Compare and the review redline show a footer that changed between two
+  versions, and count it. Versions submitted before the column existed took their content type's footer as it stood
+  then (migration 0011), which is what they had been rendering.
 - **No public link shorteners** in an SMS or a push body: carriers filter them (CTIA §5.3.2). A branded short domain
   is fine.
 - **Consumers turn off Smart Encoding** and any other provider rewriting: the counts are for the text as rendered,
@@ -53,3 +68,16 @@ exactly what the author typed and every value as sent.
 - The API's `parts` for a given request can be higher than the composer's estimate with sample values: values decide.
 - The character tables and splitting rules (`src/domain/messages/gsm7.ts`) are part of the render specification
   (docs/render-spec.md, "SMS encoding"); a second engine must reproduce them, checked by the golden files.
+- **Grapheme clusters are pinned to Unicode 17.0, not taken from the runtime.** A UCS-2 part never splits a cluster
+  and `characters` counts them, so the clusters decide the parts. `Intl.Segmenter` follows each runtime's ICU, and
+  the rules move between Unicode versions (GB9c, which keeps an Indic conjunct like क्ष whole, arrived in 15.1 and
+  changes again in 18.0), so an older browser's preview, the server and a Java engine could each cut a different
+  SMS. Two ways out were weighed. Saying "Unicode 15.1 or later" in the specification would have named a range, not a
+  version, and left the browser preview free to disagree with the API, which decision
+  [0035](0035-message-previews-resolve-in-the-browser.md) forbids. Implementing UAX #29 here, over one version's
+  data, keeps all three in agreement in any runtime: `src/domain/messages/graphemes.ts`, with a 6 KB property table
+  generated from the Unicode Character Database 17.0.0 (`scripts/unicode-graphemes.ts`) and Unicode's own
+  conformance file as its test. 17.0 is the version Node 24's ICU has, so nothing moved when it landed. A Java engine
+  uses ICU4J 78 (Unicode 17.0) or ports the module and its table, and runs the same conformance file; the golden
+  case `sms-conjunct-at-part-boundary` fails an engine on older rules. Moving to a newer Unicode version is a change
+  to the specification, made in every engine at once.

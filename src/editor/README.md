@@ -40,7 +40,7 @@ route compiles only the parts of the editor it uses. The entry modules:
 | `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
 | `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
 | `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
-| `@/editor/model/normalize`, `model/document-check`, `model/table-grid`, `model/characters` | `normalizeDocument`, `normalizeField`, `normalizeFragment`, `HEADING_LEVELS`, `CELL_BLOCKS`, `MAX_SPLIT_COLUMNS`; `documentProblem`, `fieldProblem`, `normalizeAndCheckBody`, `normalizeAndCheckField`, `DOCUMENT_MESSAGES`; `tableGrid`, `linesUp`, `spanValue`, `MAX_TABLE_COLUMNS` (the one export); `LINE_BREAKS`, `CONTROL_CHARACTERS`, `cleanCharacters` (the text rules save normalization and the resolver share) |
+| `@/editor/model/normalize`, `model/document-check`, `model/table-grid`, `model/characters` | `normalizeDocument`, `normalizeField`, `normalizeFragment`, `HEADING_LEVELS`, `CELL_BLOCKS`, `MAX_SPLIT_COLUMNS`; `documentProblem`, `fieldProblem`, `normalizeAndCheckBody`, `normalizeAndCheckField`, `DOCUMENT_MESSAGES`; `tableGrid`, `linesUp`, `spanValue`, `MAX_TABLE_COLUMNS` (the one export); `LINE_BREAKS`, `CONTROL_CHARACTERS`, `cleanCharacters`, `CharacterRules` (the text rules save normalization and the resolver share; a message's fields keep invisible characters) |
 
 Server and domain code use only the server-safe ones: `schema`, `model/*` and `paste/*`.
 `model/*` and `paste/*` load no React at all; `schema` reaches only the chip's node view (through
@@ -102,6 +102,7 @@ interface InlineVariableFieldProps {
   label: string;                                  // accessible name; how "where it's used" names it
   value: JSONContent | null;                      // one paragraph; read once
   lines?: "line" | "lines";                       // "lines": Enter and paste add hard breaks (an SMS); read once
+  characters?: "document" | "message";            // "message": a paste keeps invisible characters (push, SMS); read once
   onChange?: (value: JSONContent) => void;
   hidden?: boolean;                               // not shown, still in the root (see Composition)
   flags?: (text: string) => readonly TextFlag[];  // problems underlined in the text (see Behavior, Flags)
@@ -148,7 +149,7 @@ interface DocumentEditorHandle {
 | `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
 | `chipsInJSON(doc)`, `variableKeys(doc)` | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses. |
-| `normalizeDocument(doc)`, `normalizeField(doc, lines?)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
+| `normalizeDocument(doc)`, `normalizeField(doc, lines?, characters?)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. A message's field (`characters: "message"`, a push's or an SMS's) keeps its invisible characters. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
 | `documentProblem(doc)`, `fieldProblem(doc, check?)`, `DOCUMENT_MESSAGES` | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences, and a channel field's check (`FieldCheck`: its lines, and the problem it is refused with: the email's, a push's or an SMS's sentence; the domain picks them by channel). `src/server/render/schema-check.ts` adds the schema parse. |
 | `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)` | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them. |
 | `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
@@ -610,6 +611,12 @@ body, an SMS's message) in a page's main column:
   SMS's locked footer). It shows in the server paint too.
 - **New prop**: `size` (`"sm"`, the default, or `"md"`): 15px text and roomier padding beside a
   document-sized column.
+- **New prop**: `characters` (`CharacterRules` in `model/characters.ts`: `"document"`, the default, or
+  `"message"`), the third argument of `inlineFieldExtensions` and a `ContentLimits` option. A message's
+  field keeps the invisible characters a phone draws with (an emoji's joiner and selector, a flag's tags,
+  the non-joiner in a Persian name) in what is pasted into it; only control characters go. The same
+  setting is on `normalizeField`, `normalizeFragment`, `FieldCheck` and `cleanCharacters`
+  (docs/render-spec.md §4).
 - No new handle methods or dependencies.
 
 ## How it's built

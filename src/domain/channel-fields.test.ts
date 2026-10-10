@@ -130,6 +130,13 @@ describe("normalizeAndCheckChannelField", () => {
     expect(normalizeAndCheckChannelField(subject!, heading).problem).toBe("field");
   });
 
+  it("keeps a push's and an SMS's invisible characters (emoji joiners), and removes the email's", () => {
+    const family = doc(p({ type: "text", text: "👨\u200D👩\u200D👧 ❤\uFE0F" }));
+    expect(normalizeAndCheckChannelField(title!, family).doc).toEqual(family);
+    expect(normalizeAndCheckChannelField(sms!, family).doc).toEqual(family);
+    expect(normalizeAndCheckChannelField(subject!, family).doc).toEqual(doc(p({ type: "text", text: "👨👩👧 ❤" })));
+  });
+
   it("takes a push title and body to one line, refused in the push's words", () => {
     expect(normalizeAndCheckChannelField(body!, broken).doc).toEqual(
       doc(p({ type: "text", text: "a" }, { type: "text", text: " " }, { type: "text", text: "b" })),

@@ -21,12 +21,13 @@ import { assertNever } from "../assert-never";
 import {
   channelFieldValue,
   channelFieldsOf,
+  fieldCharacters,
   fieldOnPlatform,
   type ChannelField,
   type ChannelFields,
-  type FieldShape,
+  type FieldOf,
 } from "../channel-fields";
-import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
+import { sampleSetValues } from "@/editor/model/sample-sets";
 import { SMS_MAX_PARTS, smsLength } from "../messages/gsm7";
 import { PUSH_MAX_BYTES, pushPayloadBytes, type PushPlatform } from "../messages/push";
 import type { JSONContent, SampleSet, Variable } from "../types";
@@ -62,17 +63,21 @@ export type MessageResult<T> = { ok: true; output: T } | { ok: false; error: Ren
 
 /**
  * A channel field as the text its channel prints: one line (`line`, `paragraph`) or its lines kept
- * (`lines`). `null` gives "". Throws a ResolveError for JSON the resolver can't place.
+ * (`lines`). A message's field (a push's, an SMS's) loses only control characters: the invisible
+ * characters a phone draws with (the joiner in an emoji sequence, a presentation selector, a flag's tags,
+ * the non-joiner in a Persian name) stay, in the text and in values. The email's lose them too, as the
+ * document does (`fieldCharacters`). `null` gives "". Throws a ResolveError for JSON the resolver can't place.
  */
-export function resolveChannelField(value: JSONContent | null, shape: FieldShape, ctx: ResolveContext): string {
-  switch (shape) {
+export function resolveChannelField(value: JSONContent | null, field: FieldOf, ctx: ResolveContext): string {
+  const characters = fieldCharacters(field);
+  switch (field.shape) {
     case "line":
     case "paragraph":
-      return resolveInlineField(value, ctx);
+      return resolveInlineField(value, ctx, characters);
     case "lines":
-      return resolveLinesField(value, ctx);
+      return resolveLinesField(value, ctx, characters);
     default:
-      return assertNever(shape, "field shape");
+      return assertNever(field.shape, "field shape");
   }
 }
 
@@ -136,25 +141,40 @@ export function withFooter(message: string, footer: string | null): string {
 
 /**
  * The "long" sample values that submit measures a message with (`submit` in lifecycle.ts) and the
- * composer's "Long values" line shows: the version's "long" set, or the generated one when it has none,
- * its gaps filled from the defaults (`sampleSetValues`), canonical. Null when they don't validate: then
- * there is nothing to measure, and the preview says why. `today` is YYYY-MM-DD (the demo clock's day).
+ * composer's "Long values" line shows, canonical, one for every variable: the version's "long" set, its
+ * gaps filled from the defaults (`sampleSetValues`), or the generated set when it has none. A stored
+ * value that doesn't validate (the set was edited while `amount` was text, and `amount` is a currency
+ * now) gives way to the generated long value for its key, so the measurements always run: a stale value
+ * can't switch off the part budget or the push size check. `today` is YYYY-MM-DD (the demo clock's day).
  */
 export function longSampleValues(
   version: { variables: readonly Variable[]; sampleSets: readonly SampleSet[] },
   today: string,
-): CanonicalValues | null {
-  const set =
-    version.sampleSets.find((s) => s.id === "long") ??
-    defaultSampleSets(version.variables, today).find((s) => s.id === "long")!;
-  const validated = validateValues(version.variables, sampleSetValues(set, version.variables, today));
-  return validated.ok ? validated.values : null;
+): CanonicalValues {
+  const generated = sampleSetValues(GENERATED_LONG, version.variables, today);
+  const own = version.sampleSets.find((s) => s.id === "long");
+  const given = own ? sampleSetValues(own, version.variables, today) : generated;
+  const values: Record<string, string> = {};
+  for (const variable of version.variables) {
+    const value = canonicalValue(variable, given[variable.key]) ?? canonicalValue(variable, generated[variable.key]);
+    if (value !== null) values[variable.key] = value;
+  }
+  return values;
+}
+
+/** A "long" set with no values of its own: `sampleSetValues` fills every variable from the generated long defaults. */
+const GENERATED_LONG: SampleSet = { id: "long", name: "long", values: {} };
+
+/** One value, canonical as `validateValues` makes it, or null when it doesn't validate (or is absent). */
+function canonicalValue(variable: Variable, value: unknown): string | null {
+  const validated = validateValues([variable], { [variable.key]: value });
+  return validated.ok ? (validated.values[variable.key] ?? null) : null;
 }
 
 /** The fields, each resolved to its text, by key. */
 function textOf(fields: readonly ChannelField[], input: MessageInput): Readonly<Record<string, string>> {
   const ctx: ResolveContext = { variables: input.variables, values: input.values };
   return Object.fromEntries(
-    fields.map((field) => [field.key, resolveChannelField(channelFieldValue(input.fields, field), field.shape, ctx)]),
+    fields.map((field) => [field.key, resolveChannelField(channelFieldValue(input.fields, field), field, ctx)]),
   );
 }

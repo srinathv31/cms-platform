@@ -60,10 +60,17 @@ describe("smsMeta", () => {
     ]);
   });
 
-  it("leaves out a half whose values don't render", () => {
+  it("leaves out the selected set's half when its values don't render", () => {
     expect(smsMetaSegments(smsMeta(input({ values: { first_name: "" } })))).toEqual([{ text: "Long values: 2 parts", over: false }]);
+  });
+
+  it("measures a stored long value that no longer validates with the generated one, as submit does", () => {
+    // Too long to be a value, so submit measures the generated long name in its place: 21 characters, 2 parts.
     const broken: SampleSet = { id: "long", name: "Long", values: { first_name: "x".repeat(1001) } };
-    expect(smsMetaSegments(smsMeta(input({ sampleSets: [broken] })))).toEqual([{ text: "GSM-7 · 1 part", over: false }]);
+    expect(smsMetaSegments(smsMeta(input({ sampleSets: [broken], rules: { smsFooter: FOOTER, smsMaxParts: 1 } })))).toEqual([
+      { text: "GSM-7 · 1 part", over: false },
+      { text: "Long values: 2 parts, over the 1-part limit", over: true },
+    ]);
   });
 
   it("measures the long values the version doesn't store from the generated set, as submit does", () => {

@@ -478,6 +478,8 @@ describe("POST …/render: push and SMS", () => {
         },
         sms: { text: field(t("Coral Offers: "), chip("amount_due"), t(" is due."), { type: "hardBreak" }, t("coral.example/pay")) },
       },
+      // Frozen at submit, as the Alert content type's footer stood then.
+      smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.",
       sunsetAt: null,
       revoke: null,
     });
@@ -518,6 +520,22 @@ describe("POST …/render: push and SMS", () => {
       characters: 98,
       newerVersion: null,
     });
+  });
+
+  it("ends with the footer the version was submitted with: a later change to the content type's reaches only a draft", async () => {
+    const { contentTypes } = await import("@/server/db/schema/ucomp");
+    const NEW = "Coral: Reply STOP to end, HELP for help.";
+    await db.update(contentTypes).set({ smsFooter: NEW }).where(eq(contentTypes.id, "ct_alert"));
+    await db.insert(versions).values({ ...(await db.select().from(versions).where(eq(versions.id, "v_alert_1")))[0]!, id: "v_alert_draft", number: null, state: "draft", smsFooter: null });
+    try {
+      const active = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
+      expect(((await active.json()) as { text: string }).text).toMatch(/\nCoral Offers: Reply STOP to opt out, HELP for help\.$/);
+      const draft = await post(ALERT_ID, { version: "draft", preview: true, channel: "sms", values: VALUES }, {});
+      expect(((await draft.json()) as { text: string }).text).toMatch(new RegExp(`\\n${NEW.replace(/[.]/g, "\\.")}$`));
+    } finally {
+      await db.delete(versions).where(eq(versions.id, "v_alert_draft"));
+      await db.update(contentTypes).set({ smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+    }
   });
 
   it("a value outside GSM-7 switches the SMS to UCS-2; it is never transliterated", async () => {

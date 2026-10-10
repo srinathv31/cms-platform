@@ -7,6 +7,7 @@
 import type {
   ApproverRule,
   Channel,
+  ChannelFamily,
   ContractChange,
   JSONContent,
   PermissionResult,
@@ -251,6 +252,18 @@ export interface FieldRedline {
   doc: RedlineDoc;
 }
 
+/**
+ * The SMS's locked footer in a redline (`diffChannelFields`): the one each version prints (its own, frozen at
+ * submit; a draft's is the content type's), shown under the SMS's message. `from` is null with no base, or
+ * when the base had no footer. A changed footer counts as one change, unless the SMS itself was turned on or
+ * off (its message counts then, and the footer comes or goes with it).
+ */
+export interface FooterRedline {
+  from: string | null;
+  to: string | null;
+  status: Exclude<RedlineStatus, "moved">;
+}
+
 // ── Consequences (domain/consequences.ts) ─────────────────────────────────────
 
 /** Render-log aggregate per consumer and version (non-preview renders only). */
@@ -318,7 +331,8 @@ export interface ReviewQueue {
 }
 
 export interface ReviewScreenData {
-  template: { id: string; teamId: string; teamSlug: string; teamName: string };
+  /** `family`: its content type's (`contentTypeFamily`), never read from a version's channels. */
+  template: { id: string; teamId: string; teamSlug: string; teamName: string; family: ChannelFamily };
   version: {
     id: string;
     number: number;
@@ -331,6 +345,8 @@ export interface ReviewScreenData {
     sampleSets: SampleSet[];
     /** Each channel's own fields (channel-fields.ts). */
     channelFields: ChannelFields;
+    /** The SMS footer frozen into this version at submit (null: none): what its SMS ends with, whatever the content type's is now. */
+    smsFooter: string | null;
     submittedBy: Person;
     submittedAt: string;
     submitNote: string | null;
@@ -345,7 +361,7 @@ export interface ReviewScreenData {
    * version; with none Active (after a revoke), the released version the draft was based on, then the
    * newest version that still renders. Null for a first version, or when that would be this version.
    * `state` is for the label ("vs v3 (revoked)"). The contract changes come from submit (`contractBaseline`).
-   * Its channels and channel fields are what the fields' redline compares with (`diffChannelFields`).
+   * Its channels, channel fields and SMS footer are what the fields' redline compares with (`diffChannelFields`).
    */
   baseline: {
     id: string;
@@ -355,6 +371,7 @@ export interface ReviewScreenData {
     variables: Variable[];
     channels: Channel[];
     channelFields: ChannelFields;
+    smsFooter: string | null;
   } | null;
   /**
    * The Active version this one would replace, for the Approve dialog's consequences and its sunset
@@ -377,7 +394,10 @@ export interface ReviewScreenData {
   today: string;
   /** The approve dialog's sunset picker. */
   sunsetCalendar: SunsetCalendar;
-  /** The content type's SMS footer and part budget: what the phone preview renders a message version with. */
+  /**
+   * What the phone preview renders a message version with: the SMS footer is the version's own (frozen at
+   * submit, as `version.smsFooter`), the part budget the content type's.
+   */
   messageRules: MessageTypeRules;
   /** Who the team's messages come from on the phone preview. */
   senders: TeamSenders;

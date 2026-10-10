@@ -103,9 +103,33 @@ describe("GET /api/templates/[templateId]/compare", () => {
         body: v.body,
         channels: v.channels,
         channelFields: v.channelFields,
+        smsFooter: null,
         variables: v.variables,
       });
-      expect(body).toEqual({ ok: true, from: side(v1, 1, "superseded"), to: side(v2, 2, "active"), smsFooter: null });
+      expect(body).toEqual({ ok: true, family: "document", from: side(v1, 1, "superseded"), to: side(v2, 2, "active") });
+    }
+  });
+
+  it("gives an alert's versions each the SMS footer it prints: frozen at submit, the draft's the content type's now", async () => {
+    const alert = ids["payment-due-reminder"]!;
+    const v1 = await versionOf(alert, { number: 1 });
+    // A draft after it, and a new footer on the Alert content type since v1 was submitted.
+    await db.insert(versions).values({ ...v1, id: "v_payment_draft", number: null, state: "draft", smsFooter: null });
+    const { contentTypes } = await import("@/server/db/schema/ucomp");
+    const NOW = "Coral: Reply STOP to end.";
+    await db.update(contentTypes).set({ smsFooter: NOW }).where(eq(contentTypes.id, "ct_alert"));
+    try {
+      as("maya");
+      const { body } = await answer(get(compare, "compare", alert, `?from=${v1.id}&to=v_payment_draft`));
+      expect(body).toMatchObject({
+        ok: true,
+        family: "message",
+        from: { smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." },
+        to: { smsFooter: NOW },
+      });
+    } finally {
+      await db.delete(versions).where(eq(versions.id, "v_payment_draft"));
+      await db.update(contentTypes).set({ smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
     }
   });
 

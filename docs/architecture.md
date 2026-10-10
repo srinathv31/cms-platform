@@ -136,7 +136,7 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
 4. Resolve the TipTap JSON to a `RenderDoc` (`src/domain/render`), then a channel adapter renders web HTML, an email,
    or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
    browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
-   content type's footer, refused (422) past 4,096 bytes or 10 parts.
+   version's footer (frozen at submit; a draft's is the content type's), refused (422) past 4,096 bytes or 10 parts.
 5. One `render_log` row, success or error. It never stores the values.
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
@@ -160,7 +160,7 @@ at Turso instead. Two schema files:
   - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
     `channel_fields` (each channel's own fields, such as the email subject, by channel and then field key, from
     the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `rev`,
-    `writers`, the approval `stages` recorded at submit, sunset and revoke fields); `approvals` (each decision's
+    `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, sunset and revoke fields); `approvals` (each decision's
     stage id). The name is a version field, so a rename goes through
     review ([decision 0016](decisions/0016-the-name-is-versioned.md)).
   - **Review:** `comment_threads`, `comments`.

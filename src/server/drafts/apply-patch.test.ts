@@ -384,6 +384,11 @@ describe("applyDraftPatch: refusals change nothing", () => {
     expect(res.error).toBe("invalid");
   });
 
+  it("invalid for no channels at all, which the parse refuses too: the draft keeps its own", async () => {
+    const res = await expectUntouched(() => save({ channels: [] }));
+    expect(res).toMatchObject({ error: "invalid", message: "Turn on at least one channel." });
+  });
+
   it("does not leave half a save behind when the name is the bad part", async () => {
     await expectUntouched(() => save({ body: doc(para("Changed", "p1")), name: " " }));
   });

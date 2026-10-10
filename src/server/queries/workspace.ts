@@ -6,12 +6,12 @@ import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
+import { contractBaseline, planDraftStart, smsFooterOf } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import {
-  familyOf,
+  contentTypeFamily,
   type Channel,
   type ChannelFamily,
   type JSONContent,
@@ -167,8 +167,10 @@ export interface WorkspaceDocumentData {
    */
   family: ChannelFamily;
   /**
-   * The content type's SMS footer and part budget: what the message preview renders an SMS with
-   * (`renderMessage`'s `rules.smsFooter`) and the parts submit allows with the long sample values.
+   * The SMS footer and part budget: what the message preview renders an SMS with (`renderMessage`'s
+   * `rules.smsFooter`) and the parts submit allows with the long sample values. The footer is the shown
+   * version's (`smsFooterOf`): a draft's is its content type's as it stands, a submitted version's the one
+   * frozen into it.
    */
   messageRules: MessageTypeRules;
   /** Who the team's messages come from in the phone preview: the push app name and the SMS sender. */
@@ -229,6 +231,7 @@ export const getWorkspaceDocument = cache(
         variables: versions.variables,
         channels: versions.channels,
         channelFields: versions.channelFields,
+        smsFooter: versions.smsFooter,
         sampleSets: versions.sampleSets,
       })
       .from(versions)
@@ -252,8 +255,8 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
-      family: familyOf(tpl.allowedChannels) ?? familyOf(shown.channels) ?? "document",
-      messageRules: { smsFooter: tpl.smsFooter, smsMaxParts: tpl.smsMaxParts },
+      family: contentTypeFamily(tpl.allowedChannels),
+      messageRules: { smsFooter: smsFooterOf(shown, tpl.smsFooter), smsMaxParts: tpl.smsMaxParts },
       senders: { appName: tpl.appName, smsSender: tpl.smsSender },
       channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,

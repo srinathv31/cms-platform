@@ -796,6 +796,47 @@ const smsFooter = message("sms-footer", "The footer counts", {
   channelFields: { sms: { text: line(t("z".repeat(108))) } },
 });
 
+// A phone draws with the invisible characters a document drops (docs/render-spec.md §4): the joiner in an
+// emoji ZWJ sequence, the emoji presentation selector (❤ U+FE0F), a keycap's, the tags of a subdivision flag,
+// and the zero-width non-joiner a Persian name is spelled with. A message keeps every one, typed or sent.
+const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}"; // man, woman, girl: one emoji
+const ENGLAND = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}"; // the black flag and its tags: one flag
+const ALIREZA = "علی‌رضا"; // a Persian name, its two words held apart by a ZWNJ
+const nickname = variable("nickname", "Nickname", "text", true, "Zoë");
+
+const pushJoiners = message("push-emoji-and-joiners", "Emoji and joiners in a push", {
+  channels: ["push"],
+  variables: [first, nickname],
+  values: { first_name: ALIREZA, nickname: "Zoë \u{1F469}‍\u{1F4BB}" },
+  channelFields: {
+    push: {
+      title: line(t(`Family ❤️ ${FAMILY} ${ENGLAND} 1️⃣`)),
+      subtitle: line(t("For "), v("first_name")),
+      body: line(t("Hi "), v("nickname"), t(", your family plan is ready.")),
+    },
+  },
+});
+
+const smsJoiners = message("sms-emoji-and-joiners", "Emoji and joiners in an SMS", {
+  channels: ["sms"],
+  smsFooter: FOOTER,
+  variables: [first, variable("plan", "Plan", "text", true, "Family")],
+  // The author typed GSM-7; the values hold a ZWNJ name, an emoji ZWJ sequence and a flag tag sequence. Each
+  // prints as sent, the SMS goes in UCS-2, and each emoji and flag counts one character.
+  values: { first_name: ALIREZA, plan: `${FAMILY} ${ENGLAND}` },
+  channelFields: { sms: { text: line(t("Coral Offers: "), v("first_name"), t(", your plan "), v("plan"), t(" is ready.")) } },
+});
+
+// GB9c, Unicode's rule that keeps an Indic conjunct (क्ष: ka, virama, ssa) one grapheme cluster since 15.1:
+// 65 units, then the conjunct's 3 don't fit in 67, so the second part starts with it whole. `characters`
+// counts it once. An engine on older rules makes 2 clusters of it, and cuts after the virama.
+const smsConjunct = message("sms-conjunct-at-part-boundary", "An Indic conjunct at a part boundary", {
+  channels: ["sms"],
+  variables: [variable("word", "Word", "text", true, "क्ष")],
+  values: { word: "क्ष" },
+  channelFields: { sms: { text: line(t("y".repeat(65)), v("word"), t("y".repeat(10))) } },
+});
+
 const smsTooLong = message("sms-error-too-long", "SMS over 10 parts", {
   channels: ["sms"],
   smsFooter: FOOTER,
@@ -854,4 +895,7 @@ export const FOCUSED_CASES: FocusedCase[] = [
   smsEmojiBoundary,
   smsFooter,
   smsTooLong,
+  pushJoiners,
+  smsJoiners,
+  smsConjunct,
 ];
