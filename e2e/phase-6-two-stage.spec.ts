@@ -8,9 +8,9 @@ import { asPersona, beat, demoTimeout, expect, hydrated, liveEditor, openLibrary
 //
 //   1. Riley (Platform Admin) adds a "Legal reviewer" stage to the Disclosure approval chain, naming Dana
 //      Park. The strip shows the chain Now and After and says Dana will review every team's submissions.
-//      Cash Back Welcome Bonus v3 (seeded, in review, submitted by Maya) keeps the one stage it was
-//      submitted with (decision 0015): Jordan's approval makes it Active. Maya then edits Cash Back and
-//      submits v4, which goes through both stages.
+//      Cash Back Welcome Bonus v3 (seeded, in review on round 2 after one send-back, submitted by Maya) keeps
+//      the one stage it was submitted with (decision 0015): Jordan's approval of "v3, round 2" makes it
+//      Active. Maya then edits Cash Back and submits v4, which goes through both stages.
 //   2. Jordan (Approver) opens v4 from his queue: the stepper has two stages and he is on the first. He
 //      approves: the dialog says it moves on to the Legal reviewer and is not Active yet. Afterwards the
 //      stepper shows his approval, Dana's stage is current, his queue no longer holds it, and he has no say
@@ -91,32 +91,41 @@ async function openQueue(page: Page, tab = "Waiting on me") {
   await expect(queueTab).toHaveAttribute("aria-selected", "true");
 }
 
-/** The review screen, once the document is live. */
+/** The review screen, once the document is live. A queue row links a round past the first with `?round=`. */
 async function expectReviewScreen(page: Page, number: number) {
-  await expect(page).toHaveURL(new RegExp(`/${TEAM}/review/[^/]+/${number}$`));
+  await expect(page).toHaveURL(new RegExp(`/${TEAM}/review/[^/]+/${number}(\\?round=\\d+)?$`));
   await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
   await expect(decision(page)).toBeVisible();
   await liveEditor(page);
   await hydrated(page);
 }
 
-/** The seed's in-review version of Cash Back (v3). */
+/** How a round in review is named in a sentence: "v4", or "v3, round 2" once v3 was sent back (decision 0033). */
+const inReviewLabel = (number: number, round: number) => (round > 1 ? `v${number}, round ${round}` : `v${number}`);
+
+/** The seed's in-review version of Cash Back: v3, round 2 (round 1 was sent back). */
 async function seededInReview() {
   const [seeded] = await rows(
-    `SELECT v.id, v.template_id, v.number, v.state, v.current_stage, v.stages FROM versions v JOIN templates t ON t.id = v.template_id
+    `SELECT v.id, v.template_id, v.number, v.round, v.state, v.current_stage, v.stages FROM versions v JOIN templates t ON t.id = v.template_id
      WHERE v.name = ? AND v.state = 'in_review'`,
     [NAME],
   );
   if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);
-  return { versionId: String(seeded.id), templateId: String(seeded.template_id), number: Number(seeded.number), row: seeded };
+  const number = Number(seeded.number);
+  const round = Number(seeded.round);
+  expect([number, round], "the seed has Cash Back v3 in review on round 2").toEqual([3, 2]);
+  return { versionId: String(seeded.id), templateId: String(seeded.template_id), number, round, label: inReviewLabel(number, round), row: seeded };
 }
 
-/** Approve on the open review screen, through the dialog; at the last stage, wait out the go-live moment. */
-async function approveOnScreen(page: Page, number: number, outcome: "live" | "next") {
+/**
+ * Approve on the open review screen, through the dialog named for the round ("Approve v3, round 2",
+ * "Approve v4"); at the last stage, wait out the go-live moment.
+ */
+async function approveOnScreen(page: Page, label: string, outcome: "live" | "next") {
   await click(approveButton(page));
-  const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
+  const dialog = page.getByRole("dialog", { name: `Approve ${label}`, exact: true });
   await expect(dialog).toBeVisible();
-  await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+  await click(dialog.getByRole("button", { name: `Approve ${label}`, exact: true }));
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   if (outcome === "live") {
     await expect(page.locator("[data-go-live]")).toHaveCount(0, { timeout: 20_000 });
@@ -131,12 +140,14 @@ async function approveOnScreen(page: Page, number: number, outcome: "live" | "ne
  * Jordan's approval makes it Active. Maya then presses Edit and submits v4, which records the chain as it
  * is now. Returns v4.
  */
-async function goLiveThenResubmit(page: Page, seeded: { templateId: string; number: number }) {
+async function goLiveThenResubmit(page: Page, seeded: { templateId: string; number: number; round: number; label: string }) {
   await asPersona(page, "jordan");
   await page.goto(`/${TEAM}/review/${seeded.templateId}/${seeded.number}`);
   await expectReviewScreen(page, seeded.number);
+  // The bare link opens the number's latest round, and the header names it.
+  await expect(page.getByRole("heading", { level: 1, name: NAME }).locator("xpath=../..")).toContainText(`v${seeded.number} · Round ${seeded.round} by Maya Chen`);
   await expect(decision(page).locator("[data-step]"), "v3 has the one stage it was submitted with").toHaveCount(1);
-  await approveOnScreen(page, seeded.number, "live");
+  await approveOnScreen(page, seeded.label, "live");
 
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${seeded.templateId}`);
@@ -518,7 +529,7 @@ test.describe("phase 6: two-stage approval", () => {
       await page.goto(`/${TEAM}/review/${templateId}/${v4.number}`);
       await expectReviewScreen(page, v4.number);
       await expect(decision(page)).toContainText("Stage 1 of 2");
-      await approveOnScreen(page, v4.number, "next");
+      await approveOnScreen(page, `v${v4.number}`, "next");
       await expect(step(page, "done")).toContainText("Dana Park");
       await expect(step(page, "current")).toContainText("Team approver");
     });
@@ -564,7 +575,7 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(approveButton(page)).toBeEnabled();
       await beat(page, 900);
       await shoot(page, "jordan-after-reorder");
-      await approveOnScreen(page, v4.number, "live");
+      await approveOnScreen(page, `v${v4.number}`, "live");
       await expect(step(page, "done")).toHaveCount(2);
       await expect(step(page, "done").nth(0)).toContainText("Dana Park");
       await expect(step(page, "done").nth(1)).toContainText("Jordan Ellis");

@@ -41,6 +41,7 @@ async function submitV3(spring: SpringFixture) {
     ...v2,
     id: `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
     number: 3,
+    round: 1,
     state: "in_review",
     based_on_version_id: spring.v2Id,
     current_stage: 0,
