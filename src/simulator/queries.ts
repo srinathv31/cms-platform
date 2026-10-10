@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
@@ -404,14 +404,16 @@ const parseSms = (output: string | null) => parseOutput<Omit<SimSms, "deliveryId
 
 /**
  * The customer's thread with Coral's short code: every text delivered to them, from any offer or alert,
- * oldest first, up to and including `upTo`.
+ * oldest first, up to and including `upTo`. `at` is to the second, so two sends in one second tie on it;
+ * SQLite's rowid (the order the rows went in, as a send writes its batch in one insert) breaks the tie. The
+ * id can't: a batch's ids start with a random key.
  */
 async function smsThread(customerId: string, upTo: DeliveryRow): Promise<SimSms[]> {
   const rows = await simDb
     .select({ id: simDeliveries.id, at: simDeliveries.at, output: simDeliveries.output })
     .from(simDeliveries)
     .where(and(eq(simDeliveries.customerId, customerId), eq(simDeliveries.channel, "sms"), eq(simDeliveries.status, "delivered")))
-    .orderBy(asc(simDeliveries.at), asc(simDeliveries.id));
+    .orderBy(asc(simDeliveries.at), asc(sql`rowid`));
   const thread: SimSms[] = [];
   for (const row of rows) {
     const sms = parseSms(row.output);
