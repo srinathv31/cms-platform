@@ -713,18 +713,23 @@ describe("notifications, access and audit", () => {
 });
 
 describe("simulator data", () => {
-  it("has Spring Travel Rewards unlinked and three linked offers pinned correctly", async () => {
+  it("has Spring Travel Rewards unlinked, three linked offers and the payment alert pinned correctly", async () => {
     const offers = await db.select().from(sim.simOffers);
     const links = await db.select().from(sim.simLinks);
     const spring = offers.find((o) => o.name === "Spring Travel Rewards");
     expect(spring?.headline).toBe("Spend $1,000 in 3 months, get $200 back");
     expect(links.some((l) => l.offerId === spring!.id)).toBe(false);
-    expect(links).toHaveLength(3);
+    expect(links).toHaveLength(4);
 
     const pinned = Object.fromEntries(links.map((l) => [l.templateId, l.pinnedVersion]));
     expect(pinned[tpl("balance-transfer")]).toBe(1);
     expect(pinned[tpl("cash-back")]).toBe(2);
     expect(pinned[tpl("holiday-points")]).toBe(2);
+    expect(pinned[tpl("payment-due-reminder")]).toBe(1);
+    for (const l of links) {
+      const kind = offers.find((o) => o.id === l.offerId)!.kind;
+      expect(l.channels.every((c) => (kind === "alert" ? ["push", "sms"] : ["pdf", "web", "email"]).includes(c))).toBe(true);
+    }
 
     for (const l of links) {
       const v = versions.find((x) => x.templateId === l.templateId && x.number === l.pinnedVersion)!;
@@ -746,8 +751,32 @@ describe("simulator data", () => {
     const customers = await db.select().from(sim.simCustomers);
     for (const c of customers) expect(c.annualFee).toMatch(/^\d+$/);
     const spring = (await db.select().from(sim.simOffers)).find((o) => o.id === "offer_spring_travel")!;
-    expect(spring.terms.annualFee).toBe(95);
-    expect(spring.terms.endsOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(spring.terms?.annualFee).toBe(95);
+    expect(spring.terms?.endsOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("gives every customer a fictional phone, iPhone or Android, and a card account for the alerts", async () => {
+    const customers = await db.select().from(sim.simCustomers);
+    expect(new Set(customers.map((c) => c.platform))).toEqual(new Set(["ios", "android"]));
+    expect(new Set(customers.map((c) => c.phone)).size).toBe(customers.length);
+    for (const c of customers) {
+      expect(c.phone).toMatch(/^\+1\d{3}55501\d{2}$/);
+      expect(c.cardLast4).toMatch(/^\d{4}$/);
+      expect(c.statement?.minimumDue).toMatch(/^\d+\.\d{2}$/);
+      expect(c.statement?.dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(c.lastPurchase?.amount).toMatch(/^\d+\.\d{2}$/);
+    }
+  });
+
+  it("has two alerts with no terms: Payment due linked on Push and SMS, Card used abroad not linked", async () => {
+    const alerts = (await db.select().from(sim.simOffers)).filter((o) => o.kind === "alert");
+    expect(alerts.map((a) => [a.name, a.terms])).toEqual([
+      ["Payment due", null],
+      ["Card used abroad", null],
+    ]);
+    const links = await db.select().from(sim.simLinks);
+    expect(links.find((l) => l.offerId === "alert_payment_due")).toMatchObject({ templateId: tpl("payment-due-reminder"), channels: ["push", "sms"] });
+    expect(links.some((l) => l.offerId === "alert_card_abroad")).toBe(false);
   });
 
   it("has Coral's seeded notices read, except Balance Transfer v1's sunset", async () => {

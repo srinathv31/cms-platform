@@ -9,6 +9,7 @@ import type { ApiChannel, ApiContractChange, ApiTemplateSummary } from "@/contra
 import { cn } from "@/lib/utils";
 import { linkTemplate, searchTemplates } from "@/simulator/actions";
 import { simField } from "@/simulator/fields";
+import { KIND_CHANNELS, sendable } from "@/simulator/kinds";
 import { blockedSentence } from "@/simulator/mapping";
 import type { SimFieldPath, SimLinkFlow, SimMappingRow } from "@/simulator/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +28,6 @@ const KIND: Record<ApiContractChange["kind"], { label: string; tone: Tone }> = {
   label_changed: { label: "Label changed", tone: "plain" },
 };
 
-const ALL_CHANNELS: ApiChannel[] = ["pdf", "web", "email"];
 
 function Step({ n, title, right, children }: { n: number; title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -63,7 +63,8 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
         if (cancelled) return;
         setResultsFor(q);
         if (result.ok) {
-          setResults(result.results);
+          // Only what this offer or alert can send: an alert lists alert templates, an offer documents.
+          setResults(result.results.filter((t) => sendable(offer.kind, t.channels).length > 0));
           setSearchError(null);
         } else setSearchError(result.reason);
       },
@@ -73,10 +74,10 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [q, searching]);
+  }, [q, searching, offer.kind]);
 
   // ── The chosen template ────────────────────────────────────────────────────
-  const contractChannels = candidate?.template.contract?.channels ?? [];
+  const contractChannels = sendable(offer.kind, candidate?.template.contract?.channels ?? []);
   const [channels, setChannels] = useState<ApiChannel[]>(() => {
     const kept = current ? current.channels.filter((c) => contractChannels.includes(c)) : [];
     return kept.length > 0 ? kept : contractChannels;
@@ -108,7 +109,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       router.push(`${base}?tab=${missing.length > 0 ? "values" : "send"}` as Route);
     });
 
-  const toggleChannel = (c: ApiChannel) => setChannels((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : ALL_CHANNELS.filter((x) => x === c || cur.includes(x))));
+  const toggleChannel = (c: ApiChannel) => setChannels((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : contractChannels.filter((x) => x === c || cur.includes(x))));
 
   const title = relinking && candidate ? `Relink to v${candidate.version}` : "Link template";
   // The consequence, before the commitment: which version sends use from now on, and what happens to the old one.
@@ -117,7 +118,13 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       ? ` v${current.pinnedVersion} stops rendering ${dayLabel(current.sunsetAt)}.`
       : "";
   const consequence = candidate && channels.length > 0 && !sameVersion ? `Sends use v${candidate.version} on ${channelList(channels)}.${stops}` : "";
-  const blocker = sameVersion ? `Already linked to v${candidate?.version}.` : channels.length === 0 && candidate ? "Choose at least one channel." : "";
+  const blocker = sameVersion
+    ? `Already linked to v${candidate?.version}.`
+    : candidate && contractChannels.length === 0
+      ? KIND_CHANNELS[offer.kind].refusal
+      : channels.length === 0 && candidate
+        ? "Choose at least one channel."
+        : "";
 
   return (
     <PageScroll>
@@ -125,7 +132,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
         crumbs={
           <>
             <Link href={"/sim" as Route} className="text-(--sim-muted) no-underline hover:underline">
-              Offers
+              {offer.kind === "alert" ? "Alerts" : "Offers"}
             </Link>
             {"  /  "}
             <Link href={base as Route} className="text-(--sim-muted) no-underline hover:underline">

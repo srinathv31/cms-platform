@@ -9,6 +9,7 @@ import { simDb, withBusyRetry } from "./db";
 import { isSimFieldPath } from "./fields";
 import { blockedSentence, missingRequired, valuesFor } from "./mapping";
 import { customerRecord, getSimDeliveryView, loadBatch, offerRecord } from "./queries";
+import { KIND_CHANNELS } from "./kinds";
 import type { SimApiError, SimBatch, SimDeliveryView, SimFieldPath, SimResult } from "./types";
 import { ucompApi } from "./ucomp-api";
 
@@ -22,7 +23,7 @@ const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", emai
 const RENDER_CONCURRENCY = 3;
 const MAX_CUSTOMERS = 50;
 
-const Channel = z.enum(["pdf", "web", "email"]);
+const Channel = z.enum(["pdf", "web", "email", "push", "sms"]);
 const Mapping = z.record(z.string().min(1).max(100), z.string().nullable());
 
 const randomPart = (length: number) => crypto.randomUUID().replace(/-/g, "").slice(0, length);
@@ -68,8 +69,10 @@ export async function linkTemplate(input: {
   if (!parsed.success) return fail(parsed.error.issues[0]?.path[0] === "channels" ? "Choose at least one channel." : "That link isn't complete.");
   const { offerId, templateId, version, channels, mapping } = parsed.data;
 
-  const [offer] = await simDb.select({ id: simOffers.id }).from(simOffers).where(eq(simOffers.id, offerId));
+  const [offer] = await simDb.select({ id: simOffers.id, kind: simOffers.kind }).from(simOffers).where(eq(simOffers.id, offerId));
   if (!offer) return fail("That offer doesn't exist.");
+  const sends = KIND_CHANNELS[offer.kind];
+  if (channels.some((c) => !sends.channels.includes(c))) return fail(sends.refusal);
 
   const detail = await (await ucompApi()).getTemplate(templateId);
   if (!detail.ok) return fail(detail.error.message);
@@ -85,7 +88,7 @@ export async function linkTemplate(input: {
     templateId: detail.data.id,
     templateName: name,
     pinnedVersion: activeVersion,
-    // In the API's order. Coral links the channels it can deliver: PDF, web and email (`Channel`).
+    // In the API's order.
     channels: Channel.options.filter((c) => channels.includes(c)),
     mapping: kept,
     linkedAt: new Date(),
@@ -177,9 +180,15 @@ export async function sendToCustomers(input: { offerId: string; customerIds: str
   const results = await pool(jobs, RENDER_CONCURRENCY, async ({ customer, channel }) => {
     const correlationId = `coral_${randomPart(16)}`;
     const values = valuesFor(mapping, customerRecord(customer), offerRec);
-    const rendered = await api.render(link.templateId, { version: link.pinnedVersion, channel, values }, correlationId);
+    // A push is rendered for the phone it goes to: the customer's platform.
+    const platform = channel === "push" ? customer.platform : null;
+    const rendered = await api.render(
+      link.templateId,
+      { version: link.pinnedVersion, channel, values, ...(platform ? { platform } : {}) },
+      correlationId,
+    );
     // Stamped with UCOMP's answer time (its HTTP Date header: the demo's clock), real time without one.
-    return { customer, channel, correlationId, rendered, at: rendered.at };
+    return { customer, channel, platform, correlationId, rendered, at: rendered.at };
   });
 
   const unreachable = results.every((r) => !r.rendered.ok && r.rendered.error.status === 0);
@@ -196,6 +205,7 @@ export async function sendToCustomers(input: { offerId: string; customerIds: str
     templateId: link.templateId,
     versionNumber: link.pinnedVersion,
     channel: r.channel,
+    platform: r.platform,
     status: r.rendered.ok ? ("delivered" as const) : ("failed" as const),
     error: r.rendered.ok ? null : r.rendered.error,
     newerVersion: r.rendered.ok ? r.rendered.data.newerVersion : null,

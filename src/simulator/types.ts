@@ -13,9 +13,13 @@ import type {
   ApiTemplateDetail,
   ApiTemplateSummary,
   ApiVariable,
+  ApiSmsEncoding,
   ApiVariableType,
   ApiVersionState,
 } from "@/contracts/api-v1";
+import type { SimOfferKind, SimPlatform } from "@/server/db/schema/sim";
+
+export type { SimOfferKind, SimPlatform };
 
 // ── Mapping fields (src/simulator/fields.ts holds the runtime list) ─────────────────────────────
 
@@ -28,6 +32,12 @@ export type SimFieldPath =
   | "customer.homeState"
   | "customer.purchaseApr"
   | "customer.annualFee"
+  | "card.last4"
+  | "card.minimumDue"
+  | "card.dueDate"
+  | "card.purchaseAmount"
+  | "card.purchaseMerchant"
+  | "card.purchaseCountry"
   | "offer.name"
   | "offer.headline"
   | "offer.spend"
@@ -38,8 +48,8 @@ export type SimFieldPath =
 
 export interface SimField {
   path: SimFieldPath;
-  source: "customer" | "offer";
-  label: string; // "Customer · First name", "Offer · Annual fee"
+  source: "customer" | "card" | "offer";
+  label: string; // "Customer · First name", "Card · Minimum due", "Offer · Annual fee"
   /** Variable types this field's values are valid for (canonical forms). */
   fits: readonly ApiVariableType[];
 }
@@ -64,13 +74,18 @@ export interface SimCustomerRecord {
   homeState: string;
   purchaseApr: string;
   annualFee: string | null;
+  cardLast4: string;
+  /** The card's statement and last purchase: canonical values, null when the card has none. */
+  statement: { minimumDue: string; dueDate: string } | null;
+  lastPurchase: { amount: string; merchant: string; country: string } | null;
 }
 
 export interface SimOfferRecord {
   id: string;
   name: string;
   headline: string;
-  terms: { spend: number; bonus: number; months: number; annualFee?: number; endsOn?: string };
+  /** Null for an alert, which has no terms. */
+  terms: { spend: number; bonus: number; months: number; annualFee?: number; endsOn?: string } | null;
 }
 
 // ── Read models (src/simulator/queries.ts; server-only; each reads sim_* and calls /api/v1) ─────────
@@ -86,6 +101,8 @@ export interface SimHome {
 
 export interface SimOfferCard {
   id: string;
+  /** An offer (documents) or an alert (push and SMS): the home page lists them apart. */
+  kind: SimOfferKind;
   name: string;
   headline: string;
   link: SimLinkSummary | null;
@@ -117,7 +134,7 @@ export interface SimUpgrade {
 
 /** /sim/offers/[offerId] — one offer: link, mapping, send, results. */
 export interface SimOfferPage {
-  offer: { id: string; name: string; headline: string; terms: SimOfferRecord["terms"] };
+  offer: { id: string; kind: SimOfferKind; name: string; headline: string; terms: SimOfferRecord["terms"] };
   link: (SimLinkSummary & { mapping: SimMappingRow[] }) | null;
   upgrade: SimUpgrade | null;
   /** Unmapped required variables. When non-empty, Send is disabled and `blocked.sentence` says why. */
@@ -146,6 +163,9 @@ export interface SimCustomerRow {
   homeState: string;
   purchaseApr: string; // "21.99"
   annualFee: string | null;
+  /** E.164, a fictional 555-01xx number: "+12015550101". */
+  phone: string;
+  platform: SimPlatform;
 }
 
 export interface SimBatch {
@@ -173,6 +193,10 @@ export interface SimDeliveryResult {
   error: SimApiError | null;
   /** X-Stencil-Newer-Version on a delivered render of a Superseded version. */
   newerVersion: number | null;
+  /** Push: the platform it was rendered for. */
+  platform: SimPlatform | null;
+  /** A delivered SMS: the encoding and parts Stencil reported. */
+  sms: { encoding: ApiSmsEncoding; parts: number } | null;
 }
 
 export interface SimApiError {
@@ -184,7 +208,8 @@ export interface SimApiError {
 /** The customer view of one delivery (a dialog over the results grid). */
 export interface SimDeliveryView {
   id: string;
-  customer: { name: string; email: string };
+  /** The customer's phone today: the web page, the push and the texts show on it. */
+  customer: { name: string; email: string; phone: string; platform: SimPlatform };
   offerName: string;
   templateName: string;
   versionNumber: number;
@@ -193,16 +218,40 @@ export interface SimDeliveryView {
   status: "delivered" | "failed";
   error: SimApiError | null;
   /**
-   * web   → phone frame: an iframe on `src` (the stored HTML)
+   * web   → the customer's phone: an iframe on `src` (the stored HTML)
    * email → inbox: subject, preheader and an iframe on `src` (the stored email HTML)
    * pdf   → the PDF: an iframe/embed on `src` plus "Open PDF" (new tab)
+   * push  → the customer's lock screen: the push as Stencil rendered it for `platform`, from Coral's app
+   * sms   → the customer's thread with Coral's short code: every text delivered to them, oldest first,
+   *         up to and including this one
    * null when the delivery failed.
    */
   view:
     | { kind: "phone"; src: string }
     | { kind: "inbox"; src: string; from: string; subject: string; preheader: string }
     | { kind: "pdf"; src: string }
+    | { kind: "push"; appName: string; platform: SimPlatform; push: SimPush }
+    | { kind: "sms"; sender: string; thread: SimSms[] }
     | null;
+}
+
+/** A push as Stencil rendered it for one platform (ApiPushResponse without `newerVersion`). */
+export interface SimPush {
+  title: string;
+  /** iPhone only, and only when it has text. */
+  subtitle?: string;
+  body: string;
+  payloadBytes: number;
+}
+
+/** One delivered text message (ApiSmsResponse without `newerVersion`), and when Coral sent it. */
+export interface SimSms {
+  deliveryId: string;
+  at: string;
+  text: string;
+  encoding: ApiSmsEncoding;
+  parts: number;
+  characters: number;
 }
 
 export interface SimNoticeView {
@@ -223,7 +272,8 @@ export interface SimNoticeView {
 
 /** The link / relink flow (/sim/offers/[offerId]/link). */
 export interface SimLinkFlow {
-  offer: { id: string; name: string };
+  /** An offer links a document template, an alert an alert template: the search lists only that kind. */
+  offer: { id: string; kind: SimOfferKind; name: string };
   current: SimLinkSummary | null;
   /** Set once a template is chosen (?template=UC-…): its detail at the Active version, and the diff from the pin. */
   candidate: {

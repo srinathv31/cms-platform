@@ -3,6 +3,7 @@
 
 export { PushPreview, DEFAULT_CLOCK, type PushPreviewProps } from "./push-preview";
 export { SmsPreview, type SmsPreviewProps } from "./sms-preview";
+export { ScreenPreview, type ScreenPreviewProps } from "./screen-preview";
 export { IOS_LINES } from "./ios/notification-card";
 export { ANDROID_LINES } from "./android/notification-card";
 export { pushScreenLabel, PLATFORM_STYLE } from "./labels";
@@ -20,4 +21,5 @@ export type {
   PushMeasure,
   PushScreen,
   SmsContent,
+  SmsMessage,
 } from "./types";

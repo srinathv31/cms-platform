@@ -97,6 +97,41 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
   };
 }
 
+// The alert: v1 Active on Push and SMS. A push answers for the platform asked (no subtitle on Android);
+// the long-name customer's values make the push too large and the text too long.
+const ALERT = "UC-ALERT1";
+const ALERT_NAME = "Card Used Abroad";
+const ALERT_VARS = [variable("first_name", "First name", "text"), variable("card_last4", "Card last 4", "text")];
+const PUSH_TOO_LARGE = "The push is 5,120 bytes on ios; the most is 4,096.";
+const SMS_TOO_LONG = "The SMS is 12 parts; the most is 10.";
+
+function alertDetail(): ApiTemplateDetail {
+  const channels: ApiContract["channels"] = ["push", "sms"];
+  return {
+    id: ALERT,
+    name: ALERT_NAME,
+    team: { id: "coral-offers", name: "Coral Offers" },
+    contentType: { key: "alert", name: "Alert" },
+    asOf: "2026-10-05T12:00:00.000Z",
+    activeVersion: 1,
+    versions: [{ number: 1, state: "active", activatedAt: "2026-10-05T00:00:00.000Z", supersededAt: null, sunsetAt: null, sunsetPassed: false, revokedAt: null, renders: true, channels }],
+    contract: { version: 1, state: "active", channels, variables: ALERT_VARS, jsonSchema: {} as ApiContract["jsonSchema"] },
+  };
+}
+
+function alertRender(body: { channel: string; platform?: string; values: Record<string, string> }, headers: Headers): Response {
+  ucomp.renders.push({ body, headers });
+  const long = body.values.first_name === LONG.first;
+  if (body.channel === "push") {
+    if (long) return apiError(422, "push_payload_too_large", PUSH_TOO_LARGE);
+    const push = { title: "Was this you?", body: `${body.values.first_name}, your card was used abroad.`, payloadBytes: 120, newerVersion: null };
+    return Response.json(body.platform === "ios" ? { ...push, subtitle: `Card ending in ${body.values.card_last4}` } : push);
+  }
+  if (long) return apiError(422, "sms_too_long", SMS_TOO_LONG);
+  const text = `Coral: card ${body.values.card_last4} was used abroad.\nCoral Offers: Reply STOP to opt out.`;
+  return Response.json({ text, encoding: "GSM-7", parts: 1, characters: text.length, newerVersion: null });
+}
+
 /** Oldest first, as the API serves them. */
 const NOTICES: ApiNotice[] = [
   { id: "ntc_1", kind: "new_version", createdAt: "2026-09-01T00:00:00.000Z", template: { id: "UC-OTHER1", name: "Other" }, versionNumber: 2, activeVersion: 2, sunsetAt: null, sunsetDay: null, zone: null, reason: null, changes: [], message: "Other v2 is available. No contract changes." },
@@ -144,6 +179,8 @@ async function fakeUcomp(input: RequestInfo | URL, init: RequestInit = {}): Prom
     const since = url.searchParams.get("since");
     return Response.json(detail(version ? Number(version) : null, since ? Number(since) : null));
   }
+  if (path === `/api/v1/templates/${ALERT}`) return Response.json(alertDetail());
+  if (path === `/api/v1/templates/${ALERT}/render` && init.method === "POST") return alertRender(JSON.parse(String(init.body)), headers);
   if (path.startsWith("/api/v1/templates/") && !path.endsWith("/render")) {
     return apiError(404, "template_not_found", "No template has the ID UC-NOPE00.");
   }
@@ -177,11 +214,13 @@ beforeAll(async () => {
   await simDb.insert(simOffers).values([
     { id: "offer_spring_travel", name: "Spring Travel Rewards", headline: "Spend $1,000 in 3 months, get $200 back", terms: { spend: 1000, bonus: 200, months: 3, annualFee: 95, endsOn: "2027-06-30" } },
     { id: "offer_cash_back", name: "Cash Back Welcome Bonus", headline: "Earn $200", terms: { spend: 1000, bonus: 200, months: 3 } },
+    { id: "alert_card_abroad", kind: "alert", name: "Card used abroad", headline: "A card is used outside the US", terms: null },
   ]);
+  const card = { statement: null, lastPurchase: null };
   await simDb.insert(simCustomers).values([
-    { id: "cust_01", firstName: "Olivia", lastName: "Bennett", email: "olivia.bennett@example.com", homeState: "NJ", purchaseApr: "21.99", annualFee: "95" },
-    { id: "cust_02", firstName: "Marcus", lastName: "Delgado", email: "marcus.delgado@example.com", homeState: "CA", purchaseApr: "24.49", annualFee: "0" },
-    { id: "cust_10", firstName: LONG.first, lastName: LONG.last, email: "long@example.com", homeState: "NC", purchaseApr: "29.99", annualFee: "695" },
+    { id: "cust_01", firstName: "Olivia", lastName: "Bennett", email: "olivia.bennett@example.com", homeState: "NJ", purchaseApr: "21.99", annualFee: "95", phone: "+12015550142", platform: "ios", cardLast4: "3417", ...card },
+    { id: "cust_02", firstName: "Marcus", lastName: "Delgado", email: "marcus.delgado@example.com", homeState: "CA", purchaseApr: "24.49", annualFee: "0", phone: "+14155550118", platform: "android", cardLast4: "9052", ...card },
+    { id: "cust_10", firstName: LONG.first, lastName: LONG.last, email: "long@example.com", homeState: "NC", purchaseApr: "29.99", annualFee: "695", phone: "+17045550185", platform: "android", cardLast4: "6670", ...card },
   ]);
 });
 
@@ -409,6 +448,87 @@ describe("notices: a sunset that passed", () => {
     } finally {
       NOTICES.pop();
     }
+  });
+});
+
+describe("alerts: push and SMS to the customers' phones", () => {
+  const sendAlert = async (customerIds: string[]) => {
+    const result = await actions.sendToCustomers({ offerId: "alert_card_abroad", customerIds });
+    if (!result.ok) throw new Error(result.reason);
+    return result.batch;
+  };
+
+  it("links an alert on Push and SMS only", async () => {
+    const base = { offerId: "alert_card_abroad", templateId: ALERT, version: 1, mapping: { first_name: "customer.firstName", card_last4: "card.last4" } } as const;
+    expect(await actions.linkTemplate({ ...base, channels: ["pdf"] })).toEqual({ ok: false, reason: "Coral sends alerts as Push and SMS." });
+    expect(await actions.linkTemplate({ ...base, offerId: "offer_cash_back", channels: ["push"] })).toEqual({ ok: false, reason: "Coral sends offers as PDF, Web and Email." });
+    expect(await actions.linkTemplate({ ...base, channels: ["sms", "push"] })).toEqual({ ok: true });
+    const [link] = await simDb.select().from(simLinks).where(eq(simLinks.offerId, "alert_card_abroad"));
+    expect(link).toMatchObject({ templateId: ALERT, pinnedVersion: 1, channels: ["push", "sms"] });
+
+    const flow = await queries.getSimLinkFlow("alert_card_abroad", ALERT);
+    expect(flow).toMatchObject({ offer: { kind: "alert" }, candidate: { mapping: { first_name: "customer.firstName", card_last4: "card.last4" } } });
+  });
+
+  it("asks for each customer's push on their platform, and keeps what Stencil said: the platform, the encoding and the parts", async () => {
+    const batch = await sendAlert(["cust_01", "cust_02"]);
+    expect(batch).toMatchObject({ channels: ["push", "sms"], counts: { delivered: 4, failed: 0 } });
+    const pushes = ucomp.renders.filter((r) => r.body.channel === "push").map((r) => [r.body.values, r.body.platform]);
+    expect(pushes).toEqual([
+      [{ first_name: "Olivia", card_last4: "3417" }, "ios"],
+      [{ first_name: "Marcus", card_last4: "9052" }, "android"],
+    ]);
+    expect(ucomp.renders.filter((r) => r.body.channel === "sms").every((r) => !("platform" in r.body) && !("encoding" in r.body))).toBe(true);
+    expect(batch.rows.map((row) => row.results.map((r) => [r.channel, r.platform, r.sms]))).toEqual([
+      [["push", "ios", null], ["sms", null, { encoding: "GSM-7", parts: 1 }]],
+      [["push", "android", null], ["sms", null, { encoding: "GSM-7", parts: 1 }]],
+    ]);
+
+    const [olivia, marcus] = batch.rows;
+    const ios = await queries.getSimDeliveryView(olivia.results[0].deliveryId);
+    expect(ios).toMatchObject({
+      customer: { name: "Olivia Bennett", phone: "+12015550142", platform: "ios" },
+      offerName: "Card used abroad",
+      channel: "push",
+      view: { kind: "push", appName: "Coral", platform: "ios", push: { title: "Was this you?", subtitle: "Card ending in 3417", body: "Olivia, your card was used abroad.", payloadBytes: 120 } },
+    });
+    const android = await queries.getSimDeliveryView(marcus.results[0].deliveryId);
+    expect(android?.view).toMatchObject({ kind: "push", platform: "android", push: { title: "Was this you?" } });
+    expect(android?.view?.kind === "push" && android.view.push).not.toHaveProperty("subtitle");
+    const file = await queries.loadDeliveryFile(olivia.results[1].deliveryId);
+    expect(file?.contentType).toBe("application/json; charset=utf-8");
+    expect(JSON.parse(String(file?.body))).toMatchObject({ encoding: "GSM-7", parts: 1 });
+  });
+
+  it("shows a customer's texts as one thread, oldest first, up to the one viewed", async () => {
+    const first = await queries.getSimOfferPage("alert_card_abroad");
+    const second = await sendAlert(["cust_01"]);
+    const smsOf = (b: typeof second) => b.rows.find((r) => r.customerId === "cust_01")!.results.find((r) => r.channel === "sms")!.deliveryId;
+    const earlier = smsOf(first!.lastBatch!);
+    const latest = smsOf(second);
+
+    const view = await queries.getSimDeliveryView(latest);
+    expect(view?.view).toMatchObject({ kind: "sms", sender: "26725" });
+    const thread = view?.view?.kind === "sms" ? view.view.thread : [];
+    expect(thread.map((m) => m.deliveryId)).toEqual([earlier, latest]);
+    expect(thread[1]).toMatchObject({ text: "Coral: card 3417 was used abroad.\nCoral Offers: Reply STOP to opt out.", encoding: "GSM-7", parts: 1 });
+    const before = await queries.getSimDeliveryView(earlier);
+    expect(before?.view?.kind === "sms" && before.view.thread.map((m) => m.deliveryId)).toEqual([earlier]);
+  });
+
+  it("stores a refused push or text with the API's error, as any failed render", async () => {
+    const batch = await sendAlert(["cust_10"]);
+    expect(batch.counts).toEqual({ delivered: 0, failed: 2 });
+    expect(batch.rows[0].results.map((r) => [r.channel, r.platform, r.error])).toEqual([
+      ["push", "android", { status: 422, code: "push_payload_too_large", message: PUSH_TOO_LARGE }],
+      ["sms", null, { status: 422, code: "sms_too_long", message: SMS_TOO_LONG }],
+    ]);
+    expect(await queries.getSimDeliveryView(batch.rows[0].results[0].deliveryId)).toMatchObject({ status: "failed", view: null });
+  });
+
+  it("lists the alert apart from the offers", async () => {
+    const home = await queries.getSimHome();
+    expect(home.offers.filter((o) => o.kind === "alert").map((o) => [o.id, o.link?.channels])).toEqual([["alert_card_abroad", ["push", "sms"]]]);
   });
 });
 

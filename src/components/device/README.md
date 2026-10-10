@@ -2,9 +2,11 @@
 
 Draws a push notification or a text message on a phone, the way the phone shows it: a generic frame with an
 iOS-style skin (`ios/`) and an Android-style one (`android/`, a current Pixel in Material 3 Expressive). Stencil's
-preview rail uses it for the Push and SMS channels, and Coral's phone will use it too. It is presentation only: it
-takes resolved plain strings (variables already replaced with values) and knows nothing about templates, channels
-or versions.
+preview rail uses it for the Push and SMS channels. Coral, the simulated consumer, is the other consumer: its
+customer drawer ([customer-drawer.tsx](../../simulator/ui/customer-drawer.tsx)) shows each customer's phone with
+the kit, from what `/api/v1` rendered: the push on the lock screen (or dropping in as a banner), their text thread,
+and a web page on `ScreenPreview`. It is presentation only: it takes resolved plain strings (variables already
+replaced with values) and knows nothing about templates, channels or versions.
 
 The design page is [/design/device](../../app/(dev)/design/device/page.tsx): iPhone and Android side by side, every
 view at 1:1 in light and dark, at each text size and width, inside the tightest preview well, and a working mock
@@ -52,6 +54,14 @@ const settings: DeviceSettings = {
 
 <SmsPreview settings={settings} content={{ sender: "26725", text, time: "9:41 AM", day: "Today" }} />
 
+// A thread: earlier texts from the same sender above the newest one, oldest first.
+<SmsPreview settings={settings} content={{ sender: "26725", text, time: "2:02 PM", earlier: [{ text: first, time: "9:41 AM", day: "Yesterday" }] }} />
+
+// Any other app's screen: the frame, status bar and home indicator around the caller's content.
+<ScreenPreview settings={settings} caption="Web page from Coral">
+  <iframe title="Offer terms" src={src} sandbox="" className="min-h-0 flex-1" />
+</ScreenPreview>
+
 pushScreenLabel("android", "banner")  // "Heads-up": label controls and captions with the platform's word
 ```
 
@@ -63,7 +73,14 @@ The types are in [types.ts](types.ts); everything public comes from [index.ts](i
   "now", "9:41 AM"). Plain text; line breaks and runs of spaces are kept.
 - **`SmsContent`**: `sender` (a short code or number: a US text can't show a brand there), `text` (the whole
   message, footer included, as delivered), `time`, `day?` (default "Today"). Links in the text show underlined and
-  not clickable, as a phone shows them from an unknown sender ([links.ts](links.ts)).
+  not clickable, as a phone shows them from an unknown sender ([links.ts](links.ts)). `earlier?` holds the texts
+  that came before from the same sender (`SmsMessage`: `text`, `time`, `day?`), oldest first: each prints its day
+  and time when they differ from the text before ([thread.ts](thread.ts)), and the thread opens scrolled to the
+  newest. Without it the text is alone, at the top.
+- **`ScreenPreview`** ([screen-preview.tsx](screen-preview.tsx)): any app's screen that isn't a push or a text,
+  such as a web page. It draws the frame, the status bar and the home indicator or gesture handle, and the caller's
+  children fill the screen between them on the app's background. `caption` names the figure; the skin's name is
+  added. Coral shows its web deliveries on it.
 - **`PushScreen`** is one set of values for both platforms. `banner` is iOS's banner and Android's heads-up;
   `expanded` is iOS's long press and Android's notification shade. Show the platform's word with
   `pushScreenLabel`.
@@ -153,6 +170,8 @@ region. The clickable notification takes the app's focus ring; a long text messa
 | [index.ts](index.ts) | The public surface. |
 | [types.ts](types.ts) | Settings, content and measurement types. |
 | [push-preview.tsx](push-preview.tsx), [sms-preview.tsx](sms-preview.tsx) | The two entry points: the frame, then the platform's skin. |
+| [screen-preview.tsx](screen-preview.tsx) | `ScreenPreview`: the frame and the system chrome around any app's content (Coral's web page). |
+| [thread.ts](thread.ts) | A text thread: its messages oldest first, which print their time, and opening on the newest. |
 | [labels.ts](labels.ts) | `pushScreenLabel` (Banner or Heads-up) and the skins' names. |
 | [phone-frame.tsx](phone-frame.tsx) | The generic frame, the `--pt` setup, the camera cutout, the figure. |
 | [status-bar.tsx](status-bar.tsx) | Each platform's status bar and its home indicator or gesture handle, generic glyphs. |
@@ -172,8 +191,9 @@ entry points.
 ## Testing
 
 [measure.test.ts](measure.test.ts) (the visible-prefix search), [links.test.ts](links.test.ts),
-[labels.test.ts](labels.test.ts), [ios/type.test.ts](ios/type.test.ts), [android/dates.test.ts](android/dates.test.ts)
+[labels.test.ts](labels.test.ts), [thread.test.ts](thread.test.ts), [ios/type.test.ts](ios/type.test.ts), [android/dates.test.ts](android/dates.test.ts)
 and [android/notification-card.test.tsx](android/notification-card.test.tsx) (no subtitle on Android; with previews
 hidden, the title stays and only the text goes) run in node. Layout, clamping and the Range read need a real
 browser: check them on the design page, whose Truncation section prints what `onMeasure` reports beside each
-screen.
+screen. Coral's phone, with a thread of several texts and a banner arriving, is driven end to end by
+`e2e/coral-alerts.spec.ts`.

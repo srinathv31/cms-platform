@@ -52,16 +52,25 @@ export interface PushContent {
   time: string;
 }
 
-/** One text message from a sender, as the Messages app shows it. */
-export interface SmsContent {
-  /** What the thread's header shows: a US short code ("26725") or a number. A brand name can't appear here. */
-  sender: string;
+/** One text message in a thread. */
+export interface SmsMessage {
   /** The whole message, footer included, exactly as delivered. Line breaks are kept. */
   text: string;
   /** The time above the message: "9:41 AM". */
   time: string;
   /** The day before the time. Default "Today". */
   day?: string;
+}
+
+/** A text message from a sender, as the Messages app shows it, under any earlier ones from the same sender. */
+export interface SmsContent extends SmsMessage {
+  /** What the thread's header shows: a US short code ("26725") or a number. A brand name can't appear here. */
+  sender: string;
+  /**
+   * Earlier texts from the same sender, oldest first, drawn above this one. The thread opens on this, the
+   * newest. Empty or missing: this text alone.
+   */
+  earlier?: readonly SmsMessage[];
 }
 
 /** The phone's own clock: the status bar and the lock screen. */
