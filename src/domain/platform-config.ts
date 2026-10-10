@@ -82,7 +82,8 @@ export interface MessageTypeRules {
 /**
  * Who a team's messages come from, as the phone previews show it (`teams`): the app name over a push,
  * and the sender of an SMS (a US short code, since a US SMS can't show a brand name there). Null when
- * not set: the push preview then shows the team's name, and the SMS preview no sender.
+ * not set (a team made in settings): the push preview then shows the team's name, and the SMS preview
+ * a neutral "No sender" (`phoneSenders` in components/preview/preview-sender.ts).
  */
 export interface TeamSenders {
   appName: string | null;

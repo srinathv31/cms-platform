@@ -20,6 +20,7 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
 - **Nothing jumps.**
   - The same structure appears for every state, value and option: no row that wraps for one value and not another.
   - Skeletons have the real geometry.
+  - A meta row that can wrap ("Draft · Based on v1 · Saved") never leaves a "·" at either end of a line: the separator sits in its item's left padding, and the row pulls its items back by that padding inside a horizontal clip (`src/components/versions/version-entry.tsx`, `src/components/workspace/workspace-header.tsx`).
   - Measure the y of the content area across states and report it.
 - **Insets are shared constants.** One inset per surface kind, the same for every variant of that surface. Rails pad 20px horizontally.
 - **Wide panels keep comfortable measures.** Lists and forms cap at about 22rem and align to the panel's left content edge; they don't stretch or center in dead space.

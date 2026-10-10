@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
+import { useState } from "react";
 import {
   PushPreview,
   SmsPreview,
@@ -9,19 +10,19 @@ import {
   type PushScreen,
 } from "@/components/device";
 import type { RenderError } from "@/domain/render/types";
-import type { MessageOutput } from "./message-preview";
+import { refusalNotice, type MessageOutput } from "./message-preview";
 import { WELL_INSET } from "./well";
 
 // Push and SMS in the preview's well, on the phone kit (src/components/device): the text as the
 // browser rendered it (message-preview.ts), on the phone the controls row chose. The phone fills the
 // well's height and is its platform's exact width, scaled down evenly when the well is narrower, so it
 // wraps every line as the phone does. A message the route would refuse still shows on the phone, with
-// the route's sentence above it.
+// the route's sentence above it (announced once, in fixed words, when it turns refused).
 
 /** Who the team's messages come from: the app a push is from, and the number an SMS is from. */
 export interface PhoneSenders {
   appName: string;
-  /** A US short code or a number; "" when the team has none. */
+  /** A US short code or a number; "" when the team has none (the phone then shows "No sender"). */
   smsSender: string;
 }
 
@@ -81,12 +82,21 @@ export function monogramOf(appName: string): string {
   return Array.from(appName.trim())[0]?.toUpperCase() ?? "";
 }
 
-/** The well's mat around the phone, with a refused message's sentence above it. */
+/**
+ * The well's mat around the phone, with a refused message's sentence above it. The sentence has the
+ * message's live size in it ("The SMS is 11 parts…"), so it changes with each keystroke: it is not a live
+ * region. A screen reader hears a fixed sentence once, from a polite region, when the message goes from
+ * sendable to refused (`refusalNotice`); a message that opens already refused says nothing until it is read.
+ */
 function PhoneWell({ refusal, children }: { refusal: RenderError | null; children: React.ReactNode }) {
+  const notice = useRefusalNotice(refusal);
   return (
     <div className={`flex h-full flex-col ${WELL_INSET}`}>
+      <p role="status" data-slot="message-refusal-notice" className="sr-only">
+        {notice}
+      </p>
       {refusal ? (
-        <p role="alert" data-slot="message-refusal" className="mb-3 flex shrink-0 items-start gap-2 text-[13px] leading-5 text-text">
+        <p data-slot="message-refusal" className="mb-3 flex shrink-0 items-start gap-2 text-[13px] leading-5 text-text">
           <CircleAlert aria-hidden strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-warning" />
           <span className="min-w-0 [overflow-wrap:anywhere]">{refusal.message}</span>
         </p>
@@ -94,4 +104,16 @@ function PhoneWell({ refusal, children }: { refusal: RenderError | null; childre
       <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
+}
+
+/** What the polite region says: the fixed notice from the render that turned the message refused, until it is sendable again. */
+function useRefusalNotice(refusal: RenderError | null): string {
+  const refused = refusal !== null;
+  const [state, setState] = useState({ refused, notice: "" });
+  if (state.refused !== refused) {
+    const next = { refused, notice: refusal ? refusalNotice(refusal) : "" };
+    setState(next);
+    return next.notice;
+  }
+  return state.notice;
 }

@@ -224,10 +224,13 @@ describe("people, teams and access", () => {
     expect(consumers.map((c) => c.id).sort()).toEqual(["coral", "deposits-online"]);
   });
 
-  it("gives Coral Offers the app name and short code its messages come from", async () => {
+  it("gives every team the app name and short code its messages come from, so no preview shows the fallback", async () => {
     const rows = await db.select({ id: ucomp.teams.id, appName: ucomp.teams.appName, smsSender: ucomp.teams.smsSender }).from(ucomp.teams);
-    expect(rows.find((t) => t.id === "coral-offers")).toEqual({ id: "coral-offers", appName: "Coral", smsSender: "26725" });
-    expect(rows.filter((t) => t.id !== "coral-offers").every((t) => t.appName === null && t.smsSender === null)).toBe(true);
+    expect(rows.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: "card-statements", appName: "Card Center", smsSender: "22737" },
+      { id: "coral-offers", appName: "Coral", smsSender: "26725" },
+      { id: "deposits", appName: "Deposits Online", smsSender: "33767" },
+    ]);
   });
 });
 

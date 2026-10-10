@@ -1,6 +1,6 @@
 "use client";
 
-import { PLATFORM_STYLE } from "./labels";
+import { smsCaption } from "./labels";
 import { PhoneFrame } from "./phone-frame";
 import { DEFAULT_CLOCK } from "./push-preview";
 import { AndroidMessagesThread } from "./android/messages-thread";
@@ -17,7 +17,8 @@ export interface SmsPreviewProps {
 
 /**
  * A text message in the phone's messaging app, in the platform's look. Same geometry as `PushPreview`:
- * the container's height, the platform's exact width. The text is never cut; a long one scrolls.
+ * the container's height, the platform's exact width. The text is never cut; a long one scrolls. With no
+ * sender, the header shows a muted "No sender" and the caption leaves out "from".
  */
 export function SmsPreview({ settings, content, clock = DEFAULT_CLOCK, className }: SmsPreviewProps) {
   const props = { content, settings, clock };
@@ -26,7 +27,7 @@ export function SmsPreview({ settings, content, clock = DEFAULT_CLOCK, className
       platform={settings.platform}
       width={settings.width}
       appearance={settings.appearance}
-      caption={`Text message from ${content.sender}, ${PLATFORM_STYLE[settings.platform]} preview`}
+      caption={smsCaption(settings.platform, content.sender)}
       className={className}
     >
       {settings.platform === "ios" ? <MessagesThread {...props} /> : <AndroidMessagesThread {...props} />}

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   BusinessZoneSection,
   ChannelRuleRow,
+  ContentTypeView,
   InactivityRow,
   InactivitySection,
   MemberRow,
@@ -41,6 +42,7 @@ vi.mock("@/server/actions/platform", () => ({
 }));
 
 const { ChannelRulesSectionView } = await import("./platform/channel-rules");
+const { ContentTypesSectionView } = await import("./platform/content-types");
 const { InactivityView } = await import("./team/inactivity-view");
 const { MembersTable } = await import("./team/members-table");
 const { RecertificationView } = await import("./team/recertification-view");
@@ -155,6 +157,38 @@ describe("Channel rules", () => {
     // The other family's channels show disabled, not hidden.
     expect(sw("Disclosure on Push").hasAttribute("data-disabled")).toBe(true);
     expect(sw("Disclosure on SMS").hasAttribute("data-disabled")).toBe(true);
+  });
+});
+
+describe("Content types", () => {
+  const type = (id: string, name: string, editSections: ContentTypeView["can"]["editSections"]): ContentTypeView => ({
+    id,
+    key: id,
+    name,
+    family: "document",
+    requiredSections: [{ key: "terms", title: "Terms" }],
+    allowedChannels: ["pdf", "web"],
+    smsFooter: null,
+    smsMaxParts: 3,
+    templates: 1,
+    can: { editSections },
+  });
+
+  it("keeps the Edit sections the read model refuses in place, greyed and still focusable, with its reason", async () => {
+    const refused = { ok: false, code: "sections_on_messages", reason: "Decided by the server." } as const;
+    await show(<ContentTypesSectionView types={[type("ct_a", "Notice", OK), type("ct_b", "Alert", refused)]} />);
+    const blocked = buttonNamed("Edit Alert sections")!;
+    expect(blocked.hasAttribute("disabled"), "not the native disabled: Tab would skip it and its reason").toBe(false);
+    expect(blocked.getAttribute("aria-disabled")).toBe("true");
+    expect(blocked.hasAttribute("data-disabled")).toBe(true);
+    expect(document.getElementById(blocked.getAttribute("aria-describedby")!)?.textContent).toBe("Decided by the server.");
+    await click(blocked);
+    expect(container.querySelector('[data-slot="sections-editor"]')).toBeNull();
+
+    const open = buttonNamed("Edit Notice sections")!;
+    expect(open.hasAttribute("aria-disabled")).toBe(false);
+    await click(open);
+    expect(container.querySelector('[data-slot="sections-editor"]')).not.toBeNull();
   });
 });
 

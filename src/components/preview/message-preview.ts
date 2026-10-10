@@ -13,7 +13,9 @@
 
 import type { ChannelFields } from "@/domain/channel-fields";
 import { assertNever } from "@/domain/assert-never";
-import type { PushPlatform } from "@/domain/messages/push";
+import { SMS_MAX_PARTS } from "@/domain/messages/gsm7";
+import { PUSH_MAX_BYTES, type PushPlatform } from "@/domain/messages/push";
+import { formatCount } from "@/domain/numbers";
 import { renderFailedDocument } from "@/domain/render/errors";
 import { renderMessage, resolveMessage, type MessageRules, type PushText } from "@/domain/render/message";
 import { ResolveError } from "@/domain/render/resolve";
@@ -66,6 +68,22 @@ export function renderMessagePreview(target: MessagePreviewTarget, input: Messag
     // Only a field the resolver can't place, which the editor never makes: say so as the route would.
     if (error instanceof ResolveError) return { ok: false, error: renderFailedDocument(target.channel, error.message) };
     throw error;
+  }
+}
+
+/**
+ * What a screen reader hears when a message turns refused: the limit it went over, in words that don't
+ * change as the author types on ("The SMS is over 10 parts."). The route's own sentence carries the live
+ * size, so it is shown but not announced.
+ */
+export function refusalNotice(refusal: RenderError): string {
+  switch (refusal.code) {
+    case "sms_too_long":
+      return `The SMS is over ${formatCount(SMS_MAX_PARTS)} parts.`;
+    case "push_payload_too_large":
+      return `The push is over ${formatCount(PUSH_MAX_BYTES)} bytes.`;
+    default:
+      return "This message can't be sent as it is.";
   }
 }
 

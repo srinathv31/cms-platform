@@ -131,7 +131,8 @@ export function PreviewPane({
           className="h-full"
         >
           {error ? (
-            <OutputError error={error} variables={variables} onEditValues={onEditValues} onRetry={onRetry} />
+            // A message renders in the browser, with no request: trying it again gives the same answer.
+            <OutputError error={error} variables={variables} onEditValues={onEditValues} onRetry={messageChannel ? undefined : onRetry} />
           ) : (
             <Output
               channel={channel}

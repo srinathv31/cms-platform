@@ -106,4 +106,12 @@ describe("OutputError", () => {
     expect(show("missing_variables")).not.toContain("Try again");
     expect(show("template_not_found")).not.toContain("Try again");
   });
+
+  it("offers no Try again where there is nothing to send again", () => {
+    const html = renderToStaticMarkup(
+      <OutputError error={{ code: "render_failed", message: "The SMS couldn't be rendered." }} variables={VARIABLES} onEditValues={noop} />,
+    );
+    expect(html).toContain("The SMS couldn&#x27;t be rendered.");
+    expect(html).not.toContain("<button");
+  });
 });

@@ -516,6 +516,35 @@ describe("alerts: push and SMS to the customers' phones", () => {
     expect(before?.view?.kind === "sms" && before.view.thread.map((m) => m.deliveryId)).toEqual([earlier]);
   });
 
+  it("keeps texts sent in the same second in the order they came in, whatever their ids", async () => {
+    const at = new Date("2026-10-05T12:00:07.000Z");
+    const text = (id: string, body: string) => ({
+      id,
+      batchId: `bat_${id}`,
+      offerId: "alert_card_abroad",
+      customerId: "cust_same_second",
+      templateId: ALERT,
+      versionNumber: 1,
+      channel: "sms" as const,
+      platform: null,
+      status: "delivered" as const,
+      error: null,
+      newerVersion: null,
+      correlationId: `coral_${id}`,
+      output: JSON.stringify({ text: body, encoding: "GSM-7", parts: 1, characters: body.length }),
+      at,
+    });
+    // Two sends in one second: the later one's random batch key sorts first.
+    await simDb.insert(simDeliveries).values(text("dlv_zz_000", "First"));
+    await simDb.insert(simDeliveries).values(text("dlv_aa_000", "Second"));
+    const thread = async (id: string) => {
+      const view = await queries.getSimDeliveryView(id);
+      return view?.view?.kind === "sms" ? view.view.thread.map((m) => m.text) : null;
+    };
+    expect(await thread("dlv_aa_000")).toEqual(["First", "Second"]);
+    expect(await thread("dlv_zz_000")).toEqual(["First"]);
+  });
+
   it("stores a refused push or text with the API's error, as any failed render", async () => {
     const batch = await sendAlert(["cust_10"]);
     expect(batch.counts).toEqual({ delivered: 0, failed: 2 });

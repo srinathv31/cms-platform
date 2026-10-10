@@ -6,6 +6,7 @@ import type { ContentTypeView } from "@/domain/access-types";
 import { SECTION_TITLE_MAX, describeSectionsChange, removeSectionRefusal } from "@/domain/platform-config";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { RequiredSection } from "@/domain/types";
+import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { updateContentType } from "@/server/actions/platform";
@@ -48,21 +49,23 @@ export function ContentTypesSectionView({ types }: { types: ContentTypeView[] })
               {type.allowedChannels.map((c) => CHANNEL_LABELS[c]).join(", ")}
             </div>
             <div role="cell" className="flex justify-end">
-              {open === type.id ? null : (
-                // A message type (an Alert) has no document, so no sections: disabled, with the reason.
-                <Blocked reason={type.can.editSections.ok ? null : type.can.editSections.reason}>
-                  <Button
-                    ref={(el) => {
-                      openers.current.set(type.id, el);
-                    }}
-                    variant="outline"
-                    aria-label={`Edit ${type.name} sections`}
-                    disabled={!type.can.editSections.ok}
-                    onClick={() => setOpen(type.id)}
-                  >
-                    Edit sections
-                  </Button>
-                </Blocked>
+              {open === type.id ? null : type.can.editSections.ok ? (
+                <Button
+                  ref={(el) => {
+                    openers.current.set(type.id, el);
+                  }}
+                  variant="outline"
+                  aria-label={`Edit ${type.name} sections`}
+                  onClick={() => setOpen(type.id)}
+                >
+                  Edit sections
+                </Button>
+              ) : (
+                // A message type (an Alert) has no document, so no sections: greyed in place and still
+                // focusable, its reason the tooltip and its description.
+                <BlockedButton aria-label={`Edit ${type.name} sections`} reason={type.can.editSections.reason}>
+                  Edit sections
+                </BlockedButton>
               )}
             </div>
           </div>

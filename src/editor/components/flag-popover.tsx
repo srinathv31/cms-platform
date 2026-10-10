@@ -3,8 +3,9 @@
 // A flagged run's popover (InlineVariableField's `flags`): the host's sentence, and its one-click fix
 // when it has one ("Replace with '", or "Remove" for a character that is taken out). One per field,
 // anchored to the open flag. It never takes focus on its own, so typing and the arrow keys stay in the
-// field; Tab moves into it (extensions/text-flags.ts), and Esc or Tab there goes back. The fix is one
-// editor transaction, so undo puts the text back.
+// field; Tab moves into it (extensions/text-flags.ts). There, Esc or Shift+Tab goes back to the field,
+// and Tab closes it and goes on to the control after the field, so Tab never circles between the two.
+// The fix is one editor transaction, so undo puts the text back.
 //
 // Built on Base UI's Popover parts, like the chip popover: the flag lives inside contenteditable, so
 // it can't be a Popover.Trigger.
@@ -16,6 +17,7 @@ import { useCallback, type KeyboardEvent } from "react";
 import { useStore } from "zustand";
 import { Button } from "@/components/ui/button";
 import { applyFlagFix, flagsOf } from "../extensions/text-flags";
+import { nextTabbable } from "../lib/tab-order";
 import type { FlagPopoverStore } from "../state/flag-popover";
 import { FOCUS_RING } from "./classes";
 
@@ -64,11 +66,19 @@ function FlagPopoverPanel({ editor, store, index }: { editor: Editor; store: Fla
     if (details.reason === "escape-key") backToField();
   };
 
-  // The popover has one control: Tab or Shift+Tab goes back to the field rather than off the page.
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Tab") return;
+  // The popover stands in the field's place in the Tab order (it is portalled to the end of the page):
+  // Shift+Tab goes back to the field, and Tab closes it and goes on to the control after the field.
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab" || event.metaKey || event.ctrlKey || event.altKey) return;
     event.preventDefault();
-    backToField();
+    if (event.shiftKey) {
+      backToField();
+      return;
+    }
+    const next = nextTabbable(editor.view.dom, event.currentTarget);
+    store.getState().close();
+    if (next) next.focus();
+    else backToField();
   };
 
   const apply = () => {

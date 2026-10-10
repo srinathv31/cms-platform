@@ -14,10 +14,12 @@ import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveFi
 //   2. Preview: an iPhone lock screen with the push, the sample values filled in. Typing in the body changes
 //      the phone at once; past the lock screen's four lines, the field warns where the iPhone cuts it.
 //   3. A subtitle shows under the title on the iPhone; Android leaves it out; back on the iPhone it is there.
+//      In the Device options, Banner greys Previews with its reason, and no row of the popover moves.
 //   4. The SMS: its meta line (encoding and parts, with the long values too). A curly apostrophe is flagged
 //      in the text and the line turns to UCS-2 and 3 parts; the phone's Messages thread shows the text.
-//   5. Submit is refused with the reason, and the dialog stays; the flag's Replace fixes the character (the
-//      line is back to GSM-7); submit goes through and v1 is In review.
+//   5. Submit is refused with the reason, and the dialog stays; Tab reaches the flag's Replace and goes on
+//      past the field from it; Replace fixes the character (the line is back to GSM-7); submit goes through
+//      and v1 is In review.
 //   6. Jordan opens v1: the Document view is the alert's fields, read-only, with no Show changes (nothing to
 //      compare with yet). He approves: v1 is Active.
 //   7. Maya edits (v2): a word on the push title and a sentence on the SMS, and submits v2.
@@ -193,6 +195,25 @@ test.describe("alerts", () => {
       await tap(platforms.getByRole("button", { name: "iPhone", exact: true }));
       await expect(phone(page)).toHaveAttribute("data-device", "ios");
       await expect(onPhone(page, "subtitle")).toHaveText(SUBTITLE);
+
+      // The Device options hold still: Banner greys Previews with its reason under it, and no row moves.
+      await tap(page.locator('[data-slot="preview-controls"]').getByRole("button", { name: "Device options" }));
+      const options = page.getByRole("dialog", { name: "Device options" });
+      await expect(options).toBeVisible();
+      // Measured once the popover has finished opening (it zooms in from 95%).
+      const geometry = () =>
+        options.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished));
+          return [el.getBoundingClientRect().height, ...[...el.querySelectorAll('[role="group"]')].map((g) => g.getBoundingClientRect().y)];
+        });
+      const before = await geometry();
+      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Banner", exact: true }));
+      await expect(phone(page).locator("figcaption")).toHaveText("Banner, iOS-style preview");
+      await expect(options.locator('[role="group"][aria-disabled="true"]')).toHaveAccessibleDescription("Lock screen only");
+      expect(await geometry(), "picking Banner moves no row of the popover").toEqual(before);
+      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Lock screen", exact: true }));
+      await page.keyboard.press("Escape");
+      await expect(options).toBeHidden();
     });
 
     await test.step("4. The SMS meta line, and a curly apostrophe flagged where it was typed: UCS-2, 3 parts", async () => {
@@ -226,7 +247,25 @@ test.describe("alerts", () => {
       await untilUncovered(flags(page).first());
       await tap(flags(page).first());
       await expect(page.getByRole("heading", { name: "’ isn't in the SMS character set." }), "the flag says why").toBeVisible();
-      await tap(page.getByRole("button", { name: "Replace with '" }));
+      // The fix stands in the field's place in the Tab order: Tab reaches it and Shift+Tab goes back; Tab
+      // from it closes the popover and goes on past the field, never round to the field again.
+      const fix = page.getByRole("button", { name: "Replace with '" });
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(field(page, "SMS message")).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeHidden();
+      await expect(field(page, "SMS message")).not.toBeFocused();
+      expect(await page.evaluate(() => document.activeElement !== document.body), "Tab lands on a control").toBe(true);
+      // Tab landed in the rail, which scrolled the canvas: bring the flag back into view, as a person would,
+      // since a popover whose flag is clipped at the canvas's edge stays hidden.
+      await flags(page).first().evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await untilUncovered(flags(page).first());
+      await tap(flags(page).first());
+      await tap(fix);
       await expect(flags(page)).toHaveCount(0);
       await expect(smsMeta(page)).toHaveText(/^GSM-7 · 2 parts/);
       await expectAutosaved(page);

@@ -64,7 +64,10 @@ export interface SmsMessage {
 
 /** A text message from a sender, as the Messages app shows it, under any earlier ones from the same sender. */
 export interface SmsContent extends SmsMessage {
-  /** What the thread's header shows: a US short code ("26725") or a number. A brand name can't appear here. */
+  /**
+   * What the thread's header shows: a US short code ("26725") or a number. A brand name can't appear here.
+   * Empty: no sender, and the header shows a muted "No sender".
+   */
   sender: string;
   /**
    * Earlier texts from the same sender, oldest first, drawn above this one. The thread opens on this, the

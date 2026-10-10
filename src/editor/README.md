@@ -274,8 +274,10 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
   sentence, and the fix when there is one ("Replace with '", "Replace with a space", or "Remove" for
   an empty replacement). It opens on a click on the flag, or when the caret is moved onto it without
   typing; an edit, the caret leaving, Esc and blur close it. It never takes focus on its own: Tab
-  from the field moves into it, and Tab or Esc there goes back to the field. Its sentence is also
-  said in a polite live region beside the field, so a screen reader hears it as the caret arrives.
+  from the field moves into it. There, Esc or Shift+Tab goes back to the field, and Tab closes it
+  and goes on to the control after the field (`lib/tab-order.ts`: the popover is portalled, so the
+  browser's own Tab would land at the end of the page). Its sentence is also said in a polite live
+  region beside the field, so a screen reader hears it as the caret arrives.
 - **The fix is one transaction** (`applyFlagFix`): the text replaced, or removed for "". ⌘Z puts it
   back. Read-only, the popover explains and offers no fix.
 
@@ -373,7 +375,7 @@ Mechanics only: the editor highlights, reports and asks; the host stores threads
 | Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Alt+F10: block options for the caret's block (Enter opens the menu, Esc back to the text) · Home/End line start/end · ⌘Z / ⇧⌘Z |
 | Highlights | arrows into a highlight report it (`onCaretThreadChange`) |
 | Chip | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove |
-| Flag (inline field) | arrow onto it: popover · Tab: into the popover's fix (Enter applies it) · Tab or Esc there: back to the field · Esc: close |
+| Flag (inline field) | arrow onto it: popover · Tab: into the popover's fix (Enter applies it) · Shift+Tab or Esc there: back to the field · Tab there: close, on to the control after the field · Esc: close |
 | Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell); in a numbered list inside a cell, block options instead |
 | Required heading | Enter at its start adds a line above · edits show the note |
 | Panel | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels |
@@ -659,7 +661,7 @@ components/               React: EditorRoot, DocumentEditor, VariablesPanel, Inl
 paste/                    clipboard HTML normalizer, Markdown → HTML, `{{key}}` → chips;
                           __fixtures__/ Word (Windows, Mac) and Google Docs clipboard HTML
 lib/                      small helpers (chip transforms, section positions, + insert, hooks,
-                          thread anchors and quotes, block rects, platform keys)
+                          thread anchors and quotes, block rects, platform keys, Tab order)
 testing/                  helpers for the tests (headless editors)
 ```
 

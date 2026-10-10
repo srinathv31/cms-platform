@@ -29,11 +29,13 @@ export function recipientOf(values: VariableValues): string | null {
 }
 
 /**
- * Who the team's messages come from on the phone: the push's app (the team's app name, else its name)
- * and the SMS's sender (its short code, else none: a US text can't show a brand name there).
+ * Who the team's messages come from on the phone. The push's app is the team's app name, else its name
+ * (a team always has one), so the app is never blank. The SMS's sender is the team's short code, else
+ * none (""): a US text can't show a brand name there, and a made-up number would pass for the real one,
+ * so the phone shows a neutral "No sender" instead (the kit's `NO_SENDER`).
  */
 export function phoneSenders(senders: TeamSenders, teamName: string): PhoneSenders {
-  return { appName: senders.appName?.trim() || teamName, smsSender: senders.smsSender?.trim() ?? "" };
+  return { appName: senders.appName?.trim() || teamName.trim(), smsSender: senders.smsSender?.trim() || "" };
 }
 
 /** The phone's clock: 9:41, as every phone preview shows it, on the demo clock's day ("Friday, October 9"). */

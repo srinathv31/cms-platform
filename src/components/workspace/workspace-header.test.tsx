@@ -14,7 +14,8 @@ const { WorkspaceHeader } = await import("./workspace-header");
 const { NameField } = await import("./name-field");
 const { WorkspaceShare } = await import("./workspace-share");
 const { BindDraft } = await import("./session/workspace-session");
-const { SaveStopped } = await import("./save-status");
+const { SaveStatus, SaveStopped } = await import("./save-status");
+const { StatusRow } = await import("./status-row");
 
 const DRAFT: WorkspaceHeaderData = {
   id: "UC-4F7K2Q",
@@ -62,6 +63,35 @@ describe("WorkspaceHeader names", () => {
   it("has no SHARE ring when nothing is Active", async () => {
     const tree = await render({ ...DRAFT, activeName: null, activeNumber: null, versionLabel: null, basedOnNumber: null });
     expect(find(tree, WorkspaceShare)).toEqual([]);
+  });
+});
+
+/** The element whose own children include one of `type`. */
+function parentOf(node: ReactNode, type: unknown): ReactElement<{ className?: string; children?: ReactNode }> | null {
+  if (Array.isArray(node)) return node.map((child) => parentOf(child, type)).find((found) => found !== null) ?? null;
+  if (!isValidElement<{ className?: string; children?: ReactNode }>(node)) return null;
+  const children = [node.props.children].flat(3);
+  if (children.some((child) => isValidElement(child) && child.type === type)) return node;
+  return parentOf(node.props.children, type);
+}
+
+// The status row wraps when the rail is open: its separator goes with the save status, inside that item's
+// left padding, which the row clips at a line's start, so no line ends (or starts) with a "·".
+describe("WorkspaceHeader status row", () => {
+  it("keeps the separator in the save status's own item, in a row that clips each line's start", async () => {
+    const tree = await render(DRAFT);
+    const item = parentOf(tree, SaveStatus)!;
+    const dot = [item.props.children].flat(3).find((child) => isValidElement<{ children?: ReactNode }>(child) && child.props.children === "·");
+    expect(dot, "the · is in the save status's item").toBeTruthy();
+    expect(item.props.className).toContain("pl-4");
+    const row = find<{ className: string }>(tree, StatusRow)[0]!;
+    expect(row.props.className).toContain("overflow-x-clip");
+  });
+
+  it("has no separator without a version label to separate", async () => {
+    const tree = await render({ ...DRAFT, versionLabel: null, basedOnNumber: null });
+    const item = parentOf(tree, SaveStatus)!;
+    expect([item.props.children].flat(3).filter((child) => isValidElement(child) && child.type !== SaveStatus)).toEqual([]);
   });
 });
 

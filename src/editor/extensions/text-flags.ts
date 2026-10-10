@@ -10,7 +10,8 @@
 //   • Its popover (components/flag-popover.tsx) opens on a click on the flag, or when the caret is moved
 //     onto it without typing (arrows, Home and End, a click). An edit closes it, and so do the caret
 //     leaving the flag, Esc and focus leaving the field (unless it went into the popover).
-//   • While it is open, Tab moves focus into it, to its fix; Esc there, or Tab again, comes back.
+//   • While it is open, Tab moves focus into it, to its fix. Esc or Shift+Tab there comes back to the
+//     field; Tab there closes it and goes on to the control after the field (components/flag-popover.tsx).
 //   • A fix is one ordinary transaction (`applyFlagFix`): the flagged text replaced, or removed for an
 //     empty replacement. Undo puts it back.
 

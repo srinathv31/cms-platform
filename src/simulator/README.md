@@ -135,7 +135,9 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   code (`CORAL_SHORT_CODE`), every text Coral delivered to them from any offer or alert, oldest first, up to the
   one viewed. The web page is a sandboxed iframe in `ScreenPreview`. When a send reaches the customer whose drawer
   is open, the drawer stays on them, keeps the old delivery on the phone while the new one loads, and a push drops
-  in as a banner (a heads-up on Android) once; any other view ends that (`Arrival` in `OfferView`). Inbox and PDF
+  in as a banner (a heads-up on Android) once; any other view ends that (`Arrival` in `OfferView`). Closing an
+  opened push, or coming back to it from another view, shows the lock screen: the drop never replays (`PushPhone`
+  holds the screen, keyed by the delivery). Inbox and PDF
   are Coral's own frames. Sandboxed iframes load `/sim/deliveries/{id}/file`, which serves the stored output with
   `no-store`, `nosniff`, and for HTML a CSP that allows no scripts (a push or SMS as its JSON).
 - **Upgrade, sunset, revoke** (`loadLinkState`, `linkStatus`). For each link Coral reads the template at the pinned

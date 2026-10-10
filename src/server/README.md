@@ -153,12 +153,14 @@ SQLite and libSQL specifics:
 
 The platform ([seed/platform.ts](seed/platform.ts)) has two content types, each with a one-stage chain: Disclosure
 (documents: PDF, Web and Email, three required sections) and Alert (messages: Push and SMS, no sections, the SMS
-footer "Coral Offers: Reply STOP to opt out, HELP for help." and a 3-part budget). Coral Offers sends its messages as
-the app "Coral" and from the short code 26725 ([seed/teams.ts](seed/teams.ts)). The submit action reads the content
-type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)), and freezes
-the footer into the version (`versions.sms_footer`, migration 0011): render, the review screen, Compare and Coral
-print a submitted version's own footer, and only a draft takes the content type's as it stands (`smsFooterOf`). The
-template's family comes from its content type too (`loadFamily`, `contentTypeFamily`), never a version's channels. The
+footer "Coral Offers: Reply STOP to opt out, HELP for help." and a 3-part budget). Every seeded team has an app name
+and a fictional short code its messages come from, so no preview shows the fallback: Coral Offers sends as "Coral"
+from 26725, Deposits as "Deposits Online" from 33767, and Card Statements as "Card Center" from 22737
+([seed/teams.ts](seed/teams.ts)). The submit action reads the content type's footer and budget with
+`loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)), and freezes the footer into the version
+(`versions.sms_footer`, migration 0011): render, the review screen, Compare and Coral print a submitted version's own
+footer, and only a draft takes the content type's as it stands (`smsFooterOf`). The template's family comes from its
+content type too (`loadFamily`, `contentTypeFamily`), never a version's channels. The
 workspace's and the review screen's read models carry them and the team's senders (`messageRules`, `senders`) for
 the message composer and the phone preview, which render in the browser
 ([decision 0035](../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)); the workspace's also says

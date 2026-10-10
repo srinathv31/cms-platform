@@ -71,8 +71,10 @@ The types are in [types.ts](types.ts); everything public comes from [index.ts](i
 - **`PushContent`**: `appName`, `appMark: { monogram }` (a tile in the brand's tone, never a real icon), `title`,
   `subtitle?` (iPhone only: Android never shows it, even when set; empty means none), `body`, `time` (as printed:
   "now", "9:41 AM"). Plain text; line breaks and runs of spaces are kept.
-- **`SmsContent`**: `sender` (a short code or number: a US text can't show a brand there), `text` (the whole
-  message, footer included, as delivered), `time`, `day?` (default "Today"). Links in the text show underlined and
+- **`SmsContent`**: `sender` (a short code or number: a US text can't show a brand there; when it is empty the
+  header shows a muted "No sender", `NO_SENDER` in [labels.ts](labels.ts), and the caption leaves out "from"),
+  `text` (the whole message, footer included, as delivered), `time`, `day?` (default "Today"). Links in the text
+  show underlined and
   not clickable, as a phone shows them from an unknown sender ([links.ts](links.ts)). `earlier?` holds the texts
   that came before from the same sender (`SmsMessage`: `text`, `time`, `day?`), oldest first: each prints its day
   and time when they differ from the text before ([thread.ts](thread.ts)), and the thread opens scrolled to the
@@ -172,7 +174,7 @@ region. The clickable notification takes the app's focus ring; a long text messa
 | [push-preview.tsx](push-preview.tsx), [sms-preview.tsx](sms-preview.tsx) | The two entry points: the frame, then the platform's skin. |
 | [screen-preview.tsx](screen-preview.tsx) | `ScreenPreview`: the frame and the system chrome around any app's content (Coral's web page). |
 | [thread.ts](thread.ts) | A text thread: its messages oldest first, which print their time, and opening on the newest. |
-| [labels.ts](labels.ts) | `pushScreenLabel` (Banner or Heads-up) and the skins' names. |
+| [labels.ts](labels.ts) | `pushScreenLabel` (Banner or Heads-up), the skins' names, the SMS caption and the no-sender placeholder. |
 | [phone-frame.tsx](phone-frame.tsx) | The generic frame, the `--pt` setup, the camera cutout, the figure. |
 | [status-bar.tsx](status-bar.tsx) | Each platform's status bar and its home indicator or gesture handle, generic glyphs. |
 | [wallpaper.tsx](wallpaper.tsx) | The wallpaper, drawn from `--device-wall-*`, shared by both platforms. |
@@ -191,8 +193,9 @@ entry points.
 ## Testing
 
 [measure.test.ts](measure.test.ts) (the visible-prefix search), [links.test.ts](links.test.ts),
-[labels.test.ts](labels.test.ts), [thread.test.ts](thread.test.ts), [ios/type.test.ts](ios/type.test.ts), [android/dates.test.ts](android/dates.test.ts)
-and [android/notification-card.test.tsx](android/notification-card.test.tsx) (no subtitle on Android; with previews
+[labels.test.ts](labels.test.ts), [thread.test.ts](thread.test.ts), [ios/type.test.ts](ios/type.test.ts), [android/dates.test.ts](android/dates.test.ts),
+[messages-thread.test.tsx](messages-thread.test.tsx) (the sender, or "No sender", in each thread's header) and
+[android/notification-card.test.tsx](android/notification-card.test.tsx) (no subtitle on Android; with previews
 hidden, the title stays and only the text goes) run in node. Layout, clamping and the Range read need a real
 browser: check them on the design page, whose Truncation section prints what `onMeasure` reports beside each
 screen. Coral's phone, with a thread of several texts and a banner arriving, is driven end to end by

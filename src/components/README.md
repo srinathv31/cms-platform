@@ -243,11 +243,15 @@ output on a tinted well whose top never moves. Where the output comes from depen
 | Shown | `PdfViewer`, `WebOutput`, `EmailOutput` | the phone kit, `PushOutput` and `SmsOutput` (`phone-output.tsx`) |
 | Its controls | Download PDF; Desktop · Mobile | iPhone · Android, and the 32px Device options (`phone-controls.tsx`): screen (push only), appearance, previews (lock screen only), text size, width in the platform's own units. A row that doesn't apply stays, greyed, with why under it. |
 
-Either way, values the route would refuse show as `OutputError`, in the author's words. A message the route would
+Either way, values the route would refuse show as `OutputError`, in the author's words, with Edit values. Its Try
+again is for a document channel's failed request; a message renders in the browser, where the same fields fail the
+same way, so its failure offers no button. A message the route would
 refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
-sentence above it. In the workspace the phone's settings and Push's screen live in the session's preview state
+sentence above it. That sentence carries the live size, so it is no live region: a polite one says a fixed sentence
+(`refusalNotice`: "The SMS is over 10 parts.") once, when the message turns refused. In the workspace the phone's settings and Push's screen live in the session's preview state
 (`phone`, `pushScreen`), like Web's `device`; the review keeps its own. The phone's sender is the team's app name
-(else its name) and short code, its date the demo clock's day (`preview-sender.ts`).
+(else its name) and short code (else none: the thread shows a muted "No sender", never a made-up number or the
+team's name), its date the demo clock's day (`preview-sender.ts`).
 
 ## The message composer
 
@@ -266,7 +270,8 @@ What it measures, shown only when it matters and never animated:
 - **Flags in the text**: characters outside GSM-7 in an SMS, public shorteners in an SMS or a push body
   (`messageFieldFlags`), underlined through the field's `flags`, with Replace or Remove where there is a fix.
 - **Cut warnings** under a push field (`push-fit.tsx`): two hidden phones, one per platform, at the lock screen,
-  standard width and default text size, report through the kit's `onMeasure` where they clamp each field;
+  standard width and default text size, report through the kit's `onMeasure` where they clamp each field (they
+  redraw only when the push does: `usePushContent` reads the push's own fields, so an SMS keystroke leaves them);
   `truncationWarnings` says it ("iPhone lock screen cuts after “…payment of”."). The title on either platform; the
   subtitle and body on iPhone only (Android's one-line body is how Android shows it).
 

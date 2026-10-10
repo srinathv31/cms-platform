@@ -30,8 +30,8 @@ import { asPersona, beat, demoTimeout, expect, hydrated, shoot, test } from "./h
 //   4. Olivia's phone: the lock screen shows the push with its iPhone subtitle; Messages shows the text with
 //      the content type's footer, and what Stencil reported (GSM-7, 1 part).
 //   5. Marcus's phone: the same push, without the subtitle (Android never shows one).
-//   6. With Marcus's phone open, Coral sends to him again: the heads-up drops in, and his thread holds both
-//      texts, oldest first.
+//   6. With Marcus's phone open, Coral sends to him again: the heads-up drops in (opened and closed, it is on
+//      the lock screen), and his thread holds both texts, oldest first. Back on the push: the lock screen.
 //
 // afterAll puts back what the run changed: Card Used Abroad goes back in review (its version row, and the
 // approval, audit events, notifications and notices the approval wrote), and Coral's link, deliveries and
@@ -237,6 +237,13 @@ test.describe("Coral receives alerts", () => {
       await expect(field(view, "title")).toHaveText("Was this you?");
       await beat(page, 1200);
       await shoot(page, "coral-alert-android-heads-up");
+
+      // Opened and closed again, it is on the lock screen: the heads-up has dropped, and doesn't drop again.
+      const notification = () => phone(view).locator('[data-slot="notification"]').first();
+      await click(notification());
+      await expect(phone(view).locator("figcaption")).toHaveText("Expanded, Android-style preview");
+      await click(notification());
+      await expect(phone(view).locator("figcaption")).toHaveText("Lock screen, Android-style preview");
 
       await click(viewSwitch(page, "Messages"));
       const sms = customerView(page, MARCUS.name, "SMS");
