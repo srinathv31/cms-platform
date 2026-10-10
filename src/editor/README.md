@@ -16,6 +16,7 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 [Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
 [Changes since Phase 3](#changes-since-phase-3) · [Changes since Phase 4](#changes-since-phase-4) ·
 [Changes since Phase 7a](#changes-since-phase-7a) ·
+[Changes for the message composer](#changes-for-the-message-composer) ·
 [How it's built](#how-its-built)
 
 ## Public API (frozen for Phase 2)
@@ -53,7 +54,7 @@ Server and domain code use only the server-safe ones: `schema`, `model/*` and `p
 | `EditorRoot` | Holds one variable list for everything inside it (document, panel, inline fields). |
 | `DocumentEditor` | The document. Inside a root, or standalone (it then makes a private root). |
 | `VariablesPanel` | The template's variables: insert, drag, edit, delete, contract flags. Inside a root. |
-| `InlineVariableField` | A channel field with chips: one line (email subject and preheader, a push title or body), or with `lines="lines"` keeping its line breaks as hard breaks (an SMS message: Enter adds one, a paste keeps its lines and blank lines). Inside a root. |
+| `InlineVariableField` | A channel field with chips: one line (email subject and preheader, a push title or body), or with `lines="lines"` keeping its line breaks as hard breaks (an SMS message: Enter adds one, a paste keeps its lines and blank lines). Optionally the host's `flags` (problems underlined in the text, each with its sentence and a one-click fix), a locked `footer` inside its box, and `size="md"` for a main column. Inside a root. |
 | `StaticDocument` | Server-safe render of a document (no JS), identical markup to the live editor. |
 | `VariableChipView` | The presentational chip, to show a variable outside the editor the same way. |
 | `useContractState()` | Inside a root: `{ variables, changes }`, the live contract diff against `baseline`. |
@@ -103,8 +104,13 @@ interface InlineVariableFieldProps {
   lines?: "line" | "lines";                       // "lines": Enter and paste add hard breaks (an SMS); read once
   onChange?: (value: JSONContent) => void;
   hidden?: boolean;                               // not shown, still in the root (see Composition)
+  flags?: (text: string) => readonly TextFlag[];  // problems underlined in the text (see Behavior, Flags)
+  footer?: ReactNode;                             // fixed text inside the box, after the field's (an SMS footer)
+  size?: "sm" | "md";                             // "sm" 14px for a rail (default); "md" 15px for a main column
   id?: string; className?: string;
 }
+
+interface TextFlag { from: number; to: number; message: string; replacement?: string }  // offsets into `text`; "" removes
 
 interface StaticDocumentProps {
   content: JSONContent; variables: readonly Variable[]; align?: "center" | "start"; className?: string;
@@ -147,7 +153,7 @@ interface DocumentEditorHandle {
 | `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)` | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them. |
 | `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
 | `looksLikeMarkdown(text)`, `markdownToHtml(markdown)` | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import. |
-| Component types | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`. |
+| Component types | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`, `TextFlag`, `TextFlagger`. |
 
 ## Composition
 
@@ -251,6 +257,26 @@ Legal notices) can't be deleted, renamed, retyped, reformatted or moved:
 - Protection follows the document's `requiredKey` attributes; `requiredSections` is accepted for
   the host's reference.
 
+### Flags (inline fields)
+
+`InlineVariableField`'s `flags` lets a host mark problems in a field's text where they sit (Stencil
+flags an SMS's characters outside GSM-7 and links on public shorteners; the editor knows only
+ranges, sentences and replacements). `extensions/text-flags.ts`:
+
+- **The text the flagger reads**: the field's text with each chip as one space and each line break
+  as `\n` (`fieldText`), so an offset there is a position in the field. It runs on every edit; a
+  new flagger flags the text again at once.
+- **Drawn as decorations**: `<span class="ucomp-flag" data-flag="i">`, a wavy warning underline on a
+  soft wash that reaches a little past the text, so a single ’ shows. Text that draws nothing (a
+  zero-width space) is also `data-invisible` and gets a sliver of width. Nothing moves.
+- **The popover** (`components/flag-popover.tsx`, store `state/flag-popover.ts`): the host's
+  sentence, and the fix when there is one ("Replace with '", "Replace with a space", or "Remove" for
+  an empty replacement). It opens on a click on the flag, or when the caret is moved onto it without
+  typing; an edit, the caret leaving, Esc and blur close it. It never takes focus on its own: Tab
+  from the field moves into it, and Tab or Esc there goes back to the field.
+- **The fix is one transaction** (`applyFlagFix`): the text replaced, or removed for "". ⌘Z puts it
+  back. Read-only, the popover explains and offers no fix.
+
 ### Blocks
 
 - **Block handle**: hovering a block shows + and ⋮⋮. + adds a line below and opens the `/` menu
@@ -345,6 +371,7 @@ Mechanics only: the editor highlights, reports and asks; the host stores threads
 | Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Alt+F10: block options for the caret's block (Enter opens the menu, Esc back to the text) · Home/End line start/end · ⌘Z / ⇧⌘Z |
 | Highlights | arrows into a highlight report it (`onCaretThreadChange`) |
 | Chip | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove |
+| Flag (inline field) | arrow onto it: popover · Tab: into the popover's fix (Enter applies it) · Tab or Esc there: back to the field · Esc: close |
 | Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell); in a numbered list inside a cell, block options instead |
 | Required heading | Enter at its start adds a line above · edits show the note |
 | Panel | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels |
@@ -569,6 +596,21 @@ a rename into the contract diff, which change the contract types (the last item)
   `DiffOptions` and its `renames` map are gone, and so are the variable store's `renames` and a
   tombstone's `renamedFrom`. `identityOf` is new in `model/contract`.
 
+## Changes for the message composer
+
+Three additive props on `InlineVariableField`, for the message composer's fields (a push's title and
+body, an SMS's message) in a page's main column:
+
+- **New prop**: `flags` (`TextFlagger`, with the `TextFlag` type in `types.ts`): problems underlined in
+  the text, each with the host's sentence and an optional one-click fix (see Behavior, Flags). It is
+  `textFlags` in `EditorExtensionOptions` for `inlineFieldExtensions`. New files:
+  `extensions/text-flags.ts`, `state/flag-popover.ts`, `components/flag-popover.tsx`.
+- **New prop**: `footer`, fixed content inside the field's box after its text, never editable (an
+  SMS's locked footer). It shows in the server paint too.
+- **New prop**: `size` (`"sm"`, the default, or `"md"`): 15px text and roomier padding beside a
+  document-sized column.
+- No new handle methods or dependencies.
+
 ## How it's built
 
 | Need | Piece |
@@ -586,6 +628,7 @@ a rename into the contract diff, which change the contract types (the last item)
 | Dragged-block highlight | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`) |
 | Format toolbar (+ Comment) | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`, its link field `components/link-field.tsx`); Base UI `Tooltip` |
 | Review-thread highlights | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute |
+| Inline-field flags | ProseMirror decorations recomputed on each edit from the host's flagger (`extensions/text-flags.ts`); the popover on Base UI `Popover` parts, like the chip's (`components/flag-popover.tsx`) |
 | Thread placement for hosts | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container) |
 | Placeholder | `Placeholder` from `@tiptap/extensions` |
 | Markdown paste | Our parser (`paste/markdown.ts`): Markdown → schema HTML → ProseMirror's clipboard parser (no Markdown dependency) |
@@ -600,7 +643,8 @@ schema.ts                 the one extension list (+ the channel field list, on o
 styles.css                document typography and editor states (tokens only)
 model/                    pure TS: Variable types, values and keys, contract diff, usage, form rules,
                           default sample sets
-state/                    zustand stores: variable list (ids, rename forwards, tombstones), root runtime, chip popover
+state/                    zustand stores: variable list (ids, rename forwards, tombstones), root runtime, chip popover,
+                          flag popover
 extensions/               TipTap extensions (server-safe, except variable-view.ts)
 components/               React: EditorRoot, DocumentEditor, VariablesPanel, InlineVariableField,
                           StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus

@@ -7,7 +7,8 @@
 //                          field binding (usage, drop, chip popover, paste), Home/End,
 //                          review-thread highlights and list markers.
 // inlineFieldExtensions()  a channel field (email subject, push title, SMS message): text + chips only,
-//                          on one line, or keeping its line breaks as hard breaks.
+//                          on one line, or keeping its line breaks as hard breaks; with the host's
+//                          text flags when it has any.
 
 import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
@@ -33,6 +34,7 @@ import type { FieldLines as FieldLinesMode } from "./model/normalize";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
 import { SectionPaste } from "./extensions/section-paste";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
+import { TextFlags, type TextFlagsOptions } from "./extensions/text-flags";
 import { Variable } from "./extensions/variable";
 import { variableSuggestion, type VariablePickerRender, type VariableSuggestion } from "./extensions/variable-picker";
 import { VariableWithChip } from "./extensions/variable-view";
@@ -220,6 +222,8 @@ export interface EditorExtensionOptions {
   requiredNote?: () => string;
   /** Review threads: where they come from and where clicks and the caret's thread go. */
   reviewThreads?: Omit<Partial<ReviewThreadsOptions>, "leafText"> | null;
+  /** A channel field's flags (InlineVariableField's `flags`): the host's flagger and the popover's store. */
+  textFlags?: TextFlagsOptions | null;
 }
 
 function clientVariableOptions({ store, pickerRender }: EditorExtensionOptions): InternalBaseOptions {
@@ -309,6 +313,7 @@ export function inlineFieldExtensions(options: EditorExtensionOptions, lines: Fi
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
     lines === "lines" ? FieldLines : SingleLine,
+    ...(options.textFlags ? [TextFlags.configure(options.textFlags)] : []),
   ];
 }
 

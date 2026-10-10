@@ -204,9 +204,42 @@ export interface InlineVariableFieldProps {
    * undo and redo pass it by. Default false.
    */
   hidden?: boolean;
+  /**
+   * Marks problems in the text where they sit (an SMS's characters outside GSM-7, a link on a public
+   * shortener). Called on every edit with the field's text (each chip a space, each line break "\n");
+   * each flag it returns is underlined, and its popover shows the `message` and, with a `replacement`,
+   * a one-click fix. Read on every edit, so it may change between renders. Default: no flags.
+   */
+  flags?: TextFlagger;
+  /**
+   * Fixed text shown inside the field's box after what the author types, never editable: an SMS's
+   * locked footer. Default none.
+   */
+  footer?: ReactNode;
+  /**
+   * `"sm"` (default): 14px text, for a rail (the email subject). `"md"`: 15px text and roomier
+   * padding, for a page's main column (the message composer).
+   */
+  size?: "sm" | "md";
   id?: string;
   className?: string;
 }
+
+/**
+ * One problem in a field's text (`InlineVariableFieldProps.flags`). `from` and `to` are offsets into
+ * the text the flagger was given (UTF-16, `to` exclusive).
+ */
+export interface TextFlag {
+  from: number;
+  to: number;
+  /** What the popover says: "’ isn't in the SMS character set." */
+  message: string;
+  /** What the one-click fix writes in its place; "" removes it. Absent: no fix (the popover only explains). */
+  replacement?: string;
+}
+
+/** A field's text in, its flags out (see `InlineVariableFieldProps.flags`). */
+export type TextFlagger = (text: string) => readonly TextFlag[];
 
 // ── Contract state (useContractState) ─────────────────────────
 
