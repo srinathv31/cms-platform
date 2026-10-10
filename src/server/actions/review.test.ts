@@ -10,7 +10,9 @@ import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
+import { diffChannelFields } from "@/domain/redline";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import { createVariableStore } from "@/editor/state/variable-store";
 import type { Db } from "@/server/db/client";
@@ -24,6 +26,7 @@ import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { findRound } from "@/server/queries/find-round";
 import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
+import { getReviewScreen } from "@/server/queries/review";
 import { addComment } from "./comments";
 import { startDraft, submitDraft } from "./templates";
 import {
@@ -1365,6 +1368,57 @@ describe("submitting an alert", () => {
       expect((await version(templateId, 1))?.smsFooter).toBe(footer);
     } finally {
       await db.update(schema.contentTypes).set({ smsFooter: footer }).where(eq(schema.contentTypes.id, "ct_alert"));
+    }
+  });
+
+  it("resubmits a sent-back alert as the next round, each round freezing its own footer, redlined against the live version", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
+    const alertFooter = async (smsFooter: string) =>
+      db.update(schema.contentTypes).set({ smsFooter }).where(eq(schema.contentTypes.id, "ct_alert"));
+    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+    const editDraft = async (fields: Partial<ChannelFields>) => {
+      const draft = (await draftOf(templateId))!;
+      await db.update(versions).set({ channelFields: { ...draft.channelFields, ...fields }, rev: draft.rev + 1 }).where(eq(versions.id, draft.id));
+    };
+    const title = (text: string) => ({ push: { title: field(t(text)), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) } });
+    try {
+      as("maya");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+      as("jordan");
+      expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+      const v1 = (await version(templateId, 1))!;
+
+      // v2, round 1: a new title, submitted under a new footer; Jordan sends it back.
+      as("maya");
+      expect(await startDraft({ templateId })).toMatchObject({ ok: true });
+      await editDraft(title("Your offer ends Friday"));
+      await alertFooter("Coral: Text STOP to end.");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+      as("jordan");
+      expect(await requestChanges({ templateId, versionNumber: 2, round: 1, reason: "Say which card." })).toEqual({ ok: true });
+
+      // v2, round 2: the draft the send-back opened carries round 1's fields; Maya rewrites the title.
+      as("maya");
+      expect((await draftOf(templateId))!.channelFields).toEqual((await version(templateId, 2, 1))!.channelFields);
+      await editDraft(title("Your Coral card offer ends Friday"));
+      await alertFooter("Coral: Reply STOP to stop.");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 2 });
+      const [round1, round2] = [(await version(templateId, 2, 1))!, (await version(templateId, 2, 2))!];
+      expect([v1.smsFooter, round1.smsFooter, round2.smsFooter]).toEqual([footer, "Coral: Text STOP to end.", "Coral: Reply STOP to stop."]);
+      expect(round2.basedOnVersionId).toBe(round1.id);
+
+      // Both rounds are redlined against v1, the live version, fields and footer alike: never against each other.
+      as("jordan");
+      for (const round of [null, 1] as const) {
+        const screen = await getReviewScreen("coral-offers", templateId, 2, round);
+        expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "active", channelFields: v1.channelFields, smsFooter: footer });
+        const redline = diffChannelFields(screen.baseline, screen.version);
+        expect(redline.fields.filter((f) => f.status !== "unchanged").map((f) => [f.field.id, f.status])).toEqual([["push.title", "changed"]]);
+        expect(redline.footer).toEqual({ from: footer, to: screen.version.smsFooter, status: "changed" });
+      }
+      expect((await getReviewScreen("coral-offers", templateId, 2, 1)).replacedBy).toMatchObject({ number: 2, round: 2, label: "v2, round 2" });
+    } finally {
+      await alertFooter(footer!);
     }
   });
 
