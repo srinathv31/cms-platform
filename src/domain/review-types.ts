@@ -16,6 +16,7 @@ import type {
   VersionState,
 } from "./types";
 import type { Refused } from "./refusals";
+import type { NumberedRound } from "./rounds";
 
 // ── People ───────────────────────────────────────────────────────────────────
 
@@ -356,6 +357,13 @@ export interface ReviewScreenData {
    * nothing of.
    */
   previousNumber: number | null;
+  /**
+   * Where this round's work went (`replacedBy`), when it is a sent-back round that was resubmitted: its
+   * number's head, a later round or the release, with its label ("v3, round 2", or "v3" once released).
+   * Null when this round is the head (in review, released, or sent back with only a draft after it), and
+   * when the viewer can't open the head.
+   */
+  replacedBy: (NumberedRound & { label: string }) | null;
   /**
    * The name customers get today, which the rail shows a rename against: the Active version's or, with
    * none Active, the newest version that still renders (`renameBaseline`). For a round sent back before

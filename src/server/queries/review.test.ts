@@ -258,6 +258,33 @@ describe("getReviewScreen", () => {
     );
   });
 
+  it("links a sent-back round on to where its work went: the next round, the release, or nothing while only a draft follows", async () => {
+    as("jordan");
+    const cashBack = ids["cash-back"]!;
+    expect((await getReviewScreen("coral-offers", cashBack, 3, 1)).replacedBy, "round 2 is in review").toEqual({
+      number: 3,
+      round: 2,
+      state: "in_review",
+      label: "v3, round 2",
+    });
+    expect((await getReviewScreen("coral-offers", cashBack, 3, null)).replacedBy, "round 2 is the head").toBeNull();
+    // Annual Fee Waiver v1 was sent back, and Maya hasn't resubmitted: her draft has no number yet.
+    const waiver = await getReviewScreen("coral-offers", ids["annual-fee-waiver"]!, 1, null);
+    expect([waiver.version.state, waiver.replacedBy]).toEqual(["changes_requested", null]);
+
+    // High-Yield Savings v2 was approved on round 3: its sent-back rounds link to v2, its bare page.
+    as("eli");
+    const highYield = ids["high-yield-savings"]!;
+    for (const round of [1, 2]) {
+      const screen = await getReviewScreen("deposits", highYield, 2, round);
+      expect(screen.replacedBy, `round ${round}`).toEqual({ number: 2, round: 3, state: "active", label: "v2" });
+      expect(screen.steps, "the stepper says who sent it back").toEqual([
+        expect.objectContaining({ status: "returned", decidedBy: expect.objectContaining({ id: "naomi" }), decidedAt: expect.stringMatching(ISO) }),
+      ]);
+    }
+    expect((await getReviewScreen("deposits", highYield, 2, null)).replacedBy, "the release itself").toBeNull();
+  });
+
   it("compares a round sent back before its number went live with the version it was drafted from, not its own release", async () => {
     // High-Yield Savings: v1 Superseded, v2 approved on round 3 after two send-backs.
     as("eli");

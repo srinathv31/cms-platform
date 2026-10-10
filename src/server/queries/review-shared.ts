@@ -132,6 +132,18 @@ export const requireReviewVersion = cache(
   },
 );
 
+/**
+ * Whether the viewer may open this round's review screen from the space, by the rule
+ * `requireReviewVersion` lets them in by: the template's team in its space, or someone the round's stage
+ * names or who decided it. A screen links to another round only when this holds, so it never links to a 404.
+ */
+export async function opensRound(access: TemplateAccess, versionId: string): Promise<boolean> {
+  const { space, template } = access;
+  if (seesInSpace(space, template)) return true;
+  const version = await db.query.versions.findFirst({ where: eq(versions.id, versionId) });
+  return version !== undefined && namedOnVersion(space.viewer, template, version);
+}
+
 async function namedOnVersion(
   viewer: Viewer,
   template: { teamId: string; contentTypeId: string },

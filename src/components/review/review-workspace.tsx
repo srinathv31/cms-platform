@@ -1,19 +1,21 @@
 "use client";
 
 import { Activity, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import type { Route } from "next";
 import { useReducedMotion } from "motion/react";
 import { COMPOSER_THREAD_ID, ThreadList, blockTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
 import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
 import { diffDocuments, nameChange } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
+import { reviewPath } from "@/domain/rounds";
 import type { Channel, VersionState } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { ApproveDialog, type Approved } from "./approve-dialog";
 import { BlockCommentMenu } from "./block-comment-menu";
 import { DecisionBar } from "./decision-bar";
 import { approvalStage, decisionAccess, decisionLine, type LocalDecision } from "./decision-model";
-import { DecisionRail } from "./decision-rail";
+import { DecisionRail, type NextRound } from "./decision-rail";
 import { DocumentView } from "./document-view";
 import { GoLive } from "./go-live";
 import { PreviewView } from "./preview-view";
@@ -249,7 +251,14 @@ export function ReviewWorkspace({
     authorName: version.submittedBy.name,
     local,
     canDecideAgain: can.approve.ok,
+    steps,
+    nowIso,
   });
+  // A sent-back round that was resubmitted links on to where its work went, in this space.
+  const { replacedBy } = data;
+  const next: NextRound | null = replacedBy
+    ? { label: replacedBy.label, href: reviewPath(team, template.id, replacedBy) as Route }
+    : null;
   useEffect(() => {
     if (line !== null && decided.current) decisionRegion.current?.focus({ preventScroll: true });
   }, [line]);
@@ -369,6 +378,7 @@ export function ReviewWorkspace({
         nowIso={nowIso}
         access={access}
         line={line}
+        next={next}
         onApprove={() => openDialog("approve")}
         onRequest={() => openDialog("request")}
         approveRef={approveButton}

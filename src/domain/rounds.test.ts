@@ -7,6 +7,7 @@ import {
   isReleased,
   nextRound,
   parseRoundParam,
+  replacedBy,
   reviewHistoryLabel,
   reviewHistoryName,
   reviewLink,
@@ -109,6 +110,31 @@ describe("lookups and order", () => {
     expect(headOf(rows, 4)).toBeUndefined();
     // A released row wins over a higher round (a database numbered before rounds can't have one, but the rule holds).
     expect(headOf([{ id: "a", ...row(1, 1, "superseded") }, { id: "b", ...row(1, 2, "changes_requested") }], 1)?.id).toBe("a");
+  });
+
+  it("a sent-back round links on to its number's head: a later round, or the release", () => {
+    // A later round in review: "Open v3, round 2".
+    const v3 = replacedBy(rows, v(3, 1, "changes_requested"));
+    expect(v3?.id).toBe("v3r2");
+    expect(versionLabel(asNumbered(v3!), { style: "sentence" })).toBe("v3, round 2");
+    // Released since: "Open v2", the bare link.
+    for (const round of [1, 2]) {
+      const v2 = replacedBy(rows, v(2, round, "changes_requested"));
+      expect(v2?.id, `round ${round}`).toBe("v2r3");
+      expect(versionLabel(asNumbered(v2!), { style: "sentence" })).toBe("v2");
+      expect(reviewPath("deposits", "UC-ZKZSRZ", asNumbered(v2!))).toBe("/deposits/review/UC-ZKZSRZ/2");
+    }
+    // Sent back again: the newer record.
+    const twice = [...rows, { id: "v4r1", ...row(4, 1, "changes_requested") }, { id: "v4r2", ...row(4, 2, "changes_requested") }];
+    expect(replacedBy(twice, v(4, 1, "changes_requested"))?.id).toBe("v4r2");
+  });
+
+  it("a round that is its number's head links nowhere: only a draft after it, in review, or released", () => {
+    const sentBack = [{ id: "v1", ...row(1, 1, "active") }, { id: "v2r1", ...row(2, 1, "changes_requested") }, { id: "d", ...DRAFT }];
+    expect(replacedBy(sentBack, v(2, 1, "changes_requested"))).toBeNull();
+    expect(replacedBy(rows, v(3, 2, "in_review"))).toBeNull();
+    expect(replacedBy(rows, v(2, 3, "active"))).toBeNull();
+    expect(replacedBy(rows, v(1, 1, "superseded"))).toBeNull();
   });
 
   it("lists a number's rounds newest first", () => {

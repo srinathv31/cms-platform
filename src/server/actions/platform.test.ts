@@ -958,13 +958,21 @@ describe("a bare review link a stage reviewer outside the team was sent before a
     const screen = await getReviewScreen("deposits", templateId, 1, null);
     expect(screen.version).toMatchObject({ number: 1, round: 1, state: "changes_requested" });
     expect(screen.can.approve.ok).toBe(false);
+    // Its rail links to no round she can't open.
+    expect(screen.replacedBy).toBeNull();
     // Access is no wider: round 2 is still a 404 for her, and the bare link for someone who decided no round.
     await expect(getReviewScreen("deposits", templateId, 1, 2)).rejects.toThrow(NOT_FOUND);
     as("eli");
     await expect(getReviewScreen("deposits", templateId, 1, null)).rejects.toThrow(NOT_FOUND);
-    // The team's link is the number's head.
+    // The team's link is the number's head, and round 1's screen links on to it.
     as("jordan");
     expect((await getReviewScreen("coral-offers", templateId, 1, null)).version).toMatchObject({ round: 2, state: "in_review" });
+    expect((await getReviewScreen("coral-offers", templateId, 1, 1)).replacedBy).toEqual({
+      number: 1,
+      round: 2,
+      state: "in_review",
+      label: "v1, round 2",
+    });
 
     // Once round 2 waits on her stage, the same link opens it.
     expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: ["typical"] })).toEqual({
@@ -977,6 +985,7 @@ describe("a bare review link a stage reviewer outside the team was sent before a
     const next = await getReviewScreen("deposits", templateId, 1, null);
     expect(next.version).toMatchObject({ number: 1, round: 2, state: "in_review" });
     expect(next.can.approve).toEqual({ ok: true });
+    expect((await getReviewScreen("deposits", templateId, 1, 1)).replacedBy, "round 1 now links on to it").toMatchObject({ round: 2 });
   });
 });
 

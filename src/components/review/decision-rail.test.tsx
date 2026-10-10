@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 import { createRef } from "react";
+import type { Route } from "next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { REASONS } from "@/domain/permissions";
 import type { StepView } from "@/domain/review-types";
 import type { DecisionAccess } from "./decision-model";
 import { DecisionBar } from "./decision-bar";
-import { BLOCKED_ID, DecisionRail } from "./decision-rail";
+import { BLOCKED_ID, DecisionRail, type NextRound } from "./decision-rail";
 
 const STEPS: StepView[] = [{ position: 0, name: "Team approver", status: "current" }];
 const NOW = "2026-10-05T02:29:00.000Z";
@@ -25,14 +26,15 @@ function description(el: Element): string {
     .join(" ");
 }
 
-function rail(access: DecisionAccess, line: string | null = null) {
+function rail(access: DecisionAccess, line: string | null = null, next: NextRound | null = null, steps: StepView[] = STEPS) {
   const host = document.createElement("div");
   host.innerHTML = renderToStaticMarkup(
     <DecisionRail
-      steps={STEPS}
+      steps={steps}
       nowIso={NOW}
       access={access}
       line={line}
+      next={next}
       onApprove={() => {}}
       onRequest={() => {}}
       approveRef={createRef()}
@@ -121,6 +123,51 @@ describe("DecisionRail: one geometry for every viewer", () => {
     expect(region.hasAttribute("data-decided")).toBe(true);
     expect(region.textContent).toBe("You approved v3.");
     expect(region.className).toContain("h-8");
+  });
+
+  describe("a sent-back round", () => {
+    const RETURNED: StepView[] = [{ position: 0, name: "Team approver", status: "returned" }];
+    const LINE = "Jordan Ellis requested changes 3 days ago.";
+    const ROUND_2 = { label: "v3, round 2", href: "/coral-offers/review/UC-J530DX/3?round=2" as Route };
+    const region = (host: HTMLElement) => host.querySelector("[data-decision]") as HTMLElement;
+
+    it("says who sent it back and links to the round that replaced it, in the same 32px row", () => {
+      const host = rail({ kind: "open" }, LINE, ROUND_2, RETURNED);
+      const row = region(host);
+      expect(row.className).toContain("h-8");
+      expect(row.getAttribute("role")).toBe("status");
+      expect(row.querySelectorAll("button")).toHaveLength(0);
+      expect(row.querySelector("span")?.textContent).toBe(LINE);
+      const links = [...row.querySelectorAll("a")];
+      expect(links.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+        ["Open v3, round 2", "/coral-offers/review/UC-J530DX/3?round=2"],
+      ]);
+      // Not a primary button: the screen's one black button is Approve.
+      expect(links[0]!.getAttribute("data-slot")).toBeNull();
+      // The stage line keeps the state; the row doesn't repeat it.
+      expect(host.querySelector('[data-step="returned"]')!.textContent).toContain("Changes requested");
+      expect(row.textContent).not.toContain("Changes requested");
+    });
+
+    it("links a number released since by its number, to its bare review page", () => {
+      const row = region(rail({ kind: "hidden" }, LINE, { label: "v2", href: "/deposits/review/UC-ZKZSRZ/2" as Route }, RETURNED));
+      expect([...row.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+        ["Open v2", "/deposits/review/UC-ZKZSRZ/2"],
+      ]);
+    });
+
+    it("with only a draft after it, is the line alone", () => {
+      const row = region(rail({ kind: "open" }, LINE, null, RETURNED));
+      expect(row.textContent).toBe(LINE);
+      expect(row.querySelectorAll("a")).toHaveLength(0);
+      expect(row.className).toContain("h-8");
+    });
+
+    it("never shows the link in place of the buttons", () => {
+      const row = region(rail({ kind: "open" }, null, ROUND_2));
+      expect(row.querySelectorAll("a")).toHaveLength(0);
+      expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Approve", "Request changes"]);
+    });
   });
 
   it("a row that isn't decided is not a status, and is not a focus target", () => {

@@ -1,7 +1,9 @@
 "use client";
 
 import type { ReactNode, Ref } from "react";
-import { Check, CornerUpLeft } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
+import { ArrowRight, Check, CornerUpLeft } from "lucide-react";
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
 import { formatAgo } from "@/domain/dates";
@@ -19,7 +21,9 @@ import { SectionLabel } from "./rail-sections";
 // The pinned head is one height for everyone (151px with one stage): the decision row is always
 // there, 32px, whatever stands in it: the two buttons (theirs to press, or greyed when they can't
 // decide it), a line once it is decided, or nothing when the viewer isn't an approver. So the content
-// below never moves when the persona changes, and the skeleton has the same height.
+// below never moves when the persona changes, and the skeleton has the same height. A sent-back round
+// that was resubmitted fits two lines in the same 32px: who sent it back, and a link to where its work
+// went (its number's head).
 
 // ── Approval chain ───────────────────────────────────────────────
 
@@ -104,6 +108,12 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
 
 // ── The decision ─────────────────────────────────────────────────
 
+/** Where a sent-back round's work went: its number's head, "v3, round 2" or (released since) "v3". */
+export interface NextRound {
+  label: string;
+  href: Route;
+}
+
 /**
  * The decision row, under the stepper: 32px for everyone.
  * - Open: Approve and Request changes.
@@ -115,10 +125,13 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
  * - Decided, or not in review: a line (what was decided, or the version's state) stands where the buttons
  *   were. It is a status, and it takes focus when the decision was made here, since the button that
  *   opened the dialog is gone.
+ * - A sent-back round that was resubmitted: the line (who sent it back, and when) and under it the link
+ *   to the round that carried its work on, two 16px lines in the row.
  */
 function Decision({
   access,
   line,
+  next,
   describedBy,
   onApprove,
   onRequest,
@@ -129,6 +142,8 @@ function Decision({
   access: DecisionAccess;
   /** Replaces the buttons. */
   line: string | null;
+  /** With the line: where this round's work went. */
+  next: NextRound | null;
   /** The id of the stepper's line that gives a blocked pair its reason, when that line is on screen. */
   describedBy: string | undefined;
   onApprove: () => void;
@@ -147,8 +162,23 @@ function Decision({
       tabIndex={line ? -1 : undefined}
       className={cn("mt-4 flex h-8 items-center outline-none", line && "text-[14px] leading-6 text-text-muted")}
     >
-      {line ? (
-        line
+      {line && next ? (
+        <div className="flex min-w-0 flex-col text-[13px] leading-4">
+          <span className="truncate" title={line}>
+            {line}
+          </span>
+          <Link
+            href={next.href}
+            className="inline-flex w-fit items-center gap-1 rounded-sm font-medium text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Open {next.label}
+            <ArrowRight aria-hidden strokeWidth={2} className="size-3.5" />
+          </Link>
+        </div>
+      ) : line ? (
+        <span className="min-w-0 truncate" title={line}>
+          {line}
+        </span>
       ) : access.kind === "open" ? (
         <div className="flex w-full gap-2">
           <Button ref={approveRef} className="flex-1" onClick={onApprove}>
@@ -179,6 +209,7 @@ export function DecisionRail({
   nowIso,
   access,
   line,
+  next = null,
   onApprove,
   onRequest,
   approveRef,
@@ -190,6 +221,8 @@ export function DecisionRail({
   nowIso: string;
   access: DecisionAccess;
   line: string | null;
+  /** A sent-back round that was resubmitted: the round its work went on to, linked under the line. */
+  next?: NextRound | null;
   onApprove: () => void;
   onRequest: () => void;
   approveRef: Ref<HTMLButtonElement>;
@@ -207,6 +240,7 @@ export function DecisionRail({
         <Decision
           access={access}
           line={line}
+          next={line === null ? null : next}
           describedBy={reason === null ? undefined : BLOCKED_ID}
           onApprove={onApprove}
           onRequest={onRequest}

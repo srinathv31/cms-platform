@@ -10,7 +10,7 @@ import { REFUSALS, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
-import { asNumbered } from "@/domain/rounds";
+import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
@@ -25,6 +25,7 @@ import {
   loadChain,
   loadConsumerUsage,
   loadDecisions,
+  opensRound,
   personOf,
   requireReviewVersion,
   stageApproverIds,
@@ -244,7 +245,8 @@ async function loadBaseline(
  */
 export const getReviewScreen = cache(
   async (spaceSlug: string, templateId: string, versionNumber: number, round: number | null): Promise<ReviewScreenData> => {
-    const { space, template, version } = await requireReviewVersion(spaceSlug, templateId, versionNumber, round);
+    const access = await requireReviewVersion(spaceSlug, templateId, versionNumber, round);
+    const { space, template, version } = access;
     const shown = asNumbered(version);
     const { number } = shown;
 
@@ -255,6 +257,7 @@ export const getReviewScreen = cache(
         .select({
           id: versions.id,
           number: versions.number,
+          round: versions.round,
           state: versions.state,
           sunsetAt: versions.sunsetAt,
           name: versions.name,
@@ -294,6 +297,10 @@ export const getReviewScreen = cache(
     // the Active one, unless that is this version's own release.
     const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
     const active = others.find((v) => v.state === "active");
+    // A sent-back round that was resubmitted is a record: where its work went is the number's head, linked
+    // when the viewer may open it (a stage reviewer from another team may not).
+    const head = replacedBy(others, shown);
+    const next = head && (await opensRound(access, head.id)) ? asNumbered(head) : null;
 
     return {
       template: {
@@ -323,6 +330,7 @@ export const getReviewScreen = cache(
       },
       baseline,
       previousNumber: active && active.number !== number ? active.number : null,
+      replacedBy: next ? { ...next, label: versionLabel(next, { style: "sentence" }) } : null,
       liveName: renamedFrom?.name ?? null,
       steps: stepperState(
         own,

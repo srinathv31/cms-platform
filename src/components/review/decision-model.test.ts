@@ -165,7 +165,8 @@ describe("approveLines", () => {
 });
 
 describe("decisionLine", () => {
-  const base = { authorName: "Maya Chen", local: null, canDecideAgain: false } as const;
+  const base = { authorName: "Maya Chen", local: null, canDecideAgain: false, steps: [], nowIso: "2026-10-04T12:00:00.000Z" } as const;
+  const JORDAN = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 200 };
   const at = (state: VersionState, round = 1) => ({ version: { number: 3, round, state } });
 
   it("leaves the buttons in place while the version is in review", () => {
@@ -186,9 +187,21 @@ describe("decisionLine", () => {
     expect(decisionLine({ ...base, ...at("changes_requested"), local: { kind: "returned" } })).toBe(
       "You returned v3, round 1 to Maya Chen.",
     );
-    expect(decisionLine({ ...base, ...at("changes_requested") })).toBe("Changes requested.");
     expect(decisionLine({ ...base, ...at("superseded") })).toBe("v3 is Superseded.");
     expect(decisionLine({ ...base, ...at("revoked") })).toBe("v3 is Revoked.");
+  });
+
+  it("says who sent a round back, and when, as a record (the reason stays in its thread)", () => {
+    const returned: StepView[] = [
+      { position: 0, name: "Team approver", status: "returned", decidedBy: JORDAN, decidedAt: "2026-10-01T09:00:00.000Z" },
+    ];
+    expect(decisionLine({ ...base, ...at("changes_requested"), steps: returned })).toBe("Jordan Ellis requested changes 3 days ago.");
+    const yesterday = [{ ...returned[0]!, decidedAt: "2026-10-03T18:00:00.000Z" }];
+    expect(decisionLine({ ...base, ...at("changes_requested", 2), steps: yesterday })).toBe("Jordan Ellis requested changes yesterday.");
+    // Right after the viewer sent it back, it is theirs.
+    expect(decisionLine({ ...base, ...at("changes_requested"), steps: returned, local: { kind: "returned" } })).toBe(
+      "You returned v3, round 1 to Maya Chen.",
+    );
   });
 
   it("names the round it returned (a sent-back round always shows it), and a released version by its number", () => {

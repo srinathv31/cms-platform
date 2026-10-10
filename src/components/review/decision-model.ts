@@ -4,6 +4,7 @@
 // has been decided. No React, so they are tested without the screen.
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
+import { formatAgo } from "@/domain/dates";
 import { formatCount } from "@/domain/numbers";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import { versionLabel, type NumberedRound } from "@/domain/rounds";
@@ -115,12 +116,16 @@ export type LocalDecision =
  * The one line that stands where Approve and Request changes were, or null when the buttons still
  * belong there (the round is in review). A round that isn't in review is a read-only record. The
  * version reads as its label in its state now: "You returned v1, round 1 to Maya Chen.", "v3 is Active."
+ * A round sent back before says who sent it back, and when: "Jordan Ellis requested changes 3 days ago."
+ * (its reason stays in the resolved change-request thread).
  */
 export function decisionLine({
   version,
   authorName,
   local,
   canDecideAgain,
+  steps,
+  nowIso,
 }: {
   /** The round on screen, in the state it is in now. */
   version: NumberedRound;
@@ -128,6 +133,10 @@ export function decisionLine({
   local: LocalDecision;
   /** The server says this viewer may decide the version's current stage. */
   canDecideAgain: boolean;
+  /** The stepper: a sent-back round's returned stage carries who returned it, and when. */
+  steps: readonly StepView[];
+  /** The demo clock's instant. */
+  nowIso: string;
 }): string | null {
   const v = versionLabel(version, { style: "sentence" });
   switch (version.state) {
@@ -138,7 +147,7 @@ export function decisionLine({
       }
       return null;
     case "changes_requested":
-      return local?.kind === "returned" ? `You returned ${v} to ${authorName}.` : "Changes requested.";
+      return local?.kind === "returned" ? `You returned ${v} to ${authorName}.` : sentBackLine(steps, nowIso);
     case "active":
       return local?.kind === "approved" && local.wentLive ? `You approved ${v}.` : `${v} is Active.`;
     case "superseded":
@@ -148,4 +157,11 @@ export function decisionLine({
     case "draft":
       return null;
   }
+}
+
+/** "Jordan Ellis requested changes 3 days ago.", from the stage the round was returned at. */
+function sentBackLine(steps: readonly StepView[], nowIso: string): string {
+  const returned = steps.find((step) => step.status === "returned");
+  if (!returned?.decidedBy || !returned.decidedAt) return "Changes requested.";
+  return `${returned.decidedBy.name} requested changes ${formatAgo(returned.decidedAt, nowIso)}.`;
 }

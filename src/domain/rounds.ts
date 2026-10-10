@@ -101,6 +101,18 @@ export function headOf<T extends RoundRow>(rows: readonly T[], number: number): 
   return head;
 }
 
+/**
+ * The row a round's work went on to, which its review screen links to: its number's head, when that is
+ * another row. A round sent back and then resubmitted is a record, and the head is where the number is
+ * now: a later round (in review, or sent back again) or the released row. A round that is its number's
+ * head has none: it is in review, it was released, or it was sent back and the author hasn't resubmitted
+ * (their draft has no number yet).
+ */
+export function replacedBy<T extends RoundRow>(rows: readonly T[], shown: RoundRef): T | null {
+  const head = headOf(rows, shown.number);
+  return head !== undefined && head.round !== shown.round ? head : null;
+}
+
 /** Every round of a number, newest first. */
 export function roundsOf<T extends RoundRow>(rows: readonly T[], number: number): T[] {
   return rows.filter((row) => row.number === number).sort((a, b) => (b.round ?? 0) - (a.round ?? 0));
