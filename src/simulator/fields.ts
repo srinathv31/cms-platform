@@ -1,6 +1,7 @@
-// The fields Coral can feed into a template variable: every customer.* and offer.* path, with the
-// variable types its values are valid for. Pure data (no server code): the link flow and the mapping
-// rows list these as combobox options.
+// The fields Coral can feed into a template variable: every customer.*, card.* and offer.* path, with
+// the variable types its values are valid for. Pure data (no server code): the link flow and the mapping
+// rows list these as combobox options. The card.* fields are the customer's card account (its statement
+// and last purchase): an alert's values.
 
 import type { SimField, SimFieldPath } from "./types";
 
@@ -12,6 +13,12 @@ export const SIM_FIELDS: readonly SimField[] = [
   { path: "customer.homeState", source: "customer", label: "Customer · Home state", fits: ["us_state", "text"] },
   { path: "customer.purchaseApr", source: "customer", label: "Customer · Purchase APR", fits: ["percent", "number", "text"] },
   { path: "customer.annualFee", source: "customer", label: "Customer · Annual fee", fits: ["currency", "number", "text"] },
+  { path: "card.last4", source: "card", label: "Card · Last 4 digits", fits: ["text"] },
+  { path: "card.minimumDue", source: "card", label: "Card · Minimum due", fits: ["currency", "number", "text"] },
+  { path: "card.dueDate", source: "card", label: "Card · Due date", fits: ["date", "text"] },
+  { path: "card.purchaseAmount", source: "card", label: "Card · Last purchase amount", fits: ["currency", "number", "text"] },
+  { path: "card.purchaseMerchant", source: "card", label: "Card · Last purchase merchant", fits: ["text"] },
+  { path: "card.purchaseCountry", source: "card", label: "Card · Last purchase country", fits: ["text"] },
   { path: "offer.name", source: "offer", label: "Offer · Name", fits: ["text"] },
   { path: "offer.headline", source: "offer", label: "Offer · Headline", fits: ["text"] },
   { path: "offer.spend", source: "offer", label: "Offer · Spend", fits: ["currency", "number", "text"] },

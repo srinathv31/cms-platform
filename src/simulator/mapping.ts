@@ -17,6 +17,12 @@ const AUTO: Readonly<Record<string, SimFieldPath>> = {
   purchase_apr: "customer.purchaseApr",
   home_state: "customer.homeState",
   offer_end_date: "offer.endsOn",
+  card_last4: "card.last4",
+  amount_due: "card.minimumDue",
+  due_date: "card.dueDate",
+  transaction_amount: "card.purchaseAmount",
+  merchant: "card.purchaseMerchant",
+  country: "card.purchaseCountry",
 };
 
 function fits(path: string | null | undefined, variable: ApiVariable): path is SimFieldPath {
@@ -66,20 +72,33 @@ export function fieldValue(path: SimFieldPath, customer: SimCustomerRecord, offe
       return customer.purchaseApr;
     case "customer.annualFee":
       return customer.annualFee;
+    case "card.last4":
+      return customer.cardLast4;
+    case "card.minimumDue":
+      return customer.statement?.minimumDue ?? null;
+    case "card.dueDate":
+      return customer.statement?.dueDate ?? null;
+    case "card.purchaseAmount":
+      return customer.lastPurchase?.amount ?? null;
+    case "card.purchaseMerchant":
+      return customer.lastPurchase?.merchant ?? null;
+    case "card.purchaseCountry":
+      return customer.lastPurchase?.country ?? null;
     case "offer.name":
       return offer.name;
     case "offer.headline":
       return offer.headline;
+    // An alert has no terms: its offer.* fields have no value.
     case "offer.spend":
-      return String(offer.terms.spend);
+      return offer.terms ? String(offer.terms.spend) : null;
     case "offer.bonus":
-      return String(offer.terms.bonus);
+      return offer.terms ? String(offer.terms.bonus) : null;
     case "offer.months":
-      return String(offer.terms.months);
+      return offer.terms ? String(offer.terms.months) : null;
     case "offer.annualFee":
-      return offer.terms.annualFee === undefined ? null : String(offer.terms.annualFee);
+      return offer.terms?.annualFee === undefined ? null : String(offer.terms.annualFee);
     case "offer.endsOn":
-      return offer.terms.endsOn ?? null;
+      return offer.terms?.endsOn ?? null;
   }
 }
 
