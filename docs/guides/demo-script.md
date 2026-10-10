@@ -444,7 +444,6 @@ The dry run found no blocking bugs. These are worth knowing so you can name them
 
 - **The Share sheet's email response example is fixed sample text.** On Spring Travel it mentions an APR change on March 4, 2027. Say it's an example of the response shape, not this template's email.
 - **The Share sheet shows "Loading integration details" for about a second.** Pause a beat before talking through it.
-- **Coral doesn't deliver alerts yet.** Its simulator sends PDF, Web and Email; an approved alert doesn't land on its phone. Usage shows the seeded push and SMS renders.
 - **Importing the PDF adds a second "Rate Change Notice".** There's no duplicate-name warning yet. Reset clears it.
 - **Imported placeholders come in as Text.** For example, "Offer end date" arrives as Text rather than Date. Change the type in the Variables rail if someone asks.
 - **After clock jumps, relative times read as weeks ago.** Actions from minutes earlier show "1 month ago", and Members shows people last active "31 days ago". Explain that the demo clock has moved forward.
