@@ -29,7 +29,7 @@ import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { loadChain, loadDecisions, stageApproverIds } from "@/server/queries/review-shared";
+import { loadChain, loadDecisions, loadMessageRules, stageApproverIds } from "@/server/queries/review-shared";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. Each one
@@ -251,6 +251,7 @@ export async function submitVersion(input: {
         templateName: draft.name,
         note: input.note ?? null,
         chain: await loadChain(tx, found.contentTypeId),
+        messageRules: await loadMessageRules(tx, found.contentTypeId),
       });
       if (!outcome.ok) refuse(outcome);
       const { changes, effects } = outcome;

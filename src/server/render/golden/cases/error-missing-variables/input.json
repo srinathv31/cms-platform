@@ -66,5 +66,10 @@
       }
     ]
   },
-  "channelFields": {}
+  "channelFields": {},
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
 }

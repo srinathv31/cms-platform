@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   BAD_REQUEST_MESSAGES,
+  CHANNEL_LABELS,
+  PLATFORM_LABELS,
+  joinWithOr,
+  pushPayloadTooLarge,
+  renderTarget,
+  smsTooLong,
   badRequest,
   bodyTooLarge,
   channelNotAllowed,
@@ -52,7 +58,7 @@ describe("joinWithAnd", () => {
 describe("fixed messages", () => {
   it.each([
     [badRequest(BAD_REQUEST_MESSAGES.body), "bad_request", "The body must be JSON with version, channel and values."],
-    [badRequest(BAD_REQUEST_MESSAGES.channel), "bad_request", "channel must be one of pdf, web, email."],
+    [badRequest(BAD_REQUEST_MESSAGES.channel), "bad_request", "channel must be one of pdf, web, email, push, sms."],
     [badRequest(BAD_REQUEST_MESSAGES.version), "bad_request", "version must be a version number."],
     [consumerRequired(), "consumer_required", "X-Consumer-Id is required."],
     [bodyTooLarge(), "body_too_large", "The body must be at most 1,000,000 bytes."],
@@ -64,9 +70,28 @@ describe("fixed messages", () => {
     [renderFailed("pdf"), "render_failed", "The PDF couldn't be rendered. Try again."],
     [renderFailed("web"), "render_failed", "The web page couldn't be rendered. Try again."],
     [renderFailed("email"), "render_failed", "The email couldn't be rendered. Try again."],
+    [renderFailed("push"), "render_failed", "The push couldn't be rendered. Try again."],
+    [renderFailed("sms"), "render_failed", "The SMS couldn't be rendered. Try again."],
+    [badRequest(BAD_REQUEST_MESSAGES.platform), "bad_request", "platform must be ios or android."],
+    [badRequest(BAD_REQUEST_MESSAGES.platformNotPush), "bad_request", "platform is only for channel push."],
+    [badRequest(BAD_REQUEST_MESSAGES.encodingNotFile), "bad_request", "encoding is only for channels pdf, web and email."],
+    [pushPayloadTooLarge("ios", 4321), "push_payload_too_large", "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes."],
+    [smsTooLong({ parts: 11, encoding: "UCS-2", characters: 700 }), "sms_too_long", "The SMS is 11 parts in UCS-2. It can be at most 10 parts."],
   ])("%j", (error, code, message) => {
     expect(error.code).toBe(code);
     expect(error.message).toBe(message);
+  });
+
+  it("a message over its limit is the values' doing: 422, with the numbers and no value", () => {
+    expect(RENDER_ERROR_STATUS.push_payload_too_large).toBe(422);
+    expect(RENDER_ERROR_STATUS.sms_too_long).toBe(422);
+    expect(pushPayloadTooLarge("android", 5000).details).toEqual({ platform: "android", payloadBytes: 5000, maxBytes: 4096 });
+    expect(smsTooLong({ parts: 12, encoding: "GSM-7", characters: 1800 }).details).toEqual({
+      parts: 12,
+      maxParts: 10,
+      encoding: "GSM-7",
+      characters: 1800,
+    });
   });
 
   it("every code has a status", () => {
@@ -230,5 +255,32 @@ describe("value messages", () => {
   it("valuesError picks the code", () => {
     expect(valuesError(details).code).toBe("missing_variables");
     expect(valuesError({ missing: [], invalid: details.invalid }).code).toBe("invalid_values");
+  });
+});
+
+describe("renderTarget (channel, platform and encoding together)", () => {
+  const refused = (message: string) => ({ ok: false, error: badRequest(message) });
+
+  it("a push needs its platform, and takes no encoding", () => {
+    expect(renderTarget("push", "ios")).toEqual({ ok: true, target: { channel: "push", platform: "ios" } });
+    expect(renderTarget("push", "android")).toEqual({ ok: true, target: { channel: "push", platform: "android" } });
+    expect(renderTarget("push", undefined)).toEqual(refused("platform must be ios or android."));
+    expect(renderTarget("push", "ios", "base64")).toEqual(refused("encoding is only for channels pdf, web and email."));
+  });
+
+  it("no other channel takes a platform; an SMS takes no encoding either", () => {
+    expect(renderTarget("sms", undefined)).toEqual({ ok: true, target: { channel: "sms" } });
+    expect(renderTarget("sms", "ios")).toEqual(refused("platform is only for channel push."));
+    expect(renderTarget("sms", undefined, "base64")).toEqual(refused("encoding is only for channels pdf, web and email."));
+    expect(renderTarget("email", "android")).toEqual(refused("platform is only for channel push."));
+    expect(renderTarget("pdf", undefined, "base64")).toEqual({ ok: true, target: { channel: "pdf" } });
+  });
+});
+
+describe("labels", () => {
+  it("names every channel and platform", () => {
+    expect(CHANNEL_LABELS).toEqual({ pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" });
+    expect(PLATFORM_LABELS).toEqual({ ios: "iPhone", android: "Android" });
+    expect(joinWithOr(["Disclosure", "Notice", "Statement"])).toBe("Disclosure, Notice or Statement");
   });
 });

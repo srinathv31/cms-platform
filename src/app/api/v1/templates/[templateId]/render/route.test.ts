@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import type { NextRequest } from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_BODY_BYTES, MAX_VALUE_LENGTH, type Base64ResponseBody, type EmailResponseBody, type RenderErrorBody } from "@/domain/render/types";
-import type { Viewer } from "@/domain/types";
+import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { contentTypes, renderLog, versions } from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
@@ -274,7 +274,7 @@ describe("POST …/render: 400 bad requests", () => {
     ["a JSON array", "[]", BODY],
     ["no values", { version: 2, channel: "web" }, BODY],
     ["no version", { channel: "web", values: {} }, BODY],
-    ["an unknown channel", { ...good, channel: "fax" }, "channel must be one of pdf, web, email."],
+    ["an unknown channel", { ...good, channel: "fax" }, "channel must be one of pdf, web, email, push, sms."],
     ["a version as a string", { ...good, version: "2" }, "version must be a version number."],
     ["version 0", { ...good, version: 0 }, "version must be a version number."],
     ["a fractional version", { ...good, version: 1.5 }, "version must be a version number."],
@@ -424,5 +424,178 @@ describe("POST …/render: 403, 404 and 422", () => {
     } finally {
       await db.update(contentTypes).set({ allowedChannels: ["pdf", "web", "email"] }).where(eq(contentTypes.key, "disclosure"));
     }
+  });
+
+  it("a disclosure doesn't render to push or SMS: its content type is documents", async () => {
+    await expectError(
+      await post("balance-transfer", { version: 2, channel: "sms", values: CUSTOMER }),
+      422,
+      "channel_not_allowed",
+      "Disclosures don't render to SMS.",
+    );
+  });
+});
+
+// ── Push and SMS: an Alert ───────────────────────────────────────────────────
+
+describe("POST …/render: push and SMS", () => {
+  const ALERT_ID = "UC-ALERT1";
+  const t = (text: string): JSONContent => ({ type: "text", text });
+  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+  const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
+  const VALUES = { first_name: "Maya", amount_due: "35.00" };
+
+  beforeAll(async () => {
+    // An Active Alert version, made from a seeded version's row: the seed has no alert yet.
+    const [base] = await db.select().from(versions).where(and(eq(versions.templateId, ids["balance-transfer"]!), eq(versions.number, 2)));
+    const { templates: templatesTable } = await import("@/server/db/schema/ucomp");
+    await db.insert(templatesTable).values({
+      id: ALERT_ID,
+      teamId: "coral-offers",
+      contentTypeId: "ct_alert",
+      createdBy: "maya",
+      createdAt: env.now,
+      starterKey: null,
+    });
+    await db.insert(versions).values({
+      ...base!,
+      id: "v_alert_1",
+      templateId: ALERT_ID,
+      number: 1,
+      state: "active",
+      name: "Payment due",
+      body: { type: "doc", content: [{ type: "paragraph" }] },
+      variables: [
+        { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
+        { key: "amount_due", label: "Amount due", type: "currency", required: true, sample: "35" },
+      ],
+      channels: ["push", "sms"],
+      channelFields: {
+        push: {
+          title: field(t("Payment due")),
+          subtitle: field(t("Coral Card")),
+          body: field(t("Hi "), chip("first_name"), t(", your payment of "), chip("amount_due"), t(" is due.")),
+        },
+        sms: { text: field(t("Coral Offers: "), chip("amount_due"), t(" is due."), { type: "hardBreak" }, t("coral.example/pay")) },
+      },
+      sunsetAt: null,
+      revoke: null,
+    });
+  });
+
+  it("push for iPhone: JSON with the title, the subtitle and the body in full, and the payload's size", async () => {
+    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "ios", values: VALUES }, { ...CORAL, "X-Correlation-Id": "push-ios" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
+    expect(res.headers.get("X-Stencil-Version")).toBe("1");
+    expect(await res.json()).toEqual({
+      title: "Payment due",
+      subtitle: "Coral Card",
+      body: "Hi Maya, your payment of $35.00 is due.",
+      payloadBytes: 114,
+      newerVersion: null,
+    });
+    // The log holds the channel and the outcome, never a value.
+    const [row] = await logRows("push-ios");
+    expect(row).toMatchObject({ channel: "push", outcome: "ok", errorCode: null, consumerId: "coral" });
+    expect(JSON.stringify(row)).not.toContain("Maya");
+  });
+
+  it("push for Android: never a subtitle", async () => {
+    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "android", values: VALUES });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ title: "Payment due", body: "Hi Maya, your payment of $35.00 is due.", payloadBytes: 101, newerVersion: null });
+  });
+
+  it("SMS: JSON with the text as sent, the footer on its last line, and its encoding and parts", async () => {
+    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      text: "Coral Offers: $35.00 is due.\ncoral.example/pay\nCoral Offers: Reply STOP to opt out, HELP for help.",
+      encoding: "GSM-7",
+      parts: 1,
+      characters: 98,
+      newerVersion: null,
+    });
+  });
+
+  it("a value outside GSM-7 switches the SMS to UCS-2; it is never transliterated", async () => {
+    await db
+      .update(versions)
+      .set({
+        channelFields: {
+          push: { title: field(t("Payment due")), body: field(t("Hi")) },
+          sms: { text: field(t("Hi "), chip("first_name")) },
+        },
+      })
+      .where(eq(versions.id, "v_alert_1"));
+    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "Gómez" } });
+    expect(await res.json()).toEqual({
+      text: "Hi Gómez\nCoral Offers: Reply STOP to opt out, HELP for help.",
+      encoding: "UCS-2",
+      parts: 1,
+      characters: 60,
+      newerVersion: null,
+    });
+  });
+
+  it("a push without a platform, or with a platform that isn't one, is 400", async () => {
+    await expectError(await post(ALERT_ID, { version: 1, channel: "push", values: VALUES }), 400, "bad_request", "platform must be ios or android.");
+    await expectError(
+      await post(ALERT_ID, { version: 1, channel: "push", platform: "windows", values: VALUES }),
+      400,
+      "bad_request",
+      "platform must be ios or android.",
+    );
+  });
+
+  it("any other channel with a platform is 400, and push and SMS refuse an encoding", async () => {
+    await expectError(
+      await post(ALERT_ID, { version: 1, channel: "sms", platform: "ios", values: VALUES }),
+      400,
+      "bad_request",
+      "platform is only for channel push.",
+    );
+    await expectError(
+      await post("balance-transfer", { version: 2, channel: "pdf", platform: "android", values: CUSTOMER }),
+      400,
+      "bad_request",
+      "platform is only for channel push.",
+    );
+    await expectError(
+      await post(ALERT_ID, { version: 1, channel: "sms", encoding: "base64", values: VALUES }),
+      400,
+      "bad_request",
+      "encoding is only for channels pdf, web and email.",
+    );
+  });
+
+  it("an alert doesn't render to PDF: its content type is messages", async () => {
+    await expectError(await post(ALERT_ID, { version: 1, channel: "pdf", values: VALUES }), 422, "channel_not_allowed", "Alerts don't render to PDF.");
+  });
+
+  it("a push over 4,096 bytes is 422 and logged by its code, never cut and never echoing the value", async () => {
+    const long = "x".repeat(1000);
+    await db
+      .update(versions)
+      .set({
+        channelFields: {
+          push: { title: field(chip("first_name")), body: field(chip("first_name"), chip("first_name"), chip("first_name"), chip("first_name")) },
+          sms: { text: field(chip("first_name")) },
+        },
+      })
+      .where(eq(versions.id, "v_alert_1"));
+    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "ios", values: { ...VALUES, first_name: long } }, { ...CORAL, "X-Correlation-Id": "push-big" });
+    const error = await expectError(res, 422, "push_payload_too_large", "The push is 5,040 bytes on iPhone. It can be at most 4,096 bytes.");
+    expect(error.details).toEqual({ platform: "ios", payloadBytes: 5040, maxBytes: 4096 });
+    const [row] = await logRows("push-big");
+    expect(row).toMatchObject({ channel: "push", outcome: "error", errorCode: "push_payload_too_large" });
+    expect(JSON.stringify(row)).not.toContain("xxxx");
+  });
+
+  it("an SMS over 10 parts is 422, never cut", async () => {
+    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "é".repeat(699) + "😀" } });
+    await expectError(res, 422, "sms_too_long", "The SMS is 12 parts in UCS-2. It can be at most 10 parts.");
   });
 });

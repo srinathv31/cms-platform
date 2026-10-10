@@ -344,17 +344,21 @@ function YLabels({ ticks, y, format }: { ticks: number[]; y: (v: number) => numb
 
 export interface StackSeries {
   label: string;
-  /** Both spellings written out so the class scanner sees them: one of the series-1…4 hues. */
+  /** Both spellings written out so the class scanner sees them: one of the series-1…5 hues. */
   fill: string;
   bg: string;
 }
 
-/** The series hues in their fixed order, both spellings written out so the class scanner sees them. */
+/**
+ * The series hues in their fixed order, both spellings written out so the class scanner sees them. Five:
+ * one per channel (decision 0014).
+ */
 export const SERIES = [
   { fill: "fill-series-1", bg: "bg-series-1" },
   { fill: "fill-series-2", bg: "bg-series-2" },
   { fill: "fill-series-3", bg: "bg-series-3" },
   { fill: "fill-series-4", bg: "bg-series-4" },
+  { fill: "fill-series-5", bg: "bg-series-5" },
 ] as const;
 
 export interface StackDatum {

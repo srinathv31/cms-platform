@@ -6,19 +6,19 @@
 // processes in opposite orders, and every output must be identical.
 
 import { describe, expect, it } from "vitest";
-import type { RenderDoc } from "@/domain/render/types";
-import type { Channel } from "@/domain/types";
+import { PUSH_PLATFORMS } from "@/domain/messages/push";
+import type { RenderDoc, RenderTarget } from "@/domain/render/types";
+import { CHANNELS } from "@/domain/types";
 import type { RenderFixture } from "@/server/render/testing/fixture";
 import { renderInFreshProcess, type FreshJob, type FreshResult } from "@/server/render/testing/fresh-process";
 import { doc, h, p, t } from "@/server/render/testing/tiptap";
 import { caseSlugs, readInput } from "./files";
 
-const CHANNELS: readonly Channel[] = ["pdf", "web", "email"];
 const AT = "2027-03-04T12:00:00.000Z";
 
 const probe = (name: string, body: RenderFixture["body"]): FreshJob => ({
   name: `probe ${name}`,
-  channel: "pdf",
+  target: { channel: "pdf" },
   input: {
     templateId: "UC-PROBE",
     templateName: "Probe",
@@ -28,6 +28,7 @@ const probe = (name: string, body: RenderFixture["body"]): FreshJob => ({
     values: {},
     body,
     channelFields: {},
+    channels: ["pdf"],
   },
 });
 
@@ -51,9 +52,17 @@ const PROBES: FreshJob[] = [
   adapterProbe("shared glyphs", "a∙b c;d 1∕2"),
 ];
 
+/** Each channel the case renders, and a push once per platform. */
 const CASE_JOBS: FreshJob[] = caseSlugs().flatMap((slug) => {
   const input = readInput(slug);
-  return CHANNELS.map((channel): FreshJob => ({ name: `${slug} ${channel}`, input, channel }));
+  const targets = CHANNELS.filter((channel) => input.channels.includes(channel)).flatMap((channel): RenderTarget[] =>
+    channel === "push" ? PUSH_PLATFORMS.map((platform) => ({ channel, platform })) : [{ channel }],
+  );
+  return targets.map((target): FreshJob => ({
+    name: `${slug} ${target.channel === "push" ? `push.${target.platform}` : target.channel}`,
+    input,
+    target,
+  }));
 });
 
 const byName = (results: readonly FreshResult[]) => new Map(results.map((r) => [r.name, r]));

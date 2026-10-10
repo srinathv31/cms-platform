@@ -29,6 +29,7 @@
 // (`version.name`): that is what its notifications call it.
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
+import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import { usageFromJSON } from "@/editor/model/usage";
 import {
   approvedThisRound,
@@ -42,15 +43,28 @@ import {
 import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zone";
 import {
   channelFieldValue,
+  channelFieldsOf,
   fieldNoun,
   fieldsOfChannels,
+  typedText,
+  type ChannelField,
   type ChannelFields,
   type ChannelFieldSpec,
 } from "./channel-fields";
 import { describeChanges } from "./contract";
+import { nonGsmCharacters, smsLength } from "./messages/gsm7";
+import { findPublicShorteners } from "./messages/links";
+import { PUSH_MAX_BYTES, PUSH_PLATFORMS, pushPayloadBytes, type PushPlatform } from "./messages/push";
+import { formatCount } from "./numbers";
 import { REASONS, makerCheckerRefusal } from "./permissions";
+import type { MessageTypeRules } from "./platform-config";
+import { plural } from "./plural";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
-import { formatLongDate } from "./dates";
+import { codePointLabel, joinWithAnd, PLATFORM_LABELS } from "./render/errors";
+import { resolveMessage } from "./render/message";
+import type { CanonicalValues } from "./render/types";
+import { validateValues } from "./render/validate";
+import { formatLongDate, utcDay } from "./dates";
 import {
   DOCUMENT_THREAD,
   type ApprovalStage,
@@ -59,14 +73,16 @@ import {
   type Recipients,
   type VersionStage,
 } from "./review-types";
-import type {
-  Channel,
-  ContractChange,
-  JSONContent,
-  RevokeRecord,
-  SampleSet,
-  Variable,
-  VersionState,
+import {
+  familyOf,
+  type Channel,
+  type ChannelFamily,
+  type ContractChange,
+  type JSONContent,
+  type RevokeRecord,
+  type SampleSet,
+  type Variable,
+  type VersionState,
 } from "./types";
 
 export type {
@@ -84,8 +100,28 @@ export const UNTITLED_TEMPLATE_NAME = "Untitled template";
 /** Key of the starter that has no example content (just the required sections). */
 export const BLANK_STARTER_KEY = "blank";
 
-/** A new template renders PDF and Web. Email is a deliberate opt-in, as in the seed. */
-export const DEFAULT_CHANNELS: readonly Channel[] = ["pdf", "web"];
+/**
+ * The channels a new template starts with, by its content type's family: a document renders PDF and Web
+ * (Email is a deliberate opt-in, as in the seed); a message (an Alert) renders Push and SMS.
+ */
+export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel[] } = {
+  document: ["pdf", "web"],
+  message: ["push", "sms"],
+};
+
+/**
+ * A new template's channels, given the ones its starter wants (none: the family's defaults) and the ones
+ * its content type allows: the wanted ones the type allows; else the family's defaults it allows; else
+ * the first channel it allows. A content type is one family, so these never mix.
+ */
+export function newTemplateChannels(wanted: readonly Channel[] | undefined, allowed: readonly Channel[]): Channel[] {
+  const family = familyOf(allowed) ?? "document";
+  const fits = (channels: readonly Channel[]) => channels.filter((c) => allowed.includes(c));
+  const fromStarter = fits(wanted ?? []);
+  if (fromStarter.length > 0) return fromStarter;
+  const defaults = fits(DEFAULT_CHANNELS[family]);
+  return defaults.length > 0 ? defaults : allowed.slice(0, 1);
+}
 
 // ── Shapes ────────────────────────────────────────────────────
 
@@ -103,7 +139,10 @@ export interface StarterContent {
   body: JSONContent;
   variables: Variable[];
   sampleSets: SampleSet[];
-  /** Defaults to `DEFAULT_CHANNELS`. */
+  /**
+   * The channels it renders. A starter without any is a document's (it has a body): `DEFAULT_CHANNELS.document`.
+   * Fitted to the content type before the draft is made (`newTemplateChannels`, via `conformToContentType`).
+   */
   channels?: readonly Channel[];
   /** The channel fields it ships with (an email subject, say). Defaults to none. */
   channelFields?: ChannelFields;
@@ -197,7 +236,7 @@ export function createDraft(input: {
         name,
         body: clone(starter.body),
         channelFields: clone(starter.channelFields ?? {}),
-        channels: [...(starter.channels ?? DEFAULT_CHANNELS)],
+        channels: [...(starter.channels ?? DEFAULT_CHANNELS.document)],
         variables: clone([...starter.variables]),
         sampleSets: clone([...starter.sampleSets]),
         contractChanges: null,
@@ -360,6 +399,8 @@ export interface SubmitDraft {
   body: JSONContent;
   channelFields: ChannelFields;
   channels: readonly Channel[];
+  /** Its sample sets: a message is measured with the "long" one (or that set's defaults when it has none). */
+  sampleSets: readonly SampleSet[];
   /** Who has written the draft (`DraftFields.writers`). */
   writers: readonly string[];
   /** Moves with every write to the version row: each autosave that lands, and every transition. */
@@ -414,6 +455,8 @@ export interface SubmitInput {
    * approver"). The version records its stages, and its first stage's rule says who is asked to review.
    */
   chain: readonly ApprovalStage[];
+  /** The content type's SMS footer and part budget: a message's checks measure the SMS with them. */
+  messageRules: MessageTypeRules;
 }
 
 /**
@@ -427,7 +470,11 @@ export interface SubmitInput {
  *     meanwhile, from this page or another, would otherwise be frozen without being shown;
  *   - a chip names a key the variable list doesn't have: in the document, and in the fields of the
  *     channels that are on (channel-fields.ts; a field isn't part of the output while its channel is off);
- *   - a required field of a channel that is on is blank (Email's subject): the first such field.
+ *   - a required field of a channel that is on is blank (Email's subject): the first such field;
+ *   - a message breaks a rule its channels have (`messageRefusal`, decisions 0033 and 0034): the SMS has
+ *     characters the author typed outside GSM-7, or takes more parts than the content type allows with
+ *     the "long" sample values; a push body or SMS links through a public shortener; or a push is over
+ *     4,096 bytes on either platform with the long values.
  *
  * A renamed key is one `key_renamed` change: the renamed variable keeps its identity as its id
  * (`Variable.id`), so `diffVariables` pairs it with the baseline's variable whatever it is keyed now.
@@ -448,6 +495,9 @@ export function submit(input: SubmitInput): SubmitResult {
 
   const missing = fields.find((field) => field.required && isBlankField(channelFieldValue(draft.channelFields, field)));
   if (missing) return refuse(REFUSALS.fieldMissing(missing));
+
+  const message = messageRefusal(draft, input.messageRules, now);
+  if (message) return refuse(message);
 
   const number = highestNumber + 1;
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
@@ -490,6 +540,69 @@ export function submit(input: SubmitInput): SubmitResult {
       }),
     ],
   };
+}
+
+/**
+ * Why a message can't be submitted, or null: the rules of Push and SMS that render can't check, because
+ * they hold for any values, or are tighter than render's own limits. In this order, the first that fails:
+ *   1. SMS characters: every character the author typed in an SMS field is GSM-7. One that isn't would
+ *      switch every message to UCS-2 (a third of the room); the composer offers a fix for each. Values
+ *      aren't checked: a customer's "Gómez" prints as sent and the API reports the encoding.
+ *   2. SMS parts: with the "long" sample values and the footer, the SMS takes at most the content
+ *      type's budget of parts (`smsMaxParts`).
+ *   3. Public shorteners: no link the author typed in a push body or SMS (`refusesShorteners`) is on a
+ *      public URL shortener.
+ *   4. Push size: with the long sample values, the push is at most PUSH_MAX_BYTES on each platform.
+ * The long values are the draft's "long" sample set (its defaults when the draft has none); when they
+ * aren't valid values, 2 and 4 have nothing to measure and pass, and the preview shows why.
+ */
+function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date): Refusal | null {
+  const on = (channel: Channel) => draft.channels.includes(channel);
+  if (!on("push") && !on("sms")) return null;
+  const valueOf = (field: ChannelField) => channelFieldValue(draft.channelFields, field);
+
+  if (on("sms")) {
+    for (const field of channelFieldsOf("sms")) {
+      const outside = nonGsmCharacters(typedText(valueOf(field)));
+      if (outside.length > 0) return REFUSALS.smsCharacters(field, outside.map((c) => c.char));
+    }
+  }
+
+  const long = longValues(draft, now);
+  const input = long && { fields: draft.channelFields, variables: draft.variables, values: long, rules };
+  if (on("sms") && input) {
+    const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
+    if (parts > rules.smsMaxParts) return REFUSALS.smsParts(parts, rules.smsMaxParts);
+  }
+
+  for (const field of fieldsOfChannels(draft.channels)) {
+    if (!field.refusesShorteners) continue;
+    const links = findPublicShorteners(typedText(valueOf(field)));
+    if (links.length > 0) return REFUSALS.publicShortener(field, links.map((link) => link.domain));
+  }
+
+  if (on("push") && input) {
+    for (const platform of PUSH_PLATFORMS) {
+      const bytes = pushPayloadBytes(platform, resolveMessage({ channel: "push", platform }, input));
+      if (bytes > PUSH_MAX_BYTES) return REFUSALS.pushTooLarge(platform, bytes);
+    }
+  }
+  return null;
+}
+
+/** The draft's "long" sample values, canonical; null when they don't validate. */
+function longValues(draft: SubmitDraft, now: Date): CanonicalValues | null {
+  const today = utcDay(now);
+  const set =
+    draft.sampleSets.find((s) => s.id === "long") ??
+    defaultSampleSets(draft.variables, today).find((s) => s.id === "long")!;
+  const validated = validateValues(draft.variables, sampleSetValues(set, draft.variables, today));
+  return validated.ok ? validated.values : null;
+}
+
+/** "’", or "U+00A0" for a character that doesn't show on its own (a space, an invisible one). */
+function characterLabel(char: string): string {
+  return /^[\p{L}\p{M}\p{N}\p{P}\p{S}]/u.test(char) ? char : codePointLabel(char);
 }
 
 /** The keys of the chips in a document, in order of first use. */
@@ -541,6 +654,36 @@ export const REFUSALS = {
   fieldMissing: refusal(
     "field_missing",
     (field: Pick<ChannelFieldSpec, "name">) => `Add ${fieldNoun(field)} before submitting.`,
+  ),
+  /**
+   * `submit`: characters the author typed in an SMS that aren't in GSM-7, each once, in order:
+   * "Replace ’ and – in the SMS message before submitting. They aren't in the SMS character set."
+   */
+  smsCharacters: refusal("sms_characters", (field: Pick<ChannelFieldSpec, "name">, chars: readonly string[]) => {
+    const labels = unique(chars.map(characterLabel));
+    const they = labels.length === 1 ? "It isn't" : "They aren't";
+    return `Replace ${joinWithAnd(labels)} in the ${field.name} before submitting. ${they} in the SMS character set.`;
+  }),
+  /** `submit`: "With the long sample values, the SMS is 4 parts. Keep it to 3 parts or fewer." */
+  smsParts: refusal(
+    "sms_too_many_parts",
+    (parts: number, max: number) =>
+      `With the long sample values, the SMS is ${plural(parts, "part")}. Keep it to ${plural(max, "part")} or fewer.`,
+  ),
+  /** `submit`: "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain." */
+  publicShortener: refusal(
+    "public_shortener",
+    (field: Pick<ChannelFieldSpec, "name">, domains: readonly string[]) => {
+      const names = unique(domains);
+      const what = names.length === 1 ? "a public link shortener" : "public link shorteners";
+      return `The ${field.name} links through ${joinWithAnd(names)}, ${what} carriers filter. Use a link on your own domain.`;
+    },
+  ),
+  /** `submit`: "With the long sample values, the push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." */
+  pushTooLarge: refusal(
+    "push_too_large",
+    (platform: PushPlatform, bytes: number) =>
+      `With the long sample values, the push is ${formatCount(bytes)} bytes on ${PLATFORM_LABELS[platform]}. It can be at most ${formatCount(PUSH_MAX_BYTES)} bytes.`,
   ),
   notInReview: refusal("not_in_review", "This version isn't in review."),
   stageMissing: refusal("stage_missing", "This version's approval stage no longer exists."),

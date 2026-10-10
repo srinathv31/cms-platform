@@ -10,7 +10,17 @@ import type { CopilotPrompt, CopilotPromptInput } from "./import-types";
 import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
 import { CHANNELS, type Channel, type JSONContent, type RequiredSection } from "./types";
 
-const CHANNEL_NAMES: Record<Channel, string> = { pdf: "PDF", web: "web page", email: "email" };
+/**
+ * How the prompt names a channel. Copilot writes a document's body, so only a document's channels
+ * (PDF, web, email) reach the prompt; a message template has no body to write.
+ */
+const CHANNEL_NAMES: Record<Channel, string> = {
+  pdf: "PDF",
+  web: "web page",
+  email: "email",
+  push: "push notification",
+  sms: "SMS",
+};
 
 /** "a", "a and b", "a, b and c" (the product's lists). */
 function andList(items: string[]): string {

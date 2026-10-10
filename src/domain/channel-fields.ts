@@ -1,7 +1,8 @@
 // The channel fields registry: the short fields a channel renders of its own, beside or instead of the
-// body. Today only Email has any (its subject and preheader). Everything that stores, saves, checks,
-// submits or renders a channel field loops over this registry rather than naming fields, so a channel's
-// fields are declared here and nowhere else.
+// body. Email prints its subject and preheader beside the document; Push and SMS print only their own
+// fields (a push's title, subtitle and body; an SMS's message), never anything from a body. Everything
+// that stores, saves, checks, submits or renders a channel field loops over this registry rather than
+// naming fields, so a channel's fields are declared here and nowhere else.
 //
 // How a version stores them: one JSON column, `versions.channel_fields` (`ChannelFields`), keyed by
 // channel and then by field key, each value the field's stored document (one paragraph of text and
@@ -17,18 +18,30 @@
 // field has no value (`ChannelFieldValues`). A draft patch carries the ids that changed
 // (`ChannelFieldsPatch`), and the server lays them over the stored column (`withChannelFieldValues`).
 
-import { normalizeAndCheckField, type Checked } from "@/editor/model/document-check";
+import {
+  fieldProblem,
+  normalizeAndCheckField,
+  type Checked,
+  type FieldCheck,
+  type FieldProblem,
+} from "@/editor/model/document-check";
+import type { FieldLines } from "@/editor/model/normalize";
 import { assertNever } from "./assert-never";
+import type { PushPlatform } from "./messages/push";
 import { withArticle } from "./plural";
 import { CHANNELS, type Channel, type JSONContent } from "./types";
 
 // ── The registry ──────────────────────────────────────────────
 
 /**
- * What a field holds. `line`: one line of text and variable chips, with no marks and no line breaks
+ * What a field holds. Every shape is plain text and variable chips in one paragraph: no marks, no links
  * (the editor's `InlineVariableField`; saved through `normalizeField` and checked by `fieldProblem`).
+ *   - `line`: one line, no line breaks: a header or a title (the email subject, a push title).
+ *   - `paragraph`: no line breaks either, but long enough to wrap where it is shown (a push body).
+ *   - `lines`: line breaks allowed, each a hard break (an SMS message). Enter adds one.
+ * A line break typed or pasted into a `line` or `paragraph` field is saved as a space.
  */
-export const FIELD_SHAPES = ["line"] as const;
+export const FIELD_SHAPES = ["line", "paragraph", "lines"] as const;
 export type FieldShape = (typeof FIELD_SHAPES)[number];
 
 /** One field of a channel, as the registry declares it. */
@@ -46,6 +59,16 @@ export interface ChannelFieldSpec {
   readonly shape: FieldShape;
   /** Submit refuses while the field is blank (no text and no chip) and its channel is on. */
   readonly required: boolean;
+  /**
+   * A push field shown on only some platforms: the subtitle is iPhone-only, so Android's output and
+   * preview leave it out. Absent: every platform.
+   */
+  readonly platforms?: readonly PushPlatform[];
+  /**
+   * Submit refuses a link on a public URL shortener in the text the author typed (`findPublicShorteners`):
+   * carriers filter them (CTIA). Set on the fields that carry a link to a customer: a push body, an SMS.
+   */
+  readonly refusesShorteners?: true;
 }
 
 /** Every channel's fields, in the order the workspace shows them and submit checks them. */
@@ -56,6 +79,12 @@ export const CHANNEL_FIELDS = {
     { key: "subject", label: "Subject", name: "email subject", shape: "line", required: true },
     { key: "preheader", label: "Preheader", name: "email preheader", shape: "line", required: false },
   ],
+  push: [
+    { key: "title", label: "Title", name: "push title", shape: "line", required: true },
+    { key: "subtitle", label: "Subtitle", name: "push subtitle", shape: "line", required: false, platforms: ["ios"] },
+    { key: "body", label: "Body", name: "push body", shape: "paragraph", required: true, refusesShorteners: true },
+  ],
+  sms: [{ key: "text", label: "Message", name: "SMS message", shape: "lines", required: true, refusesShorteners: true }],
 } as const satisfies { readonly [C in Channel]: readonly ChannelFieldSpec[] };
 
 /** A channel's field keys: `ChannelFieldKey<"email">` is "subject" | "preheader". */
@@ -109,13 +138,76 @@ export function fieldNoun(field: Pick<ChannelFieldSpec, "name">): string {
  * a save is sent and the server before one is stored (`prepareField`), so both refuse the same fields
  * with the same sentence.
  */
-export function normalizeAndCheckChannelField(shape: FieldShape, doc: JSONContent): Checked {
+export function normalizeAndCheckChannelField(field: FieldOf, doc: JSONContent): Checked {
+  return normalizeAndCheckField(doc, fieldCheck(field));
+}
+
+/** The field check alone, on a stored field: null when it passes, else the problem to refuse it with. */
+export function channelFieldProblem(field: FieldOf, doc: JSONContent): FieldProblem | null {
+  return fieldProblem(doc, fieldCheck(field));
+}
+
+/** What the checks need to know about a field: its channel (which sentence) and its shape (which lines). */
+export type FieldOf = Pick<ChannelField, "channel" | "shape">;
+
+function fieldCheck(field: FieldOf): FieldCheck {
+  return { lines: fieldLines(field.shape), problem: fieldProblemFor(field.channel) };
+}
+
+/** How a field of this shape holds its lines: only `lines` keeps line breaks. */
+export function fieldLines(shape: FieldShape): FieldLines {
   switch (shape) {
     case "line":
-      return normalizeAndCheckField(doc);
+    case "paragraph":
+      return "line";
+    case "lines":
+      return "lines";
     default:
       return assertNever(shape, "field shape");
   }
+}
+
+/** The sentence a channel's field is refused with ("The SMS message can hold only text, line breaks and variables."). */
+function fieldProblemFor(channel: Channel): FieldProblem {
+  switch (channel) {
+    case "email":
+      return "field";
+    case "push":
+      return "pushField";
+    case "sms":
+      return "smsField";
+    case "pdf":
+    case "web":
+      throw new Error(`The ${channel} channel has no fields`);
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
+/**
+ * The text the author typed into a field: its text, each hard break or paragraph break as "\n", and each
+ * variable chip as `chip` (a value isn't the author's text). What submit's character and link checks
+ * read. `null` gives "".
+ */
+export function typedText(doc: JSONContent | null, chip = " "): string {
+  if (!doc) return "";
+  switch (doc.type) {
+    case "text":
+      return typeof doc.text === "string" ? doc.text : "";
+    case "hardBreak":
+      return "\n";
+    case "variable":
+      return chip;
+    case "doc":
+      return (doc.content ?? []).map((block) => typedText(block, chip)).join("\n");
+    default:
+      return (doc.content ?? []).map((child) => typedText(child, chip)).join("");
+  }
+}
+
+/** Whether a field shows on a push platform: the subtitle shows only on iPhone. */
+export function fieldOnPlatform(field: Pick<ChannelFieldSpec, "platforms">, platform: PushPlatform): boolean {
+  return field.platforms === undefined || field.platforms.includes(platform);
 }
 
 // ── Stored and flat values ────────────────────────────────────

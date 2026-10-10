@@ -13,9 +13,9 @@ export const dayLabel = (iso: string) => DAY.format(new Date(iso));
 /** "Mar 4, 2:02 PM UTC". */
 export const whenLabel = (iso: string) => `${WHEN.format(new Date(iso))} UTC`;
 
-export const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email" };
+export const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
 /** How the customer meets each channel. */
-export const VIEW_LABEL: Record<ApiChannel, string> = { web: "Phone", email: "Inbox", pdf: "PDF" };
+export const VIEW_LABEL: Record<ApiChannel, string> = { web: "Phone", email: "Inbox", pdf: "PDF", push: "Lock screen", sms: "Messages" };
 
 export const TYPE_LABEL: Record<ApiVariableType, string> = {
   text: "Text",

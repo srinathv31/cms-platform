@@ -15,12 +15,66 @@ export type {
 export { VARIABLE_TYPES } from "@/editor/model/types";
 
 import type { JSONContent, SampleSet, Variable } from "@/editor/model/types";
+import { assertNever } from "./assert-never";
 import type { ChannelFieldsPatch } from "./channel-fields";
 import type { Refused } from "./refusals";
 
 // ── Channels ──────────────────────────────────────────────────
-export const CHANNELS = ["pdf", "web", "email"] as const;
+// Two families, never mixed on one content type or template (docs/decisions/0033):
+//   - documents render the one long body: PDF, Web and Email (Email adds its subject and preheader);
+//   - messages render their own short fields and nothing from a body: Push and SMS.
+export const CHANNELS = ["pdf", "web", "email", "push", "sms"] as const;
 export type Channel = (typeof CHANNELS)[number];
+
+/** The channels that render the template's document. */
+export const DOCUMENT_CHANNELS = ["pdf", "web", "email"] as const satisfies readonly Channel[];
+/** The channels that render only their own short fields (channel-fields.ts). */
+export const MESSAGE_CHANNELS = ["push", "sms"] as const satisfies readonly Channel[];
+export type DocumentChannel = (typeof DOCUMENT_CHANNELS)[number];
+export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+
+export const CHANNEL_FAMILIES = ["document", "message"] as const;
+export type ChannelFamily = (typeof CHANNEL_FAMILIES)[number];
+
+/** Which family a channel belongs to. */
+export function channelFamily(channel: Channel): ChannelFamily {
+  switch (channel) {
+    case "pdf":
+    case "web":
+    case "email":
+      return "document";
+    case "push":
+    case "sms":
+      return "message";
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
+/** The family's channels, in `CHANNELS` order. */
+export function familyChannels(family: ChannelFamily): readonly Channel[] {
+  return family === "document" ? DOCUMENT_CHANNELS : MESSAGE_CHANNELS;
+}
+
+/**
+ * The family a set of channels belongs to: a content type's allowed channels or a version's channels,
+ * which never mix. Null for no channels. When they do mix (stored data a rule should have refused),
+ * the first channel's family.
+ */
+export function familyOf(channels: readonly Channel[]): ChannelFamily | null {
+  const first = CHANNELS.find((channel) => channels.includes(channel));
+  return first === undefined ? null : channelFamily(first);
+}
+
+/** True for PDF, Web and Email. */
+export function isDocumentChannel(channel: Channel): channel is DocumentChannel {
+  return channelFamily(channel) === "document";
+}
+
+/** True for Push and SMS. */
+export function isMessageChannel(channel: Channel): channel is MessageChannel {
+  return channelFamily(channel) === "message";
+}
 
 // ── Lifecycle ─────────────────────────────────────────────────
 export const VERSION_STATES = [

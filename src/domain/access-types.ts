@@ -12,6 +12,7 @@ import type { ActionResult, ApprovalStage, NotificationKind, Person, VersionStag
 import type {
   ApproverRule,
   Channel,
+  ChannelFamily,
   MembershipStatus,
   MembershipStatusReason,
   PermissionResult,
@@ -411,6 +412,10 @@ export interface TeamRow {
   members: number; // active
   templates: number;
   createdAt: string;
+  /** The app name the team's push notifications show ("Coral"); null when not set. */
+  appName: string | null;
+  /** The short code the team's SMS come from ("26725"); null when not set. */
+  smsSender: string | null;
 }
 
 export interface TeamsSection {
@@ -425,9 +430,17 @@ export interface ContentTypeView {
   id: string;
   key: string;
   name: string;
+  /** Documents (PDF, Web, Email) or messages (Push, SMS): the family of the channels it allows. */
+  family: ChannelFamily;
   requiredSections: RequiredSection[];
   allowedChannels: Channel[];
+  /** The SMS footer every SMS of this type ends with; null when none (and on a document type). */
+  smsFooter: string | null;
+  /** The parts an SMS may take with the long sample values before submit refuses it. */
+  smsMaxParts: number;
   templates: number;
+  /** Whether "Edit sections" may open (`sectionsRefusal`): a message type has no sections. */
+  can: { editSections: PermissionResult };
 }
 
 export interface ContentTypesSection {
@@ -667,20 +680,28 @@ export interface PlatformConfigDomain {
     existing: { slug: string; name: string }[];
   }): Ok<{ team: { id: string; slug: string; name: string; description: string; icon: string; createdAt: Date }; membership: MembershipChange; effects: AccessEffect[] }> | Refused;
 
-  /** Sections: at least one; titles 1–60 chars, unique; keys snake_case from the title, kept for renamed sections. */
+  /**
+   * Sections: at least one; titles 1–60 chars, unique; keys snake_case from the title, kept for renamed
+   * sections. A message type has none to edit.
+   */
   updateRequiredSections(input: {
-    contentType: { id: string; name: string; requiredSections: RequiredSection[] };
+    contentType: { id: string; name: string; requiredSections: RequiredSection[]; allowedChannels: readonly Channel[] };
     next: RequiredSection[];
     actor: Named;
     now: Date;
   }): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused;
 
-  /** At least one channel stays on. Turning one off returns consequence lines naming the Active versions it stops. */
+  /**
+   * At least one channel stays on, and no channel of the other family goes on (`contentTypes` names the
+   * content types it goes on instead). Turning one off returns consequence lines naming the Active
+   * versions it stops.
+   */
   setChannelRule(input: {
     contentType: { id: string; name: string; allowedChannels: Channel[] };
     channel: Channel;
     allowed: boolean;
     activeUsing: number;
+    contentTypes: readonly { name: string; allowedChannels: readonly Channel[] }[];
     actor: Named;
     now: Date;
   }): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused;

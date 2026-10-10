@@ -4,10 +4,14 @@
 //   - the web page, the email HTML, the email text and the PDF show the same content as the RenderDoc
 //     (markers, blank lines and links included), and the PDF has no glyph the font could not draw;
 //   - the RenderDoc keeps its own invariants (docs/render-spec.md section 9);
-//   - a case named `error-*` fails before any channel, and `pdf-error-*` renders everything but the PDF;
+//   - a case named `error-*` fails before any channel, `pdf-error-*` renders everything but the PDF,
+//     `push-error-*` refuses the push on every platform and `sms-error-*` refuses the SMS;
+//   - a message's platforms agree, and its measurements are its text measured again;
 //   - the PDF carries the render time as its dates; the same input gives the same bytes again.
 
 import { beforeAll, describe, expect, it } from "vitest";
+import { PUSH_PLATFORMS } from "@/domain/messages/push";
+import type { Channel } from "@/domain/types";
 import { caseSlugs, readInput } from "./files";
 import { renderDocProblems } from "./invariants";
 import { expectedFiles, nodeFiles, parityProblems, runCase, type CaseRun } from "./pipeline";
@@ -20,14 +24,29 @@ describe.each(caseSlugs())("parity %s", (slug) => {
   }, 60_000);
 
   it("fails, or renders, as the case promises", () => {
+    const has = (channel: Channel) => run.input.channels.includes(channel);
     if (slug.startsWith("error-")) {
       expect(run.error, "this case must be refused before any channel renders").not.toBeNull();
       expect(run.pdf).toBeNull();
-    } else {
-      expect(run.error, "this case must render").toBeNull();
+      expect(run.push).toBeNull();
+      expect(run.sms).toBeNull();
+      return;
+    }
+    expect(run.error, "this case must render").toBeNull();
+    if (has("pdf")) {
       if (slug.startsWith("pdf-error-")) {
         expect(run.pdf?.ok, "the PDF must be refused (no tofu, no silent drops)").toBe(false);
       } else expect(run.pdf?.ok, run.pdf && !run.pdf.ok ? `the PDF failed: ${run.pdf.error.message}` : "").toBe(true);
+    }
+    if (has("push")) {
+      const refused = Object.values(run.push ?? {}).filter((push) => !push.ok).length;
+      if (slug.startsWith("push-error-")) expect(refused, "the push must be refused on every platform (never cut to fit)").toBe(PUSH_PLATFORMS.length);
+      else expect(refused, "the push must render on every platform").toBe(0);
+    }
+    if (has("sms")) {
+      expect(run.sms?.ok, slug.startsWith("sms-error-") ? "the SMS must be refused (never cut to fit)" : "the SMS must render").toBe(
+        !slug.startsWith("sms-error-"),
+      );
     }
   });
 

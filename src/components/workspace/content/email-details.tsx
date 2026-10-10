@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useId } from "react";
-import { assertNever } from "@/domain/assert-never";
 import {
   channelFieldsOf,
+  fieldLines,
   fieldName,
   type ChannelField,
   type ChannelFieldValues,
@@ -66,21 +66,18 @@ function ChannelFieldInput({
   const { id } = field;
   const onChange = useCallback((doc: JSONContent) => session.save({ [id]: doc } as ChannelFieldsPatch), [session, id]);
 
-  switch (field.shape) {
-    case "line":
-      return (
-        <Labelled label={field.label}>
-          <InlineVariableField
-            label={fieldName(field)}
-            value={value}
-            hidden={hidden}
-            onChange={editable ? onChange : undefined}
-          />
-        </Labelled>
-      );
-    default:
-      return assertNever(field.shape, "field shape");
-  }
+  // Every shape is one paragraph of text and chips; only `lines` (an SMS message) takes line breaks.
+  return (
+    <Labelled label={field.label}>
+      <InlineVariableField
+        label={fieldName(field)}
+        value={value}
+        lines={fieldLines(field.shape)}
+        hidden={hidden}
+        onChange={editable ? onChange : undefined}
+      />
+    </Labelled>
+  );
 }
 
 /** A small label over its field. The field names itself to assistive tech ("Email subject"). */

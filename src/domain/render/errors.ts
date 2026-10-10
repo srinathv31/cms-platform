@@ -3,17 +3,23 @@
 // Messages are plain sentences for the people integrating; the simulator shows them as is. They
 // name keys, types, versions, channels and ids, and NEVER echo a submitted variable value.
 
+import { assertNever } from "../assert-never";
 import { sunsetDay } from "../business-zone";
 import { formatLongDate } from "../dates";
+import { SMS_MAX_PARTS, type SmsLength } from "../messages/gsm7";
+import { PUSH_MAX_BYTES, PUSH_PLATFORMS, type PushPlatform } from "../messages/push";
 import { formatCount } from "../numbers";
 import { pluralName } from "../plural";
-import { CHANNELS, type Channel, type VariableType, type VersionState } from "../types";
+import { CHANNELS, type Channel, type DocumentChannel, type VariableType, type VersionState } from "../types";
 import {
   MAX_BODY_BYTES,
   type InvalidValue,
+  type PushTooLargeDetails,
   type RenderError,
   type RenderErrorCode,
   type RenderFailedDetails,
+  type RenderTarget,
+  type SmsTooLongDetails,
   type ValueErrorDetails,
   type VersionErrorDetails,
 } from "./types";
@@ -28,12 +34,30 @@ export function renderError(code: RenderErrorCode, message: string, details?: Re
 // Dates, counts and plurals read the one shared way (`../dates.ts`, `../numbers.ts`, `../plural.ts`).
 
 /** How a channel is named in messages. */
-export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = { pdf: "PDF", web: "Web", email: "Email" };
+export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = {
+  pdf: "PDF",
+  web: "Web",
+  email: "Email",
+  push: "Push",
+  sms: "SMS",
+};
+
+/** How a push platform is named in messages: "iPhone", "Android". */
+export const PLATFORM_LABELS: Readonly<Record<PushPlatform, string>> = { ios: "iPhone", android: "Android" };
 
 /** "PDF", "PDF and Web", "PDF, Web and Email". */
 export function joinWithAnd(items: readonly string[]): string {
+  return joinWith(items, "and");
+}
+
+/** "Alert", "Disclosure or Notice", "Disclosure, Notice or Statement". */
+export function joinWithOr(items: readonly string[]): string {
+  return joinWith(items, "or");
+}
+
+function joinWith(items: readonly string[], word: "and" | "or"): string {
   if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  return `${items.slice(0, -1).join(", ")} ${word} ${items[items.length - 1]}`;
 }
 
 function channelLabel(channel: string): string {
@@ -47,7 +71,40 @@ export const BAD_REQUEST_MESSAGES = {
   body: "The body must be JSON with version, channel and values.",
   channel: `channel must be one of ${CHANNELS.join(", ")}.`,
   version: "version must be a version number.",
+  /** A push without a platform, or with one that isn't a platform. */
+  platform: `platform must be ${PUSH_PLATFORMS.join(" or ")}.`,
+  /** A platform on any channel but push. */
+  platformNotPush: "platform is only for channel push.",
+  /** encoding on push or SMS, which are JSON already. */
+  encodingNotFile: `encoding is only for channels ${joinWithAnd(["pdf", "web", "email"] satisfies DocumentChannel[])}.`,
 } as const;
+
+/**
+ * What a request's channel, platform and encoding ask to render, or the bad_request that refuses the
+ * combination: a push needs a platform, no other channel takes one, and only PDF, web and email take
+ * an encoding.
+ */
+export function renderTarget(
+  channel: Channel,
+  platform: PushPlatform | undefined,
+  encoding?: "base64",
+): { ok: true; target: RenderTarget } | { ok: false; error: RenderError } {
+  const refused = (message: string) => ({ ok: false as const, error: badRequest(message) });
+  switch (channel) {
+    case "pdf":
+    case "web":
+    case "email":
+      return platform === undefined ? { ok: true, target: { channel } } : refused(BAD_REQUEST_MESSAGES.platformNotPush);
+    case "push":
+      if (platform === undefined) return refused(BAD_REQUEST_MESSAGES.platform);
+      return encoding === undefined ? { ok: true, target: { channel, platform } } : refused(BAD_REQUEST_MESSAGES.encodingNotFile);
+    case "sms":
+      if (platform !== undefined) return refused(BAD_REQUEST_MESSAGES.platformNotPush);
+      return encoding === undefined ? { ok: true, target: { channel } } : refused(BAD_REQUEST_MESSAGES.encodingNotFile);
+    default:
+      return assertNever(channel, "channel");
+  }
+}
 
 export function badRequest(message: string): RenderError {
   return renderError("bad_request", message);
@@ -222,7 +279,42 @@ const RENDER_FAILED_SUBJECT: Readonly<Record<Channel, string>> = {
   pdf: "The PDF",
   web: "The web page",
   email: "The email",
+  push: "The push",
+  sms: "The SMS",
 };
+
+// ── 422: what a message channel can't deliver ────────────────────────────────
+
+/**
+ * A push whose notification JSON is over the platform's limit, with these values:
+ * "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." Never cut to fit.
+ */
+export function pushPayloadTooLarge(platform: PushPlatform, payloadBytes: number): RenderError {
+  const details: PushTooLargeDetails = { platform, payloadBytes, maxBytes: PUSH_MAX_BYTES };
+  return renderError(
+    "push_payload_too_large",
+    `${RENDER_FAILED_SUBJECT.push} is ${formatCount(payloadBytes)} bytes on ${PLATFORM_LABELS[platform]}. It can be at most ${formatCount(PUSH_MAX_BYTES)} bytes.`,
+    details,
+  );
+}
+
+/**
+ * An SMS longer than any provider sends, with these values: "The SMS is 11 parts in UCS-2. It can be at
+ * most 10 parts." Never cut to fit.
+ */
+export function smsTooLong(length: Pick<SmsLength, "parts" | "encoding" | "characters">): RenderError {
+  const details: SmsTooLongDetails = {
+    parts: length.parts,
+    maxParts: SMS_MAX_PARTS,
+    encoding: length.encoding,
+    characters: length.characters,
+  };
+  return renderError(
+    "sms_too_long",
+    `${RENDER_FAILED_SUBJECT.sms} is ${formatCount(length.parts)} parts in ${length.encoding}. It can be at most ${formatCount(SMS_MAX_PARTS)} parts.`,
+    details,
+  );
+}
 
 /** "The PDF couldn't be rendered. Try again." Anything that fails in stages 7–9 without a reason of its own. */
 export function renderFailed(channel: Channel): RenderError {

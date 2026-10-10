@@ -10,11 +10,13 @@ import {
   checkVersion,
   consumerRequired,
   previewForbidden,
+  renderTarget,
   templateNotFound,
   unknownConsumer,
   versionNotFound,
 } from "@/domain/render";
-import type { RenderError } from "@/domain/render/types";
+import type { PushPlatform } from "@/domain/messages/push";
+import type { RenderError, RenderTarget } from "@/domain/render/types";
 import type { Channel, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
@@ -26,6 +28,8 @@ import { writeRenderLog } from "./log";
 // The render pipeline behind POST /api/v1/templates/{templateId}/render. The editor preview, the
 // review screen and the simulator all come through here, so an approver sees what a customer gets.
 //
+//   0 the target: push needs a platform, no other channel takes one, push and SMS take no encoding
+//     → 400 bad_request (not logged)
 //   1 template (+ content type)  → 404 template_not_found
 //   2 version, or the open draft → 404 version_not_found          (nothing is logged before here)
 //   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
@@ -34,13 +38,16 @@ import { writeRenderLog } from "./log";
 //   6–9 the engine (engine.ts): values → 422 missing_variables / invalid_values; the document check,
 //     resolve and the channel adapter → 500 render_failed: "… Try again.", or a reason the caller
 //     can act on (a stored document the check or the resolver refuses, or characters the PDF's
-//     fonts can't draw; see `renderFailure`)
-//  10 one render_log row, ok or error. Never values.
+//     fonts can't draw; see `renderFailure`); a push or SMS over its limit → 422
+//     push_payload_too_large / sms_too_long
+//  10 one render_log row, ok or error. Never values: the channel and the error code only.
 
 export interface RenderInput {
   templateId: string;
   version: number | "draft";
   channel: Channel;
+  /** Required with push, refused with any other channel (`renderTarget`). */
+  platform?: PushPlatform;
   values: Readonly<Record<string, unknown>>;
   /** Carried for the route; the pipeline's output is the same either way. */
   encoding?: "base64";
@@ -64,12 +71,12 @@ export type RenderResult =
       newerVersion: number | null;
       /** "UC-4F7K2Q-v2.pdf", "UC-4F7K2Q-draft.html". */
       filename: string;
-      /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text. */
+      /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text; push and sms: their JSON. */
       body: RenderBody;
     }
   | { ok: false; error: RenderError };
 
-const EXTENSION: Readonly<Record<Channel, string>> = { pdf: "pdf", web: "html", email: "json" };
+const EXTENSION: Readonly<Record<Channel, string>> = { pdf: "pdf", web: "html", email: "json", push: "json", sms: "json" };
 
 const fail = (error: RenderError): RenderResult => ({ ok: false, error });
 
@@ -88,6 +95,7 @@ type TemplateRow = {
   contentTypeId: string;
   contentTypeName: string;
   allowedChannels: Channel[];
+  smsFooter: string | null;
 };
 type VersionRow = typeof versions.$inferSelect;
 
@@ -98,9 +106,11 @@ type VersionRow = typeof versions.$inferSelect;
 export async function runRender(db: Db, input: RenderInput, at: Date): Promise<RenderResult> {
   const started = performance.now();
 
-  // The route checks both first; repeated here so no caller can skip them. Not logged.
+  // The route checks these first; repeated here so no caller can skip them. Not logged.
   if (input.version === "draft" && !input.preview) return fail(badRequest(BAD_REQUEST_MESSAGES.version));
   if (!input.preview && !input.consumerId) return fail(consumerRequired());
+  const target = renderTarget(input.channel, input.platform, input.encoding);
+  if (!target.ok) return fail(target.error);
 
   // 1. The template, with its content type.
   const [template] = await db
@@ -110,6 +120,7 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
       contentTypeId: templates.contentTypeId,
       contentTypeName: contentTypes.name,
       allowedChannels: contentTypes.allowedChannels,
+      smsFooter: contentTypes.smsFooter,
     })
     .from(templates)
     .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
@@ -127,7 +138,7 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
   if (!version) return fail(versionNotFound(template.id, input.version));
 
   // 3–9, then 10: every request that got this far is logged, whatever the outcome.
-  const result = await renderVersion(db, input, template, version, at);
+  const result = await renderVersion(db, input, target.target, template, version, at);
   await writeRenderLog(
     db,
     {
@@ -185,6 +196,7 @@ async function activeNumber(db: Db, templateId: string): Promise<number | null> 
 async function renderVersion(
   db: Db,
   input: RenderInput,
+  target: RenderTarget,
   template: TemplateRow,
   version: VersionRow,
   at: Date,
@@ -240,13 +252,15 @@ async function renderVersion(
       values: input.values,
       body: version.body,
       channelFields: version.channelFields,
+      smsFooter: template.smsFooter,
     },
-    input.channel,
+    target,
     at,
   );
   if (!result.ok) {
-    // Anything that throws from stage 7 on is our failure, not the caller's.
-    if (result.stage >= 7) reportFailure(template.id, version.number, input.channel, input.correlationId, result.cause);
+    // Anything that throws from stage 7 on is our failure, not the caller's. A message over its limit
+    // (push_payload_too_large, sms_too_long) is the values' doing, like invalid_values: not logged.
+    if (result.error.code === "render_failed") reportFailure(template.id, version.number, input.channel, input.correlationId, result.cause);
     return fail(result.error);
   }
   return {

@@ -1,7 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import {
-  DEFAULT_CHANNELS,
+  newTemplateChannels,
   type DraftFields,
   type LifecycleResult,
   type NewTemplateChanges,
@@ -63,22 +63,21 @@ export async function disclosureContentType(reader: Reader = db) {
 
 /**
  * A first draft shaped to the content type as it is now (Platform settings), for every way a template
- * is born. Only the channels the type allows (the first allowed one if none of the wanted ones is).
- * Its required sections: removed ones become ordinary headings, renamed ones take the new title, new
- * ones are appended. An import has already fitted them (`finishImport`), so it passes
- * `sectionsFitted` and its body is left alone. Existing templates are never reshaped.
+ * is born. Its channels: the ones the starter wants that the type allows, else the defaults of the
+ * type's family (documents PDF and Web, messages Push and SMS) that it allows, else the first it allows
+ * (`newTemplateChannels`). Its required sections: removed ones become ordinary headings, renamed ones
+ * take the new title, new ones are appended. An import has already fitted them (`finishImport`), so it
+ * passes `sectionsFitted` and its body is left alone. Existing templates are never reshaped.
  */
 export function conformToContentType(
   starter: StarterContent,
   type: { requiredSections: RequiredSection[]; allowedChannels: Channel[] },
   options: { sectionsFitted?: boolean } = {},
 ): StarterContent {
-  const wanted = starter.channels ?? DEFAULT_CHANNELS;
-  const allowed = wanted.filter((c) => type.allowedChannels.includes(c));
   return {
     ...starter,
     body: options.sectionsFitted ? starter.body : conformToSections(starter.body, type.requiredSections, () => newId("b")),
-    channels: allowed.length > 0 ? allowed : type.allowedChannels.slice(0, 1),
+    channels: newTemplateChannels(starter.channels, type.allowedChannels),
   };
 }
 

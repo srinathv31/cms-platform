@@ -1,9 +1,27 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { assertNever } from "@/domain/assert-never";
-import { BAD_REQUEST_MESSAGES, MAX_BODY_BYTES, badRequest, bodyTooLarge, consumerRequired, renderFailed } from "@/domain/render";
+import { PUSH_PLATFORMS } from "@/domain/messages/push";
+import {
+  BAD_REQUEST_MESSAGES,
+  MAX_BODY_BYTES,
+  badRequest,
+  bodyTooLarge,
+  consumerRequired,
+  renderFailed,
+  renderTarget,
+} from "@/domain/render";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
-import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
+import type {
+  Base64ResponseBody,
+  EmailRender,
+  EmailResponseBody,
+  PushRender,
+  PushResponseBody,
+  RenderError,
+  SmsRender,
+  SmsResponseBody,
+} from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
 import { readBodyCapped } from "@/server/import/read-body";
@@ -26,6 +44,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 const RequestBody = z.object({
   version: z.union([z.int().min(1), z.literal("draft")]),
   channel: z.enum(CHANNELS),
+  platform: z.enum(PUSH_PLATFORMS).optional(),
   values: z.custom<Record<string, unknown>>(isPlainObject),
   encoding: z.literal("base64").optional(),
   preview: z.boolean().optional(),
@@ -36,6 +55,7 @@ type RequestBody = z.infer<typeof RequestBody>;
 const FIELD_MESSAGES: Readonly<Record<string, string>> = {
   version: BAD_REQUEST_MESSAGES.version,
   channel: BAD_REQUEST_MESSAGES.channel,
+  platform: BAD_REQUEST_MESSAGES.platform,
   values: "values must be an object.",
   encoding: "encoding must be base64.",
   preview: "preview must be true or false.",
@@ -123,6 +143,15 @@ function successResponse(
           : { ...email, newerVersion };
       return Response.json(body, { headers });
     }
+    // Messages are JSON already: the platform's push, or the SMS as sent.
+    case "push": {
+      const body: PushResponseBody = { ...(result.body as PushRender), newerVersion };
+      return Response.json(body, { headers });
+    }
+    case "sms": {
+      const body: SmsResponseBody = { ...(result.body as SmsRender), newerVersion };
+      return Response.json(body, { headers });
+    }
     default:
       return assertNever(result.channel, "channel");
   }
@@ -141,10 +170,13 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
 
   const parsed = parseBody(new TextDecoder().decode(body.bytes));
   if (!parsed.ok) return errorResponse(parsed.error, correlationId);
-  const { version, channel, values, encoding } = parsed.body;
+  const { version, channel, platform, values, encoding } = parsed.body;
   const preview = parsed.body.preview === true;
 
   if (version === "draft" && !preview) return errorResponse(badRequest(BAD_REQUEST_MESSAGES.version), correlationId);
+  // A push asks for its platform; nothing else takes one, and push and SMS take no encoding.
+  const target = renderTarget(channel, platform, encoding);
+  if (!target.ok) return errorResponse(target.error, correlationId);
   const consumerId = request.headers.get("x-consumer-id")?.trim() || null;
   if (!preview && !consumerId) return errorResponse(consumerRequired(), correlationId);
 
@@ -153,6 +185,7 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
       templateId,
       version,
       channel,
+      platform,
       values,
       encoding,
       preview,

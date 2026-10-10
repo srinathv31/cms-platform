@@ -160,6 +160,9 @@ export function sameOutput(a: PreviewOutput, b: PreviewOutput): boolean {
       const other = b as typeof a;
       return a.subject === other.subject && a.preheader === other.preheader && a.html === other.html;
     }
+    case "push":
+    case "sms":
+      return JSON.stringify(a) === JSON.stringify(b);
     default:
       return assertNever(a, "preview output");
   }

@@ -78,7 +78,8 @@ export function seedSimulator(ctx: SeedCtx) {
       templateId: t.id,
       templateName: t.name,
       pinnedVersion: v.number ?? 0,
-      channels: v.channels.filter((c) => c !== "email"),
+      // The seeded links deliver PDF and web; Coral can't deliver push or SMS yet.
+      channels: v.channels.filter((c): c is "pdf" | "web" => c === "pdf" || c === "web"),
       mapping: mapping([...customerKeys]),
       linkedAt: ctx.at(l.linkedAt),
     });

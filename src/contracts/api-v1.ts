@@ -19,7 +19,15 @@
 
 // ── Shared vocabulary (mirrors src/domain/types.ts; checked there) ──────────────
 
-export type ApiChannel = "pdf" | "web" | "email";
+/**
+ * pdf, web and email render the template's document; push and sms render a message template's own
+ * short fields. A template is one or the other, never both.
+ */
+export type ApiChannel = "pdf" | "web" | "email" | "push" | "sms";
+/** The platform a push is rendered for. iPhone shows a subtitle; Android never does. */
+export type ApiPushPlatform = "ios" | "android";
+/** An SMS's encoding: GSM-7, or UCS-2 when one character is outside GSM-7 (a value can switch it). */
+export type ApiSmsEncoding = "GSM-7" | "UCS-2";
 export type ApiVariableType = "text" | "currency" | "percent" | "date" | "number" | "us_state";
 /** The states a consumer can see. Drafts and versions in review never leave UCOMP. */
 export type ApiVersionState = "active" | "superseded" | "revoked";
@@ -40,6 +48,8 @@ export type ApiErrorCode =
   | "channel_not_enabled"
   | "missing_variables"
   | "invalid_values"
+  | "push_payload_too_large" // 422: the push's notification JSON is over 4,096 bytes on its platform
+  | "sms_too_long" // 422: the SMS is over 10 parts
   | "render_failed"
   // Phase 5: the notices endpoint
   | "consumer_not_found" // 404: the path names a consumer that isn't registered
@@ -49,7 +59,27 @@ export interface ApiError {
   code: ApiErrorCode;
   /** One exact, plain sentence. Shown to people as is (the simulator prints it in the results grid). */
   message: string;
-  details?: ApiValueErrorDetails | ApiVersionErrorDetails | Record<string, unknown>;
+  details?:
+    | ApiValueErrorDetails
+    | ApiVersionErrorDetails
+    | ApiPushTooLargeDetails
+    | ApiSmsTooLongDetails
+    | Record<string, unknown>;
+}
+
+/** push_payload_too_large: the platform asked for, the push's size there, and the limit (4,096). */
+export interface ApiPushTooLargeDetails {
+  platform: ApiPushPlatform;
+  payloadBytes: number;
+  maxBytes: number;
+}
+
+/** sms_too_long: the parts the SMS would take, the limit (10), and what set the part size. */
+export interface ApiSmsTooLongDetails {
+  parts: number;
+  maxParts: number;
+  encoding: ApiSmsEncoding;
+  characters: number;
 }
 
 /** missing_variables / invalid_values: keys only, never values. */
@@ -328,11 +358,52 @@ export interface ApiNotice {
 export interface ApiRenderRequest {
   version: number;
   channel: ApiChannel;
+  /**
+   * Required with channel push, and refused with any other (400 bad_request, "platform must be ios or
+   * android." / "platform is only for channel push."). A push is one message for both platforms; only
+   * iPhone's has the subtitle.
+   */
+  platform?: ApiPushPlatform;
   values: Record<string, string | number>;
+  /** pdf, web and email only (else 400 bad_request, "encoding is only for channels pdf, web and email."). */
   encoding?: "base64";
 }
 
-/** 200, channel email (and any channel with encoding base64 for email). */
+/**
+ * 200, channel push: the push for the requested platform, every field in full (the phone cuts what
+ * doesn't fit; Stencil never does). A value is never shortened, so a long one can make a push too large:
+ * 422 push_payload_too_large.
+ */
+export interface ApiPushResponse {
+  title: string;
+  /** iPhone only, and only when it has text. Never present for android. */
+  subtitle?: string;
+  body: string;
+  /**
+   * The UTF-8 size of the notification JSON this text makes, compact: APNs' {"aps":{"alert":{…}}} for
+   * ios, FCM's {"message":{"notification":{…}}} for android. Your own keys (a deep link, data, badge,
+   * sound) add to it: you have 4,096 − payloadBytes left for them (2,048 for an FCM topic message).
+   */
+  payloadBytes: number;
+  newerVersion: number | null;
+}
+
+/**
+ * 200, channel sms: the message exactly as it must be sent, the content type's footer (brand and
+ * opt-out) on its own last line. Send `text` as is, and turn off provider rewriting such as Twilio's
+ * Smart Encoding: `encoding` and `parts` are for this text, and a value is never transliterated.
+ */
+export interface ApiSmsResponse {
+  text: string;
+  encoding: ApiSmsEncoding;
+  /** Message parts (segments): 160 GSM-7 characters or 70 UCS-2 in one, 153 or 67 each once split. At most 10. */
+  parts: number;
+  /** Characters as a reader counts them. */
+  characters: number;
+  newerVersion: number | null;
+}
+
+/** 200, channel email (with or without encoding base64). */
 export interface ApiEmailResponse {
   subject: string;
   preheader: string;

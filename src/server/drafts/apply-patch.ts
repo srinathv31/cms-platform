@@ -111,7 +111,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       fields[field.id] = null;
       continue;
     }
-    const prepared = prepareField(value, field.shape);
+    const prepared = prepareField(value, field);
     if (!prepared.ok) return fail("invalid", prepared.message);
     fields[field.id] = prepared.doc;
   }

@@ -5,9 +5,11 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ChannelFields } from "@/domain/channel-fields";
 import { parseJsonWithNumberText } from "@/domain/render/json-number-text";
+import { CHANNELS, type Channel } from "@/domain/types";
 import type { Variable } from "@/editor/model/types";
+import type { EngineInput } from "../engine";
 
-/** Everything the engine needs to render one document, frozen. */
+/** Everything the engine needs to render one template, frozen, and the channels to render it in. */
 export interface RenderFixture {
   templateId: string;
   templateName: string;
@@ -18,9 +20,22 @@ export interface RenderFixture {
   variables: Variable[];
   /** As a request sends them: JSON numbers are read from their source text (21.90 stays "21.90"). */
   values: Record<string, unknown>;
+  /** The document: what PDF, web and email render. A message case's is never read. */
   body: JSONContent;
   /** Each channel's own fields, as `versions.channel_fields` stores them (src/domain/channel-fields.ts). */
   channelFields: ChannelFields;
+  /**
+   * The channels the case renders, as a version's `channels` (one family: PDF, web, email; or push and
+   * SMS). A push renders once per platform.
+   */
+  channels: Channel[];
+  /** The content type's SMS footer. Absent: none. */
+  smsFooter?: string;
+}
+
+/** What the engine reads from a fixture. */
+export function engineInput(fixture: RenderFixture): EngineInput {
+  return { ...fixture, smsFooter: fixture.smsFooter ?? null };
 }
 
 /** JSON the way the files are written: two spaces, a newline at the end. */
@@ -41,6 +56,11 @@ export function parseRenderFixture(text: string): RenderFixture {
   if (!raw.channelFields || typeof raw.channelFields !== "object" || Array.isArray(raw.channelFields)) {
     throw new Error('Render fixture: "channelFields" must be an object.');
   }
+  const channels = raw.channels;
+  if (!Array.isArray(channels) || channels.length === 0 || !channels.every((c) => (CHANNELS as readonly unknown[]).includes(c))) {
+    throw new Error(`Render fixture: "channels" must list some of ${CHANNELS.join(", ")}.`);
+  }
+  if (raw.smsFooter !== undefined && typeof raw.smsFooter !== "string") throw new Error('Render fixture: "smsFooter" must be a string.');
   return {
     templateId: raw.templateId!,
     templateName: raw.templateName!,
@@ -50,5 +70,7 @@ export function parseRenderFixture(text: string): RenderFixture {
     values: parsed.numbersAsText(raw.values),
     body: raw.body,
     channelFields: raw.channelFields,
+    channels: CHANNELS.filter((c) => channels.includes(c)),
+    ...(raw.smsFooter === undefined ? {} : { smsFooter: raw.smsFooter }),
   };
 }

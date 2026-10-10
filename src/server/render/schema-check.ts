@@ -1,9 +1,8 @@
 import "server-only";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
-import { assertNever } from "@/domain/assert-never";
-import type { FieldShape } from "@/domain/channel-fields";
-import { DOCUMENT_MESSAGES, documentProblem, fieldProblem, type DocumentProblem } from "@/editor/model/document-check";
+import { channelFieldProblem, type FieldOf } from "@/domain/channel-fields";
+import { DOCUMENT_MESSAGES, documentProblem, type DocumentProblem } from "@/editor/model/document-check";
 import { baseExtensions } from "@/editor/schema";
 
 // The document check (docs/render-spec.md §3): the guard between a document and storage (autosave)
@@ -62,21 +61,12 @@ export function checkDocument(body: JSONContent): void {
 }
 
 /**
- * Throws a RenderDocumentError when `field` isn't a valid channel field of its shape
- * (src/domain/channel-fields.ts): for `line`, one line of text and variables (the email subject and
- * preheader).
+ * Throws a RenderDocumentError when `value` isn't a valid channel field of its shape
+ * (src/domain/channel-fields.ts), in its channel's words: one paragraph of text and variables with no
+ * marks, and hard breaks only in a `lines` field (an SMS message).
  */
-export function checkField(field: JSONContent, shape: FieldShape): void {
-  const problem = fieldProblemOf(field, shape);
+export function checkField(value: JSONContent, field: FieldOf): void {
+  const problem = channelFieldProblem(field, value);
   if (problem) throw new RenderDocumentError(problem);
-  parseWithSchema(field);
-}
-
-function fieldProblemOf(field: JSONContent, shape: FieldShape): DocumentProblem | null {
-  switch (shape) {
-    case "line":
-      return fieldProblem(field);
-    default:
-      return assertNever(shape, "field shape");
-  }
+  parseWithSchema(value);
 }

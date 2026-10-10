@@ -11,7 +11,7 @@ import { noticeView } from "@/domain/golive/notices";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
-import type { Variable, Viewer } from "@/domain/types";
+import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import { createVariableStore } from "@/editor/state/variable-store";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -1218,5 +1218,73 @@ describe("the writers backfill in the migration", () => {
     await libsql.execute("UPDATE versions SET writers = '[]'");
     await libsql.execute(backfill!);
     expect(await writersById()).toEqual(recorded);
+  });
+});
+
+// ── Submitting an alert: the message rules (decisions 0033 and 0034) ──────────
+
+describe("submitting an alert", () => {
+  const t = (text: string): JSONContent => ({ type: "text", text });
+  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+  const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
+
+  /** A draft turned into an Alert's: its template on the Alert content type, Push and SMS on. */
+  async function alertDraft(sms: JSONContent) {
+    const { templateId, draftId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await db.update(schema.templates).set({ contentTypeId: "ct_alert" }).where(eq(schema.templates.id, templateId));
+    await db
+      .update(versions)
+      .set({
+        body: { type: "doc", content: [{ type: "paragraph" }] },
+        channels: ["push", "sms"],
+        channelFields: {
+          push: { title: field(t("Your offer ends soon")), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) },
+          sms: { text: sms },
+        },
+      })
+      .where(eq(versions.id, draftId));
+    return templateId;
+  }
+
+  it("refuses characters the author typed outside GSM-7, and writes nothing", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", it’s ending.")));
+    const before = await draftOf(templateId);
+    const at = as("maya");
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      code: "sms_characters",
+      reason: "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.",
+    });
+    expect(await draftOf(templateId)).toEqual(before);
+    expect(await auditAt(at)).toEqual([]);
+  });
+
+  it("measures the SMS with the content type's footer and part budget, using the long sample values", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(". " + "Your offer ends Friday. ".repeat(4))));
+    // The footer and the long first name take it past one part: fine at the Alert's 3.
+    await db.update(schema.contentTypes).set({ smsMaxParts: 1 }).where(eq(schema.contentTypes.id, "ct_alert"));
+    try {
+      as("maya");
+      expect(await submitNow(templateId)).toEqual({
+        ok: false,
+        code: "sms_too_many_parts",
+        reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer.",
+      });
+    } finally {
+      await db.update(schema.contentTypes).set({ smsMaxParts: 3 }).where(eq(schema.contentTypes.id, "ct_alert"));
+    }
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect((await version(templateId, 1))?.state).toBe("in_review");
+  });
+
+  it("refuses a public link shortener in the SMS", async () => {
+    const templateId = await alertDraft(field(t("Pay at bit.ly/coral")));
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      code: "public_shortener",
+      reason: "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain.",
+    });
   });
 });

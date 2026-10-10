@@ -38,6 +38,8 @@ decided and why, so it can be revisited without the person who made it.
 | [0030](0030-shared-primitives-have-one-home.md) | Shared UI building blocks have one home in `primitives/`, and a test keeps it so | Accepted |
 | [0031](0031-a-correction-is-redlined-against-the-revoked-version.md) | After a revoke, the review redlines the correction against the revoked version it started from | Accepted |
 | [0032](0032-consumers-are-told-when-a-sunset-passes.md) | Consumers are told when a sunset passes: a `sunset_passed` notice from the sweep, to the template's consumers | Accepted |
+| [0033](0033-message-channels-families-and-the-fields-registry.md) | Push and SMS are message channels, a family of their own never mixed with documents, rendered from a registry of fields; a push is one message, with an iPhone-only subtitle, rendered per `platform` | Accepted |
+| [0034](0034-sms-characters-and-length.md) | An SMS is written in GSM-7 (Ç, not ç), measured in parts against a budget, and never cut or transliterated | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

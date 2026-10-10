@@ -1,5 +1,5 @@
 import "server-only";
-import { normalizeAndCheckChannelField, type FieldShape } from "@/domain/channel-fields";
+import { normalizeAndCheckChannelField, type FieldOf } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
 import { normalizeAndCheckBody, type Checked } from "@/editor/model/document-check";
 import { normalizeDocument } from "@/editor/model/normalize";
@@ -33,11 +33,12 @@ export function prepareBody(doc: JSONContent): Prepared {
 }
 
 /**
- * A channel field (src/domain/channel-fields.ts) as it is stored: normalized for its shape and checked.
- * A `line` (the email subject and preheader) is normalized to one line.
+ * A channel field (src/domain/channel-fields.ts) as it is stored: normalized for its shape and checked,
+ * and refused in its channel's words. A `line` or `paragraph` (the email subject, a push title or body)
+ * is normalized to one line; a `lines` field (an SMS message) keeps its line breaks as hard breaks.
  */
-export function prepareField(doc: JSONContent, shape: FieldShape): Prepared {
-  return prepare(doc, (field) => normalizeAndCheckChannelField(shape, field), (normalized) => normalized);
+export function prepareField(doc: JSONContent, field: FieldOf): Prepared {
+  return prepare(doc, (value) => normalizeAndCheckChannelField(field, value), (normalized) => normalized);
 }
 
 function prepare(doc: JSONContent, check: (doc: JSONContent) => Checked, finish: (doc: JSONContent) => JSONContent): Prepared {

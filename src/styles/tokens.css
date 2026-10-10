@@ -56,13 +56,15 @@
   --lavender-100: #e6d9fa;
   --lavender-700: #5b3a9e;
 
-  /* Chart series hues, told apart by hue rather than lightness. As a set, in the order of --series-1…4,
+  /* Chart series hues, told apart by hue rather than lightness. As a set, in the order of --series-1…5,
      they keep neighbours apart under protanopia and deuteranopia (OKLab ΔE ≥ 10) and clear 3:1 on
-     surface and surface-tinted (docs/decisions/0014). Change them together and re-check. */
+     surface and surface-tinted (docs/decisions/0014). Change them together and re-check. The blue is
+     the fifth channel's (SMS): rose↔blue is ΔE 16.5 under CVD and 25 for full colour vision. */
   --viz-teal: #008c80;
   --viz-orange: #b5653a;
   --viz-violet: #6b4fb0;
   --viz-rose: #b5476f;
+  --viz-blue: #2084d4;
 
   /* ── 2. Semantic ───────────────────────────────────────────── */
   --app-bg: var(--stone-100);          /* window + sidebar */
@@ -98,6 +100,7 @@
   --series-2: var(--viz-orange);
   --series-3: var(--viz-violet);
   --series-4: var(--viz-rose);
+  --series-5: var(--viz-blue);
 
   --positive-bg: var(--mint-100);
   --positive-text: var(--mint-700);

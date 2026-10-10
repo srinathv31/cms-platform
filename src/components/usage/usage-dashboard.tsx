@@ -24,7 +24,13 @@ import { UsageTabs } from "./usage-tabs";
  * Each channel's hue. The charts list the channels in `CHANNELS` order, and the channel mix colours its
  * parts in the order it gets them, so a channel has the same hue here and there.
  */
-const CHANNEL_HUE: Readonly<Record<Channel, (typeof SERIES)[number]>> = { pdf: SERIES[0], web: SERIES[1], email: SERIES[2] };
+const CHANNEL_HUE: Readonly<Record<Channel, (typeof SERIES)[number]>> = {
+  pdf: SERIES[0],
+  web: SERIES[1],
+  email: SERIES[2],
+  push: SERIES[3],
+  sms: SERIES[4],
+};
 const CHANNEL_SERIES: StackSeries[] = CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], ...CHANNEL_HUE[c] }));
 
 function Overview({ d }: { d: UsageDashboard }) {

@@ -23,6 +23,7 @@ import {
   sunsetPassed,
   sweepSunsets,
   withWriter,
+  newTemplateChannels,
   type ReviewVersion,
   type SunsetFacts,
   type StarterContent,
@@ -30,6 +31,7 @@ import {
   type VersionSnapshot,
 } from "./lifecycle";
 import { REASONS } from "./permissions";
+import type { MessageTypeRules } from "./platform-config";
 import type { Refusal } from "./refusals";
 import type { ApprovalStage, Recipients, VersionStage } from "./review-types";
 import {
@@ -45,6 +47,8 @@ import {
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 const TEMPLATE = { id: "UC-4F7K2Q", name: "Spring Travel Rewards — Terms" };
 const CHAIN_1: ApprovalStage[] = [{ id: "st_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }];
+/** A document's content type: no SMS footer, the default part budget (never read for a document). */
+const NO_MESSAGE_RULES: MessageTypeRules = { smsFooter: null, smsMaxParts: 3 };
 
 const heading = (id: string, requiredKey: string, text: string): JSONContent => ({
   type: "heading",
@@ -136,7 +140,7 @@ describe("createDraft", () => {
 
   it("turns on PDF and Web only, with no email copy, unless the starter says otherwise", () => {
     const { changes } = createDraft({ starter: EXAMPLE, createdBy: "maya", now: NOW });
-    expect(changes.draft.channels).toEqual([...DEFAULT_CHANNELS]);
+    expect(changes.draft.channels).toEqual([...DEFAULT_CHANNELS.document]);
     expect(changes.draft.channels).not.toContain("email");
     expect(changes.draft.channelFields).toEqual({});
 
@@ -148,6 +152,18 @@ describe("createDraft", () => {
     });
     expect(withEmail.changes.draft.channels).toEqual(["pdf", "web", "email"]);
     expect(withEmail.changes.draft.channelFields).toEqual({ email: { subject, preheader: subject } });
+  });
+
+  it("fits a new template's channels to its content type's family (newTemplateChannels)", () => {
+    // A document type: the wanted ones it allows, else PDF and Web, else its first.
+    expect(newTemplateChannels(undefined, ["pdf", "web", "email"])).toEqual(["pdf", "web"]);
+    expect(newTemplateChannels(["pdf", "web", "email"], ["pdf", "email"])).toEqual(["pdf", "email"]);
+    expect(newTemplateChannels(undefined, ["email"])).toEqual(["email"]);
+    // A message type (an Alert): Push and SMS, whatever a document starter wanted.
+    expect(newTemplateChannels(undefined, ["push", "sms"])).toEqual(["push", "sms"]);
+    expect(newTemplateChannels(["pdf", "web"], ["push", "sms"])).toEqual(["push", "sms"]);
+    expect(newTemplateChannels(undefined, ["sms"])).toEqual(["sms"]);
+    expect(newTemplateChannels(["sms"], ["push", "sms"])).toEqual(["sms"]);
   });
 
   it("makes Blank untitled, with no starter key and no variables", () => {
@@ -429,6 +445,7 @@ describe("submit", () => {
     body: BODY,
     channelFields: {},
     channels: ["pdf", "web"],
+    sampleSets: SAMPLE_SETS,
     writers: ["maya"],
     rev: 7,
   };
@@ -441,6 +458,7 @@ describe("submit", () => {
       note?: string | null;
       chain?: ApprovalStage[];
       seenRev?: number;
+      messageRules?: MessageTypeRules;
     } = {},
   ) =>
     submit({
@@ -455,6 +473,7 @@ describe("submit", () => {
       templateName: TEMPLATE.name,
       note: extra.note,
       chain: extra.chain ?? CHAIN_1,
+      messageRules: extra.messageRules ?? NO_MESSAGE_RULES,
     });
 
   const reviewRequested = (number: number, extra: { body?: string; to?: Recipients } = {}) => ({
@@ -697,6 +716,100 @@ describe("submit", () => {
 
   it("doesn't need a subject when Email is off", () => {
     expect(run({ channels: ["pdf"], channelFields: {} }).ok).toBe(true);
+  });
+
+  // ── A message (an Alert): Push and SMS (decisions 0033 and 0034) ──
+  describe("a message", () => {
+    const ALERT: MessageTypeRules = { smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.", smsMaxParts: 3 };
+    const lines = (...inline: JSONContent[]): JSONContent => oneLine(...inline);
+    const push = {
+      title: oneLine(text("Your APR changes soon")),
+      body: oneLine(text("Hi "), chip("first_name"), text(", your purchase APR becomes "), chip("purchase_apr"), text(".")),
+    };
+    const sms = { text: lines(text("Coral Offers: your APR becomes "), chip("purchase_apr"), text("."), { type: "hardBreak" }, text("coral.example/apr")) };
+    const alert = (over: Partial<SubmitDraft> = {}, rules: MessageTypeRules = ALERT) =>
+      run({ body: { type: "doc", content: [{ type: "paragraph" }] }, channels: ["push", "sms"], channelFields: { push, sms }, ...over }, { messageRules: rules });
+
+    it("submits a push and an SMS that keep every rule", () => {
+      expect(alert().ok).toBe(true);
+    });
+
+    it("needs every required field of each channel that is on, from the registry", () => {
+      expect(alert({ channelFields: { push: { body: push.body }, sms } })).toEqual({
+        ok: false,
+        code: "field_missing",
+        reason: "Add a push title before submitting.",
+      });
+      expect(alert({ channelFields: { push } })).toEqual({ ok: false, code: "field_missing", reason: "Add an SMS message before submitting." });
+      // The subtitle is optional, and SMS's fields don't matter while SMS is off.
+      expect(alert({ channels: ["push"], channelFields: { push } }).ok).toBe(true);
+    });
+
+    it("refuses characters the author typed outside GSM-7, naming each once", () => {
+      const typed = { text: lines(text("Your card’s APR – it’s changing. Reply"), chip("first_name")) };
+      expect(alert({ channelFields: { push, sms: typed } })).toEqual({
+        ok: false,
+        code: "sms_characters",
+        reason: "Replace ’, – and U+00A0 in the SMS message before submitting. They aren't in the SMS character set.",
+      });
+      expect(alert({ channelFields: { push, sms: { text: lines(text("Façade")) } } })).toEqual({
+        ok: false,
+        code: "sms_characters",
+        reason: "Replace ç in the SMS message before submitting. It isn't in the SMS character set.",
+      });
+      // Ç is GSM-7, and so is é; a value is never checked (it can switch a message to UCS-2).
+      expect(alert({ channelFields: { push, sms: { text: lines(text("Ç é "), chip("first_name")) } } }).ok).toBe(true);
+    });
+
+    it("refuses an SMS over the content type's parts with the long sample values, footer included", () => {
+      const long = { text: lines(text("x".repeat(120)), chip("first_name")) };
+      // 120 + 21 (the long first name) + a line break + the footer's 51: 193 septets, 2 parts.
+      expect(alert({ channelFields: { push, sms: long } }).ok).toBe(true);
+      expect(alert({ channelFields: { push, sms: long } }, { ...ALERT, smsMaxParts: 1 })).toEqual({
+        ok: false,
+        code: "sms_too_many_parts",
+        reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer.",
+      });
+      // Without the long set, its defaults stand in.
+      expect(alert({ channelFields: { push, sms: long }, sampleSets: [] }, { ...ALERT, smsMaxParts: 1 }).ok).toBe(false);
+    });
+
+    it("refuses a public link shortener in an SMS or a push body", () => {
+      const shortened = { text: lines(text("Pay at https://bit.ly/3xYz or tinyurl.com/a")) };
+      expect(alert({ channelFields: { push, sms: shortened } })).toEqual({
+        ok: false,
+        code: "public_shortener",
+        reason: "The SMS message links through bit.ly and tinyurl.com, public link shorteners carriers filter. Use a link on your own domain.",
+      });
+      const body = oneLine(text("See bit.ly/"), chip("first_name"));
+      expect(alert({ channelFields: { push: { ...push, body }, sms } })).toEqual({
+        ok: false,
+        code: "public_shortener",
+        reason: "The push body links through bit.ly, a public link shortener carriers filter. Use a link on your own domain.",
+      });
+      // A branded domain is fine; a title isn't checked.
+      expect(alert({ channelFields: { push: { ...push, title: oneLine(text("bit.ly/x")) }, sms } }).ok).toBe(true);
+    });
+
+    it("refuses a push over 4,096 bytes on either platform with the long sample values", () => {
+      const huge = oneLine(text("é".repeat(2100)));
+      expect(alert({ channelFields: { push: { ...push, body: huge }, sms } })).toEqual({
+        ok: false,
+        code: "push_too_large",
+        reason: "With the long sample values, the push is 4,261 bytes on iPhone. It can be at most 4,096 bytes.",
+      });
+      // The subtitle is iPhone's alone: it can tip iPhone over while Android fits.
+      const subtitle = oneLine(text("é".repeat(100)));
+      const near = oneLine(text("é".repeat(1950)));
+      const result = alert({ channels: ["push"], channelFields: { push: { ...push, body: near, subtitle } } });
+      expect(result).toMatchObject({ ok: false, code: "push_too_large" });
+      expect(result.ok || result.reason).toContain("on iPhone");
+    });
+
+    it("never runs the message rules on a document", () => {
+      const typed = { text: lines(text("’")) };
+      expect(run({ channels: ["pdf"], channelFields: { sms: typed } }, { messageRules: ALERT }).ok).toBe(true);
+    });
   });
 
   it("reports an unknown key before the missing subject", () => {
@@ -1831,10 +1944,19 @@ describe("scenario 3: the review loop", () => {
       body: BODY,
       channelFields: {},
       channels: ["pdf", "web"],
+      sampleSets: SAMPLE_SETS,
       writers: ["maya"],
       rev: 3,
     };
-    const base = { now: NOW, submittedBy: "maya", submitterName: "Maya Chen", templateId: TEMPLATE.id, templateName: TEMPLATE.name, chain: CHAIN_1 };
+    const base = {
+      now: NOW,
+      submittedBy: "maya",
+      submitterName: "Maya Chen",
+      templateId: TEMPLATE.id,
+      templateName: TEMPLATE.name,
+      chain: CHAIN_1,
+      messageRules: NO_MESSAGE_RULES,
+    };
 
     const first = submit({ ...base, draft, seenRev: 3, highestNumber: 0, baseline: null });
     if (!first.ok) throw new Error(first.reason);
@@ -1885,6 +2007,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       templateId: TEMPLATE.id,
       templateName: TEMPLATE.name,
       chain: CHAIN_1,
+      messageRules: NO_MESSAGE_RULES,
     });
     if (!result.ok) throw new Error(result.reason);
     return reviewVersion({ ...draft, ...result.changes, id: `v_${result.changes.number}` });

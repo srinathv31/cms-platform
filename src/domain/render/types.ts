@@ -12,7 +12,9 @@
 
 import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/list-markers";
 import type { ChannelFieldKey } from "../channel-fields";
-import type { Channel, Variable, VariableType, VariableValues } from "../types";
+import type { SmsEncoding } from "../messages/gsm7";
+import type { PushPlatform } from "../messages/push";
+import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType, VariableValues } from "../types";
 
 export type { BulletStyle, MarkerDelimiter, MarkerFormat };
 
@@ -198,6 +200,53 @@ export interface EmailRender {
   text: string;
 }
 
+// ── Messages: Push and SMS ───────────────────────────────────────────────────
+//
+// A message channel renders its own fields (channel-fields.ts) and nothing from the body: no RenderDoc.
+// `renderMessage` (message.ts) makes these, in the browser (the composer's live preview) and on the
+// server (the render route and the golden files) alike.
+
+/**
+ * What one render is for: a channel, and for a push the platform it goes to. A push is one message for
+ * both platforms, but iPhone shows a subtitle and Android never does, so the API asks which.
+ */
+export type RenderTarget =
+  | { channel: DocumentChannel }
+  | { channel: "push"; platform: PushPlatform }
+  | { channel: "sms" };
+
+/** A message channel's target. */
+export type MessageTarget = Extract<RenderTarget, { channel: MessageChannel }>;
+
+/**
+ * A push notification for one platform, its variables resolved. Every field is printed in full: the
+ * phone cuts what doesn't fit, never Stencil.
+ */
+export interface PushRender {
+  title: string;
+  /** iPhone only, and only when it has text. Android's push never has one. */
+  subtitle?: string;
+  body: string;
+  /**
+   * The UTF-8 size of the notification JSON this text makes on the platform (`pushPayloadBytes`): APNs'
+   * `{"aps":{"alert":…}}` or FCM's `{"message":{"notification":…}}`, compact. A lower bound on what the
+   * consumer sends: its own keys add to it. At most PUSH_MAX_BYTES, or the render is refused.
+   */
+  payloadBytes: number;
+}
+
+/** An SMS, its variables resolved and the content type's footer on its own line at the end. */
+export interface SmsRender {
+  /** The whole message as sent: the author's text, a line break, then the footer. Never truncated. */
+  text: string;
+  /** GSM-7 unless one character of `text` is outside it; a value can switch a message to UCS-2. */
+  encoding: SmsEncoding;
+  /** The parts it is sent in (`smsParts`): at most SMS_MAX_PARTS, or the render is refused. */
+  parts: number;
+  /** Characters as a reader counts them (grapheme clusters). */
+  characters: number;
+}
+
 // ── Values ───────────────────────────────────────────────────────────────────
 
 /**
@@ -230,9 +279,14 @@ export interface ResolveContext {
 export interface RenderRequestBody {
   version: number | "draft";
   channel: Channel;
+  /** Required with channel push, refused with any other: the platform the push is for. */
+  platform?: PushPlatform;
   /** key → value, canonical ("21.99", "2027-03-04", "NJ") or friendly ("21.99%", "3/4/2027", "New Jersey"). Unknown keys are ignored. */
   values: VariableValues;
-  /** Opt-in for consumers that can't take binary: the body comes back as JSON with base64 content. */
+  /**
+   * Opt-in for consumers that can't take binary: the body comes back as JSON with base64 content. PDF,
+   * web and email only; push and SMS are JSON already, and refuse it.
+   */
   encoding?: "base64";
   preview?: boolean;
 }
@@ -263,13 +317,23 @@ export const MAX_VALUE_LENGTH = 1_000;
  *   pdf    application/pdf (bytes); Content-Disposition: inline; filename="UC-4F7K2Q-v2.pdf" ("…-draft.pdf")
  *   web    text/html; charset=utf-8 (a complete, responsive HTML document)
  *   email  application/json: EmailResponseBody
- *   any channel with encoding "base64": application/json: Base64ResponseBody (pdf, web) or
+ *   push   application/json: PushResponseBody (the platform's push; never a subtitle on android)
+ *   sms    application/json: SmsResponseBody
+ *   pdf, web or email with encoding "base64": application/json: Base64ResponseBody (pdf, web) or
  *          EmailResponseBody with `encoding: "base64"` and base64 `html` and `text` (email)
  */
 export interface EmailResponseBody extends EmailRender {
   /** The Active version's number when the rendered version is Superseded; otherwise null. */
   newerVersion: number | null;
   encoding?: "base64";
+}
+
+export interface PushResponseBody extends PushRender {
+  newerVersion: number | null;
+}
+
+export interface SmsResponseBody extends SmsRender {
+  newerVersion: number | null;
 }
 
 export interface Base64ResponseBody {
@@ -289,7 +353,9 @@ export interface Base64ResponseBody {
  *
  * | status | code                  | message (examples)                                                       |
  * | 400    | bad_request           | "The body must be JSON with version, channel and values."                 |
- * |        |                       | "channel must be one of pdf, web, email."  "version must be a version number." |
+ * |        |                       | "channel must be one of pdf, web, email, push, sms."  "version must be a version number." |
+ * |        |                       | "platform must be ios or android."  "platform is only for channel push."  |
+ * |        |                       | "encoding is only for channels pdf, web and email."                       |
  * | 400    | consumer_required     | "X-Consumer-Id is required."                                              |
  * | 413    | body_too_large        | "The body must be at most 1,000,000 bytes."                              |
  * | 403    | unknown_consumer      | "Consumer \"acme\" isn't registered."                                     |
@@ -304,6 +370,8 @@ export interface Base64ResponseBody {
  * | 422    | missing_variables     | "Missing required variables: first_name, purchase_apr."                   |
  * | 422    | invalid_values        | "purchase_apr must be a percentage, like 21.99."                          |
  * |        |                       | "first_name must be at most 1,000 characters." (longer than MAX_VALUE_LENGTH) |
+ * | 422    | push_payload_too_large | "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes."      |
+ * | 422    | sms_too_long          | "The SMS is 11 parts in UCS-2. It can be at most 10 parts."               |
  * | 500    | render_failed         | "The PDF couldn't be rendered. Try again."                                |
  * |        |                       | "The PDF couldn't be rendered. Tables can have at most 12 columns." (document check) |
  * |        |                       | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ)." |
@@ -326,6 +394,8 @@ export type RenderErrorCode =
   | "channel_not_enabled"
   | "missing_variables"
   | "invalid_values"
+  | "push_payload_too_large"
+  | "sms_too_long"
   | "render_failed";
 
 export const RENDER_ERROR_STATUS: Readonly<Record<RenderErrorCode, number>> = {
@@ -343,6 +413,8 @@ export const RENDER_ERROR_STATUS: Readonly<Record<RenderErrorCode, number>> = {
   channel_not_enabled: 422,
   missing_variables: 422,
   invalid_values: 422,
+  push_payload_too_large: 422,
+  sms_too_long: 422,
   render_failed: 500,
 };
 
@@ -367,6 +439,21 @@ export interface ValueErrorDetails {
  */
 export type RenderFailedDetails = { reason: "document" } | { reason: "glyphs"; characters: string[] };
 
+/** push_payload_too_large: the platform, the payload's size and the limit. */
+export interface PushTooLargeDetails {
+  platform: PushPlatform;
+  payloadBytes: number;
+  maxBytes: number;
+}
+
+/** sms_too_long: the parts it would take, the limit, and the encoding that set the part size. */
+export interface SmsTooLongDetails {
+  parts: number;
+  maxParts: number;
+  encoding: SmsEncoding;
+  characters: number;
+}
+
 export interface VersionErrorDetails {
   version: number;
   activeVersion: number | null;
@@ -377,7 +464,13 @@ export interface VersionErrorDetails {
 export interface RenderError {
   code: RenderErrorCode;
   message: string;
-  details?: ValueErrorDetails | VersionErrorDetails | RenderFailedDetails | Record<string, unknown>;
+  details?:
+    | ValueErrorDetails
+    | VersionErrorDetails
+    | RenderFailedDetails
+    | PushTooLargeDetails
+    | SmsTooLongDetails
+    | Record<string, unknown>;
 }
 
 export interface RenderErrorBody {

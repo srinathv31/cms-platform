@@ -9,6 +9,7 @@
 // starts with `pdf-error-` must render every channel except the PDF (parity.test.ts asserts both).
 
 import type { ChannelFields } from "@/domain/channel-fields";
+import { DOCUMENT_CHANNELS, type Channel } from "@/domain/types";
 import type { Variable } from "@/editor/model/types";
 import type { RenderFixture } from "@/server/render/testing/fixture";
 import {
@@ -65,6 +66,9 @@ function make(
     values?: Record<string, unknown>;
     channelFields?: ChannelFields;
     versionNumber?: number | null;
+    /** Default: the document channels, PDF, web and email. */
+    channels?: Channel[];
+    smsFooter?: string;
   },
 ): FocusedCase {
   return {
@@ -78,6 +82,8 @@ function make(
       values: parts.values ?? {},
       body: parts.body,
       channelFields: parts.channelFields ?? {},
+      channels: parts.channels ?? [...DOCUMENT_CHANNELS],
+      ...(parts.smsFooter === undefined ? {} : { smsFooter: parts.smsFooter }),
     },
   };
 }

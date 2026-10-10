@@ -132,22 +132,29 @@ describe("Channel rules", () => {
   const row = (toggle: ChannelRuleRow["can"]["toggle"]): ChannelRuleRow => ({
     contentTypeId: "ct_disclosure",
     name: "Disclosure",
-    allowed: { pdf: true, web: true, email: true },
-    activeUsing: { pdf: 1, web: 1, email: 0 },
+    allowed: { pdf: true, web: true, email: true, push: false, sms: false },
+    activeUsing: { pdf: 1, web: 1, email: 0, push: 0, sms: 0 },
     can: { toggle },
   });
+  const family = { ok: false, code: "channel_family", reason: "Disclosures are documents. Push and SMS go on Alert templates." } as const;
 
   it("disables exactly the switches the read model refuses", async () => {
     // Three channels on, so the rule alone would refuse none: the refusal here is the server's word.
     await show(
       <ChannelRulesSectionView
-        section={{ channels: ["pdf", "web", "email"], rows: [row({ pdf: OK, web: { ok: false, code: "last_channel", reason: "Decided by the server." }, email: OK })] }}
+        section={{
+          channels: ["pdf", "web", "email", "push", "sms"],
+          rows: [row({ pdf: OK, web: { ok: false, code: "last_channel", reason: "Decided by the server." }, email: OK, push: family, sms: family })],
+        }}
       />,
     );
     const sw = (label: string) => container.querySelector(`[role="switch"][aria-label="${label}"]`)!;
     expect(sw("Disclosure on Web").hasAttribute("data-disabled")).toBe(true);
     expect(sw("Disclosure on PDF").hasAttribute("data-disabled")).toBe(false);
     expect(sw("Disclosure on Email").hasAttribute("data-disabled")).toBe(false);
+    // The other family's channels show disabled, not hidden.
+    expect(sw("Disclosure on Push").hasAttribute("data-disabled")).toBe(true);
+    expect(sw("Disclosure on SMS").hasAttribute("data-disabled")).toBe(true);
   });
 });
 

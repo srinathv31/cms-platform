@@ -49,16 +49,20 @@ export function ContentTypesSectionView({ types }: { types: ContentTypeView[] })
             </div>
             <div role="cell" className="flex justify-end">
               {open === type.id ? null : (
-                <Button
-                  ref={(el) => {
-                    openers.current.set(type.id, el);
-                  }}
-                  variant="outline"
-                  aria-label={`Edit ${type.name} sections`}
-                  onClick={() => setOpen(type.id)}
-                >
-                  Edit sections
-                </Button>
+                // A message type (an Alert) has no document, so no sections: disabled, with the reason.
+                <Blocked reason={type.can.editSections.ok ? null : type.can.editSections.reason}>
+                  <Button
+                    ref={(el) => {
+                      openers.current.set(type.id, el);
+                    }}
+                    variant="outline"
+                    aria-label={`Edit ${type.name} sections`}
+                    disabled={!type.can.editSections.ok}
+                    onClick={() => setOpen(type.id)}
+                  >
+                    Edit sections
+                  </Button>
+                </Blocked>
               )}
             </div>
           </div>

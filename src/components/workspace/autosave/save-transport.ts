@@ -40,7 +40,7 @@ function refusal(patch: DraftPatch): DraftSaveResponse | null {
   let problem = patch.body ? normalizeAndCheckBody(patch.body).problem : null;
   for (const field of ALL_CHANNEL_FIELDS) {
     const value = patch[field.id];
-    if (!problem && value) problem = normalizeAndCheckChannelField(field.shape, value).problem;
+    if (!problem && value) problem = normalizeAndCheckChannelField(field, value).problem;
   }
   return problem ? { ok: false, error: "invalid", message: DOCUMENT_MESSAGES[problem] } : null;
 }

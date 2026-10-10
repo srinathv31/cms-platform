@@ -58,6 +58,13 @@ export const teams = sqliteTable("teams", {
   description: text("description").notNull(),
   icon: text("icon").notNull(), // lucide icon key
   createdAt: ts("created_at").notNull(),
+  // Who the team's messages come from, as the phone previews show it (decision 0033). Facts, not
+  // derived from the name the way the email preview's sender is (decision 0023): an app has its own
+  // name, and a short code is a number. Null when not set.
+  /** The app name over the team's push notifications: "Coral". */
+  appName: text("app_name"),
+  /** The short code the team's SMS come from: "26725". */
+  smsSender: text("sms_sender"),
 });
 
 export const memberships = sqliteTable(
@@ -97,7 +104,12 @@ export const contentTypes = sqliteTable("content_types", {
   key: text("key").notNull().unique(), // "disclosure"
   name: text("name").notNull(),
   requiredSections: json<RequiredSection[]>("required_sections").notNull(),
+  // One family, documents or messages, never both (decision 0033): `channelRuleRefusal`.
   allowedChannels: json<Channel[]>("allowed_channels").notNull(),
+  /** Printed on its own line after every SMS of this type: brand and opt-out. Null: none. */
+  smsFooter: text("sms_footer"),
+  /** Submit refuses an SMS over this many parts with the long sample values (`DEFAULT_SMS_MAX_PARTS`). */
+  smsMaxParts: integer("sms_max_parts").notNull().default(3),
 });
 
 export const approvalStages = sqliteTable("approval_stages", {

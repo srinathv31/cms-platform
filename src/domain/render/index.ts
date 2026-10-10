@@ -6,3 +6,4 @@ export * from "./errors";
 export * from "./validate";
 export * from "./version-rules";
 export * from "./resolve";
+export * from "./message";

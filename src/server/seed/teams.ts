@@ -5,13 +5,25 @@ import { userName } from "./people";
 export const TEAM_IDS = ["coral-offers", "deposits", "card-statements"] as const;
 export type TeamId = (typeof TEAM_IDS)[number];
 
-const TEAMS: { id: TeamId; name: string; description: string; icon: string; createdDaysAgo: number }[] = [
+const TEAMS: {
+  id: TeamId;
+  name: string;
+  description: string;
+  icon: string;
+  createdDaysAgo: number;
+  /** Who the team's push notifications and SMS come from (decision 0033). */
+  appName?: string;
+  /** A fictional US short code. */
+  smsSender?: string;
+}[] = [
   {
     id: "coral-offers",
     name: "Coral Offers",
     description: "Card offer disclosures: balance transfers, cash back and promotional terms.",
     icon: "credit-card",
     createdDaysAgo: 420,
+    appName: "Coral",
+    smsSender: "26725",
   },
   {
     id: "deposits",
@@ -68,6 +80,8 @@ export function seedTeams(ctx: SeedCtx) {
       description: t.description,
       icon: t.icon,
       createdAt: ctx.at(t.createdDaysAgo),
+      appName: t.appName ?? null,
+      smsSender: t.smsSender ?? null,
     });
     ctx.sink.auditEvents.push({
       id: ctx.id("ae"),

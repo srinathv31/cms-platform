@@ -5,6 +5,7 @@
 import { act, useLayoutEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { channelFieldValues } from "@/domain/channel-fields";
 import { EditorRoot, useEditorRoot } from "@/editor/components/editor-root";
 import type { JSONContent, Variable } from "@/editor/model/types";
 import { EmailDetails } from "./email-details";
@@ -41,7 +42,7 @@ function render(on: boolean) {
     reactRoot.render(
       <EditorRoot variables={VARIABLES}>
         <Probe onRoot={keepRuntime} />
-        <EmailDetails on={on} editable values={{ "email.subject": SUBJECT, "email.preheader": null }} />
+        <EmailDetails on={on} editable values={channelFieldValues({ email: { subject: SUBJECT } })} />
       </EditorRoot>,
     ),
   );

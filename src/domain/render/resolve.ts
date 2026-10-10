@@ -146,16 +146,32 @@ export function resolveDocument(body: JSONContent, ctx: ResolveContext): RenderB
 }
 
 /**
- * The text of a one-line field (email subject, preheader): its text and its variables' display text,
- * in order, with the character rules and NFC. A line break or hard break becomes one space (and
- * several paragraphs are joined by one), whitespace at both ends is trimmed (a mail header can't
- * start with it), and runs of spaces inside stay as typed. There is no removal rule. `null` gives "".
+ * The text of a one-line field (`line` or `paragraph`: the email subject and preheader, a push title,
+ * subtitle or body): its text and its variables' display text, in order, with the character rules and
+ * NFC. A line break or hard break becomes one space (and several paragraphs are joined by one),
+ * whitespace at both ends is trimmed (a mail header can't start with it), and runs of spaces inside
+ * stay as typed. There is no removal rule. `null` gives "".
  */
 export function resolveInlineField(field: JSONContent | null, ctx: ResolveContext): string {
+  return fieldText(field, ctx, " ");
+}
+
+/**
+ * The text of a field that keeps its line breaks (an SMS message): as `resolveInlineField`, but each
+ * line break or hard break is one "\n" (and several paragraphs are joined by one), so the text has the
+ * lines the author typed. A value is still one line: a line break inside it reads as a space. Line
+ * breaks and other whitespace at both ends are trimmed; spaces at a line's ends inside stay as typed.
+ */
+export function resolveLinesField(field: JSONContent | null, ctx: ResolveContext): string {
+  return fieldText(field, ctx, "\n");
+}
+
+/** A field's text, each line break (in text, a hard break, between paragraphs) written as `lineBreak`. */
+function fieldText(field: JSONContent | null, ctx: ResolveContext, lineBreak: " " | "\n"): string {
   if (!field) return "";
   const scope = scopeOf(ctx);
   const lines = field.type === "doc" ? (field.content ?? []) : [field];
-  const text = lines.map((line) => fieldLine(line, scope)).join(" ");
+  const text = lines.map((line) => fieldLine(line, scope, lineBreak)).join(lineBreak);
   return text.normalize("NFC").replace(FIELD_ENDS, "");
 }
 
@@ -482,17 +498,19 @@ function sameMarks(a: MarkSet, b: MarkSet): boolean {
 // ── One-line fields ──────────────────────────────────────────────────────────
 
 /** One paragraph of a one-line field as plain text (marks are read for validity, not kept). */
-function fieldLine(node: JSONContent, scope: Scope): string {
+function fieldLine(node: JSONContent, scope: Scope, lineBreak: " " | "\n"): string {
   if (node?.type !== "paragraph" && node?.type !== "heading") throw unsupported();
   let out = "";
   for (const child of node.content ?? []) {
     switch (child?.type) {
-      case "text":
+      case "text": {
         marksOf(child.marks);
-        out += oneLineChars(typeof child.text === "string" ? child.text : "");
+        const text = typeof child.text === "string" ? child.text : "";
+        out += cleanCharacters(text.replace(LINE_BREAKS, lineBreak));
         break;
+      }
       case "hardBreak":
-        out += " ";
+        out += lineBreak;
         break;
       case "variable":
         marksOf(child.marks);

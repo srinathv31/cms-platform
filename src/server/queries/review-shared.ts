@@ -6,12 +6,23 @@ import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } f
 import { DAY_MS } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { DEFAULT_SMS_MAX_PARTS, type MessageTypeRules } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
 import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
-import { approvalStages, approvals, consumers, renderLog, teams, templates, users, versions } from "@/server/db/schema/ucomp";
+import {
+  approvalStages,
+  approvals,
+  consumers,
+  contentTypes,
+  renderLog,
+  teams,
+  templates,
+  users,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { requireSpace, type SpaceContext } from "./spaces";
 import { currentName } from "./template-name";
 
@@ -139,6 +150,16 @@ export async function loadChain(reader: Reader, contentTypeId: string): Promise<
     .where(eq(approvalStages.contentTypeId, contentTypeId))
     .orderBy(asc(approvalStages.position));
   return rows.length > 0 ? rows : DEFAULT_CHAIN.map((stage) => ({ ...stage }));
+}
+
+/** The content type's SMS footer and part budget, which submit measures a message with. */
+export async function loadMessageRules(reader: Reader, contentTypeId: string): Promise<MessageTypeRules> {
+  const [row] = await reader
+    .select({ smsFooter: contentTypes.smsFooter, smsMaxParts: contentTypes.smsMaxParts })
+    .from(contentTypes)
+    .where(eq(contentTypes.id, contentTypeId))
+    .limit(1);
+  return row ?? { smsFooter: null, smsMaxParts: DEFAULT_SMS_MAX_PARTS };
 }
 
 /** Every content type's chain at once (the queue spans templates of several types). */

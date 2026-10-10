@@ -12,6 +12,12 @@
 //     no existing draft becomes unsubmittable (`conformToSections` shapes a new template's starter).
 //   - A channel turned off stops rendering at once, Active versions included: the consequence names
 //     how many. At least one channel stays on.
+//   - A content type is one family, documents (PDF, Web, Email) or messages (Push, SMS), never both
+//     (decision 0033): a channel from the other family can't be turned on. Its family is the family of
+//     the channels it allows, and since one always stays on, it never changes.
+//   - A message content type has an SMS footer (brand and opt-out, printed on every SMS) and a part
+//     budget that submit checks against the "long" sample set (`DEFAULT_SMS_MAX_PARTS` parts unless
+//     set). A team has the app name its push notifications show and the short code its SMS come from.
 //   - Approval chains: every stage must be one somebody can approve (`validateChain`): the Approver
 //     role, or a person who can approve and isn't on another stage. Nobody names themselves. A
 //     version in review goes through the stages it recorded at submit, so an edit never moves it; a
@@ -33,16 +39,20 @@ import type {
 import { ROLE_LABEL } from "./access";
 import { isBusinessZone, zoneLabel, type BusinessZone } from "./business-zone";
 import { formatCount } from "./numbers";
-import { plural, pluralWord } from "./plural";
+import { plural, pluralName, pluralWord } from "./plural";
 import { refusal, refuse, type Refusal } from "./refusals";
-import { CHANNEL_LABELS, joinWithAnd } from "./render/errors";
+import { CHANNEL_LABELS, joinWithAnd, joinWithOr } from "./render/errors";
 import { versionsNeeding } from "./approval-chain";
 import type { ApprovalStage, VersionStage } from "./review-types";
 import {
   CHANNELS,
   TEAM_ROLES,
+  channelFamily,
+  familyChannels,
+  familyOf,
   type ApproverRule,
   type Channel,
+  type ChannelFamily,
   type JSONContent,
   type RequiredSection,
   type TeamRole,
@@ -54,6 +64,30 @@ export const TEAM_NAME_MAX = 60;
 export const TEAM_DESCRIPTION_MAX = 200;
 export const SECTION_TITLE_MAX = 60;
 export const STAGE_NAME_MAX = 40;
+
+/**
+ * The parts an SMS may take with the "long" sample values before submit refuses it, unless the content
+ * type sets its own (`content_types.sms_max_parts`). Render's own limit is far higher (SMS_MAX_PARTS).
+ */
+export const DEFAULT_SMS_MAX_PARTS = 3;
+
+/** What a message content type adds to every SMS and allows of one (`content_types`). */
+export interface MessageTypeRules {
+  /** Printed after the message on its own line, exactly as written: the brand and the opt-out. Null: none. */
+  smsFooter: string | null;
+  /** Submit refuses an SMS over this many parts with the long sample values. */
+  smsMaxParts: number;
+}
+
+/**
+ * Who a team's messages come from, as the phone previews show it (`teams`): the app name over a push,
+ * and the sender of an SMS (a US short code, since a US SMS can't show a brand name there). Null when
+ * not set: the push preview then shows the team's name, and the SMS preview no sender.
+ */
+export interface TeamSenders {
+  appName: string | null;
+  smsSender: string | null;
+}
 
 /** Lucide keys the team icon picker offers (the seed's teams use the first three). */
 export const TEAM_ICONS = [
@@ -101,10 +135,23 @@ export const PLATFORM_REFUSALS = {
   /** A new team's first Team Admin: the Auditor is read-only everywhere. */
   auditorCantBeAdmin: refusal("auditor_cant_be_admin", (person: string) => `${person} is an Auditor and can't be a Team Admin.`),
   oneSection: refusal("last_section", "Keep at least one required section."),
+  /** A message type's sections: "Alerts are messages, with no document to hold sections." */
+  noSections: refusal("sections_on_messages", (type: string) => `${pluralName(type)} are messages, with no document to hold sections.`),
   sectionTitle: refusal("section_title_missing", "Give every section a title."),
   sectionTitleTooLong: refusal("section_title_too_long", `Keep section titles under ${SECTION_TITLE_MAX} characters.`),
   sectionDuplicate: refusal("section_duplicate", (title: string) => `There are two sections called ${title}.`),
   oneChannel: refusal("last_channel", "Keep at least one channel on."),
+  /**
+   * A channel from the other family (decision 0033): "Disclosures are documents. Push and SMS go on Alert
+   * templates." / "Alerts are messages. PDF, Web and Email go on Disclosure templates." `homes` are the
+   * content types of the channel's family; with none, the family is named instead.
+   */
+  otherFamily: refusal("channel_family", (type: string, family: ChannelFamily, homes: readonly string[]) => {
+    const other: ChannelFamily = family === "document" ? "message" : "document";
+    const channels = joinWithAnd(familyChannels(other).map((c) => CHANNEL_LABELS[c]));
+    const where = homes.length > 0 ? `${joinWithOr(homes)} templates` : `${other} templates`;
+    return `${pluralName(type)} are ${family}s. ${channels} go on ${where}.`;
+  }),
   oneStage: refusal("last_stage", "Keep at least one stage."),
   stageName: refusal("stage_name_missing", "Give every stage a name."),
   stageNameTooLong: refusal("stage_name_too_long", `Keep stage names under ${STAGE_NAME_MAX} characters.`),
@@ -340,17 +387,28 @@ export function describeSectionsChange(input: {
 }
 
 /**
+ * Why a content type's required sections can't be edited, or null: a message type (an Alert) renders
+ * no document, so it has no sections. The content types read model asks it for every row.
+ */
+export function sectionsRefusal(contentType: ChannelRuleType): Refusal | null {
+  return familyOf(contentType.allowedChannels) === "message" ? PLATFORM_REFUSALS.noSections(contentType.name) : null;
+}
+
+/**
  * The content type's required sections, replaced. `next` lists every section in order: an existing
  * one by its key (its title may change: a rename keeps the key), a new one with any other key (the
- * key is made from its title, never reusing one the type has or had in this list).
+ * key is made from its title, never reusing one the type has or had in this list). A message type has
+ * none (`sectionsRefusal`).
  */
 export function updateRequiredSections(input: {
-  contentType: { id: string; name: string; requiredSections: RequiredSection[] };
+  contentType: { id: string; name: string; requiredSections: RequiredSection[]; allowedChannels: readonly Channel[] };
   next: RequiredSection[];
   actor: Named;
   now: Date;
 }): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused {
   const { contentType } = input;
+  const noSections = sectionsRefusal(contentType);
+  if (noSections) return refuse(noSections);
   const current = contentType.requiredSections;
   const problem = validateRequiredSections(input.next);
   if (problem) return refuse(problem);
@@ -428,14 +486,36 @@ export function channelOffConsequences(contentTypeName: string, channel: Channel
   return lines;
 }
 
+/** A content type as the channel rules read it: its name and the channels it allows. */
+export interface ChannelRuleType {
+  name: string;
+  allowedChannels: readonly Channel[];
+}
+
 /**
- * Why a content type allowing `allowedChannels` can't have `channel` set to `allowed`, or null: it
- * must be a channel, and at least one channel stays on. The channel rules read model asks it for
- * every switch, so the last one on shows disabled with the reason.
+ * Why a content type can't have `channel` set to `allowed`, or null: it must be a channel; at least one
+ * channel stays on; and a content type is one family (docs/decisions/0033), so a channel from the
+ * other family can't be turned on: "Disclosures are documents. Push and SMS go on Alert templates."
+ * `contentTypes` are the platform's content types, to name the ones the channel's family goes on. The
+ * channel rules read model asks it for every switch, so a switch that can't flip shows disabled with
+ * the reason.
  */
-export function channelRuleRefusal(allowedChannels: readonly Channel[], channel: Channel, allowed: boolean): Refusal | null {
+export function channelRuleRefusal(
+  contentType: ChannelRuleType,
+  channel: Channel,
+  allowed: boolean,
+  contentTypes: readonly ChannelRuleType[] = [],
+): Refusal | null {
   if (!(CHANNELS as readonly string[]).includes(channel)) return PLATFORM_REFUSALS.oneChannel;
-  const next = CHANNELS.filter((c) => (c === channel ? allowed : allowedChannels.includes(c)));
+  const family = familyOf(contentType.allowedChannels);
+  if (allowed && family !== null && channelFamily(channel) !== family) {
+    const homes = contentTypes
+      .filter((type) => familyOf(type.allowedChannels) === channelFamily(channel))
+      .map((type) => type.name)
+      .sort((a, b) => a.localeCompare(b));
+    return PLATFORM_REFUSALS.otherFamily(contentType.name, family, homes);
+  }
+  const next = CHANNELS.filter((c) => (c === channel ? allowed : contentType.allowedChannels.includes(c)));
   return next.length === 0 ? PLATFORM_REFUSALS.oneChannel : null;
 }
 
@@ -445,6 +525,8 @@ export function setChannelRule(input: {
   channel: Channel;
   allowed: boolean;
   activeUsing: number;
+  /** Every content type, to name the ones a channel of the other family goes on (`channelRuleRefusal`). */
+  contentTypes: readonly ChannelRuleType[];
   actor: Named;
   now: Date;
 }): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused {
@@ -452,7 +534,7 @@ export function setChannelRule(input: {
   const current = contentType.allowedChannels;
   if (!(CHANNELS as readonly string[]).includes(channel)) return refuse(PLATFORM_REFUSALS.oneChannel);
   if (current.includes(channel) === allowed) return { ok: true, allowedChannels: current, consequences: [], effects: [] };
-  const refusal = channelRuleRefusal(current, channel, allowed);
+  const refusal = channelRuleRefusal(contentType, channel, allowed, input.contentTypes);
   if (refusal) return refuse(refusal);
 
   const next = CHANNELS.filter((c) => (c === channel ? allowed : current.includes(c)));

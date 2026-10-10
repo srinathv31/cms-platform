@@ -191,16 +191,35 @@ describe("people, teams and access", () => {
     expect(events[0]).toMatchObject({ actorId: null, teamId: "coral-offers" });
   });
 
-  it("configures the Disclosure content type and a single approval stage", async () => {
-    const [type] = await db.select().from(ucomp.contentTypes);
-    expect(type.key).toBe("disclosure");
-    expect(type.requiredSections.map((s) => s.key)).toEqual(REQUIRED);
-    expect(type.allowedChannels).toEqual(["pdf", "web", "email"]);
+  it("configures the Disclosure and Alert content types, each with a single approval stage", async () => {
+    const types = await db.select().from(ucomp.contentTypes);
+    expect(types.map((t) => t.key)).toEqual(["disclosure", "alert"]);
+    const [disclosure, alert] = types;
+    expect(disclosure!.requiredSections.map((s) => s.key)).toEqual(REQUIRED);
+    expect(disclosure!.allowedChannels).toEqual(["pdf", "web", "email"]);
+    expect(disclosure!.smsFooter).toBeNull();
+    // An Alert is a message: Push and SMS, no document and so no sections, and every SMS ends with the footer.
+    expect(alert).toMatchObject({
+      name: "Alert",
+      requiredSections: [],
+      allowedChannels: ["push", "sms"],
+      smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.",
+      smsMaxParts: 3,
+    });
     const stages = await db.select().from(ucomp.approvalStages);
-    expect(stages).toHaveLength(1);
-    expect(stages[0]).toMatchObject({ position: 0, name: "Team approver", approverRule: { kind: "team_role", role: "approver" } });
+    expect(stages).toHaveLength(2);
+    for (const stage of stages) {
+      expect(stage).toMatchObject({ position: 0, name: "Team approver", approverRule: { kind: "team_role", role: "approver" } });
+    }
+    expect(stages.map((s) => s.contentTypeId)).toEqual(["ct_disclosure", "ct_alert"]);
     const consumers = await db.select().from(ucomp.consumers);
     expect(consumers.map((c) => c.id).sort()).toEqual(["coral", "deposits-online"]);
+  });
+
+  it("gives Coral Offers the app name and short code its messages come from", async () => {
+    const rows = await db.select({ id: ucomp.teams.id, appName: ucomp.teams.appName, smsSender: ucomp.teams.smsSender }).from(ucomp.teams);
+    expect(rows.find((t) => t.id === "coral-offers")).toEqual({ id: "coral-offers", appName: "Coral", smsSender: "26725" });
+    expect(rows.filter((t) => t.id !== "coral-offers").every((t) => t.appName === null && t.smsSender === null)).toBe(true);
   });
 });
 

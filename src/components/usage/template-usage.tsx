@@ -37,13 +37,14 @@ export const USAGE_CELL = cn(
 export const USAGE_COLUMNS = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]";
 
 // The newest version takes the first series hue, the one before it the second, and so on; past the
-// fourth, older versions are taupe.
+// fourth, older versions are taupe (the fifth hue is the fifth channel's, decision 0014).
 const OLDEST = { fill: "fill-heat-empty", bg: "bg-heat-empty" };
+const VERSION_HUES = SERIES.slice(0, 4);
 
 function versionSeries(versions: number[]): StackSeries[] {
   return versions.map((v, i) => {
     const age = versions.length - 1 - i;
-    return { label: `v${v}`, ...(SERIES[age] ?? OLDEST) };
+    return { label: `v${v}`, ...(VERSION_HUES[age] ?? OLDEST) };
   });
 }
 

@@ -64,6 +64,13 @@
       "when": 1791594257780,
       "tag": "0008_channel_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791596287008,
+      "tag": "0009_message_channels",
+      "breakpoints": true
     }
   ]
 }

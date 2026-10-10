@@ -272,7 +272,7 @@ describe("setChannelRule", () => {
   it("turning Email off counts the Active versions it stops; turning it on restores it", async () => {
     as("riley");
     const row = (await getChannelRulesSection()).rows.find((r) => r.contentTypeId === CT)!;
-    expect(row.allowed).toEqual({ pdf: true, web: true, email: true });
+    expect(row.allowed).toEqual({ pdf: true, web: true, email: true, push: false, sms: false });
     const activeEmail = (
       await db
         .select({ channels: versions.channels })
@@ -301,6 +301,23 @@ describe("setChannelRule", () => {
       expect(await setChannelRule({ contentTypeId: CT, channel, allowed: true })).toEqual({ ok: true });
     }
     expect((await db.query.contentTypes.findFirst({ where: eq(contentTypes.id, CT) }))?.allowedChannels).toEqual(["pdf", "web", "email"]);
+  });
+
+  it("refuses a channel of the other family, and writes nothing", async () => {
+    as("riley");
+    expect(await setChannelRule({ contentTypeId: CT, channel: "push", allowed: true })).toEqual({
+      ok: false,
+      code: "channel_family",
+      reason: "Disclosures are documents. Push and SMS go on Alert templates.",
+    });
+    as("riley");
+    expect(await setChannelRule({ contentTypeId: "ct_alert", channel: "email", allowed: true })).toEqual({
+      ok: false,
+      code: "channel_family",
+      reason: "Alerts are messages. PDF, Web and Email go on Disclosure templates.",
+    });
+    expect((await db.query.contentTypes.findFirst({ where: eq(contentTypes.id, CT) }))?.allowedChannels).toEqual(["pdf", "web", "email"]);
+    expect((await db.query.contentTypes.findFirst({ where: eq(contentTypes.id, "ct_alert") }))?.allowedChannels).toEqual(["push", "sms"]);
   });
 });
 
@@ -743,7 +760,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
     const result = await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }] });
     expect(result).toEqual({ ok: false, code: "stage_in_use", reason: expect.stringMatching(/^\d+ versions? in review still needs? Legal reviewer\.$/) });
     expect((await chain()).length).toBe(2);
-    expect((await getApprovalChainsSection()).chains[0]!.stages[1]!.waiting).toBeGreaterThanOrEqual(1);
+    expect((await getApprovalChainsSection()).chains.find((c) => c.contentTypeId === CT)!.stages[1]!.waiting).toBeGreaterThanOrEqual(1);
   });
 
   it("Dana decides a Deposits submission from her own space, with no Deposits membership", async () => {

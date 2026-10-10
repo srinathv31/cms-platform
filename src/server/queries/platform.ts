@@ -14,9 +14,16 @@ import type {
 import { versionsNeeding } from "@/domain/approval-chain";
 import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
-import { approverProblem, channelRuleRefusal, ruleLabel, TEAM_ICONS, zoneChangeConsequences } from "@/domain/platform-config";
-import { refuse } from "@/domain/refusals";
-import { CHANNELS, type Channel, type PermissionResult } from "@/domain/types";
+import {
+  approverProblem,
+  channelRuleRefusal,
+  ruleLabel,
+  sectionsRefusal,
+  TEAM_ICONS,
+  zoneChangeConsequences,
+} from "@/domain/platform-config";
+import { refuse, type Refusal } from "@/domain/refusals";
+import { CHANNELS, familyOf, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -67,6 +74,9 @@ async function activeMembers() {
 
 const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
 
+/** A rule's refusal as the UI gets it decided: refused with its sentence, or allowed. */
+const decided = (refusal: Refusal | null): PermissionResult => (refusal ? refuse(refusal) : { ok: true });
+
 // ── Teams ─────────────────────────────────────────────────────
 
 export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
@@ -95,6 +105,8 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
         members: new Set(here.map((m) => m.userId)).size,
         templates: templateRows.filter((r) => r.teamId === t.id).length,
         createdAt: iso(t.createdAt),
+        appName: t.appName,
+        smsSender: t.smsSender,
       };
     }),
     // The first Team Admin: anyone but an Auditor, who is read-only everywhere.
@@ -119,9 +131,13 @@ export const getContentTypesSection = cache(async (): Promise<ContentTypesSectio
       id: t.id,
       key: t.key,
       name: t.name,
+      family: familyOf(t.allowedChannels) ?? "document",
       requiredSections: t.requiredSections,
       allowedChannels: CHANNELS.filter((c) => t.allowedChannels.includes(c)),
+      smsFooter: t.smsFooter,
+      smsMaxParts: t.smsMaxParts,
       templates: templateRows.filter((r) => r.contentTypeId === t.id).length,
+      can: { editSections: decided(sectionsRefusal(t)) },
     })),
   };
 });
@@ -151,10 +167,8 @@ export const getChannelRulesSection = cache(async (): Promise<ChannelRulesSectio
         allowed: perChannel((c) => t.allowedChannels.includes(c)),
         activeUsing: perChannel((c) => mine.filter((v) => v.channels.includes(c)).length),
         can: {
-          toggle: perChannel((c): PermissionResult => {
-            const refusal = channelRuleRefusal(t.allowedChannels, c, !t.allowedChannels.includes(c));
-            return refusal ? refuse(refusal) : { ok: true };
-          }),
+          // The last channel on can't go off, and a channel of the other family can't go on.
+          toggle: perChannel((c) => decided(channelRuleRefusal(t, c, !t.allowedChannels.includes(c), types))),
         },
       };
     }),

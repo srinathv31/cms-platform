@@ -17,7 +17,7 @@ import { ucompApi } from "./ucomp-api";
 // Values never reach a log: nothing below prints customer data.
 
 const fail = (reason: string) => ({ ok: false as const, reason });
-const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email" };
+const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
 /** At most this many renders in flight per send. */
 const RENDER_CONCURRENCY = 3;
 const MAX_CUSTOMERS = 50;
@@ -85,7 +85,8 @@ export async function linkTemplate(input: {
     templateId: detail.data.id,
     templateName: name,
     pinnedVersion: activeVersion,
-    channels: contract.channels.filter((c) => channels.includes(c)),
+    // In the API's order. Coral links the channels it can deliver: PDF, web and email (`Channel`).
+    channels: Channel.options.filter((c) => channels.includes(c)),
     mapping: kept,
     linkedAt: new Date(),
   };

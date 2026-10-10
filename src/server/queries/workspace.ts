@@ -9,6 +9,7 @@ import type { ChannelFields } from "@/domain/channel-fields";
 import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import type { Channel, JSONContent, PermissionResult, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
@@ -149,6 +150,13 @@ export interface WorkspaceDocumentData {
   channels: Channel[];
   /** The channels the content type allows: what the Channels selector offers. */
   allowedChannels: Channel[];
+  /**
+   * The content type's SMS footer and part budget: what the message preview renders an SMS with
+   * (`renderMessage`'s `rules.smsFooter`) and the parts submit allows with the long sample values.
+   */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from in the phone preview: the push app name and the SMS sender. */
+  senders: TeamSenders;
   /** Each channel's own fields (src/domain/channel-fields.ts), whether or not the channel is on. */
   channelFields: ChannelFields;
   /** The version's named sample data sets, as saved. The preview's switcher fills in any default that is missing. */
@@ -181,9 +189,14 @@ export const getWorkspaceDocument = cache(
         teamId: templates.teamId,
         requiredSections: contentTypes.requiredSections,
         allowedChannels: contentTypes.allowedChannels,
+        smsFooter: contentTypes.smsFooter,
+        smsMaxParts: contentTypes.smsMaxParts,
+        appName: teams.appName,
+        smsSender: teams.smsSender,
       })
       .from(templates)
       .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
+      .innerJoin(teams, eq(teams.id, templates.teamId))
       .where(eq(templates.id, header.id))
       .limit(1)
       .then((r) => r[0]);
@@ -223,6 +236,8 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
+      messageRules: { smsFooter: tpl.smsFooter, smsMaxParts: tpl.smsMaxParts },
+      senders: { appName: tpl.appName, smsSender: tpl.smsSender },
       channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,
       today,

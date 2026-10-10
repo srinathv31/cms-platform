@@ -4,7 +4,7 @@
 // chips filled, from its own sample sets.
 
 import { describe, expect, it } from "vitest";
-import { ALL_CHANNEL_FIELDS, channelFieldValue, type ChannelFields } from "@/domain/channel-fields";
+import { ALL_CHANNEL_FIELDS, channelFieldValue, channelFieldsOf, type ChannelFields } from "@/domain/channel-fields";
 import { HANDLED_MARKS, HANDLED_NODES, resolveDocument, validateValues } from "@/domain/render";
 import type { RenderBlock, RenderInline } from "@/domain/render";
 import type { JSONContent, SampleSet, Variable } from "@/domain/types";
@@ -257,10 +257,11 @@ describe("checkDocument: the limits, with their sentences", () => {
 
 describe("checkField, a line (email subject, preheader)", () => {
   const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
+  const subject = channelFieldsOf("email")[0]!;
 
   it("accepts one line of text and variables, or an empty line", () => {
-    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }), "line")).not.toThrow();
-    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] }, "line")).not.toThrow();
+    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }), subject)).not.toThrow();
+    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] }, subject)).not.toThrow();
   });
 
   it.each<[string, JSONContent]>([
@@ -270,7 +271,27 @@ describe("checkField, a line (email subject, preheader)", () => {
     ["a mark", field({ type: "text", text: "a", marks: [{ type: "bold" }] })],
     ["no paragraph", { type: "doc", content: [] }],
   ])("refuses %s", (_, value) => {
-    expect(() => checkField(value, "line")).toThrow("The email subject and preheader can hold only one line of text and variables.");
+    expect(() => checkField(value, subject)).toThrow("The email subject and preheader can hold only one line of text and variables.");
+  });
+});
+
+describe("checkField, a push's fields and an SMS", () => {
+  const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
+  const [title, , body] = channelFieldsOf("push");
+  const [sms] = channelFieldsOf("sms");
+  const broken = field({ type: "text", text: "a" }, { type: "hardBreak" }, { type: "text", text: "b" });
+
+  it("refuses a line break in a push field, in the push's words", () => {
+    for (const push of [title!, body!]) {
+      expect(() => checkField(broken, push)).toThrow("The push title, subtitle and body can hold only text and variables, with no line breaks.");
+    }
+  });
+
+  it("takes line breaks in an SMS, and refuses a mark in the SMS's words", () => {
+    expect(() => checkField(broken, sms!)).not.toThrow();
+    expect(() => checkField(field({ type: "text", text: "a", marks: [{ type: "bold" }] }), sms!)).toThrow(
+      "The SMS message can hold only text, line breaks and variables.",
+    );
   });
 });
 

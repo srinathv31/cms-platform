@@ -105,7 +105,8 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   Active version with `suggestMapping` (keeps current mappings that still fit, auto-maps keys it is sure of, leaves
   `annual_fee` to the person). `linkTemplate` re-reads the template, refuses a version that isn't Active or a channel
   it doesn't render, drops unknown keys and fields, and upserts `sim_links`. Unmapped required keys may be saved;
-  Send then names them.
+  Send then names them. Coral links PDF, web and email only (`SimChannel`): it has no phone to deliver a push or an
+  SMS to yet, though its API client (`ucomp-api.ts`) reads both answers.
 - **Map values** (`OfferView`, `saveMapping`). Each select saves at once under `useOptimistic`. `saveMapping` checks
   the keys against the pinned version's contract over the API.
 - **Send** (`sendToCustomers`). Checks the mapping against the pinned contract first (`missingRequired`, then

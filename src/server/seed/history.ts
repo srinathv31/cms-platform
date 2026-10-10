@@ -75,7 +75,8 @@ const LATEST: { tpl: string; ver: string; consumer: ConsumerId; minutesAgo: numb
   { tpl: "holiday-points", ver: "v2", consumer: "coral", minutesAgo: 22 },
 ];
 
-const CHANNEL_WEIGHT: Record<Channel, number> = { pdf: 0.5, web: 0.35, email: 0.15 };
+/** How often each channel is asked for, among a version's channels (a version is one family). */
+const CHANNEL_WEIGHT: Record<Channel, number> = { pdf: 0.5, web: 0.35, email: 0.15, push: 0.6, sms: 0.4 };
 
 function pickChannel(rng: Rng, channels: Channel[]): Channel {
   const total = channels.reduce((sum, c) => sum + CHANNEL_WEIGHT[c], 0);
@@ -92,6 +93,9 @@ const CHANNEL_DURATION: Record<Channel, readonly [min: number, spread: number]> 
   pdf: [180, 420],
   web: [35, 90],
   email: [55, 110],
+  // A message resolves a few short fields: no layout.
+  push: [6, 14],
+  sms: [5, 12],
 };
 
 function duration(rng: Rng, channel: Channel): number {

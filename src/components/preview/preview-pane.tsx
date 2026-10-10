@@ -8,6 +8,7 @@ import { duration, ease } from "@/components/motion/presets";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
 import { ChannelTabs, DevicePicker, DownloadPdfButton } from "./controls";
 import { EmailOutput } from "./email-output";
+import { MessageSkeleton, PushOutput, SmsOutput } from "./message-output";
 import { OutputError } from "./output-error";
 import { EmailSkeleton, WebSkeleton } from "./output-skeletons";
 import { PdfViewer } from "./pdf/pdf-viewer";
@@ -163,6 +164,11 @@ function Output({
       ) : (
         <EmailSkeleton />
       );
+    // Temporary plain cards until the phone preview (Phase 2b).
+    case "push":
+      return output?.kind === "push" ? <PushOutput ios={output.ios} android={output.android} /> : <MessageSkeleton />;
+    case "sms":
+      return output?.kind === "sms" ? <SmsOutput sms={output.sms} /> : <MessageSkeleton />;
     default:
       return assertNever(channel, "channel");
   }
@@ -190,6 +196,8 @@ function ChannelControl({
     case "web":
       return <DevicePicker value={device} onChange={onDevice} />;
     case "email":
+    case "push":
+    case "sms":
       return null;
     default:
       return assertNever(channel, "channel");

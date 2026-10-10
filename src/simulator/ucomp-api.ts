@@ -6,7 +6,9 @@ import type {
   ApiEmailResponse,
   ApiErrorBody,
   ApiNoticeList,
+  ApiPushResponse,
   ApiRenderRequest,
+  ApiSmsResponse,
   ApiTemplateDetail,
   ApiTemplateSearch,
 } from "@/contracts/api-v1";
@@ -97,13 +99,18 @@ export function answeredAt(response?: Response): Date {
   return Number.isNaN(parsed) ? new Date() : new Date(parsed);
 }
 
-/** Coral stores text, so it asks for the PDF as base64 JSON; the page and the email come as they are. */
+/**
+ * Coral stores text, so it asks for the PDF as base64 JSON; the page and the email come as they are,
+ * and a push or SMS is JSON already (and takes no encoding).
+ */
 function asBase64(channel: ApiChannel): boolean {
   switch (channel) {
     case "pdf":
       return true;
     case "web":
     case "email":
+    case "push":
+    case "sms":
       return false;
     default:
       return assertNever(channel, "channel");
@@ -184,6 +191,15 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
             const json = (await response.json()) as ApiEmailResponse;
             const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
             return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
+          }
+          // Kept as the JSON the API sent, without newerVersion.
+          case "push": {
+            const { newerVersion, ...push } = (await response.json()) as ApiPushResponse;
+            return { ok: true, data: { output: JSON.stringify(push), newerVersion: newerVersionOf(response, newerVersion) }, at };
+          }
+          case "sms": {
+            const { newerVersion, ...sms } = (await response.json()) as ApiSmsResponse;
+            return { ok: true, data: { output: JSON.stringify(sms), newerVersion: newerVersionOf(response, newerVersion) }, at };
           }
           default:
             return assertNever(channel, "channel");

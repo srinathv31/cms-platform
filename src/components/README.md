@@ -46,7 +46,7 @@ Feature folders:
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
 | `library/` | Library view and browser, New template dialog, starter gallery, file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
-| `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. | `workspace/`, `review/` |
+| `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. Push and SMS show as plain cards for now (`message-output.tsx`, temporary until the phone preview). | `workspace/`, `review/` |
 | `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
 | `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows. | `/[team]/review` |
@@ -96,7 +96,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
 | `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
 
-A channel's name ("PDF", "Web", "Email") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere.
+A channel's name ("PDF", "Web", "Email", "Push", "SMS") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere, and a push platform's ("iPhone", "Android") is `PLATFORM_LABELS`.
 Anything else that differs by channel is a `Record<Channel, …>` or a `switch` that ends in `assertNever` from
 `src/domain/assert-never.ts` (the preview's output and its controls row, `renderPreview`, the usage charts' hues),
 never an `if` with a fallthrough: a new channel is then a compile error at each place that must handle it.
@@ -119,7 +119,8 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 (`bg-primary`, `border-border`). Light theme only: `globals.css` defines no dark theme, so don't add `dark:` classes.
 
 - **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
-  use `series-1…4`, four hues in a fixed order, checked as a set for colour-blind separation
+  use `series-1…5`, five hues in a fixed order, one per channel (a version chart uses the first four, then taupe),
+  checked as a set for colour-blind separation
   ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)). No value is hover-only: a chart's
   readable marks are one Tab stop with arrow keys between them (`usage/chart-keys.tsx`), and a chart whose values
   aren't printed is followed by an sr-only table of them.
