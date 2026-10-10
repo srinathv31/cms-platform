@@ -1,7 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Lock } from "lucide-react";
+import { ScaledViewport } from "@/components/primitives/scaled-viewport";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
 import { cn } from "@/lib/utils";
 import { BufferedFrame } from "./buffered-frame";
@@ -82,53 +82,6 @@ export function BrowserChrome({ host, className }: { host?: string; className?: 
       </div>
       {/* The same width as the dots, so the pill sits in the middle. */}
       <div className="w-9 shrink-0" />
-    </div>
-  );
-}
-
-/**
- * Lays its children out at `width` CSS pixels and scales them down (never up) to fit the box's own
- * width, with a CSS transform: the text stays vector-crisp and scrolling still works inside (a wheel
- * over the scaled frame scrolls the frame's document). The inner box is `height / scale` tall, so
- * once scaled it fills the box exactly. Until the box has been measured (before first paint) nothing
- * is drawn.
- */
-export function ScaledViewport({
-  width,
-  className,
-  children,
-}: {
-  width: number;
-  className?: string;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const next = { width: el.clientWidth, height: el.clientHeight };
-      setBox((now) => (now && now.width === next.width && now.height === next.height ? now : next));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const scale = box && box.width > 0 ? Math.min(1, box.width / width) : 1;
-  return (
-    <div ref={ref} data-slot="scaled-viewport" data-scale={box ? scale.toFixed(3) : undefined} className={cn("relative overflow-hidden", className)}>
-      {box ? (
-        <div
-          className="absolute top-0 left-0 origin-top-left"
-          style={{ width, height: box.height / scale, transform: `scale(${scale})` }}
-        >
-          {children}
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DESKTOP_WIDTH, MOBILE_FRAME_WIDTH, MOBILE_WIDTH, ScaledViewport, WebOutput } from "./web-output";
+import { DESKTOP_WIDTH, MOBILE_FRAME_WIDTH, MOBILE_WIDTH, WebOutput } from "./web-output";
 
 // The frame itself is the BufferedFrame's business; here it is a stand-in with the same name.
 vi.mock("./buffered-frame", () => ({
@@ -13,20 +13,14 @@ vi.mock("./buffered-frame", () => ({
 
 let root: Root;
 let container: HTMLElement;
-let box = { width: 600, height: 400 };
-let observed: (() => void) | null = null;
+const box = { width: 600, height: 400 };
 
 class FakeResizeObserver {
-  constructor(callback: () => void) {
-    observed = callback;
-  }
   observe() {}
   disconnect() {}
 }
 
 beforeEach(() => {
-  box = { width: 600, height: 400 };
-  observed = null;
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   // happy-dom lays nothing out: give every element the pane's size.
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => box.width);
@@ -41,34 +35,6 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-});
-
-const inner = () => container.querySelector<HTMLElement>('[data-slot="scaled-viewport"] > div');
-
-describe("ScaledViewport", () => {
-  it("lays its content out at the design width and scales it down to the box's width", () => {
-    act(() => root.render(<ScaledViewport width={1200}>x</ScaledViewport>));
-    const el = inner()!;
-    expect(el.style.width).toBe("1200px");
-    expect(el.style.transform).toBe("scale(0.5)");
-    // Once scaled, the content is exactly as tall as the box.
-    expect(el.style.height).toBe("800px");
-    expect(container.querySelector("[data-scale]")?.getAttribute("data-scale")).toBe("0.500");
-  });
-
-  it("never scales up", () => {
-    box = { width: 1600, height: 400 };
-    act(() => root.render(<ScaledViewport width={1200}>x</ScaledViewport>));
-    expect(inner()!.style.transform).toBe("scale(1)");
-    expect(inner()!.style.height).toBe("400px");
-  });
-
-  it("follows the box when it is resized", () => {
-    act(() => root.render(<ScaledViewport width={1200}>x</ScaledViewport>));
-    box = { width: 300, height: 400 };
-    act(() => observed?.());
-    expect(inner()!.style.transform).toBe("scale(0.25)");
-  });
 });
 
 describe("WebOutput", () => {
