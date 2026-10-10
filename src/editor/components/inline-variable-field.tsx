@@ -25,6 +25,7 @@ import { useStore } from "zustand";
 import { cx } from "../lib/cx";
 import { captureHistory, restoreHistory, type HistoryCarry } from "../lib/history-carry";
 import { useHydrated } from "../lib/use-hydrated";
+import type { CharacterRules } from "../model/characters";
 import type { FieldLines } from "../model/normalize";
 import { NODE, type JSONContent, type Variable } from "../model/types";
 import { inlineFieldExtensions } from "../schema";
@@ -55,6 +56,7 @@ export function InlineVariableField({
   label,
   value,
   lines = "line",
+  characters = "document",
   onChange,
   hidden = false,
   flags,
@@ -70,6 +72,7 @@ export function InlineVariableField({
   const fieldId = useId();
   const [initial] = useState<JSONContent>(() => value ?? EMPTY_FIELD);
   const [mode] = useState<FieldLines>(lines);
+  const [keeps] = useState<CharacterRules>(characters);
   const latestRef = useRef<JSONContent | null>(null);
 
   useState(() => {
@@ -90,6 +93,7 @@ export function InlineVariableField({
         <LiveField
           label={label}
           lines={mode}
+          characters={keeps}
           fieldId={fieldId}
           initial={initial}
           latestRef={latestRef}
@@ -108,6 +112,7 @@ export function InlineVariableField({
 function LiveField({
   label,
   lines,
+  characters,
   fieldId,
   initial,
   latestRef,
@@ -117,6 +122,7 @@ function LiveField({
 }: {
   label: string;
   lines: FieldLines;
+  characters: CharacterRules;
   fieldId: string;
   initial: JSONContent;
   latestRef: RefObject<JSONContent | null>;
@@ -140,6 +146,7 @@ function LiveField({
         textFlags: { flagger: flagger.get, store: flagPopover },
       },
       lines,
+      characters,
     ),
   );
 

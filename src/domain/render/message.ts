@@ -21,10 +21,11 @@ import { assertNever } from "../assert-never";
 import {
   channelFieldValue,
   channelFieldsOf,
+  fieldCharacters,
   fieldOnPlatform,
   type ChannelField,
   type ChannelFields,
-  type FieldShape,
+  type FieldOf,
 } from "../channel-fields";
 import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import { SMS_MAX_PARTS, smsLength } from "../messages/gsm7";
@@ -62,17 +63,21 @@ export type MessageResult<T> = { ok: true; output: T } | { ok: false; error: Ren
 
 /**
  * A channel field as the text its channel prints: one line (`line`, `paragraph`) or its lines kept
- * (`lines`). `null` gives "". Throws a ResolveError for JSON the resolver can't place.
+ * (`lines`). A message's field (a push's, an SMS's) loses only control characters: the invisible
+ * characters a phone draws with (the joiner in an emoji sequence, a presentation selector, a flag's tags,
+ * the non-joiner in a Persian name) stay, in the text and in values. The email's lose them too, as the
+ * document does (`fieldCharacters`). `null` gives "". Throws a ResolveError for JSON the resolver can't place.
  */
-export function resolveChannelField(value: JSONContent | null, shape: FieldShape, ctx: ResolveContext): string {
-  switch (shape) {
+export function resolveChannelField(value: JSONContent | null, field: FieldOf, ctx: ResolveContext): string {
+  const characters = fieldCharacters(field);
+  switch (field.shape) {
     case "line":
     case "paragraph":
-      return resolveInlineField(value, ctx);
+      return resolveInlineField(value, ctx, characters);
     case "lines":
-      return resolveLinesField(value, ctx);
+      return resolveLinesField(value, ctx, characters);
     default:
-      return assertNever(shape, "field shape");
+      return assertNever(field.shape, "field shape");
   }
 }
 
@@ -155,6 +160,6 @@ export function longSampleValues(
 function textOf(fields: readonly ChannelField[], input: MessageInput): Readonly<Record<string, string>> {
   const ctx: ResolveContext = { variables: input.variables, values: input.values };
   return Object.fromEntries(
-    fields.map((field) => [field.key, resolveChannelField(channelFieldValue(input.fields, field), field.shape, ctx)]),
+    fields.map((field) => [field.key, resolveChannelField(channelFieldValue(input.fields, field), field, ctx)]),
   );
 }

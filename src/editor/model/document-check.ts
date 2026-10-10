@@ -13,6 +13,7 @@ import {
   isMarkerDelimiter,
   isMarkerFormat,
 } from "./list-markers";
+import type { CharacterRules } from "./characters";
 import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, normalizeDocument, normalizeField, type FieldLines } from "./normalize";
 import { MAX_TABLE_COLUMNS, linesUp, tableGrid } from "./table-grid";
 import { isNode, type JSONContent } from "./types";
@@ -105,18 +106,21 @@ export function normalizeAndCheckBody(doc: JSONContent): Checked {
 export type FieldProblem = Extract<DocumentProblem, "field" | "pushField" | "smsField">;
 
 /**
- * How a field is checked: whether it keeps its line breaks (`lines`, default `"line"`), and the problem
- * it is refused with (`problem`, default `"field"`, the email's sentence). The caller, which knows the
- * field's channel, picks them (`normalizeAndCheckChannelField` in src/domain/channel-fields.ts).
+ * How a field is checked: whether it keeps its line breaks (`lines`, default `"line"`), the problem it
+ * is refused with (`problem`, default `"field"`, the email's sentence), and which characters its text
+ * keeps (`characters`, default `"document"`; a push's or an SMS's field is `"message"`, characters.ts).
+ * The caller, which knows the field's channel, picks them (`normalizeAndCheckChannelField` in
+ * src/domain/channel-fields.ts).
  */
 export interface FieldCheck {
   lines?: FieldLines;
   problem?: FieldProblem;
+  characters?: CharacterRules;
 }
 
-/** A channel field as every save takes it: normalized for its lines, then the field check. */
+/** A channel field as every save takes it: normalized for its lines and characters, then the field check. */
 export function normalizeAndCheckField(doc: JSONContent, check: FieldCheck = {}): Checked {
-  const normalized = normalizeField(doc, check.lines);
+  const normalized = normalizeField(doc, check.lines, check.characters);
   return { doc: normalized, problem: fieldProblem(normalized, check) };
 }
 

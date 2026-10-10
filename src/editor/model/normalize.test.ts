@@ -353,3 +353,27 @@ describe("normalizeField with its lines kept (an SMS message)", () => {
     expect(normalizeField(once, "lines")).toEqual(once);
   });
 });
+
+describe("normalizeField with a message's characters (a push's or an SMS's field)", () => {
+  // The invisible characters a phone draws with: the joiner in 👨‍👩‍👧, the selector in ❤️ and 1️⃣, the tags
+  // of 🏴󠁧󠁢󠁥󠁮󠁧󠁿, the non-joiner in a Persian name. A zero-width space stays too: an SMS flags it, with "remove".
+  const typed = "Family ❤\uFE0F 👨\u200D👩\u200D👧 🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} 1\uFE0F\u20E3 علی\u200Cرضا a\u200Bb";
+
+  it.each(["line", "lines"] as const)("keeps every invisible character (%s)", (lines) => {
+    expect(normalizeField(doc(p(t(typed))), lines, "message")).toEqual(doc(p(t(typed))));
+  });
+
+  it("still removes control characters and turns a tab into a space", () => {
+    expect(normalizeField(doc(p(t("a\u0007b\tc\u0085"))), "lines", "message")).toEqual(doc(p(t("ab c"))));
+  });
+
+  it("removes them from the email's fields and the document, as before", () => {
+    expect(normalizeField(doc(p(t("👨\u200D👩\u200D👧"))))).toEqual(doc(p(t("👨👩👧"))));
+    expect(first(p(t("👨\u200D👩\u200D👧")))).toEqual(p(t("👨👩👧")));
+  });
+
+  it("keeps them in a paste into a message's field", () => {
+    expect(normalizeFragment([p(t(typed))], { openStart: 1, openEnd: 1 }, "line", false, "message")).toEqual([p(t(typed))]);
+    expect(normalizeFragment([p(t(typed))], { openStart: 1, openEnd: 1 }, "line")).not.toEqual([p(t(typed))]);
+  });
+});

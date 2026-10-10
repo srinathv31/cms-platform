@@ -158,7 +158,7 @@ async function renderDocument(
     fields = Object.fromEntries(
       channelFieldsOf(channel).map((field) => [
         field.key,
-        resolveChannelField(channelFieldValue(input.channelFields, field), field.shape, ctx),
+        resolveChannelField(channelFieldValue(input.channelFields, field), field, ctx),
       ]),
     );
   } catch (error) {

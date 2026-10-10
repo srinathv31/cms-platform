@@ -30,6 +30,7 @@
 // (`version.name`): that is what its notifications call it.
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
+import { withoutInvisible } from "@/editor/model/links";
 import { usageFromJSON } from "@/editor/model/usage";
 import {
   approvedThisRound,
@@ -622,11 +623,14 @@ function listKeys(keys: readonly string[]): string {
   return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
-/** True when a one-line field has no text (spaces don't count) and no chip. */
+/**
+ * True when a field has no text and no chip. Spaces don't count, and neither do invisible characters, which a
+ * message's field keeps (src/editor/model/characters.ts): a push title of a zero-width space shows nothing.
+ */
 function isBlankField(doc: JSONContent | null): boolean {
   if (!doc) return true;
   if (doc.type === "variable") return false;
-  if (typeof doc.text === "string" && doc.text.trim() !== "") return false;
+  if (typeof doc.text === "string" && withoutInvisible(doc.text).trim() !== "") return false;
   return (doc.content ?? []).every(isBlankField);
 }
 

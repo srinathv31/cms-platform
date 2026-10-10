@@ -772,6 +772,25 @@ describe("submit", () => {
       expect(alert({ channels: ["push"], channelFields: { push } }).ok).toBe(true);
     });
 
+    it("counts a field of only invisible characters as blank: the phone shows nothing for it", () => {
+      // A message's field keeps its invisible characters (an emoji's joiner), so one can hold only those.
+      const invisible = oneLine(text(" ​⁠ "));
+      expect(alert({ channelFields: { push: { ...push, title: invisible }, sms } })).toEqual({
+        ok: false,
+        code: "field_missing",
+        reason: "Add a push title before submitting.",
+      });
+      expect(alert({ channelFields: { push: { ...push, title: oneLine(text("❤️")) }, sms } }).ok).toBe(true);
+    });
+
+    it("refuses a zero-width space or a joiner the author typed in an SMS: they aren't GSM-7", () => {
+      expect(alert({ channelFields: { push, sms: { text: lines(text("Pay​ now")) } } })).toEqual({
+        ok: false,
+        code: "sms_characters",
+        reason: "Replace U+200B in the SMS message before submitting. It isn't in the SMS character set.",
+      });
+    });
+
     it("refuses characters the author typed outside GSM-7, naming each once", () => {
       const typed = { text: lines(text("Your card’s APR – it’s changing. Reply"), chip("first_name")) };
       expect(alert({ channelFields: { push, sms: typed } })).toEqual({

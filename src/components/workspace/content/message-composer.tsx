@@ -10,6 +10,7 @@ import {
   channelFieldsFrom,
   channelFieldsHeading,
   channelFieldsOf,
+  fieldCharacters,
   fieldLines,
   fieldName,
   fieldPlatformTag,
@@ -260,6 +261,7 @@ function ComposerField({
         label={fieldName(field)}
         value={value}
         lines={fieldLines(field.shape)}
+        characters={fieldCharacters(field)}
         hidden={hidden}
         size="md"
         flags={flags}

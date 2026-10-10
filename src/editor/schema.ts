@@ -30,6 +30,7 @@ import { ListMarkers } from "./extensions/list-markers";
 import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
 import { FieldLines } from "./extensions/field-lines";
+import type { CharacterRules } from "./model/characters";
 import type { FieldLines as FieldLinesMode } from "./model/normalize";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
 import { SectionPaste } from "./extensions/section-paste";
@@ -271,8 +272,11 @@ const InlineDocument = Node.create({
   content: "paragraph",
 });
 
-/** `lines`: the field keeps its line breaks (an SMS message), so its schema has the hard break. */
-function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode): Extensions {
+/**
+ * `lines`: the field keeps its line breaks (an SMS message), so its schema has the hard break. `characters`:
+ * which characters a paste keeps (model/characters.ts; `"message"` for a push's or an SMS's field).
+ */
+function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode, characters: CharacterRules): Extensions {
   return [
     InlineDocument,
     StarterKit.configure({
@@ -298,18 +302,23 @@ function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode): Extensio
       dropcursor: { color: false, width: 2, class: "ucomp-dropcursor" },
     }),
     variableNode(opts),
-    ContentLimits.configure({ field: lines }),
+    ContentLimits.configure({ field: lines, characters }),
   ];
 }
 
 /**
  * Client extensions of a channel field: the same `{{` picker, drop and chips as the document. On one
  * line (`"line"`, the default: an email subject, a push title or body), Enter adds nothing; keeping its
- * line breaks (`"lines"`, an SMS message), Enter adds a hard break.
+ * line breaks (`"lines"`, an SMS message), Enter adds a hard break. A message's field (`characters:
+ * "message"`, a push's or an SMS's) keeps the invisible characters in what is pasted into it.
  */
-export function inlineFieldExtensions(options: EditorExtensionOptions, lines: FieldLinesMode = "line"): Extensions {
+export function inlineFieldExtensions(
+  options: EditorExtensionOptions,
+  lines: FieldLinesMode = "line",
+  characters: CharacterRules = "document",
+): Extensions {
   return [
-    ...buildInline(clientVariableOptions(options), lines),
+    ...buildInline(clientVariableOptions(options), lines, characters),
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
     lines === "lines" ? FieldLines : SingleLine,

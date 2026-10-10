@@ -18,6 +18,7 @@ import { Extension, type KeyboardShortcutCommand } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type ResolvedPos, type Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { TableMap } from "@tiptap/pm/tables";
+import type { CharacterRules } from "../model/characters";
 import { DOCUMENT_MESSAGES } from "../model/document-check";
 import { MAX_LIST_DEPTH } from "../model/list-markers";
 import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, cellBlocks, normalizeFragment, type FieldLines } from "../model/normalize";
@@ -33,6 +34,8 @@ export interface ContentLimitsOptions {
    * `"lines"` (an SMS message) keeps them. False for the document.
    */
   field: FieldLines | false;
+  /** Which characters pasted text keeps (model/characters.ts): `"message"` in a push's or an SMS's field. */
+  characters: CharacterRules;
 }
 
 export const contentLimitsKey = new PluginKey("contentLimits");
@@ -108,10 +111,16 @@ function cellGuard(before: PMNode, state: EditorState): Transaction | null {
  * A pasted slice, normalized like a saved document (and, landing in a table cell, like a cell's
  * content). Returns the slice unchanged if it can't be rebuilt.
  */
-export function normalizeSlice(slice: Slice, schema: Schema, field: FieldLines | false = false, inCell = false): Slice {
+export function normalizeSlice(
+  slice: Slice,
+  schema: Schema,
+  field: FieldLines | false = false,
+  inCell = false,
+  characters: CharacterRules = "document",
+): Slice {
   if (slice.content.size === 0) return slice;
   const json = slice.content.toJSON() as JSONContent[];
-  const nodes = normalizeFragment(json, { openStart: slice.openStart, openEnd: slice.openEnd }, field, inCell);
+  const nodes = normalizeFragment(json, { openStart: slice.openStart, openEnd: slice.openEnd }, field, inCell, characters);
   try {
     const content = Fragment.fromJSON(schema, nodes);
     if (content.size === 0) return Slice.empty;
@@ -189,7 +198,7 @@ export const ContentLimits = Extension.create<ContentLimitsOptions>({
   priority: 1000,
 
   addOptions() {
-    return { field: false };
+    return { field: false, characters: "document" };
   },
 
   addKeyboardShortcuts(): Record<string, KeyboardShortcutCommand> {
@@ -208,7 +217,7 @@ export const ContentLimits = Extension.create<ContentLimitsOptions>({
   },
 
   addProseMirrorPlugins() {
-    const { field } = this.options;
+    const { field, characters } = this.options;
     return [
       new Plugin({
         key: contentLimitsKey,
@@ -217,7 +226,8 @@ export const ContentLimits = Extension.create<ContentLimitsOptions>({
         appendTransaction: (transactions, oldState, state) =>
           field || !transactions.some((tr) => tr.docChanged) ? null : cellGuard(oldState.doc, state),
         props: {
-          transformPasted: (slice, view) => normalizeSlice(slice, view.state.schema, field, !field && inTableCell(view.state.selection.$from)),
+          transformPasted: (slice, view) =>
+            normalizeSlice(slice, view.state.schema, field, !field && inTableCell(view.state.selection.$from), characters),
           // Ahead of the rule's and the heading's own input rules (this extension's plugins come first).
           handleTextInput: (view, from, to, text) => {
             if (field || !completesBlockedShortcutInCell(view.state, from, text)) return false;

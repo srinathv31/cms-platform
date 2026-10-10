@@ -23,6 +23,12 @@ exactly what the author typed and every value as sent.
   letter the reader sees.
 - **Values are never transliterated.** A value prints exactly as sent. If it switches the message to UCS-2, the API
   says so (`encoding`, `parts`), and the consumer pays for the parts.
+- **A message keeps its invisible characters.** A document drops the zero-width and format characters, because the
+  editor shows nothing for them and a PDF font can't draw them. A phone draws with them: the joiner in 👨‍👩‍👧, the
+  emoji selector in ❤️ and 1️⃣, a subdivision flag's tags, the non-joiner Persian and Indic names are spelled with.
+  So a push's and an SMS's fields, and the values they print, lose only control characters, at save and at render
+  (docs/render-spec.md §4). In an SMS the author's own invisible characters are still outside GSM-7: flagged, with a
+  one-click removal, and refused at submit; in a value they print as sent.
 - **Render never truncates.** It refuses only what can't be delivered at all: an SMS over 10 parts
   (`sms_too_long`, `SMS_MAX_PARTS`). Twilio accepts about 1,600 characters, so 10 parts is a product limit, set where
   a text stops being a text.
