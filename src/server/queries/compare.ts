@@ -4,12 +4,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { can } from "@/domain/permissions";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
+import type { Channel, ChannelFamily, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
-import { loadMessageRules } from "./review-shared";
+import { loadFamily, loadMessageRules } from "./review-shared";
 
 // What the Compare dialog needs and the Versions read model doesn't carry: the names, bodies, channel
 // fields and variable lists of the two versions being compared, and the content type's SMS footer (an
@@ -31,8 +31,12 @@ export interface CompareVersion {
   variables: Variable[];
 }
 
-/** The pair, and the footer every SMS of the template's content type ends with (null when it has none). */
+/**
+ * The pair, the template's family (its content type's: an alert compares only its fields), and the footer every
+ * SMS of the template's content type ends with (null when it has none).
+ */
 export interface ComparePair {
+  family: ChannelFamily;
   from: CompareVersion;
   to: CompareVersion;
   smsFooter: string | null;
@@ -80,6 +84,6 @@ export async function loadVersionsToCompare(
   const older = pick(from);
   const newer = pick(to);
   if (!older || !newer) return refusal(404, REQUEST_REFUSALS.versionUnavailable);
-  const { smsFooter } = await loadMessageRules(db, template.contentTypeId);
-  return { ok: true, from: older, to: newer, smsFooter };
+  const [family, { smsFooter }] = await Promise.all([loadFamily(db, template.contentTypeId), loadMessageRules(db, template.contentTypeId)]);
+  return { ok: true, family, from: older, to: newer, smsFooter };
 }

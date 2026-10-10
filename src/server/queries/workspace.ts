@@ -11,7 +11,7 @@ import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import {
-  familyOf,
+  contentTypeFamily,
   type Channel,
   type ChannelFamily,
   type JSONContent,
@@ -252,7 +252,7 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
-      family: familyOf(tpl.allowedChannels) ?? familyOf(shown.channels) ?? "document",
+      family: contentTypeFamily(tpl.allowedChannels),
       messageRules: { smsFooter: tpl.smsFooter, smsMaxParts: tpl.smsMaxParts },
       senders: { appName: tpl.appName, smsSender: tpl.smsSender },
       channelFields: shown.channelFields,

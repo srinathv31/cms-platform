@@ -74,6 +74,7 @@ import {
 } from "./review-types";
 import {
   TEMPLATE_KIND_LABELS,
+  contentTypeFamily,
   familyOf,
   type Channel,
   type ChannelFamily,
@@ -115,12 +116,23 @@ export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel
  * the first channel it allows. A content type is one family, so these never mix.
  */
 export function newTemplateChannels(wanted: readonly Channel[] | undefined, allowed: readonly Channel[]): Channel[] {
-  const family = familyOf(allowed) ?? "document";
+  const family = contentTypeFamily(allowed);
   const fits = (channels: readonly Channel[]) => channels.filter((c) => allowed.includes(c));
   const fromStarter = fits(wanted ?? []);
   if (fromStarter.length > 0) return fromStarter;
   const defaults = fits(DEFAULT_CHANNELS[family]);
   return defaults.length > 0 ? defaults : allowed.slice(0, 1);
+}
+
+/**
+ * Why a draft can't be saved with these channels, or null: at least one is on (the channel chips never turn
+ * off the last one, so only a crafted save sends none), and every one is a channel its content type allows,
+ * which keeps a template in its content type's family.
+ */
+export function draftChannelsRefusal(channels: readonly Channel[], allowed: readonly Channel[]): Refusal | null {
+  if (channels.length === 0) return REFUSALS.noChannels;
+  if (!channels.every((channel) => allowed.includes(channel))) return REFUSALS.channelNotAllowed;
+  return null;
 }
 
 // ── Shapes ────────────────────────────────────────────────────
@@ -490,6 +502,8 @@ export interface SubmitInput {
  *   - the version isn't a draft (a second tab, a double click);
  *   - the draft changed after the submitter's summary was read (`seenRev`): a save that landed
  *     meanwhile, from this page or another, would otherwise be frozen without being shown;
+ *   - no channel is on (only a crafted save can store that: it would render nothing and skip every
+ *     channel's rules);
  *   - a chip names a key the variable list doesn't have: in the document, and in the fields of the
  *     channels that are on (channel-fields.ts; a field isn't part of the output while its channel is off);
  *   - a required field of a channel that is on is blank (Email's subject): the first such field;
@@ -507,6 +521,7 @@ export function submit(input: SubmitInput): SubmitResult {
   if (draft.state === "in_review") return refuse(REFUSALS.alreadyInReview);
   if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
   if (draft.rev !== input.seenRev) return refuse(REFUSALS.summaryStale);
+  if (draft.channels.length === 0) return refuse(REFUSALS.noChannels);
 
   const fields = fieldsOfChannels(draft.channels);
 
@@ -659,6 +674,10 @@ export const REFUSALS = {
   notEditable: refusal("not_editable", "Only an Active or Revoked template can be edited."),
   alreadyInReview: refusal("already_in_review", "This version is already in review."),
   notDraft: refusal("not_draft", "Only a draft can be submitted."),
+  /** `submit` and a draft save (`draftChannelsRefusal`): a version with no channel renders nothing and skips every channel's rules. */
+  noChannels: refusal("no_channels", "Turn on at least one channel."),
+  /** A draft save (`draftChannelsRefusal`): a channel its content type doesn't allow, which would mix families. */
+  channelNotAllowed: refusal("channel_unavailable", "That channel isn't available for this content type."),
   /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */
   summaryStale: refusal("summary_stale", "This draft changed after this summary was made."),
   undefinedVariables: refusal(

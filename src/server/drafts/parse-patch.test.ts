@@ -92,7 +92,8 @@ describe("parseDraftPatch", () => {
 
   it("trims the name", () => expect(ok({ ...base, name: "  New name " }).name).toBe("New name"));
 
-  it("accepts an empty channel list (a draft can be mid-edit)", () => expect(ok({ ...base, channels: [] }).channels).toEqual([]));
+  it("refuses an empty channel list: a version with no channel would skip every channel's rules", () =>
+    expect(message({ ...base, channels: [] })).toBe("channels must have at least one channel"));
 
   it("refuses a patch that changes nothing", () => expect(message(base)).toBe("Nothing to save."));
 

@@ -19,7 +19,12 @@ nothing stopped a long body from flowing into a text message. The owner confirme
   body (`channelFamily`, `familyOf` in `src/domain/types.ts`). A content type is one family: `channelRuleRefusal`
   refuses turning on a channel of the other family, with a sentence that names where it goes ("Disclosures are
   documents. Push and SMS go on Alert templates."), and the channel rules matrix shows that switch disabled with it.
-  Since one channel always stays on, a content type's family never changes, and so a template's never does. The
+  Since one channel always stays on, a content type's family never changes, and so a template's never does.
+  Everything that treats a template as a document or an alert (the workspace's editor or composer, the review
+  screen, Compare, Copilot) reads its family from its content type (`contentTypeFamily`), never from a version's
+  channels, which are the author's to change. A version keeps at least one channel on: the draft save refuses an
+  empty list, and so does submit (`draftChannelsRefusal`, `REFUSALS.noChannels`), since a version with none would
+  render nothing and skip every channel's rules. The
   seed's message content type is **Alert** ("Notifications" is already the bell in the header). An Alert has no
   required sections: editing them is refused (`sectionsRefusal`). A letter plus a text heads-up is two templates.
 - **The author chooses the kind when making a template.** New template opens on Document · Alert, each kind with its

@@ -152,6 +152,7 @@ describe("getReviewScreen", () => {
       teamId: "coral-offers",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
+      family: "document",
     });
     expect(screen.version).toMatchObject({
       number: 3,
@@ -623,6 +624,21 @@ describe("the workspace's comment permission", () => {
     const document = await getWorkspaceDocument("coral-offers", ids["rate-change-notice"]!);
     expect(document.versionNumber).toBe(1);
     expect(document.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+  });
+});
+
+describe("an alert's family", () => {
+  it("comes from its content type, even when its version's channels were emptied", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const where = and(eq(versions.templateId, templateId), eq(versions.number, 1));
+    const { channels } = (await db.query.versions.findFirst({ where }))!;
+    await db.update(versions).set({ channels: [] }).where(where);
+    try {
+      as("jordan");
+      expect((await getReviewScreen("coral-offers", templateId, 1)).template.family).toBe("message");
+    } finally {
+      await db.update(versions).set({ channels }).where(where);
+    }
   });
 });
 

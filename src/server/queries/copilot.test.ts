@@ -1,9 +1,11 @@
 import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
+import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
+import { versions } from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getCopilotPrompt } from "./copilot";
@@ -65,6 +67,14 @@ describe("getCopilotPrompt", () => {
       status: 409,
       code: "copilot_documents_only",
       reason: "Copilot drafts documents only.",
+    });
+  });
+
+  it("knows an alert by its content type, even when its draft's channels were emptied", async () => {
+    await db.update(versions).set({ channels: [] }).where(and(eq(versions.templateId, ids["rate-change-heads-up"]!), eq(versions.state, "draft")));
+    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toMatchObject({
+      ok: false,
+      code: "copilot_documents_only",
     });
   });
 });

@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionResult } from "@/domain/review-types";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel } from "@/domain/types";
+import type { Channel, ChannelFamily } from "@/domain/types";
 import type { ComparePair, CompareVersion } from "@/server/queries/compare";
 import type { CompareOption } from "./compare-dialog";
 
@@ -43,7 +43,12 @@ const version = (
   ...fields,
   variables: [],
 });
-const pair = (from: CompareVersion, to: CompareVersion, smsFooter: string | null = null): CompareAnswer => ({ ok: true, from, to, smsFooter });
+/** The route's answer: the template's family is its content type's, whatever the versions' channels. */
+const pair = (
+  from: CompareVersion,
+  to: CompareVersion,
+  { family = "document", smsFooter = null }: { family?: ChannelFamily; smsFooter?: string | null } = {},
+): CompareAnswer => ({ ok: true, family, from, to, smsFooter });
 /** An alert's version: no body, a push title and an SMS. */
 const alert = (id: string, number: number, title: string, sms: string): CompareVersion =>
   version(id, number, "", "Card used abroad", {
@@ -103,7 +108,10 @@ describe("ComparePanel", () => {
 
   it("shows an alert's fields as its whole content, with the footer locked under the SMS, and no body", async () => {
     compareRoute.mockResolvedValue(
-      pair(alert("v_1", 1, "Was this you?", "Coral: card used."), alert("v_2", 2, "Was this you?", "Coral: card used abroad."), "Reply STOP to opt out."),
+      pair(alert("v_1", 1, "Was this you?", "Coral: card used."), alert("v_2", 2, "Was this you?", "Coral: card used abroad."), {
+        family: "message",
+        smsFooter: "Reply STOP to opt out.",
+      }),
     );
     await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
     await tick();
@@ -116,6 +124,14 @@ describe("ComparePanel", () => {
     expect(container.querySelector('[data-slot="sms-footer"]')?.textContent).toBe("Reply STOP to opt out.");
     expect(container.querySelector("[data-redline-document]"), "no body to redline").toBeNull();
     expect(container.querySelector('[data-slot="redline-summary"]')?.textContent).toBe("1 changed");
+  });
+
+  it("knows an alert by its content type, not its channels: one with none still shows no body", async () => {
+    const emptied = { ...alert("v_2", 2, "Was this you?", "Coral: card used abroad."), channels: [] };
+    compareRoute.mockResolvedValue(pair(alert("v_1", 1, "Was this you?", "Coral: card used."), emptied, { family: "message" }));
+    await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={OPTIONS} />));
+    await tick();
+    expect(container.querySelector("[data-redline-document]"), "no body to redline").toBeNull();
   });
 
   it("says it couldn't load them when the route refuses, and Try again reads them again", async () => {

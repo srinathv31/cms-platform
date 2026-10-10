@@ -14,7 +14,6 @@ import { Switch } from "@/components/ui/switch";
 import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
 import type { RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
-import { familyOf } from "@/domain/types";
 import type { Variable } from "@/editor/model/types";
 import { readTemplate } from "@/lib/template-reads";
 import { cn } from "@/lib/utils";
@@ -97,7 +96,11 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
     readTemplate<ComparePair>(templateId, "compare", { from: fromId, to: toId })
       .then((result) => {
         if (!live) return;
-        setLoaded(result.ok ? { key, ok: true, from: result.from, to: result.to, smsFooter: result.smsFooter } : { key, ok: false });
+        setLoaded(
+          result.ok
+            ? { key, ok: true, family: result.family, from: result.from, to: result.to, smsFooter: result.smsFooter }
+            : { key, ok: false },
+        );
       })
       .catch(() => live && setLoaded({ key, ok: false }));
     return () => {
@@ -109,8 +112,8 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
   const redline = useMemo(() => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null), [ready]);
   // Each channel's own fields, over the registry: a field's change counts with the body's.
   const fields = useMemo(() => (ready?.ok ? diffChannelFields(ready.from, ready.to) : null), [ready]);
-  // A message (an Alert) has no body: its fields are all there is to compare.
-  const message = ready?.ok ? familyOf(ready.to.channels) === "message" : false;
+  // A message (an Alert) has no body: its fields are all there is to compare. Its content type says so.
+  const message = ready?.ok ? ready.family === "message" : false;
   // The name is versioned, so a rename between the two shows with the redline, above the document, and
   // the summary counts it ("Renamed", "Renamed, 2 added and 1 changed") rather than saying "No changes".
   const rename = ready?.ok ? nameChange(ready.from.name, ready.to.name) : null;

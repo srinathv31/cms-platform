@@ -10,6 +10,7 @@ import {
   confirmRevoke,
   contractBaseline,
   createDraft,
+  draftChannelsRefusal,
   editLatest,
   initialTemplateName,
   isAfterToday,
@@ -191,6 +192,12 @@ describe("createDraft", () => {
     expect(newTemplateChannels(["pdf", "web"], ["push", "sms"])).toEqual(["push", "sms"]);
     expect(newTemplateChannels(undefined, ["sms"])).toEqual(["sms"]);
     expect(newTemplateChannels(["sms"], ["push", "sms"])).toEqual(["sms"]);
+  });
+
+  it("saves a draft's channels only when one is on and its content type allows each (draftChannelsRefusal)", () => {
+    expect(draftChannelsRefusal(["push"], ["push", "sms"])).toBeNull();
+    expect(draftChannelsRefusal([], ["push", "sms"])).toBe(REFUSALS.noChannels);
+    expect(draftChannelsRefusal(["push", "pdf"], ["push", "sms"])).toBe(REFUSALS.channelNotAllowed);
   });
 
   it("makes Blank untitled, with no starter key and no variables", () => {
@@ -866,6 +873,16 @@ describe("submit", () => {
       const result = alert({ channels: ["push"], channelFields: { push: { ...push, body: near, subtitle } } });
       expect(result).toMatchObject({ ok: false, code: "push_too_large" });
       expect(result.ok || result.reason).toContain("on iPhone");
+    });
+
+    it("refuses a draft with no channel on, which would skip every message rule", () => {
+      // A crafted save could store one: the SMS here breaks every rule, and nothing would look at it.
+      const typed = { text: lines(text("’ bit.ly/x ".repeat(80))) };
+      expect(alert({ channels: [], channelFields: { push, sms: typed } })).toEqual({
+        ok: false,
+        code: "no_channels",
+        reason: "Turn on at least one channel.",
+      });
     });
 
     it("never runs the message rules on a document", () => {

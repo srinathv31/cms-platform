@@ -7,6 +7,7 @@
 import type {
   ApproverRule,
   Channel,
+  ChannelFamily,
   ContractChange,
   JSONContent,
   PermissionResult,
@@ -318,7 +319,8 @@ export interface ReviewQueue {
 }
 
 export interface ReviewScreenData {
-  template: { id: string; teamId: string; teamSlug: string; teamName: string };
+  /** `family`: its content type's (`contentTypeFamily`), never read from a version's channels. */
+  template: { id: string; teamId: string; teamSlug: string; teamName: string; family: ChannelFamily };
   version: {
     id: string;
     number: number;

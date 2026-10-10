@@ -105,7 +105,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
         channelFields: v.channelFields,
         variables: v.variables,
       });
-      expect(body).toEqual({ ok: true, from: side(v1, 1, "superseded"), to: side(v2, 2, "active"), smsFooter: null });
+      expect(body).toEqual({ ok: true, family: "document", from: side(v1, 1, "superseded"), to: side(v2, 2, "active"), smsFooter: null });
     }
   });
 

@@ -10,7 +10,7 @@ import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { DEFAULT_SMS_MAX_PARTS, type MessageTypeRules } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
-import type { Channel, JSONContent, PermissionResult, Viewer } from "@/domain/types";
+import { contentTypeFamily, type Channel, type ChannelFamily, type JSONContent, type PermissionResult, type Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
 import {
@@ -151,6 +151,19 @@ export async function loadChain(reader: Reader, contentTypeId: string): Promise<
     .where(eq(approvalStages.contentTypeId, contentTypeId))
     .orderBy(asc(approvalStages.position));
   return rows.length > 0 ? rows : DEFAULT_CHAIN.map((stage) => ({ ...stage }));
+}
+
+/**
+ * The template's family, from its content type (`contentTypeFamily`): a document or an alert. Never read
+ * from a version's channels, which are the author's to change.
+ */
+export async function loadFamily(reader: Reader, contentTypeId: string): Promise<ChannelFamily> {
+  const [row] = await reader
+    .select({ allowedChannels: contentTypes.allowedChannels })
+    .from(contentTypes)
+    .where(eq(contentTypes.id, contentTypeId))
+    .limit(1);
+  return contentTypeFamily(row?.allowedChannels ?? []);
 }
 
 /** The content type's SMS footer and part budget, which submit measures a message with. */

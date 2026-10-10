@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { ALL_CHANNEL_FIELDS, withChannelFieldValues, type ChannelFieldsPatch } from "@/domain/channel-fields";
-import { withWriter } from "@/domain/lifecycle";
+import { draftChannelsRefusal, withWriter } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -166,9 +166,8 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       return fail("conflict", "This draft changed elsewhere.", row.rev);
     }
 
-    if (patch.channels && !patch.channels.every((channel) => row.allowedChannels.includes(channel))) {
-      return fail("invalid", "That channel isn't available for this content type.");
-    }
+    const channelsRefused = patch.channels ? draftChannelsRefusal(patch.channels, row.allowedChannels) : null;
+    if (channelsRefused) return fail("invalid", channelsRefused.reason);
 
     // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
     const set: SQLiteUpdateSetSource<typeof versions> = {
