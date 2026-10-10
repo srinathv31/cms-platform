@@ -493,9 +493,11 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           body: rateChangeBody(),
           variables: vars.list([...CUSTOMER_KEYS, "effective_date"]),
           channels: ["pdf", "web", "email"],
-          email: {
-            subject: inlineDoc("Your purchase APR is changing on {effective_date}"),
-            preheader: inlineDoc("Hi {first_name}, here is what is changing on your Coral account."),
+          channelFields: {
+            email: {
+              subject: inlineDoc("Your purchase APR is changing on {effective_date}"),
+              preheader: inlineDoc("Hi {first_name}, here is what is changing on your Coral account."),
+            },
           },
           createdBy: "maya",
           createdAt: 130,

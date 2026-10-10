@@ -62,7 +62,7 @@ cases/<slug>/
 
 | File | What it holds |
 | --- | --- |
-| `input.json` | The frozen input (`RenderFixture`): template id and name, version number (null for a draft), `at` (the render time, used as the PDF's dates), the variables, the values as a request sends them (JSON numbers are read from their source text, so `21.90` stays `21.90`), the body, the email subject and preheader. |
+| `input.json` | The frozen input (`RenderFixture`): template id and name, version number (null for a draft), `at` (the render time, used as the PDF's dates), the variables, the values as a request sends them (JSON numbers are read from their source text, so `21.90` stays `21.90`), the body, and the channel fields as a version stores them (`channelFields`: `{}`, or `{ "email": { "subject", "preheader" } }`). |
 | `expected/renderdoc.json` | The resolved document (spec section 9). |
 | `expected/web.html` | The web page. |
 | `expected/email.html` | The email HTML. |
@@ -126,7 +126,7 @@ It checks nothing else. Run `npm test` afterwards to see whether parity still ho
 
 **`npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]`** freezes
 one seeded version as a new case: `cases/<slug>/input.json` holds a copy of the version's document,
-variables, email fields and one sample set's values, with `at` set to `GOLDEN_AT`. It reads a
+variables, channel fields and one sample set's values, with `at` set to `GOLDEN_AT`. It reads a
 throwaway database built by the real seed, never `data/ucomp.db`, so it gives the same file on every
 machine. It refuses to overwrite an existing case. Then write the case's output:
 
@@ -188,7 +188,8 @@ A hand-built case pins one rule or group of rules:
 1. In `focused-cases.ts`, build the document with the builders from `src/server/render/testing/tiptap.ts`
    (`doc`, `p`, `t`, `para`, `h`, `br`, `ul`, `ol`, `li`, `item`, `table`, `row`, `cell`, `callout`,
    `link`, `v` for a variable chip, `variable(...)` for its definition), and wrap it in
-   `make(slug, templateName, { body, variables, values, emailSubject, emailPreheader })`.
+   `make(slug, templateName, { body, variables, values, channelFields })`, where `channelFields` is
+   `{ email: { subject: line(…), preheader: line(…) } }` for a case about the email's own fields.
 2. Values go in as a request sends them: strings for text, `num("21.90")` for a JSON number written
    exactly as typed.
 3. Add the case to `FOCUSED_CASES`.

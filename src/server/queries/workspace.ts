@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
+import type { ChannelFields } from "@/domain/channel-fields";
 import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
@@ -148,8 +149,8 @@ export interface WorkspaceDocumentData {
   channels: Channel[];
   /** The channels the content type allows: what the Channels selector offers. */
   allowedChannels: Channel[];
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** Each channel's own fields (src/domain/channel-fields.ts), whether or not the channel is on. */
+  channelFields: ChannelFields;
   /** The version's named sample data sets, as saved. The preview's switcher fills in any default that is missing. */
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD: date samples are generated from it. */
@@ -198,8 +199,7 @@ export const getWorkspaceDocument = cache(
         body: versions.body,
         variables: versions.variables,
         channels: versions.channels,
-        emailSubject: versions.emailSubject,
-        emailPreheader: versions.emailPreheader,
+        channelFields: versions.channelFields,
         sampleSets: versions.sampleSets,
       })
       .from(versions)
@@ -223,8 +223,7 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
-      emailSubject: shown.emailSubject,
-      emailPreheader: shown.emailPreheader,
+      channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,
       today,
       requiredSections: tpl.requiredSections,

@@ -4,6 +4,7 @@
 // chips filled, from its own sample sets.
 
 import { describe, expect, it } from "vitest";
+import { ALL_CHANNEL_FIELDS, channelFieldValue, type ChannelFields } from "@/domain/channel-fields";
 import { HANDLED_MARKS, HANDLED_NODES, resolveDocument, validateValues } from "@/domain/render";
 import type { RenderBlock, RenderInline } from "@/domain/render";
 import type { JSONContent, SampleSet, Variable } from "@/domain/types";
@@ -254,12 +255,12 @@ describe("checkDocument: the limits, with their sentences", () => {
   });
 });
 
-describe("checkField (email subject, preheader)", () => {
+describe("checkField, a line (email subject, preheader)", () => {
   const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
 
   it("accepts one line of text and variables, or an empty line", () => {
-    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }))).not.toThrow();
-    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] })).not.toThrow();
+    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }), "line")).not.toThrow();
+    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] }, "line")).not.toThrow();
   });
 
   it.each<[string, JSONContent]>([
@@ -269,7 +270,7 @@ describe("checkField (email subject, preheader)", () => {
     ["a mark", field({ type: "text", text: "a", marks: [{ type: "bold" }] })],
     ["no paragraph", { type: "doc", content: [] }],
   ])("refuses %s", (_, value) => {
-    expect(() => checkField(value)).toThrow("The email subject and preheader can hold only one line of text and variables.");
+    expect(() => checkField(value, "line")).toThrow("The email subject and preheader can hold only one line of text and variables.");
   });
 });
 
@@ -283,7 +284,7 @@ describe.each(STARTER_KEYS)("starter %s", (key) => {
       body: starter.body,
       variables: starter.variables,
       sampleSets: starter.sampleSets,
-      fields: [starter.emailSubject, starter.emailPreheader],
+      fields: ALL_CHANNEL_FIELDS.map((field) => channelFieldValue(starter.channelFields ?? {}, field)),
     });
   });
 });
@@ -307,7 +308,7 @@ describe("seeded templates", () => {
         body: v.body as JSONContent,
         variables: v.variables as Variable[],
         sampleSets: v.sampleSets as SampleSet[],
-        fields: [v.emailSubject as JSONContent | null, v.emailPreheader as JSONContent | null],
+        fields: ALL_CHANNEL_FIELDS.map((field) => channelFieldValue((v.channelFields ?? {}) as ChannelFields, field)),
       });
     },
   );

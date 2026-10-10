@@ -41,7 +41,7 @@ function render(on: boolean) {
     reactRoot.render(
       <EditorRoot variables={VARIABLES}>
         <Probe onRoot={keepRuntime} />
-        <EmailDetails on={on} editable subject={SUBJECT} preheader={null} />
+        <EmailDetails on={on} editable values={{ "email.subject": SUBJECT, "email.preheader": null }} />
       </EditorRoot>,
     ),
   );
@@ -75,8 +75,8 @@ async function mount(on: boolean) {
 
 /** The keys in the subject the session was last asked to save. */
 const savedSubjectKeys = () => {
-  const saved = session.save.mock.calls.map(([patch]) => patch as { emailSubject?: JSONContent }).filter((p) => p.emailSubject);
-  return keysIn(saved.at(-1)?.emailSubject);
+  const saved = session.save.mock.calls.map(([patch]) => patch as { "email.subject"?: JSONContent }).filter((p) => p["email.subject"]);
+  return keysIn(saved.at(-1)?.["email.subject"]);
 };
 
 describe("Email details while Email is off", () => {

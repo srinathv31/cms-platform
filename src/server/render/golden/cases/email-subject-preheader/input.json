@@ -81,62 +81,66 @@
       }
     ]
   },
-  "emailSubject": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
+  "channelFields": {
+    "email": {
+      "subject": {
+        "type": "doc",
         "content": [
           {
-            "type": "text",
-            "text": "  Zoë, your rate changes on   "
-          },
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "  Zoë, your rate changes on   "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "effective_date"
+                }
+              },
+              {
+                "type": "text",
+                "text": "  "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "promo"
+                }
+              },
+              {
+                "type": "text",
+                "text": " — please read & act ✓ (and then some more words so the subject is long enough to need wrapping in a mail client)  "
+              }
+            ]
+          }
+        ]
+      },
+      "preheader": {
+        "type": "doc",
+        "content": [
           {
-            "type": "variable",
-            "attrs": {
-              "key": "effective_date"
-            }
-          },
-          {
-            "type": "text",
-            "text": "  "
-          },
-          {
-            "type": "variable",
-            "attrs": {
-              "key": "promo"
-            }
-          },
-          {
-            "type": "text",
-            "text": " — please read & act ✓ (and then some more words so the subject is long enough to need wrapping in a mail client)  "
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ",   here is what is changing.  "
+              }
+            ]
           }
         ]
       }
-    ]
-  },
-  "emailPreheader": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
-        "content": [
-          {
-            "type": "text",
-            "text": "Hi "
-          },
-          {
-            "type": "variable",
-            "attrs": {
-              "key": "first_name"
-            }
-          },
-          {
-            "type": "text",
-            "text": ",   here is what is changing.  "
-          }
-        ]
-      }
-    ]
+    }
   }
 }

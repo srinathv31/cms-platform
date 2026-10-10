@@ -11,6 +11,7 @@
 // approver sees is exactly what a customer gets. render_log NEVER holds variable values.
 
 import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/list-markers";
+import type { ChannelFieldKey } from "../channel-fields";
 import type { Channel, Variable, VariableType, VariableValues } from "../types";
 
 export type { BulletStyle, MarkerDelimiter, MarkerFormat };
@@ -181,11 +182,11 @@ export interface RenderDoc {
   blocks: RenderBlock[];
 }
 
-/** The email channel's resolved one-line fields, next to the RenderDoc. */
-export interface EmailFields {
-  subject: string;
-  preheader: string;
-}
+/**
+ * The email channel's resolved one-line fields, next to the RenderDoc: one string per field the registry
+ * gives Email (channel-fields.ts), so a field added there is a compile error in the adapter.
+ */
+export type EmailFields = Readonly<Record<ChannelFieldKey<"email">, string>>;
 
 /** What the email adapter returns. */
 export interface EmailRender {

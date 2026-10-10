@@ -26,6 +26,7 @@ import type {
   VariableValues,
   VersionState,
 } from "@/domain/types";
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { ConsumerNoticeKind, VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
@@ -140,8 +141,9 @@ export const versions = sqliteTable(
     name: text("name").notNull(),
     basedOnVersionId: text("based_on_version_id"),
     body: json<JSONContent>("body").notNull(), // TipTap JSON; variable nodes hold only their key
-    emailSubject: json<JSONContent>("email_subject"),
-    emailPreheader: json<JSONContent>("email_preheader"),
+    // Each channel's own short fields (src/domain/channel-fields.ts), by channel and then field key:
+    // { "email": { "subject": <doc>, "preheader": <doc> } }. A field with no value is absent.
+    channelFields: json<ChannelFields>("channel_fields").notNull().default(sql`'{}'`),
     channels: json<Channel[]>("channels").notNull(),
     variables: json<Variable[]>("variables").notNull(),
     sampleSets: json<SampleSet[]>("sample_sets").notNull(),

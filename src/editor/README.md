@@ -159,7 +159,7 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
 <EditorRoot key={versionId} variables={version.variables} baseline={active?.variables ?? null}
             requiredSections={contentType.sections} readOnly={!canEdit}
             onVariablesChange={saveVariables}>
-  <InlineVariableField label="Email subject" value={version.emailSubject} onChange={saveSubject} />
+  <InlineVariableField label="Email subject" value={version.channelFields.email?.subject ?? null} onChange={saveSubject} />
   <DocumentEditor content={version.body} onChange={saveBody} ref={editorRef} align="start" />
   <VariablesPanel />
 </EditorRoot>

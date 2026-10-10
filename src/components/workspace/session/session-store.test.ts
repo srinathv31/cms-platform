@@ -98,7 +98,7 @@ describe("workspace session", () => {
       const session = createWorkspaceSession();
       session.bind({ versionId: "v_1", rev: 0 });
       session.save({ name: "First" });
-      session.save({ emailSubject: null });
+      session.save({ "email.subject": null });
 
       const calls: string[] = [];
       let finish = () => {};
@@ -117,7 +117,7 @@ describe("workspace session", () => {
       expect(save).not.toHaveBeenCalled();
 
       session.attach(save, flush);
-      expect(save).toHaveBeenCalledWith({ name: "First", emailSubject: null });
+      expect(save).toHaveBeenCalledWith({ name: "First", "email.subject": null });
       expect(calls).toEqual(["save", "flush"]);
       await Promise.resolve();
       expect(done).toBe(false);

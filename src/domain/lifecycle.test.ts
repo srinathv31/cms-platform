@@ -138,18 +138,16 @@ describe("createDraft", () => {
     const { changes } = createDraft({ starter: EXAMPLE, createdBy: "maya", now: NOW });
     expect(changes.draft.channels).toEqual([...DEFAULT_CHANNELS]);
     expect(changes.draft.channels).not.toContain("email");
-    expect(changes.draft.emailSubject).toBeNull();
-    expect(changes.draft.emailPreheader).toBeNull();
+    expect(changes.draft.channelFields).toEqual({});
 
     const subject: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
     const withEmail = createDraft({
-      starter: { ...EXAMPLE, channels: ["pdf", "web", "email"], emailSubject: subject, emailPreheader: subject },
+      starter: { ...EXAMPLE, channels: ["pdf", "web", "email"], channelFields: { email: { subject, preheader: subject } } },
       createdBy: "maya",
       now: NOW,
     });
     expect(withEmail.changes.draft.channels).toEqual(["pdf", "web", "email"]);
-    expect(withEmail.changes.draft.emailSubject).toEqual(subject);
-    expect(withEmail.changes.draft.emailPreheader).toEqual(subject);
+    expect(withEmail.changes.draft.channelFields).toEqual({ email: { subject, preheader: subject } });
   });
 
   it("makes Blank untitled, with no starter key and no variables", () => {
@@ -246,14 +244,13 @@ describe("editLatest", () => {
     state: "active",
     name: "Spring Travel Rewards — Terms",
     body: BODY,
-    emailSubject: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Subject" }] }] },
-    emailPreheader: null,
+    channelFields: { email: { subject: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Subject" }] }] } } },
     channels: ["pdf", "web", "email"],
     variables: VARIABLES,
     sampleSets: SAMPLE_SETS,
   };
 
-  it("copies the name, body, variables, channels, email fields and sample sets into a draft", () => {
+  it("copies the name, body, variables, channels, channel fields and sample sets into a draft", () => {
     const { changes } = editLatest({ from: active, createdBy: "priya", now: NOW });
     expect(changes.draft).toEqual({
       state: "draft",
@@ -261,8 +258,7 @@ describe("editLatest", () => {
       basedOnVersionId: "v_active",
       name: "Spring Travel Rewards — Terms",
       body: BODY,
-      emailSubject: active.emailSubject,
-      emailPreheader: null,
+      channelFields: active.channelFields,
       channels: ["pdf", "web", "email"],
       variables: VARIABLES,
       sampleSets: SAMPLE_SETS,
@@ -308,7 +304,7 @@ describe("editLatest", () => {
       number: null,
       basedOnVersionId: "v_revoked",
       body: BODY,
-      emailSubject: active.emailSubject,
+      channelFields: active.channelFields,
       channels: ["pdf", "web", "email"],
       variables: VARIABLES,
       sampleSets: SAMPLE_SETS,
@@ -431,8 +427,7 @@ describe("submit", () => {
     state: "draft",
     variables: VARIABLES,
     body: BODY,
-    emailSubject: null,
-    emailPreheader: null,
+    channelFields: {},
     channels: ["pdf", "web"],
     writers: ["maya"],
     rev: 7,
@@ -663,44 +658,45 @@ describe("submit", () => {
     const channels = ["pdf", "web", "email"] as const;
     const subject = oneLine(text("Hi "), chip("first_name"));
 
-    expect(run({ channels: [...channels], emailSubject: oneLine(text("Offer "), chip("promo_code")) })).toEqual({
+    expect(run({ channels: [...channels], channelFields: { email: { subject: oneLine(text("Offer "), chip("promo_code")) } } })).toEqual({
       ok: false,
       code: "undefined_variables",
       reason: "Define or remove {{promo_code}} before submitting.",
     });
-    expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("gift_name")) })).toEqual({
+    expect(run({ channels: [...channels], channelFields: { email: { subject, preheader: oneLine(chip("gift_name")) } } })).toEqual({
       ok: false,
       code: "undefined_variables",
       reason: "Define or remove {{gift_name}} before submitting.",
     });
-    expect(run({ channels: [...channels], emailSubject: subject, emailPreheader: oneLine(chip("purchase_apr")) }).ok).toBe(true);
+    expect(run({ channels: [...channels], channelFields: { email: { subject, preheader: oneLine(chip("purchase_apr")) } } }).ok).toBe(true);
   });
 
   it("ignores the email fields while Email is off: they are not part of the output", () => {
-    const result = run({ channels: ["pdf", "web"], emailSubject: oneLine(chip("promo_code")) });
+    const result = run({ channels: ["pdf", "web"], channelFields: { email: { subject: oneLine(chip("promo_code")) } } });
     expect(result.ok).toBe(true);
   });
 
   it("asks for an email subject when Email is on and the subject is empty", () => {
     const reason = "Add an email subject before submitting.";
     const email = ["pdf", "web", "email"] as const;
-    expect(run({ channels: [...email], emailSubject: null })).toEqual({ ok: false, code: "email_subject_missing", reason });
-    expect(run({ channels: [...email], emailSubject: oneLine() })).toEqual({ ok: false, code: "email_subject_missing", reason });
-    expect(run({ channels: [...email], emailSubject: { type: "doc", content: [{ type: "paragraph" }] } })).toEqual({
+    expect(run({ channels: [...email], channelFields: {} })).toEqual({ ok: false, code: "field_missing", reason });
+    expect(run({ channels: [...email], channelFields: { email: { preheader: oneLine(text("Pre")) } } })).toEqual({ ok: false, code: "field_missing", reason });
+    expect(run({ channels: [...email], channelFields: { email: { subject: oneLine() } } })).toEqual({ ok: false, code: "field_missing", reason });
+    expect(run({ channels: [...email], channelFields: { email: { subject: { type: "doc", content: [{ type: "paragraph" }] } } } })).toEqual({
       ok: false,
-      code: "email_subject_missing",
+      code: "field_missing",
       reason,
     });
-    expect(run({ channels: [...email], emailSubject: oneLine(text("   ")) })).toEqual({ ok: false, code: "email_subject_missing", reason });
+    expect(run({ channels: [...email], channelFields: { email: { subject: oneLine(text("   ")) } } })).toEqual({ ok: false, code: "field_missing", reason });
   });
 
   it("accepts an email subject that is only a chip, and needs no preheader", () => {
-    const result = run({ channels: ["email"], emailSubject: oneLine(chip("first_name")), emailPreheader: null });
+    const result = run({ channels: ["email"], channelFields: { email: { subject: oneLine(chip("first_name")) } } });
     expect(result.ok).toBe(true);
   });
 
   it("doesn't need a subject when Email is off", () => {
-    expect(run({ channels: ["pdf"], emailSubject: null }).ok).toBe(true);
+    expect(run({ channels: ["pdf"], channelFields: {} }).ok).toBe(true);
   });
 
   it("reports an unknown key before the missing subject", () => {
@@ -708,7 +704,7 @@ describe("submit", () => {
       type: "doc",
       content: [{ type: "paragraph", attrs: { id: "b_one" }, content: [chip("promo_code")] }],
     };
-    expect(run({ body, channels: ["email"], emailSubject: null })).toEqual({
+    expect(run({ body, channels: ["email"], channelFields: {} })).toEqual({
       ok: false,
       code: "undefined_variables",
       reason: "Define or remove {{promo_code}} before submitting.",
@@ -760,8 +756,7 @@ function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
     state: "in_review",
     name: TEMPLATE.name,
     body: BODY,
-    emailSubject: EMAIL_SUBJECT,
-    emailPreheader: null,
+    channelFields: { email: { subject: EMAIL_SUBJECT } },
     channels: ["pdf", "web", "email"],
     variables: VARIABLES,
     sampleSets: SAMPLE_SETS,
@@ -910,8 +905,7 @@ describe("requestChanges", () => {
         basedOnVersionId: "v_1",
         name: TEMPLATE.name,
         body: BODY,
-        emailSubject: EMAIL_SUBJECT,
-        emailPreheader: null,
+        channelFields: { email: { subject: EMAIL_SUBJECT } },
         channels: ["pdf", "web", "email"],
         variables: VARIABLES,
         sampleSets: SAMPLE_SETS,
@@ -959,7 +953,7 @@ describe("requestChanges", () => {
     result.newDraft.body.content![1]!.content![0]!.text = "Changed";
     result.newDraft.variables[0]!.label = "Changed";
     result.newDraft.sampleSets[0]!.values.first_name = "Changed";
-    result.newDraft.emailSubject!.content![0]!.content![0]!.text = "Changed";
+    result.newDraft.channelFields.email!.subject!.content![0]!.content![0]!.text = "Changed";
     expect(BODY.content![1]!.content![0]!.text).toBe("Hi ");
     expect(VARIABLES[0]!.label).toBe("First name");
     expect(SAMPLE_SETS[0]!.values.first_name).toBe("Maya");
@@ -1835,8 +1829,7 @@ describe("scenario 3: the review loop", () => {
       state: "draft",
       variables: VARIABLES,
       body: BODY,
-      emailSubject: null,
-      emailPreheader: null,
+      channelFields: {},
       channels: ["pdf", "web"],
       writers: ["maya"],
       rev: 3,

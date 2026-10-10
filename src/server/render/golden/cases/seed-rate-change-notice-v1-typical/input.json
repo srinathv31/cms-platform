@@ -458,48 +458,52 @@
       }
     ]
   },
-  "emailSubject": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
+  "channelFields": {
+    "email": {
+      "subject": {
+        "type": "doc",
         "content": [
           {
-            "type": "text",
-            "text": "Your purchase APR is changing on "
-          },
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Your purchase APR is changing on "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "effective_date"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "preheader": {
+        "type": "doc",
+        "content": [
           {
-            "type": "variable",
-            "attrs": {
-              "key": "effective_date"
-            }
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", here is what is changing on your Coral account."
+              }
+            ]
           }
         ]
       }
-    ]
-  },
-  "emailPreheader": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
-        "content": [
-          {
-            "type": "text",
-            "text": "Hi "
-          },
-          {
-            "type": "variable",
-            "attrs": {
-              "key": "first_name"
-            }
-          },
-          {
-            "type": "text",
-            "text": ", here is what is changing on your Coral account."
-          }
-        ]
-      }
-    ]
+    }
   }
 }

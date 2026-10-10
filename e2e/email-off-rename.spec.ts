@@ -37,8 +37,8 @@ const keysIn = (doc: { content?: unknown[] } | null): string[] =>
   );
 
 const savedSubjectKeys = async (templateId: string) => {
-  const [draft] = await rows(db, "SELECT email_subject FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
-  return keysIn(json(draft.email_subject));
+  const [draft] = await rows(db, "SELECT channel_fields FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
+  return keysIn(json(draft.channel_fields)?.email?.subject ?? null);
 };
 
 test("a variable renamed while Email is off is renamed in the subject too, and the draft submits", async ({ page }) => {
@@ -107,8 +107,8 @@ test("a variable renamed while Email is off is renamed in the subject too, and t
     await expect(page.getByText(/Define or remove/)).toHaveCount(0);
     await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
 
-    const [v3] = await rows(db, "SELECT state, email_subject FROM versions WHERE template_id = ? AND number = 3", [templateId]);
+    const [v3] = await rows(db, "SELECT state, channel_fields FROM versions WHERE template_id = ? AND number = 3", [templateId]);
     expect(v3.state).toBe("in_review");
-    expect(keysIn(json(v3.email_subject))).toEqual(["given_name"]);
+    expect(keysIn(json(v3.channel_fields)?.email?.subject ?? null)).toEqual(["given_name"]);
   });
 });

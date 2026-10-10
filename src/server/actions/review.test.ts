@@ -918,8 +918,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       body: v2.body,
       variables: v2.variables,
       channels: v2.channels,
-      emailSubject: v2.emailSubject,
-      emailPreheader: v2.emailPreheader,
+      channelFields: v2.channelFields,
       sampleSets: v2.sampleSets,
       contractChanges: null,
     });

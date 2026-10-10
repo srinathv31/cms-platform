@@ -108,12 +108,13 @@ variations to avoid.
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
    client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
    byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.
-3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and email fields with
-   [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against the document limits and the editor
-   schema, block ids added. Import stores documents through the same function. Then, in one transaction, it checks
-   permission, the `draft` state, and `rev` (tolerating a lost response from the same session), writes with a
-   compare-and-set, adds the saver to the version's `writers` (nobody decides a version they wrote), and keeps one
-   `draft.edited` audit row per editing session. Nothing is refreshed; the client already has the content.
+3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and the channel fields (each by its id,
+   such as `"email.subject"`) with [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against
+   the document limits and the editor schema, block ids added. Import stores documents through the same function.
+   Then, in one transaction, it checks permission, the `draft` state, and `rev` (tolerating a lost response from the
+   same session), writes with a compare-and-set (the channel fields laid over the stored ones), adds the saver to
+   the version's `writers` (nobody decides a version they wrote), and keeps one `draft.edited` audit row per editing
+   session. Nothing is refreshed; the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
@@ -151,8 +152,10 @@ at Turso instead. Two schema files:
   - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
   - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
-    variables, channels, state, `rev`, `writers`, the approval `stages` recorded at submit, sunset and revoke
-    fields); `approvals` (each decision's stage id). The name is a version field, so a rename goes through
+    `channel_fields` (each channel's own fields, such as the email subject, by channel and then field key, from
+    the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `rev`,
+    `writers`, the approval `stages` recorded at submit, sunset and revoke fields); `approvals` (each decision's
+    stage id). The name is a version field, so a rename goes through
     review ([decision 0016](decisions/0016-the-name-is-versioned.md)).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.

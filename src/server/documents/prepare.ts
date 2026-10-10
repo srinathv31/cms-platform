@@ -1,6 +1,7 @@
 import "server-only";
+import { normalizeAndCheckChannelField, type FieldShape } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
-import { normalizeAndCheckBody, normalizeAndCheckField, type Checked } from "@/editor/model/document-check";
+import { normalizeAndCheckBody, type Checked } from "@/editor/model/document-check";
 import { normalizeDocument } from "@/editor/model/normalize";
 import { ensureBlockIds } from "@/editor/schema";
 import { DOCUMENT_MESSAGES, RenderDocumentError, parseWithSchema } from "@/server/render/schema-check";
@@ -31,9 +32,12 @@ export function prepareBody(doc: JSONContent): Prepared {
   );
 }
 
-/** An email subject or preheader as it is stored: normalized to one line, and checked. */
-export function prepareField(doc: JSONContent): Prepared {
-  return prepare(doc, normalizeAndCheckField, (normalized) => normalized);
+/**
+ * A channel field (src/domain/channel-fields.ts) as it is stored: normalized for its shape and checked.
+ * A `line` (the email subject and preheader) is normalized to one line.
+ */
+export function prepareField(doc: JSONContent, shape: FieldShape): Prepared {
+  return prepare(doc, (field) => normalizeAndCheckChannelField(shape, field), (normalized) => normalized);
 }
 
 function prepare(doc: JSONContent, check: (doc: JSONContent) => Checked, finish: (doc: JSONContent) => JSONContent): Prepared {

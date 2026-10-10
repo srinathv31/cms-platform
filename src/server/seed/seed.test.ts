@@ -10,6 +10,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { ALL_CHANNEL_FIELDS, channelFieldValue, type ChannelFields } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
@@ -80,6 +81,10 @@ function walk(node: JSONContent, visit: (n: JSONContent) => void) {
   visit(node);
   node.content?.forEach((child) => walk(child, visit));
 }
+
+/** Every channel field a version has a value for. */
+const fieldDocs = (fields: ChannelFields): JSONContent[] =>
+  ALL_CHANNEL_FIELDS.flatMap((field) => channelFieldValue(fields, field) ?? []);
 
 const base = new Date();
 let db: Awaited<ReturnType<typeof freshDb>>["db"];
@@ -319,7 +324,7 @@ describe("bodies", () => {
 
   it("parses as valid TipTap documents under the contract schema", () => {
     for (const v of versions) {
-      for (const doc of [v.body, v.emailSubject, v.emailPreheader]) {
+      for (const doc of [v.body, ...fieldDocs(v.channelFields)]) {
         if (doc) expect(() => PMNode.fromJSON(contractSchema, doc).check()).not.toThrow();
       }
     }
@@ -332,10 +337,10 @@ describe("bodies", () => {
     expect(shared.length).toBeGreaterThan(8);
   });
 
-  it("declares every variable that the body, subject and preheader use", () => {
+  it("declares every variable that the body and the channel fields use", () => {
     for (const v of versions) {
       const declared = new Set(v.variables.map((x) => x.key));
-      for (const doc of [v.body, v.emailSubject, v.emailPreheader]) {
+      for (const doc of [v.body, ...fieldDocs(v.channelFields)]) {
         if (!doc) continue;
         walk(doc, (n) => {
           if (n.type === "variable") {
@@ -388,10 +393,13 @@ describe("bodies", () => {
     }
   });
 
-  it("sets email copy only on versions with the email channel", () => {
+  it("sets a channel's fields only on versions with that channel, and every required one when it is on", () => {
     for (const v of versions) {
-      if (v.emailSubject || v.emailPreheader) expect(v.channels).toContain("email");
-      if (v.channels.includes("email")) expect(v.emailSubject).toBeTruthy();
+      for (const field of ALL_CHANNEL_FIELDS) {
+        const value = channelFieldValue(v.channelFields, field);
+        if (value) expect(v.channels, field.id).toContain(field.channel);
+        if (field.required && v.channels.includes(field.channel)) expect(value, field.id).toBeTruthy();
+      }
     }
   });
 });

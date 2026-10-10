@@ -43,7 +43,7 @@ export function rich(source: string): JSONContent[] {
 
 const paragraph = (source: string): JSONContent => ({ type: "paragraph", content: rich(source) });
 
-/** A one-paragraph document for the email subject and preheader. */
+/** A one-paragraph document: a one-line channel field (the email subject and preheader). */
 export function inlineDoc(source: string): JSONContent {
   return { type: "doc", content: [paragraph(source)] };
 }

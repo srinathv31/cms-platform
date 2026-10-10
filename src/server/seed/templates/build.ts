@@ -1,4 +1,5 @@
 import { DEFAULT_BUSINESS_ZONE, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import {
   REQUIRED_SECTIONS,
@@ -34,8 +35,7 @@ function check(spec: SeedTemplate, v: SeedVersion) {
 
   const declared = new Set(v.variables.map((x) => x.key));
   const used = variableKeys(v.body);
-  variableKeys(v.email?.subject, used);
-  variableKeys(v.email?.preheader, used);
+  for (const field of ALL_CHANNEL_FIELDS) variableKeys(channelFieldValue(v.channelFields ?? {}, field), used);
   for (const key of used) {
     if (!declared.has(key)) throw new Error(`Seed: ${where} uses undeclared variable "${key}"`);
   }
@@ -53,8 +53,9 @@ function check(spec: SeedTemplate, v: SeedVersion) {
   if (v.state === "draft" && v.updatedAt === undefined) {
     throw new Error(`Seed: ${where} is a draft and needs updatedAt`);
   }
-  if (v.email && !v.channels.includes("email")) {
-    throw new Error(`Seed: ${where} has email copy but no email channel`);
+  const stray = ALL_CHANNEL_FIELDS.find((field) => !v.channels.includes(field.channel) && channelFieldValue(v.channelFields ?? {}, field));
+  if (stray) {
+    throw new Error(`Seed: ${where} has a ${stray.name} but no ${stray.channel} channel`);
   }
 }
 
@@ -161,8 +162,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       name: spec.name,
       basedOnVersionId: v.basedOn ? versionOf(v.basedOn).id : null,
       body: v.body,
-      emailSubject: v.email?.subject ?? null,
-      emailPreheader: v.email?.preheader ?? null,
+      channelFields: v.channelFields ?? {},
       channels: v.channels,
       variables: v.variables,
       sampleSets: ctx.vars.sampleSets(v.variables),

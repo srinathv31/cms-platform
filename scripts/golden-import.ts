@@ -4,7 +4,7 @@
 // src/server/render/golden/cases (see docs/render-spec.md section 13).
 //
 // Freezes one seeded version into a new golden case: cases/<case-name>/input.json holds the version's
-// document, variable list, email fields and one sample set's values, copied. Editing the seed later
+// document, variable list, channel fields and one sample set's values, copied. Editing the seed later
 // never moves the golden. The case name defaults to seed-<template key>-v<version>-<sample set>
 // (version "draft" for the open draft). Then run `npm run golden:update` to write the expected files.
 //
@@ -74,8 +74,7 @@ async function main() {
       variables: row.variables,
       values: set.values,
       body: row.body,
-      emailSubject: row.emailSubject,
-      emailPreheader: row.emailPreheader,
+      channelFields: row.channelFields,
     };
     mkdirSync(caseDir(slug), { recursive: true });
     writeFileSync(inputPath(slug), json(input));

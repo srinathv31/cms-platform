@@ -141,9 +141,11 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           body: savingsBody(2),
           variables: vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]),
           channels: ["pdf", "web", "email"],
-          email: {
-            subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
-            preheader: inlineDoc("Hi {first_name}, here are the details of your savings rate."),
+          channelFields: {
+            email: {
+              subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
+              preheader: inlineDoc("Hi {first_name}, here are the details of your savings rate."),
+            },
           },
           contractChanges: [],
           createdBy: "eli",

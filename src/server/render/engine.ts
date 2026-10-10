@@ -9,7 +9,8 @@ import {
   resolveInlineField,
   validateValues,
 } from "@/domain/render";
-import type { EmailRender, RenderDoc, RenderError, ResolveContext } from "@/domain/render/types";
+import { channelFieldValue, channelFieldsOf, type ChannelFields, type FieldShape } from "@/domain/channel-fields";
+import type { EmailFields, EmailRender, RenderDoc, RenderError, ResolveContext } from "@/domain/render/types";
 import type { Channel, JSONContent, Variable } from "@/domain/types";
 import { renderEmail } from "./channels/email";
 import { renderPdf, UnrenderableCharactersError } from "./channels/pdf";
@@ -22,7 +23,7 @@ import { checkDocument, checkField, RenderDocumentError } from "./schema-check";
 // run it on frozen inputs. One implementation, so a golden file is what the API returns.
 //
 //   6 values                                                    → 422 missing_variables / invalid_values
-//   7 the document check: the body; for email, subject and preheader too → 500 render_failed
+//   7 the document check: the body, and the channel's own fields → 500 render_failed
 //   8 resolve                                                   → 500 render_failed
 //   9 the channel adapter                                       → 500 render_failed
 //
@@ -38,8 +39,8 @@ export interface EngineInput {
   variables: readonly Variable[];
   values: Readonly<Record<string, unknown>>;
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** Each channel's own fields (src/domain/channel-fields.ts). Only the rendered channel's are read. */
+  channelFields: ChannelFields;
 }
 
 /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text. */
@@ -67,12 +68,14 @@ export async function runEngine(input: EngineInput, channel: Channel, at: Date):
   const validated = validateValues(input.variables, input.values);
   if (!validated.ok) return { ok: false, stage: 6, error: validated.error };
 
-  // 7. The document check. Only email prints the subject and preheader, so only email checks them.
+  // 7. The document check: the body, then the channel's own fields in the registry's order. Only a
+  // channel's own output prints its fields (email's subject and preheader), so only it checks them.
+  const own = channelFieldsOf(channel);
   try {
     checkDocument(input.body);
-    if (channel === "email") {
-      if (input.emailSubject) checkField(input.emailSubject);
-      if (input.emailPreheader) checkField(input.emailPreheader);
+    for (const field of own) {
+      const value = channelFieldValue(input.channelFields, field);
+      if (value) checkField(value, field.shape);
     }
   } catch (error) {
     return thrown(7, error);
@@ -81,7 +84,7 @@ export async function runEngine(input: EngineInput, channel: Channel, at: Date):
   // 8. Resolve.
   const ctx: ResolveContext = { variables: input.variables, values: validated.values };
   let doc: RenderDoc;
-  let fields = { subject: "", preheader: "" };
+  let fields: ResolvedFields;
   try {
     doc = {
       templateId: input.templateId,
@@ -89,9 +92,9 @@ export async function runEngine(input: EngineInput, channel: Channel, at: Date):
       versionNumber: input.versionNumber,
       blocks: resolveDocument(input.body, ctx),
     };
-    if (channel === "email") {
-      fields = { subject: resolveInlineField(input.emailSubject, ctx), preheader: resolveInlineField(input.emailPreheader, ctx) };
-    }
+    fields = Object.fromEntries(
+      own.map((field) => [field.key, resolveField(channelFieldValue(input.channelFields, field), field.shape, ctx)]),
+    );
   } catch (error) {
     return thrown(8, error);
   }
@@ -104,14 +107,28 @@ export async function runEngine(input: EngineInput, channel: Channel, at: Date):
   }
 }
 
-async function adapt(channel: Channel, doc: RenderDoc, fields: { subject: string; preheader: string }, at: Date): Promise<RenderBody> {
+/** The rendered channel's own fields as text, by key: a field with no value is "". */
+type ResolvedFields = Readonly<Record<string, string>>;
+
+/** A channel field as the text its channel prints. */
+function resolveField(field: JSONContent | null, shape: FieldShape, ctx: ResolveContext): string {
+  switch (shape) {
+    case "line":
+      return resolveInlineField(field, ctx);
+    default:
+      return assertNever(shape, "field shape");
+  }
+}
+
+async function adapt(channel: Channel, doc: RenderDoc, fields: ResolvedFields, at: Date): Promise<RenderBody> {
   switch (channel) {
     case "pdf":
       return renderPdf(doc, { createdAt: at });
     case "web":
       return renderWeb(doc);
     case "email":
-      return renderEmail(doc, fields);
+      // `fields` has a string for each of Email's fields (stage 8 resolves every one, "" for none).
+      return renderEmail(doc, fields as EmailFields);
     default:
       return assertNever(channel, "channel");
   }

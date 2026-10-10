@@ -40,6 +40,13 @@ import {
   type RecordedDecision,
 } from "./approval-chain";
 import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zone";
+import {
+  channelFieldValue,
+  fieldNoun,
+  fieldsOfChannels,
+  type ChannelFields,
+  type ChannelFieldSpec,
+} from "./channel-fields";
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
@@ -98,8 +105,8 @@ export interface StarterContent {
   sampleSets: SampleSet[];
   /** Defaults to `DEFAULT_CHANNELS`. */
   channels?: readonly Channel[];
-  emailSubject?: JSONContent | null;
-  emailPreheader?: JSONContent | null;
+  /** The channel fields it ships with (an email subject, say). Defaults to none. */
+  channelFields?: ChannelFields;
 }
 
 /** The content of a version that a draft is made from. */
@@ -110,8 +117,7 @@ export interface VersionSnapshot {
   /** The template's name as this version has it. A draft copies it; renaming the draft changes only the draft. */
   name: string;
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  channelFields: ChannelFields;
   channels: readonly Channel[];
   variables: readonly Variable[];
   sampleSets: readonly SampleSet[];
@@ -126,8 +132,8 @@ export interface DraftFields {
   /** The template's name in this draft: what the author renames, and what customers see once it goes live. */
   name: string;
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** Each channel's own fields (channel-fields.ts), kept whether or not the channel is on. */
+  channelFields: ChannelFields;
   channels: Channel[];
   variables: Variable[];
   sampleSets: SampleSet[];
@@ -190,8 +196,7 @@ export function createDraft(input: {
         basedOnVersionId: null,
         name,
         body: clone(starter.body),
-        emailSubject: clone(starter.emailSubject ?? null),
-        emailPreheader: clone(starter.emailPreheader ?? null),
+        channelFields: clone(starter.channelFields ?? {}),
         channels: [...(starter.channels ?? DEFAULT_CHANNELS)],
         variables: clone([...starter.variables]),
         sampleSets: clone([...starter.sampleSets]),
@@ -247,7 +252,7 @@ export function planDraftStart(
 /**
  * A new draft copied from the version `planDraftStart` chose, the template's latest, Active or
  * Revoked: its name, body (block ids included, so comments and the redline keep their anchors),
- * variables, channels, email fields and sample sets. `basedOnVersionId` is that version, revoked or not.
+ * variables, channels, channel fields and sample sets. `basedOnVersionId` is that version, revoked or not.
  * Contract changes are worked out at submit, against `contractBaseline`, so none are recorded here.
  * Its writers start afresh with the person who pressed Edit: who wrote a released version doesn't
  * keep anyone from deciding the next one.
@@ -353,8 +358,7 @@ export interface SubmitDraft {
   state: VersionState;
   variables: readonly Variable[];
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  channelFields: ChannelFields;
   channels: readonly Channel[];
   /** Who has written the draft (`DraftFields.writers`). */
   writers: readonly string[];
@@ -421,9 +425,9 @@ export interface SubmitInput {
  *   - the version isn't a draft (a second tab, a double click);
  *   - the draft changed after the submitter's summary was read (`seenRev`): a save that landed
  *     meanwhile, from this page or another, would otherwise be frozen without being shown;
- *   - a chip names a key the variable list doesn't have: in the document, and in the email subject
- *     and preheader while Email is on (they are not part of the output otherwise);
- *   - Email is on and the subject is empty.
+ *   - a chip names a key the variable list doesn't have: in the document, and in the fields of the
+ *     channels that are on (channel-fields.ts; a field isn't part of the output while its channel is off);
+ *   - a required field of a channel that is on is blank (Email's subject): the first such field.
  *
  * A renamed key is one `key_renamed` change: the renamed variable keeps its identity as its id
  * (`Variable.id`), so `diffVariables` pairs it with the baseline's variable whatever it is keyed now.
@@ -435,14 +439,15 @@ export function submit(input: SubmitInput): SubmitResult {
   if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
   if (draft.rev !== input.seenRev) return refuse(REFUSALS.summaryStale);
 
-  const emailOn = draft.channels.includes("email");
+  const fields = fieldsOfChannels(draft.channels);
 
   const defined = new Set(draft.variables.map((v) => v.key));
-  const fields = emailOn ? [draft.body, draft.emailSubject, draft.emailPreheader] : [draft.body];
-  const undefinedKeys = unique(fields.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
+  const docs = [draft.body, ...fields.map((field) => channelFieldValue(draft.channelFields, field))];
+  const undefinedKeys = unique(docs.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
   if (undefinedKeys.length > 0) return refuse(REFUSALS.undefinedVariables(undefinedKeys));
 
-  if (emailOn && isBlankField(draft.emailSubject)) return refuse(REFUSALS.emailSubjectMissing);
+  const missing = fields.find((field) => field.required && isBlankField(channelFieldValue(draft.channelFields, field)));
+  if (missing) return refuse(REFUSALS.fieldMissing(missing));
 
   const number = highestNumber + 1;
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
@@ -532,7 +537,11 @@ export const REFUSALS = {
     "undefined_variables",
     (keys: readonly string[]) => `Define or remove ${listKeys(keys)} before submitting.`,
   ),
-  emailSubjectMissing: refusal("email_subject_missing", "Add an email subject before submitting."),
+  /** `submit`, when a required channel field (channel-fields.ts) is blank: "Add an email subject before submitting." */
+  fieldMissing: refusal(
+    "field_missing",
+    (field: Pick<ChannelFieldSpec, "name">) => `Add ${fieldNoun(field)} before submitting.`,
+  ),
   notInReview: refusal("not_in_review", "This version isn't in review."),
   stageMissing: refusal("stage_missing", "This version's approval stage no longer exists."),
   giveReason: refusal("reason_missing", "Give a reason."),
@@ -1248,7 +1257,7 @@ function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string |
 /**
  * A new draft copied from a version (Edit on the latest version, or a change request): its name, body
  * with every block id (so comment threads and the redline keep their anchors), variables, channels,
- * email fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
+ * channel fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */
 function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, writers: readonly string[]): DraftFields {
   return {
@@ -1257,8 +1266,7 @@ function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, wri
     basedOnVersionId: version.id,
     name: version.name,
     body: clone(version.body),
-    emailSubject: clone(version.emailSubject),
-    emailPreheader: clone(version.emailPreheader),
+    channelFields: clone(version.channelFields),
     channels: [...version.channels],
     variables: clone([...version.variables]),
     sampleSets: clone([...version.sampleSets]),

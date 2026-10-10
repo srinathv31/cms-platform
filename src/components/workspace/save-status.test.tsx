@@ -119,15 +119,15 @@ describe("SaveStatus, in the browser", () => {
 // anything else is edited, so it can never put the old content over a newer edit.
 describe("Revert to v1", () => {
   const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
-  const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
+  const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], "email.subject": null, "email.preheader": null, sampleSets: [] };
   const V1: BaseVersionContent = {
     number: 1,
     name: "Rate notice",
     body: doc("Version 1"),
     variables: [],
     channels: ["pdf"],
-    emailSubject: null,
-    emailPreheader: null,
+    "email.subject": null,
+    "email.preheader": null,
     sampleSets: [],
   };
 

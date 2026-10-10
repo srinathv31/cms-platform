@@ -27,8 +27,7 @@ const probe = (name: string, body: RenderFixture["body"]): FreshJob => ({
     variables: [],
     values: {},
     body,
-    emailSubject: null,
-    emailPreheader: null,
+    channelFields: {},
   },
 });
 

@@ -25,8 +25,7 @@ function input(body: RenderFixture["body"], extra: Partial<RenderFixture> = {}):
     variables: [],
     values: {},
     body,
-    emailSubject: null,
-    emailPreheader: null,
+    channelFields: {},
     ...extra,
   };
 }

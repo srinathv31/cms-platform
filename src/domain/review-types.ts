@@ -15,6 +15,7 @@ import type {
   Variable,
   VersionState,
 } from "./types";
+import type { ChannelFields } from "./channel-fields";
 import type { Refused } from "./refusals";
 
 // ── People ───────────────────────────────────────────────────────────────────
@@ -316,8 +317,8 @@ export interface ReviewScreenData {
     variables: Variable[];
     channels: Channel[];
     sampleSets: SampleSet[];
-    emailSubject: JSONContent | null;
-    emailPreheader: JSONContent | null;
+    /** Each channel's own fields (channel-fields.ts). */
+    channelFields: ChannelFields;
     submittedBy: Person;
     submittedAt: string;
     submitNote: string | null;

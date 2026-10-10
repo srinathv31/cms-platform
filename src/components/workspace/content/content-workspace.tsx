@@ -7,6 +7,7 @@ import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-l
 import { openCount } from "@/components/comments/thread-state";
 import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
+import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type ChannelFields } from "@/domain/channel-fields";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { Person, ThreadView } from "@/domain/review-types";
 import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
@@ -21,8 +22,8 @@ import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./ed
 import { EmailDetails } from "./email-details";
 import { Rail } from "./rail";
 
-/** The fields this page shows, which a revert can put back. */
-const CONTENT_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
+/** The fields this page shows, which a revert can put back: every channel field among them, by id. */
+const CONTENT_FIELDS = ["body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
 
 /** The app's one scrolling element (AppFrame's canvas), which the document scrolls in. */
 const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
@@ -42,8 +43,8 @@ export interface ContentWorkspaceProps {
   requiredSections: RequiredSection[];
   channels: Channel[];
   allowedChannels: Channel[];
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** Each channel's own fields, as the version stores them (src/domain/channel-fields.ts). */
+  channelFields: ChannelFields;
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD. */
   today: string;
@@ -100,8 +101,7 @@ export function ContentWorkspace({
   requiredSections,
   channels: initialChannels,
   allowedChannels,
-  emailSubject,
-  emailPreheader,
+  channelFields,
   sampleSets,
   today,
   editable,
@@ -137,7 +137,14 @@ export function ContentWorkspace({
 
   // What the editor root and its fields mount with: the page's values as it opened, then whatever a
   // revert (or undoing one) hands over. `gen` remounts them. Later props (a refresh) don't reset a draft being edited.
-  const [opening] = useState(() => ({ body, variables, channels: initialChannels, emailSubject, emailPreheader, sampleSets }));
+  // The channel fields are held flat, by id, as autosave saves them.
+  const [opening] = useState(() => ({
+    body,
+    variables,
+    channels: initialChannels,
+    ...channelFieldValues(channelFields),
+    sampleSets,
+  }));
   const [shown, setShown] = useState(() => ({ gen: 0, ...opening }));
 
   // A revert is pressed from a button, so it must not scroll the page. The old editor leaving shortens
@@ -185,12 +192,15 @@ export function ContentWorkspace({
       opening,
       restore: (fields, values) => {
         if (!CONTENT_FIELDS.some((key) => key in fields)) return;
+        // A channel field's null is a value (cleared), so only a missing one falls back to the opening.
+        const fieldValues = Object.fromEntries(
+          CHANNEL_FIELD_IDS.map((id) => [id, values[id] === undefined ? opening[id] : values[id]]),
+        ) as ChannelFieldValues;
         const next = {
           body: values.body ?? opening.body,
           variables: values.variables ?? opening.variables,
           channels: values.channels ?? opening.channels,
-          emailSubject: values.emailSubject === undefined ? opening.emailSubject : values.emailSubject,
-          emailPreheader: values.emailPreheader === undefined ? opening.emailPreheader : values.emailPreheader,
+          ...fieldValues,
           sampleSets: values.sampleSets ?? opening.sampleSets,
         };
         liveBody.current = next.body;
@@ -336,12 +346,7 @@ export function ContentWorkspace({
           />
         }
         emailDetails={
-          <EmailDetails
-            on={channels.includes("email")}
-            editable={editable}
-            subject={shown.emailSubject}
-            preheader={shown.emailPreheader}
-          />
+          <EmailDetails on={channels.includes("email")} editable={editable} values={shown} />
         }
         original={importOriginal !== null}
         takeArrival={takeArrival}

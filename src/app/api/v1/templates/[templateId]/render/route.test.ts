@@ -201,7 +201,7 @@ describe("POST …/render: superseded versions", () => {
     const where = and(eq(versions.templateId, id), eq(versions.number, 1));
     const [v1] = await db.select().from(versions).where(where);
     const subject = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Your savings rate" }] }] };
-    await db.update(versions).set({ channels: ["pdf", "web", "email"], emailSubject: subject }).where(where);
+    await db.update(versions).set({ channels: ["pdf", "web", "email"], channelFields: { email: { subject } } }).where(where);
     try {
       const values = Object.fromEntries(v1!.variables.map((v) => [v.key, v.sample]));
       const res = await post("high-yield-savings", { version: 1, channel: "email", values }, { "X-Consumer-Id": "deposits-online" });
@@ -210,7 +210,7 @@ describe("POST …/render: superseded versions", () => {
       const body = (await res.json()) as EmailResponseBody;
       expect(body).toMatchObject({ subject: "Your savings rate", preheader: "", newerVersion: 2 });
     } finally {
-      await db.update(versions).set({ channels: v1!.channels, emailSubject: v1!.emailSubject }).where(where);
+      await db.update(versions).set({ channels: v1!.channels, channelFields: v1!.channelFields }).where(where);
     }
   });
 

@@ -48,12 +48,10 @@ export function buildStarter(key: StarterKey, { scope, now }: BuildStarterOption
     case "card_offer_terms":
       return base(cardOfferTermsBody(scope), cardOfferTermsVariables(kit));
     case "rate_change_notice": {
-      const email = rateChangeNoticeEmail();
       return {
         ...base(rateChangeNoticeBody(scope), rateChangeNoticeVariables(kit)),
         channels: ["pdf", "web", "email"],
-        emailSubject: email.subject,
-        emailPreheader: email.preheader,
+        channelFields: { email: rateChangeNoticeEmail() },
       };
     }
     case "fee_schedule":

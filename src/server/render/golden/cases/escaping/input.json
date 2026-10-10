@@ -278,38 +278,42 @@
       }
     ]
   },
-  "emailSubject": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
+  "channelFields": {
+    "email": {
+      "subject": {
+        "type": "doc",
         "content": [
           {
-            "type": "text",
-            "text": "Hi <b>there</b> & welcome "
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi <b>there</b> & welcome "
+              }
+            ]
+          }
+        ]
+      },
+      "preheader": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "\"quoted\" & <tags> "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "a"
+                }
+              }
+            ]
           }
         ]
       }
-    ]
-  },
-  "emailPreheader": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
-        "content": [
-          {
-            "type": "text",
-            "text": "\"quoted\" & <tags> "
-          },
-          {
-            "type": "variable",
-            "attrs": {
-              "key": "a"
-            }
-          }
-        ]
-      }
-    ]
+    }
   }
 }

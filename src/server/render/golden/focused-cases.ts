@@ -8,6 +8,7 @@
 // A slug that starts with `error-` must fail before any channel (values or document check); one that
 // starts with `pdf-error-` must render every channel except the PDF (parity.test.ts asserts both).
 
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { Variable } from "@/editor/model/types";
 import type { RenderFixture } from "@/server/render/testing/fixture";
 import {
@@ -62,8 +63,7 @@ function make(
     body: Node;
     variables?: Variable[];
     values?: Record<string, unknown>;
-    emailSubject?: Node | null;
-    emailPreheader?: Node | null;
+    channelFields?: ChannelFields;
     versionNumber?: number | null;
   },
 ): FocusedCase {
@@ -77,8 +77,7 @@ function make(
       variables: parts.variables ?? [],
       values: parts.values ?? {},
       body: parts.body,
-      emailSubject: parts.emailSubject ?? null,
-      emailPreheader: parts.emailPreheader ?? null,
+      channelFields: parts.channelFields ?? {},
     },
   };
 }
@@ -446,8 +445,7 @@ const escaping = make("escaping", "Hostile text and values", {
     b: `"><img src=x onerror=alert(1)>`,
     c: "-->]]> &amp; &lt; \\ 100% %s {0} ${x} $1 'single' {{first_name}}",
   },
-  emailSubject: line(t("Hi <b>there</b> & welcome ")),
-  emailPreheader: line(t('"quoted" & <tags> '), v("a")),
+  channelFields: { email: { subject: line(t("Hi <b>there</b> & welcome ")), preheader: line(t('"quoted" & <tags> '), v("a")) } },
   body: doc(
     h(2, t("Escaping & <entities>")),
     p(v("a")),
@@ -468,8 +466,12 @@ const emailFields = make("email-subject-preheader", "Email subject and preheader
     variable("promo", "Promo", "text", false, ""),
   ],
   values: { first_name: "Zoë", effective_date: "2027-03-04" },
-  emailSubject: line(t("  Zoë, your rate changes on   "), v("effective_date"), t("  "), v("promo"), t(" — please read & act ✓ (and then some more words so the subject is long enough to need wrapping in a mail client)  ")),
-  emailPreheader: line(t("Hi "), v("first_name"), t(",   here is what is changing.  ")),
+  channelFields: {
+    email: {
+      subject: line(t("  Zoë, your rate changes on   "), v("effective_date"), t("  "), v("promo"), t(" — please read & act ✓ (and then some more words so the subject is long enough to need wrapping in a mail client)  ")),
+      preheader: line(t("Hi "), v("first_name"), t(",   here is what is changing.  ")),
+    },
+  },
   body: doc(h(1, t("Your rate is changing")), p(t("Hello "), v("first_name"), t(". Effective "), v("effective_date"), t("."))),
 });
 
@@ -607,7 +609,7 @@ const errorTableBadSpan = make("error-table-bad-span", "A stored table with a co
 });
 
 const errorEmailField = make("error-email-field", "An email subject with a hard break", {
-  emailSubject: line(t("Your rate"), br, t("is changing")),
+  channelFields: { email: { subject: line(t("Your rate"), br, t("is changing")) } },
   body: doc(para("The PDF and the web page render; the email is refused for its subject.")),
 });
 

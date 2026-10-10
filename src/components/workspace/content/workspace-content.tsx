@@ -36,8 +36,7 @@ export async function WorkspaceContent({
       requiredSections={doc.requiredSections}
       channels={doc.channels}
       allowedChannels={doc.allowedChannels}
-      emailSubject={doc.emailSubject}
-      emailPreheader={doc.emailPreheader}
+      channelFields={doc.channelFields}
       sampleSets={doc.sampleSets}
       today={doc.today}
       editable={doc.editable}

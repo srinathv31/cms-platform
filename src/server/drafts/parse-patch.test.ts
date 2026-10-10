@@ -76,13 +76,18 @@ describe("parseDraftPatch", () => {
     expect(ok({ ...base, variables: [variable] }).variables).toEqual([variable]);
     expect(ok({ ...base, channels: ["pdf", "email"] }).channels).toEqual(["pdf", "email"]);
     expect(ok({ ...base, sampleSets: [{ id: "s1", name: "Maya", values: { first_name: "Maya", n: 3 } }] }).sampleSets).toHaveLength(1);
-    expect(ok({ ...base, emailSubject: doc }).emailSubject).toBe(doc);
+    expect(ok({ ...base, "email.subject": doc })["email.subject"]).toBe(doc);
   });
 
   it("accepts null to clear the email subject and preheader", () => {
-    const patch = ok({ ...base, emailSubject: null, emailPreheader: null });
-    expect(patch.emailSubject).toBeNull();
-    expect(patch.emailPreheader).toBeNull();
+    const patch = ok({ ...base, "email.subject": null, "email.preheader": null });
+    expect(patch["email.subject"]).toBeNull();
+    expect(patch["email.preheader"]).toBeNull();
+  });
+
+  it("takes a channel field only by an id the registry has", () => {
+    expect(message({ ...base, "email.footer": doc })).toMatch(/email\.footer/);
+    expect(message({ ...base, emailSubject: doc })).toMatch(/emailSubject/);
   });
 
   it("trims the name", () => expect(ok({ ...base, name: "  New name " }).name).toBe("New name"));

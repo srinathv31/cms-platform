@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import { createDraft } from "@/domain/lifecycle";
 import type { JSONContent } from "@/domain/types";
 import { formatValue, validateValue } from "@/editor/model/variables";
@@ -59,8 +60,7 @@ describe.each(STARTER_KEYS)("starter %s", (key) => {
   it("only uses variables it declares", () => {
     const declared = new Set(starter.variables.map((v) => v.key));
     const used = variableKeys(starter.body);
-    variableKeys(starter.emailSubject, used);
-    variableKeys(starter.emailPreheader, used);
+    for (const field of ALL_CHANNEL_FIELDS) variableKeys(channelFieldValue(starter.channelFields ?? {}, field), used);
     for (const k of used) expect(declared.has(k), `${k} is declared`).toBe(true);
   });
 
@@ -133,7 +133,7 @@ describe("Card offer terms", () => {
 
   it("renders to PDF and Web, with email off", () => {
     expect(card.channels ?? ["pdf", "web"]).toEqual(["pdf", "web"]);
-    expect(card.emailSubject ?? null).toBeNull();
+    expect(card.channelFields ?? {}).toEqual({});
   });
 });
 
@@ -142,14 +142,13 @@ describe("Rate change notice", () => {
 
   it("is also an email, with a subject and preheader that use declared variables", () => {
     expect(notice.channels).toEqual(["pdf", "web", "email"]);
-    expect(variableKeys(notice.emailSubject).has("effective_date")).toBe(true);
-    expect(variableKeys(notice.emailPreheader).has("first_name")).toBe(true);
+    expect(variableKeys(notice.channelFields?.email?.subject).has("effective_date")).toBe(true);
+    expect(variableKeys(notice.channelFields?.email?.preheader).has("first_name")).toBe(true);
   });
 
   it("uses every variable it declares", () => {
     const used = variableKeys(notice.body);
-    variableKeys(notice.emailSubject, used);
-    variableKeys(notice.emailPreheader, used);
+    for (const field of ALL_CHANNEL_FIELDS) variableKeys(channelFieldValue(notice.channelFields ?? {}, field), used);
     expect([...used].sort()).toEqual(notice.variables.map((v) => v.key).sort());
   });
 });

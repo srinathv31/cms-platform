@@ -15,6 +15,7 @@ export type {
 export { VARIABLE_TYPES } from "@/editor/model/types";
 
 import type { JSONContent, SampleSet, Variable } from "@/editor/model/types";
+import type { ChannelFieldsPatch } from "./channel-fields";
 import type { Refused } from "./refusals";
 
 // ── Channels ──────────────────────────────────────────────────
@@ -136,19 +137,21 @@ export type RenderOutcome = "ok" | "error";
  * Body of an autosave. Only the fields that changed since the last save are sent.
  * The server checks `draft.edit`, accepts only versions in the `draft` state, and merges every
  * save of one editing session (`sessionKey`) into a single `draft.edited` audit row.
+ *
+ * Each channel field is a key of its own, its id from the registry (`ChannelFieldsPatch`,
+ * channel-fields.ts): `"email.subject": { "type": "doc", … }` sets it and `"email.subject": null`
+ * clears it. The server lays them over the version's stored `channel_fields`.
  */
-export interface DraftPatch {
+export interface DraftPatch extends ChannelFieldsPatch {
   /** The rev the client last saw. A stale rev gets a `conflict` response carrying the current rev. */
   rev: number;
   /** One per editing session (one page visit). */
   sessionKey: string;
   body?: JSONContent;
   variables?: Variable[];
-  /** The template's name (lives on the template; editable only while a draft is open). */
+  /** The draft's name (a version field: editable only while a draft is open). */
   name?: string;
   channels?: Channel[];
-  emailSubject?: JSONContent | null;
-  emailPreheader?: JSONContent | null;
   sampleSets?: SampleSet[];
 }
 

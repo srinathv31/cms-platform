@@ -440,6 +440,5 @@
       }
     ]
   },
-  "emailSubject": null,
-  "emailPreheader": null
+  "channelFields": {}
 }

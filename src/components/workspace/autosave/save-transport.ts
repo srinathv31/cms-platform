@@ -1,7 +1,8 @@
 // The network half of autosave: PUT one patch to /api/drafts/[versionId] and read the answer.
 
+import { ALL_CHANNEL_FIELDS, normalizeAndCheckChannelField } from "@/domain/channel-fields";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse } from "@/domain/types";
-import { DOCUMENT_MESSAGES, normalizeAndCheckBody, normalizeAndCheckField } from "@/editor/model/document-check";
+import { DOCUMENT_MESSAGES, normalizeAndCheckBody } from "@/editor/model/document-check";
 import type { Send } from "./autosave-scheduler";
 
 /**
@@ -36,10 +37,11 @@ function isSaveResponse(value: unknown): value is DraftSaveResponse {
  * ten deep). Only the schema parse is left to the server.
  */
 function refusal(patch: DraftPatch): DraftSaveResponse | null {
-  const problem =
-    (patch.body ? normalizeAndCheckBody(patch.body).problem : null) ??
-    (patch.emailSubject ? normalizeAndCheckField(patch.emailSubject).problem : null) ??
-    (patch.emailPreheader ? normalizeAndCheckField(patch.emailPreheader).problem : null);
+  let problem = patch.body ? normalizeAndCheckBody(patch.body).problem : null;
+  for (const field of ALL_CHANNEL_FIELDS) {
+    const value = patch[field.id];
+    if (!problem && value) problem = normalizeAndCheckChannelField(field.shape, value).problem;
+  }
   return problem ? { ok: false, error: "invalid", message: DOCUMENT_MESSAGES[problem] } : null;
 }
 

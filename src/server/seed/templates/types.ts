@@ -1,3 +1,4 @@
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, ContractChange, JSONContent, Variable, VersionState } from "@/domain/types";
 import type { ConsumerId } from "../platform";
 import type { TeamId } from "../teams";
@@ -44,7 +45,8 @@ export interface SeedVersion {
   body: JSONContent;
   variables: Variable[];
   channels: Channel[];
-  email?: { subject: JSONContent; preheader: JSONContent };
+  /** Each channel's own fields (src/domain/channel-fields.ts): email's subject and preheader. Only for channels it renders. */
+  channelFields?: ChannelFields;
   /** Null for a first version; [] when nothing changed. */
   contractChanges?: ContractChange[] | null;
 

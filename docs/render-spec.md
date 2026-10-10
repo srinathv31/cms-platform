@@ -51,16 +51,16 @@ Contents:
 | 4 | Version rules (consumers only): released, not sunset, not revoked | 409 / 410 |
 | 5 | The channel is allowed by the content type and enabled on the version | 422 `channel_not_allowed` / `channel_not_enabled` |
 | 6 | **Validate values** against the version's variable list (section 5) | 422 `missing_variables` / `invalid_values` |
-| 7 | **Check the document**: the body passes the document check (section 3). For email only, the subject and then the preheader, when not null, pass the one-line field check (a `doc` holding exactly one `paragraph`, no marks anywhere, children only `text` and `variable`), then the schema parse | 500 `render_failed` |
+| 7 | **Check the document**: the body passes the document check (section 3). Then the rendered channel's own fields (for email, the subject and then the preheader), each that has a value, pass the check for its shape (a one-line field: a `doc` holding exactly one `paragraph`, no marks anywhere, children only `text` and `variable`), then the schema parse | 500 `render_failed` |
 | 8 | **Resolve** the TipTap JSON and the canonical values into a RenderDoc (section 8) | 500 `render_failed` |
 | 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF (section 10) | 500 `render_failed` |
 | 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values) | — |
 
 Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
-Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that for email stage 7 also checks the subject and preheader and stage 8 resolves them, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
+Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that stage 7 also checks the channel's own fields and stage 8 resolves them (only email has any: its subject and preheader), and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
-Inputs to the engine (and nothing else): the version's `body`, `emailSubject` and `emailPreheader` (TipTap JSON), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel, and the render time `at` (used only as the PDF's creation and modification date).
+Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel, and the render time `at` (used only as the PDF's creation and modification date).
 
 ---
 
@@ -110,9 +110,20 @@ The `link` mark may also carry `target`, `rel`, `class` and `title`; the engine 
 
 In the editor's HTML (clipboard, static render) the numbering attributes appear as `data-marker-format` and `data-marker-delimiter` on the `<ol>`, and `start` as the `start` attribute.
 
+### Channel fields
+
+A channel can have short fields of its own, printed by that channel only. They are declared once, in a registry (in the Node code, `src/domain/channel-fields.ts`), each with a key, a label, a shape and whether submit requires it:
+
+| Channel | Field | Shape | Required at submit |
+| --- | --- | --- | --- |
+| Email | `subject` | one line | yes |
+| Email | `preheader` | one line | no |
+
+PDF and Web have none. A version stores them as one JSON object, `channelFields` (the `versions.channel_fields` column), keyed by channel and then by field key: `{ "email": { "subject": { "type": "doc", … }, "preheader": { "type": "doc", … } } }`. A field with no value is absent, and so is a channel with none, so a version without any holds `{}`. A field keeps its value while its channel is off; only its own channel's render reads it.
+
 ### One-line fields
 
-The email subject and preheader are separate one-line documents: `{ "type": "doc", "content": [ one paragraph ] }`, whose paragraph holds only `text` and `variable` nodes. Neither those nodes nor the paragraph carry marks. The paragraph may be empty. No hard breaks. A field may be `null` (none).
+A field of the one-line shape (the email subject and preheader) is a separate one-line document: `{ "type": "doc", "content": [ one paragraph ] }`, whose paragraph holds only `text` and `variable` nodes. Neither those nodes nor the paragraph carry marks. The paragraph may be empty. No hard breaks.
 
 ### Limits
 
@@ -130,7 +141,7 @@ The email subject and preheader are separate one-line documents: `{ "type": "doc
 
 Some things can only arrive through paste, import or JSON. They are normalized when the document is saved (every autosave, the import, and paste into the editor), so the editor and every channel see the same document. Normalization is idempotent and never drops content: what can't stay where it is is moved or converted, and what can't be fixed without guessing (an unknown node, a bad span, a list start of 20000, lists ten deep) is left for the document check, which refuses it with a message instead of storing or rendering it.
 
-Every write of a body (an autosave, an import) stores it as: normalize → check → add ids → normalize again (in the Node code, `prepareBody` in `src/server/documents/prepare.ts`; the editor's autosave runs the first two steps before sending, with the same sentences). Adding ids is a ProseMirror round trip: every attribute default is written, unknown attributes are dropped, adjacent text with equal marks merges, and every block without an `id` gets one; the second normalize takes the written defaults (`align: null`, `type: null`) out again. A subject or preheader: normalize as a field → the field check → store. An autosave refusal answers `{ "ok": false, "error": "invalid", "message" }` with the check's sentence (anything else thrown while preparing gives the "unsupported" sentence), checked in the order name, body, subject, preheader. An import whose converted body the check refuses is refused with the `content` code (400) and the reason "This file can't be imported as it is." followed by the check's sentence; nothing is stored or written. The engine's check before every render (pipeline stage 7) still applies to every stored document.
+Every write of a body (an autosave, an import) stores it as: normalize → check → add ids → normalize again (in the Node code, `prepareBody` in `src/server/documents/prepare.ts`; the editor's autosave runs the first two steps before sending, with the same sentences). Adding ids is a ProseMirror round trip: every attribute default is written, unknown attributes are dropped, adjacent text with equal marks merges, and every block without an `id` gets one; the second normalize takes the written defaults (`align: null`, `type: null`) out again. A channel field (the subject, the preheader): normalize for its shape → the check for its shape → store (`prepareField`). An autosave refusal answers `{ "ok": false, "error": "invalid", "message" }` with the check's sentence (anything else thrown while preparing gives the "unsupported" sentence), checked in the order name, body, then the channel fields in the registry's order (subject, preheader). An import whose converted body the check refuses is refused with the `content` code (400) and the reason "This file can't be imported as it is." followed by the check's sentence; nothing is stored or written. The engine's check before every render (pipeline stage 7) still applies to every stored document.
 
 ### Normalization (the CMS, at save; the resolver repeats the text rules defensively)
 
@@ -690,8 +701,7 @@ src/server/render/golden/
   "variables": [ { "key", "label", "type", "required", "sample" }, … ],
   "values": { "purchase_apr": 21.90, … },   // as a request sends them; JSON numbers are read from their source text
   "body": { "type": "doc", … },
-  "emailSubject": { "type": "doc", … } | null,
-  "emailPreheader": { "type": "doc", … } | null
+  "channelFields": { "email": { "subject": { "type": "doc", … }, "preheader": { … } } }   // or {} (section 2)
 }
 ```
 

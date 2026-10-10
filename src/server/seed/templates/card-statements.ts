@@ -132,9 +132,11 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
           body: paperlessInsert(),
           variables: vars.list(["first_name", "home_state"]),
           channels: ["pdf", "web", "email"],
-          email: {
-            subject: inlineDoc("{first_name}, go paperless and skip the stack"),
-            preheader: inlineDoc("Switch in one step. Switch back any time."),
+          channelFields: {
+            email: {
+              subject: inlineDoc("{first_name}, go paperless and skip the stack"),
+              preheader: inlineDoc("Switch in one step. Switch back any time."),
+            },
           },
           createdBy: "marcus",
           createdAt: 95,

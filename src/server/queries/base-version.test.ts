@@ -67,9 +67,9 @@ describe("getBaseVersion", () => {
         body: v1.body,
         variables: v1.variables,
         channels: v1.channels,
-        emailSubject: v1.emailSubject,
-        emailPreheader: v1.emailPreheader,
         sampleSets: v1.sampleSets,
+        "email.subject": v1.channelFields.email?.subject ?? null,
+        "email.preheader": v1.channelFields.email?.preheader ?? null,
       },
     });
   });
