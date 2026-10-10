@@ -142,6 +142,17 @@ describe("PreviewPane: Push and SMS", () => {
     expect(html).toContain("The SMS is 11 parts in GSM-7. It can be at most 10 parts.");
   });
 
+  it("offers no Try again on a message the browser couldn't render: the same fields fail the same way", () => {
+    const error = { code: "render_failed", message: "The SMS couldn't be rendered. The document has content that can't be rendered." } as const;
+    for (const channel of ["push", "sms"] as const) {
+      const html = show({ channels: ["push", "sms"], channel, message: { ok: false, error } });
+      expect(html, channel).toContain("couldn&#x27;t be rendered");
+      expect(html, channel).not.toContain("Try again");
+    }
+    // A document channel's render is a request, so it can be tried again.
+    expect(show({ slot: { output: null, error } })).toContain("Try again");
+  });
+
   it("shows values that don't render as any channel does, in the author's words, with no phone", () => {
     const error = { code: "missing_variables", message: "Missing required variables: first_name.", details: { missing: ["first_name"], invalid: [] } } as const;
     const html = show({ channels: ["push", "sms"], channel: "push", message: { ok: false, error } });

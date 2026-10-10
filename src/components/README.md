@@ -243,7 +243,9 @@ output on a tinted well whose top never moves. Where the output comes from depen
 | Shown | `PdfViewer`, `WebOutput`, `EmailOutput` | the phone kit, `PushOutput` and `SmsOutput` (`phone-output.tsx`) |
 | Its controls | Download PDF; Desktop · Mobile | iPhone · Android, and the 32px Device options (`phone-controls.tsx`): screen (push only), appearance, previews (lock screen only), text size, width in the platform's own units. A row that doesn't apply stays, greyed, with why under it. |
 
-Either way, values the route would refuse show as `OutputError`, in the author's words. A message the route would
+Either way, values the route would refuse show as `OutputError`, in the author's words, with Edit values. Its Try
+again is for a document channel's failed request; a message renders in the browser, where the same fields fail the
+same way, so its failure offers no button. A message the route would
 refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
 sentence above it. That sentence carries the live size, so it is no live region: a polite one says a fixed sentence
 (`refusalNotice`: "The SMS is over 10 parts.") once, when the message turns refused. In the workspace the phone's settings and Push's screen live in the session's preview state
