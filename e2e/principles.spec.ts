@@ -411,6 +411,8 @@ test.describe("Simulator (foreign system)", () => {
     "/sim/offers/offer_spring_travel",
     "/sim/offers/offer_cash_back",
     "/sim/offers/offer_cash_back/link",
+    "/sim/offers/alert_payment_due",
+    "/sim/offers/alert_card_abroad/link",
   ];
   for (const url of SIM) {
     test(`${url}`, async ({ page }) => {
