@@ -64,7 +64,7 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
     // draft another press made meanwhile.
     transaction: async (tx, { viewer, found, now: at }) => {
       const list = await tx
-        .select({ id: versions.id, state: versions.state, number: versions.number })
+        .select({ id: versions.id, state: versions.state, number: versions.number, round: versions.round })
         .from(versions)
         .where(eq(versions.templateId, found.id));
       const plan = planDraftStart(list);
@@ -79,6 +79,7 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
       const snapshot: VersionSnapshot = {
         id: latest.id,
         number: latest.number,
+        round: latest.round,
         state: latest.state,
         name: latest.name,
         body: latest.body,
@@ -118,8 +119,8 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
 
 // ── Submit for review ─────────────────────────────────────────
 
-/** What the Submit button needs: the new version's number, or the refusal (its code and one-line reason). */
-export type SubmitDraftResult = ActionResult<{ number: number }>;
+/** What the Submit button needs: the new round's number and round, or the refusal (its code and one-line reason). */
+export type SubmitDraftResult = ActionResult<{ number: number; round: number }>;
 
 /**
  * "Submit for review" from Phase 3. The submit now lives with the review actions (`submitVersion`,

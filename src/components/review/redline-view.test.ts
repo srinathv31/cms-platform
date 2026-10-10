@@ -9,6 +9,8 @@ const thread = (id: string, blockId: string): ThreadView => ({
   quote: null,
   status: "open",
   originVersionNumber: 1,
+  originRound: 1,
+  originLabel: "v1",
   comments: [],
   orphaned: false,
 });

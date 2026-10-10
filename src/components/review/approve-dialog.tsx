@@ -54,6 +54,7 @@ export function ApproveDialog({
   onOpenChange,
   templateId,
   versionNumber,
+  round,
   previousNumber,
   contractChanges,
   stage,
@@ -70,6 +71,8 @@ export function ApproveDialog({
   onOpenChange: (open: boolean) => void;
   templateId: string;
   versionNumber: number;
+  /** The round on screen: the approval decides exactly it. */
+  round: number;
   /** The Active version this one will replace; null when nothing is Active yet. */
   previousNumber: number | null;
   /** The version's contract changes: the breaking ones are what the consumers have to map. */
@@ -141,6 +144,7 @@ export function ApproveDialog({
               const result = await approveVersion({
                 templateId,
                 versionNumber,
+                round,
                 sunsetPrevious: sunset,
                 sampleSetsSeen: [...sampleSetsSeen],
               });

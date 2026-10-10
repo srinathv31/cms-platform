@@ -12,8 +12,12 @@ export interface SubmitSummary {
    * when the draft has changed since, so nothing this summary didn't show gets frozen.
    */
   rev: number;
-  /** The number the version gets at submit: one above the template's highest. */
+  /**
+   * The number and round the draft gets at submit (`nextRound` in domain/rounds.ts): round 1 of the next
+   * version after a release, or the next round of the number sent back.
+   */
   number: number;
+  round: number;
   /** The draft's name, which goes live with it. */
   name: string;
   /** The channels the version renders to, in the content type's order. */

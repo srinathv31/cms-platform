@@ -47,7 +47,7 @@ export function AuditTable({ rows, showTeam }: { rows: AuditRow[]; showTeam: boo
               <>
                 <span className="block truncate">{e.template.name}</span>
                 <span className="block truncate text-[12px] text-text-muted">
-                  {e.versionNumber !== null ? `v${e.versionNumber} · ` : null}
+                  {e.versionLabel !== null ? `${e.versionLabel} · ` : null}
                   <span className="font-mono">{e.template.id}</span>
                 </span>
               </>

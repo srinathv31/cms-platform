@@ -75,6 +75,8 @@ export function emptySink(): Sink {
 export interface VersionRef {
   id: string;
   number: number | null;
+  /** Null for a draft. */
+  round: number | null;
   state: VersionState;
   channels: Channel[];
   variables: Variable[];

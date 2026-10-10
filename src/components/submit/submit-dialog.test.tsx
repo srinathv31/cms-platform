@@ -31,6 +31,7 @@ const summary = (over: Partial<SubmitSummary> = {}): SubmitSummary => ({
   templateId: "UC-4F7K2Q",
   rev: 4,
   number: 3,
+  round: 1,
   name: "Spring Travel Rewards — Terms",
   channels: ["pdf", "email"],
   sampleSetNames: ["Typical customer", "Long name and maximum values", "Minimum values"],

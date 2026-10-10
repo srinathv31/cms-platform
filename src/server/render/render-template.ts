@@ -15,11 +15,13 @@ import {
   versionNotFound,
 } from "@/domain/render";
 import type { RenderError } from "@/domain/render/types";
+import { asNumbered, isReleased, showsRound } from "@/domain/rounds";
 import type { Channel, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db as appDb, type Db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import { findRound } from "@/server/queries/find-round";
 import { runEngine, type RenderBody } from "./engine";
 import { writeRenderLog } from "./log";
 
@@ -28,6 +30,9 @@ import { writeRenderLog } from "./log";
 //
 //   1 template (+ content type)  → 404 template_not_found
 //   2 version, or the open draft → 404 version_not_found          (nothing is logged before here)
+//     A number is its head (`findRound`): the released row, else its latest round, which a consumer is
+//     refused at 4. A preview may name a round (`round`, `?round=` on the review screen); a consumer's
+//     `round` never reaches here (the route drops it).
 //   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
 //   4 version rules (consumers only) → 409 / 410
 //   5 channel: content type allows it → 422 channel_not_allowed; version has it → 422 channel_not_enabled
@@ -40,6 +45,8 @@ import { writeRenderLog } from "./log";
 export interface RenderInput {
   templateId: string;
   version: number | "draft";
+  /** CMS previews only: which round of `version`. Ignored without `preview`; the number's head when absent. */
+  round?: number;
   channel: Channel;
   values: Readonly<Record<string, unknown>>;
   /** Carried for the route; the pipeline's output is the same either way. */
@@ -62,7 +69,7 @@ export type RenderResult =
       versionNumber: number | null;
       /** The Active version's number when the rendered one is Superseded. */
       newerVersion: number | null;
-      /** "UC-4F7K2Q-v2.pdf", "UC-4F7K2Q-draft.html". */
+      /** "UC-4F7K2Q-v2.pdf", "UC-4F7K2Q-draft.html", or "UC-4F7K2Q-v3-round-2.pdf" for a labelled preview round. */
       filename: string;
       /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text. */
       body: RenderBody;
@@ -73,8 +80,9 @@ const EXTENSION: Readonly<Record<Channel, string>> = { pdf: "pdf", web: "html", 
 
 const fail = (error: RenderError): RenderResult => ({ ok: false, error });
 
-export function renderFilename(templateId: string, versionNumber: number | null, channel: Channel): string {
-  return `${templateId}-${versionNumber === null ? "draft" : `v${versionNumber}`}.${EXTENSION[channel]}`;
+export function renderFilename(templateId: string, versionNumber: number | null, channel: Channel, round?: number | null): string {
+  const version = versionNumber === null ? "draft" : round == null ? `v${versionNumber}` : `v${versionNumber}-round-${round}`;
+  return `${templateId}-${version}.${EXTENSION[channel]}`;
 }
 
 /** Renders with the app database and the demo clock. Request time only (the clock awaits connection()). */
@@ -117,13 +125,11 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
     .limit(1);
   if (!template) return fail(templateNotFound(input.templateId));
 
-  // 2. The version by number, or the open draft.
-  const version = await db.query.versions.findFirst({
-    where: and(
-      eq(versions.templateId, template.id),
-      input.version === "draft" ? eq(versions.state, "draft") : eq(versions.number, input.version),
-    ),
-  });
+  // 2. The version by number (and, previewing, by round), or the open draft.
+  const version =
+    input.version === "draft"
+      ? await db.query.versions.findFirst({ where: and(eq(versions.templateId, template.id), eq(versions.state, "draft")) })
+      : await findRound(db, template.id, input.version, input.preview ? input.round : undefined);
   if (!version) return fail(versionNotFound(template.id, input.version));
 
   // 3–9, then 10: every request that got this far is logged, whatever the outcome.
@@ -229,6 +235,13 @@ async function renderVersion(
     return fail(channelNotEnabled(version.number, input.channel, version.channels));
   }
 
+  // A preview of an unreleased round its label names ("v3 · Round 2") says which round it is, in the
+  // PDF's footer and subject and in the filename. A consumer only ever renders a released row: no round.
+  const round =
+    input.preview && version.number !== null && !isReleased(version.state) && showsRound(asNumbered(version))
+      ? version.round
+      : null;
+
   // 6–9. The engine. The title is the rendered version's own name: a draft's rename never reaches
   // the Active version's output.
   const result = await runEngine(
@@ -236,6 +249,7 @@ async function renderVersion(
       templateId: template.id,
       templateName: version.name,
       versionNumber: version.number,
+      round,
       variables: version.variables,
       values: input.values,
       body: version.body,
@@ -255,7 +269,7 @@ async function renderVersion(
     channel: input.channel,
     versionNumber: version.number,
     newerVersion,
-    filename: renderFilename(template.id, version.number, input.channel),
+    filename: renderFilename(template.id, version.number, input.channel, round),
     body: result.body,
   };
 }

@@ -9,7 +9,8 @@ const FDIC =
   "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category.";
 const STATE_TERMS = "Account terms for {home_state} residents are in your deposit account agreement.";
 
-function savingsBody(version: 1 | 2) {
+/** `withdrawals: false` is v2's first round, sent back for leaving out the excess withdrawal limit. */
+function savingsBody(version: 1 | 2, { withdrawals = version === 2 }: { withdrawals?: boolean } = {}) {
   return disclosure("high-yield-savings", {
     offer: [
       p(
@@ -31,9 +32,7 @@ function savingsBody(version: 1 | 2) {
           ["{minimum_balance} and over", "{apy}"],
         ],
       ),
-      ...(version === 2
-        ? [p("withdrawals", "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle.")]
-        : []),
+      ...(withdrawals ? [p("withdrawals", "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle.")] : []),
     ],
     legal: [
       p("fdic", FDIC),
@@ -106,8 +105,16 @@ function overdraftBody() {
 
 export function seedDepositsTemplates(ctx: SeedCtx) {
   const { vars } = ctx;
+  const savingsVariables = () => vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]);
+  const savingsEmail = (preheader: string) => ({
+    subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
+    preheader: inlineDoc(preheader),
+  });
+  // Rounds 1 and 2 of v2 called the email a rate change; round 3 fixed it.
+  const rateChangeEmail = () => savingsEmail("Hi {first_name}, here are the details of your rate change.");
 
   const templates: SeedTemplate[] = [
+    // v1 Superseded; v2 Active, approved on round 3 after two send-backs (Naomi).
     {
       key: "high-yield-savings",
       teamId: "deposits",
@@ -121,7 +128,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           number: 1,
           state: "superseded",
           body: savingsBody(1),
-          variables: vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]),
+          variables: savingsVariables(),
           channels: ["pdf", "web"],
           createdBy: "eli",
           createdAt: 200,
@@ -133,21 +140,72 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           supersededAt: 70,
         },
         {
-          ref: "v2",
+          ref: "v2r1",
           number: 2,
-          state: "active",
+          round: 1,
+          state: "changes_requested",
           basedOn: "v1",
-          supersedes: "v1",
-          body: savingsBody(2),
-          variables: vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]),
+          body: savingsBody(2, { withdrawals: false }),
+          variables: savingsVariables(),
           channels: ["pdf", "web", "email"],
-          email: {
-            subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
-            preheader: inlineDoc("Hi {first_name}, here are the details of your savings rate."),
-          },
+          email: rateChangeEmail(),
           contractChanges: [],
           createdBy: "eli",
           createdAt: 78,
+          submittedBy: "eli",
+          submittedAt: 77,
+          submitNote: "Adds an email version.",
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "changes_requested",
+              reason: "The withdrawal limit isn't stated. Add the six-per-statement-cycle rule before this goes out.",
+              at: 76.4,
+              seen: ["typical"],
+            },
+          ],
+        },
+        {
+          ref: "v2r2",
+          number: 2,
+          round: 2,
+          state: "changes_requested",
+          basedOn: "v2r1",
+          body: savingsBody(2),
+          variables: savingsVariables(),
+          channels: ["pdf", "web", "email"],
+          email: rateChangeEmail(),
+          contractChanges: [],
+          createdBy: "eli",
+          createdAt: 76.4,
+          editSessions: 1,
+          submittedBy: "eli",
+          submittedAt: 75.5,
+          submitNote: "Adds the excess withdrawal limit.",
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "changes_requested",
+              reason: "The email preheader still says 'rate change'. This is a rate disclosure.",
+              at: 75.2,
+              seen: ["typical", "long"],
+            },
+          ],
+        },
+        {
+          ref: "v2",
+          number: 2,
+          round: 3,
+          state: "active",
+          basedOn: "v2r2",
+          supersedes: "v1",
+          body: savingsBody(2),
+          variables: savingsVariables(),
+          channels: ["pdf", "web", "email"],
+          email: savingsEmail("Hi {first_name}, here are the details of your savings rate."),
+          contractChanges: [],
+          createdBy: "eli",
+          createdAt: 75.2,
           submittedBy: "eli",
           submittedAt: 74,
           submitNote: "Adds the excess withdrawal limit and an email version.",

@@ -20,6 +20,7 @@ export function RequestChangesDialog({
   onOpenChange,
   templateId,
   versionNumber,
+  round,
   authorName,
   onRequested,
   finalFocus,
@@ -28,6 +29,8 @@ export function RequestChangesDialog({
   onOpenChange: (open: boolean) => void;
   templateId: string;
   versionNumber: number;
+  /** The round on screen: the change request sends exactly it back. */
+  round: number;
   authorName: string;
   /** The change request went through (called before the dialog closes). */
   onRequested: () => void;
@@ -69,7 +72,7 @@ export function RequestChangesDialog({
             return;
           }
           submit(null, async () => {
-            const result = await requestChanges({ templateId, versionNumber, reason: reason.trim() });
+            const result = await requestChanges({ templateId, versionNumber, round, reason: reason.trim() });
             if (result.ok) onRequested();
             return result;
           });

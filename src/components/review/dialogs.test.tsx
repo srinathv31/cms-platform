@@ -99,6 +99,7 @@ describe("RequestChangesDialog", () => {
         onOpenChange={onOpenChange}
         templateId="UC-ABC123"
         versionNumber={3}
+        round={1}
         authorName="Maya Chen"
         onRequested={onRequested}
       />,
@@ -150,6 +151,7 @@ describe("RequestChangesDialog", () => {
     expect(actions.requestChanges).toHaveBeenCalledWith({
       templateId: "UC-ABC123",
       versionNumber: 3,
+      round: 1,
       reason: "The APR in Legal notices is wrong.",
     });
     expect(onRequested).toHaveBeenCalledTimes(1);
@@ -199,6 +201,7 @@ describe("ApproveDialog", () => {
         onOpenChange={onOpenChange}
         templateId="UC-ABC123"
         versionNumber={2}
+        round={1}
         previousNumber={over.previousNumber === undefined ? 1 : over.previousNumber}
         contractChanges={over.contractChanges ?? []}
         stage={over.stage ?? ONE}
@@ -272,6 +275,7 @@ describe("ApproveDialog", () => {
     expect(actions.approveVersion).toHaveBeenCalledWith({
       templateId: "UC-ABC123",
       versionNumber: 2,
+      round: 1,
       sunsetPrevious: null,
       sampleSetsSeen: ["typical", "long"],
     });

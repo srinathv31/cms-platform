@@ -8,8 +8,11 @@
 //
 //   createDraft    — → Draft (a new template from a starter)
 //   editLatest     the latest version, Active or Revoked → a new Draft copied from it ("Based on v3")
-//   submit         Draft → In review, numbered, with its contract changes against `contractBaseline`
-//   requestChanges In review → Changes requested, plus a new Draft carrying the block ids (and so the threads)
+//   submit         Draft → In review, numbered: round 1 of the next version after a release, or the next
+//                  round of the number sent back (`nextRound` in rounds.ts); with its contract changes
+//                  against `contractBaseline`
+//   requestChanges In review → Changes requested, plus a new Draft carrying the block ids (and so the
+//                  threads); its submit is the next round of the same number
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
 //   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes.
 //                  A sunset date ends renders at 00:00 on that day in the business time zone (business-zone.ts).
@@ -27,6 +30,9 @@
 // The name is a version field, like the body: a new draft copies it, the author renames the draft, and
 // it freezes at submit. A transition's `templateName` is the name of the version it is about
 // (`version.name`): that is what its notifications call it.
+//
+// A notification about a round names it as people read it (`versionLabel` in rounds.ts): "v2" until the
+// number has been sent back, then "v2, round 2". Sunset and revoke are about released versions: "v2".
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
 import { usageFromJSON } from "@/editor/model/usage";
@@ -43,6 +49,15 @@ import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zon
 import { describeChanges } from "./contract";
 import { REASONS, makerCheckerRefusal } from "./permissions";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
+import {
+  compareRounds,
+  isReleased,
+  nextRound,
+  reviewLink,
+  versionLabel,
+  type NumberedRound,
+  type RoundRow,
+} from "./rounds";
 import { formatLongDate } from "./dates";
 import {
   DOCUMENT_THREAD,
@@ -106,6 +121,8 @@ export interface StarterContent {
 export interface VersionSnapshot {
   id: string;
   number: number | null;
+  /** Which submission of `number` this is (rounds.ts); null while a draft, like the number. */
+  round: number | null;
   state: VersionState;
   /** The template's name as this version has it. A draft copies it; renaming the draft changes only the draft. */
   name: string;
@@ -122,6 +139,8 @@ export interface DraftFields {
   state: "draft";
   /** Null until the draft is submitted; the number is assigned at submit and then frozen. */
   number: null;
+  /** Null until the draft is submitted, with the number. */
+  round: null;
   basedOnVersionId: string | null;
   /** The template's name in this draft: what the author renames, and what customers see once it goes live. */
   name: string;
@@ -187,6 +206,7 @@ export function createDraft(input: {
       draft: {
         state: "draft",
         number: null,
+        round: null,
         basedOnVersionId: null,
         name,
         body: clone(starter.body),
@@ -219,27 +239,30 @@ export function createDraft(input: {
 /**
  * What "Edit" on a template does, given its versions: go to the open draft if there is one
  * (one open draft per template), copy the template's latest version if it is Active or Revoked, or
- * say it can't. A Revoked latest version was the Active one until it was withdrawn: the corrected
- * draft starts from its content (decision 0009). A pending revoke leaves the version Active, so it is
- * edited as Active. A newer version in review (or any other newer version) blocks it: editing then
- * would fork the template and drop the newer version's changes. Blocked, it carries the refusal
- * (`REFUSALS.newerInReview`, `REFUSALS.notEditable`) that `startDraft` answers with.
+ * say it can't. Latest is by number, then round (`compareRounds`), over every row but the rounds sent
+ * back: those are records, so after a send-back whose draft is gone, Edit starts from the Active version
+ * (and its submit is still the next round of the number sent back, `nextRound`). A Revoked latest
+ * version was the Active one until it was withdrawn: the corrected draft starts from its content
+ * (decision 0009). A pending revoke leaves the version Active, so it is edited as Active. A newer
+ * version in review (or any other newer version) blocks it: editing then would fork the template and
+ * drop the newer version's changes. Blocked, it carries the refusal (`REFUSALS.newerInReview`,
+ * `REFUSALS.notEditable`) that `startDraft` answers with.
  */
 export type DraftStartPlan =
   | { kind: "open"; versionId: string }
   | { kind: "create"; from: string }
   | ({ kind: "blocked" } & Refusal);
 
-export function planDraftStart(
-  versions: readonly { id: string; state: VersionState; number: number | null }[],
-): DraftStartPlan {
+export function planDraftStart(versions: readonly (RoundRow & { id: string })[]): DraftStartPlan {
   const open = versions.find((v) => v.state === "draft");
   if (open) return { kind: "open", versionId: open.id };
 
-  const latest = versions.reduce<(typeof versions)[number] | undefined>(
-    (best, v) => (best === undefined || (v.number ?? 0) > (best.number ?? 0) ? v : best),
-    undefined,
-  );
+  const latest = versions
+    .filter((v) => v.state !== "changes_requested")
+    .reduce<(typeof versions)[number] | undefined>(
+      (best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best),
+      undefined,
+    );
   if (latest?.state === "active" || latest?.state === "revoked") return { kind: "create", from: latest.id };
   return { kind: "blocked", ...(latest?.state === "in_review" ? REFUSALS.newerInReview : REFUSALS.notEditable) };
 }
@@ -311,9 +334,6 @@ export interface BaselineFacts {
   basedOnVersionId: string | null;
 }
 
-/** States a version reaches only once approved: one of them is text that was released. */
-const RELEASED_STATES: ReadonlySet<VersionState> = new Set(["active", "superseded", "revoked"]);
-
 /**
  * The version the review screen compares `versionId` with: its redline, the "vs vN" label and the
  * change count. The Active version when there is one (null when that is the version itself).
@@ -337,7 +357,7 @@ export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], 
     seen.add(id);
     const base = byId.get(id);
     if (!base) break;
-    if (RELEASED_STATES.has(base.state) && base.number !== null) return base;
+    if (isReleased(base.state) && base.number !== null) return base;
     if (base.state !== "changes_requested") break;
     id = base.basedOnVersionId;
   }
@@ -364,8 +384,13 @@ export interface SubmitDraft {
 
 export interface SubmitChanges {
   state: "in_review";
-  /** Assigned here and then frozen: one above the template's highest existing version number. */
+  /**
+   * Assigned here with `round`, then frozen (`nextRound`): one above the highest released number, or the
+   * number of the rounds sent back since.
+   */
   number: number;
+  /** 1 for a number's first submission; the next round when it was sent back. */
+  round: number;
   submittedBy: string;
   submittedAt: Date;
   /** The draft's writers with the submitter among them: whoever submits can't decide it either. */
@@ -393,13 +418,13 @@ export interface SubmitInput {
    * shown is what gets frozen, so a draft that has moved on since is refused.
    */
   seenRev: number;
-  /** The template's highest version number (0 when it has none). */
-  highestNumber: number;
+  /** The template's versions (number, round and state; the draft included): `nextRound` numbers the submission. */
+  versions: readonly RoundRow[];
   /** The variable list of the newest version that still renders (`contractBaseline`), or null when none does. */
   baseline: readonly Variable[] | null;
   now: Date;
   submittedBy: string;
-  /** For the notification: "Maya Chen submitted Spring Travel Rewards — Terms v1 for review." */
+  /** For the notification: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review." */
   submitterName: string;
   templateId: string;
   templateName: string;
@@ -413,7 +438,8 @@ export interface SubmitInput {
 }
 
 /**
- * Draft → In review, as the template's next version: a version number, the contract changes, the note,
+ * Draft → In review, as the template's next round (`nextRound`): round 1 of the next version number after
+ * a release, or the next round of the number sent back. With it, the contract changes, the note,
  * the stages it will go through (the chain as it is now), an audit event, and a `review_requested`
  * notification to the first stage's approvers (never anyone who wrote it, the submitter included).
  *
@@ -429,7 +455,7 @@ export interface SubmitInput {
  * (`Variable.id`), so `diffVariables` pairs it with the baseline's variable whatever it is keyed now.
  */
 export function submit(input: SubmitInput): SubmitResult {
-  const { draft, highestNumber, baseline, now, submittedBy } = input;
+  const { draft, baseline, now, submittedBy } = input;
 
   if (draft.state === "in_review") return refuse(REFUSALS.alreadyInReview);
   if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
@@ -444,7 +470,8 @@ export function submit(input: SubmitInput): SubmitResult {
 
   if (emailOn && isBlankField(draft.emailSubject)) return refuse(REFUSALS.emailSubjectMissing);
 
-  const number = highestNumber + 1;
+  const { number, round } = nextRound(input.versions);
+  const submitted: NumberedRound = { number, round, state: "in_review" };
   const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
   const submitNote = trimmed(input.note);
   const stages = recordStages(input.chain);
@@ -456,6 +483,7 @@ export function submit(input: SubmitInput): SubmitResult {
     changes: {
       state: "in_review",
       number,
+      round,
       submittedBy,
       submittedAt: now,
       writers,
@@ -470,6 +498,7 @@ export function submit(input: SubmitInput): SubmitResult {
         action: "version.submitted",
         details: {
           number,
+          round,
           note: submitNote,
           contractChanges: contractChanges?.length ?? 0,
           breaking: contractChanges ? isBreaking(contractChanges) : false,
@@ -479,9 +508,9 @@ export function submit(input: SubmitInput): SubmitResult {
         notification: "review_requested",
         // Nobody has approved anything yet, so the first stage always has someone to ask.
         to: (firstStage && stageRecipients(firstStage, writers)) || teamApproversExcept(...writers),
-        title: `${input.submitterName} submitted ${input.templateName} v${number} for review.`,
+        title: `${input.submitterName} submitted ${input.templateName} ${sentence(submitted)} for review.`,
         body: submitNote,
-        link: { to: "review", templateId: input.templateId, versionNumber: number },
+        link: reviewLink(input.templateId, submitted),
       }),
     ],
   };
@@ -601,8 +630,8 @@ export type RequestChangesResult = Outcome<{
  * In review → Changes requested (kept read-only as a record), with a new Draft copied from it for the
  * author. Approver, never someone who wrote it (`makerCheckerRefusal`); the reason is required and
  * becomes a comment. The new draft keeps the version's writers, so they stay barred from deciding the
- * next round; the approver who sent it back joins them only by editing it. Resubmitting the draft gets
- * the next number.
+ * next round; the approver who sent it back joins them only by editing it. Resubmitting the draft is
+ * the next round of the same number (`nextRound`): a send-back doesn't use up a version number.
  */
 export function requestChanges(input: {
   version: ReviewVersion;
@@ -623,20 +652,22 @@ export function requestChanges(input: {
   const reason = trimmed(input.reason);
   if (!reason) return refuse(REFUSALS.giveReason);
 
-  const number = numberOf(version);
+  const { number, round } = roundOf(version);
   const effects: LifecycleEffect[] = [
     {
       kind: "audit",
       action: "version.changes_requested",
-      details: { number, stage: stage.name, reason },
+      details: { number, round, stage: stage.name, reason },
     },
   ];
   if (version.submittedBy) {
+    // Labelled as it is now, sent back: "v1, round 1".
+    const sentBack = sentence({ number, round, state: "changes_requested" });
     effects.push(
       notify({
         notification: "changes_requested",
         to: { kind: "user", userId: version.submittedBy },
-        title: `${input.actorName} requested changes on ${input.templateName} v${number}.`,
+        title: `${input.actorName} requested changes on ${input.templateName} ${sentBack}.`,
         body: reason,
         link: { to: "template", templateId: version.templateId },
       }),
@@ -725,8 +756,8 @@ export function approve(input: {
   sampleSetsSeen: readonly string[];
   templateName: string;
   /**
-   * The version's decisions so far (its approvals rows). A version is reviewed in one round, since a
-   * change request sends the next one in as a new number.
+   * The round's decisions so far (its approvals rows). A row is one round: a change request sends the
+   * next round in as a new row, so earlier rounds' approvals don't count here.
    */
   decisions?: readonly RecordedDecision[];
 }): ApproveResult {
@@ -746,7 +777,8 @@ export function approve(input: {
   if (!isLast && !next) return refuse(REFUSALS.stageMissing);
   if (sunsetPrevious !== null && !isAfterToday(sunsetPrevious, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
 
-  const number = numberOf(version);
+  const reviewed = roundOf(version);
+  const { number, round } = reviewed;
   const approval: ApprovalRecord = {
     versionId: version.id,
     stageId: stage.id,
@@ -758,7 +790,8 @@ export function approve(input: {
     sampleSetsSeen: unique(input.sampleSetsSeen),
     decidedAt: now,
   };
-  const review = { to: "review", templateId: version.templateId, versionNumber: number } as const;
+  const review = reviewLink(version.templateId, reviewed);
+  const label = `${templateName} ${sentence(reviewed)}`;
 
   // ── An earlier stage: on to the next one ──
   if (next) {
@@ -766,7 +799,7 @@ export function approve(input: {
       {
         kind: "audit",
         action: "version.stage_approved",
-        details: { number, stage: stage.name, stagePosition: stage.position, next: next.name },
+        details: { number, round, stage: stage.name, stagePosition: stage.position, next: next.name },
       },
     ];
     // Not anyone who has approved a stage of this round, this approver included: they can't take this one.
@@ -776,7 +809,7 @@ export function approve(input: {
         notify({
           notification: "review_requested",
           to: asked,
-          title: `${templateName} v${number} is waiting on ${next.name}.`,
+          title: `${label} is waiting on ${next.name}.`,
           link: review,
         }),
       );
@@ -786,7 +819,7 @@ export function approve(input: {
         notify({
           notification: "stage_approved",
           to: { kind: "user", userId: version.submittedBy },
-          title: `${actorName} approved ${templateName} v${number} for ${stage.name}.`,
+          title: `${actorName} approved ${label} for ${stage.name}.`,
           body: `Next: ${next.name}.`,
           link: review,
         }),
@@ -812,7 +845,7 @@ export function approve(input: {
     {
       kind: "audit",
       action: "version.activated",
-      details: { number, supersedes: active?.number ?? null, stage: stage.name },
+      details: { number, round, supersedes: active?.number ?? null, stage: stage.name },
     },
   ];
   if (active) {
@@ -836,7 +869,8 @@ export function approve(input: {
       notify({
         notification: "version_live",
         to: { kind: "user", userId: version.submittedBy },
-        title: `${templateName} v${number} is now Active.`,
+        // Released: the number consumers know, "v2", whichever round it was approved on.
+        title: `${templateName} ${sentence({ number, round, state: "active" })} is now Active.`,
         body: `${actorName} approved it.`,
         link: { to: "template", templateId: version.templateId },
       }),
@@ -1220,6 +1254,18 @@ function numberOf(version: { number: number | null; state: VersionState }): numb
   return version.number;
 }
 
+/** A version past Draft always has its number and its round; a missing one is a bug, not a refusal. */
+function roundOf(version: RoundRow): NumberedRound {
+  const number = numberOf(version);
+  if (version.round === null) throw new LifecycleError(`A ${version.state} version has no round.`);
+  return { number, round: version.round, state: version.state };
+}
+
+/** The version as a sentence names it: "v2", or "v2, round 2" once its number was sent back. */
+function sentence(v: NumberedRound): string {
+  return versionLabel(v, { style: "sentence" });
+}
+
 /** Text with surrounding whitespace removed; null when nothing is left. */
 function trimmed(value: string | null | undefined): string | null {
   const t = value?.trim() ?? "";
@@ -1254,6 +1300,7 @@ function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, wri
   return {
     state: "draft",
     number: null,
+    round: null,
     basedOnVersionId: version.id,
     name: version.name,
     body: clone(version.body),

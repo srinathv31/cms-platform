@@ -12,6 +12,7 @@ import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, renderLog, teams, templates, users, versions } from "@/server/db/schema/ucomp";
+import { findRound } from "./find-round";
 import { requireSpace, type SpaceContext } from "./spaces";
 import { currentName } from "./template-name";
 
@@ -90,19 +91,24 @@ function seesInSpace(space: SpaceContext, template: { teamSlug: string }): boole
 export type ReviewVersionRow = typeof versions.$inferSelect;
 
 /**
- * The review screen's template and version. As `requireTemplate`, plus one way in from outside the
- * template's team (Phase 6, a stage that names a person): someone named on the stage a version waits
- * on opens it from their own space, in any team, and keeps seeing it once they decided it. Any other
- * version of that template stays a 404 for them.
+ * The review screen's template and version: the round asked for (`?round=`), or without one the number's
+ * head, its released row or else its latest round (`findRound`). As `requireTemplate`, plus one way in
+ * from outside the template's team (Phase 6, a stage that names a person): someone named on the stage a
+ * version waits on opens it from their own space, in any team, and keeps seeing it once they decided it.
+ * Any other version of that template stays a 404 for them. A round that doesn't exist is a 404.
  */
 export const requireReviewVersion = cache(
-  async (spaceSlug: string, templateId: string, versionNumber: number): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
+  async (
+    spaceSlug: string,
+    templateId: string,
+    versionNumber: number,
+    round: number | null = null,
+  ): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
     const space = await requireSpace(spaceSlug);
     const template = await findTemplate(templateId);
     if (!template || !Number.isInteger(versionNumber) || versionNumber < 1) notFound();
-    const version = await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)),
-    });
+    if (round !== null && (!Number.isInteger(round) || round < 1)) notFound();
+    const version = await findRound(db, template.id, versionNumber, round);
     if (!version || version.number === null) notFound();
     if (seesInSpace(space, template)) return { space, template, version };
     if (await namedOnVersion(space.viewer, template, version)) return { space, template, version };

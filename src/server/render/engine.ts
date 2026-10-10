@@ -34,6 +34,8 @@ export interface EngineInput {
   templateName: string;
   /** null for the open draft. */
   versionNumber: number | null;
+  /** A labelled preview round (`RenderDoc.round`); null or absent otherwise. */
+  round?: number | null;
   variables: readonly Variable[];
   values: Readonly<Record<string, unknown>>;
   body: JSONContent;
@@ -86,6 +88,7 @@ export async function runEngine(input: EngineInput, channel: Channel, at: Date):
       templateId: input.templateId,
       templateName: input.templateName,
       versionNumber: input.versionNumber,
+      ...(input.round != null ? { round: input.round } : {}),
       blocks: resolveDocument(input.body, ctx),
     };
     if (channel === "email") {

@@ -14,6 +14,7 @@ import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { draftRow } from "@/server/templates/create";
 import { loadPersona } from "@/server/testing/review-fixtures";
+import { findRound } from "@/server/queries/find-round";
 import { getViewer } from "@/server/viewer";
 import { addComment, reopenThread, reply, resolveThread } from "./comments";
 
@@ -69,13 +70,13 @@ const notificationsAt = (at: Date) =>
   db.select().from(notifications).where(eq(notifications.createdAt, at)).orderBy(notifications.userId);
 const threadRow = (id: string) => db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
 
+/** The open draft (null), or a number's head: its released row, else its latest round (Cash Back v3 is round 2). */
 async function versionOf(template: string, number: number | null) {
-  return (await db.query.versions.findFirst({
-    where: and(
-      eq(versions.templateId, ids[template]!),
-      number === null ? eq(versions.state, "draft") : eq(versions.number, number),
-    ),
-  }))!;
+  const found =
+    number === null
+      ? await db.query.versions.findFirst({ where: and(eq(versions.templateId, ids[template]!), eq(versions.state, "draft")) })
+      : await findRound(db, ids[template]!, number);
+  return found!;
 }
 
 /** The id of the n-th top-level block. */
@@ -85,7 +86,7 @@ const blockAt = (body: { content?: { attrs?: Record<string, unknown> }[] }, n: n
 describe("addComment", () => {
   let threadId: string;
 
-  it("Jordan comments on a block of Cash Back v3; Maya, its author, is notified", async () => {
+  it("Jordan comments on a block of Cash Back v3 (round 2); Maya, its author, is notified", async () => {
     const v3 = await versionOf("cash-back", 3);
     const blockId = blockAt(v3.body, 1);
     const at = as("jordan");
@@ -116,15 +117,15 @@ describe("addComment", () => {
       expect.objectContaining({
         action: "comment.added",
         versionId: v3.id,
-        details: { threadId, blockId, number: 3, quote: "spend $1,000" },
+        details: { threadId, blockId, number: 3, round: 2, quote: "spend $1,000" },
       }),
     ]);
     expect(await notificationsAt(at)).toEqual([
       expect.objectContaining({
         userId: "maya",
         kind: "comment_added",
-        title: "Jordan Ellis commented on Cash Back Welcome Bonus — Terms v3.",
-        href: `/coral-offers/review/${ids["cash-back"]}/3`,
+        title: "Jordan Ellis commented on Cash Back Welcome Bonus — Terms v3, round 2.",
+        href: `/coral-offers/review/${ids["cash-back"]}/3?round=2`,
       }),
     ]);
   });
@@ -134,10 +135,10 @@ describe("addComment", () => {
     expect(await reply({ threadId, body: "Yes, confirmed with Product." })).toEqual({ ok: true });
     expect(await db.select().from(comments).where(eq(comments.threadId, threadId))).toHaveLength(2);
     expect((await auditAt(at)).map((r) => r.details)).toEqual([
-      expect.objectContaining({ threadId, reply: true, number: 3 }),
+      expect.objectContaining({ threadId, reply: true, number: 3, round: 2 }),
     ]);
     expect((await notificationsAt(at)).map((n) => [n.userId, n.title])).toEqual([
-      ["jordan", "Maya Chen replied on Cash Back Welcome Bonus — Terms v3."],
+      ["jordan", "Maya Chen replied on Cash Back Welcome Bonus — Terms v3, round 2."],
     ]);
   });
 

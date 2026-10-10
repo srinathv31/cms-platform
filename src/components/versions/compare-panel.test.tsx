@@ -28,6 +28,7 @@ const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", con
 const version = (id: string, number: number, text: string, name = "Rate notice"): CompareVersion => ({
   id,
   number,
+  round: 1,
   state: number === 2 ? "active" : "superseded",
   name,
   body: doc(text),

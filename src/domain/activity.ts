@@ -5,10 +5,15 @@
 //
 // It reads every AuditAction the lifecycle and the sunset sweep write, plus the older spellings the seed
 // uses (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
+//
+// A review event names the round as the review history does (rounds.ts, `history`): "Maya Chen submitted
+// v3, round 1 for review.", "Jordan Ellis approved v2 on round 3, making it Active." Every other event is
+// about the released version consumers know, "v2".
 
 import { recordedSunsetDay } from "./business-zone";
 import { formatLongDate, formatRecordedDate } from "./dates";
 import type { AuditAction, Person } from "./review-types";
+import { versionLabel, type LabelStyle, type NumberedRound } from "./rounds";
 
 /** Who a null actor is: the platform itself (the seed's activations, the sunset sweep). */
 export const SYSTEM_ACTOR = "Stencil";
@@ -17,14 +22,39 @@ export const SYSTEM_INITIALS = "S";
 export interface ActivityEvent {
   action: AuditAction | string;
   details: Record<string, unknown> | null;
-  versionNumber: number | null;
+  /**
+   * The version row the event is about, as it is now; null when it is the open draft or there is none.
+   * Without one, the event's details name it (`number`, `round`).
+   */
+  version: NumberedRound | null;
+}
+
+/** The events of a version's review: their sentences and labels name the round, as the review history does. */
+export const REVIEW_EVENT_ACTIONS: ReadonlySet<string> = new Set([
+  "version.submitted",
+  "version.changes_requested",
+  "version.stage_approved",
+  "version.approved",
+  "version.activated",
+  "comment.added",
+  "thread.resolved",
+  "comment.resolved",
+  "thread.reopened",
+]);
+
+/**
+ * The version an event is about, as its row or sentence names it: the round for a review event (with
+ * history), the plain "vN" for the rest (sunsets and revokes are about the released version). Null for none.
+ */
+export function eventVersionLabel(action: string, v: NumberedRound | null, style: LabelStyle = "chrome"): string | null {
+  return v === null ? null : versionLabel(v, { style, history: REVIEW_EVENT_ACTIONS.has(action) });
 }
 
 export function describeActivity(e: ActivityEvent, actor: Person | null): string {
   const d = e.details ?? {};
   const who = actor?.name ?? SYSTEM_ACTOR;
-  const n = e.versionNumber ?? numberOr(d.number);
-  const v = n === null ? "the draft" : `v${n}`;
+  const version = e.version ?? fromDetails(d);
+  const v = eventVersionLabel(e.action, version, "sentence") ?? "the draft";
 
   switch (e.action) {
     case "template.created": {
@@ -50,9 +80,15 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       return stage ? `${who} approved ${v} (${stage}).` : `${who} approved ${v}.`;
     }
     case "version.activated": {
-      if (actor) return `${who} approved ${v}, making it Active.`;
+      // The released number, and the round it was approved on when that wasn't the first.
+      const live = version === null ? v : `v${version.number}`;
+      if (actor) {
+        return version !== null && version.round > 1
+          ? `${who} approved ${live} on round ${version.round}, making it Active.`
+          : `${who} approved ${live}, making it Active.`;
+      }
       const replaced = numberOr(d.supersedes);
-      return replaced === null ? `${v} became Active.` : `${v} became Active, replacing v${replaced}.`;
+      return replaced === null ? `${live} became Active.` : `${live} became Active, replacing v${replaced}.`;
     }
     case "version.superseded": {
       const by = numberOr(d.supersededBy);
@@ -83,10 +119,13 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       return `${who} commented on ${v}.`;
     case "thread.resolved":
     case "comment.resolved": {
-      // Submitting the next version resolves the change request that sent this one back.
-      const answeredBy = typeof d.resolvedWith === "number" ? d.resolvedWith : null;
+      // Submitting the next round resolves the change request that sent this one back. A row from before
+      // rounds names the next version instead.
+      const answeredBy = numberOr(d.resolvedWith);
       if (d.auto === true && answeredBy !== null) {
-        return `${who} answered the change request on ${v} with v${answeredBy}.`;
+        const round = numberOr(d.resolvedWithRound);
+        const next = round !== null && answeredBy === version?.number ? `round ${round}` : `v${answeredBy}`;
+        return `${who} answered the change request on ${v} with ${next}.`;
       }
       return `${who} resolved a comment on ${v}.`;
     }
@@ -96,7 +135,7 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       const summary = text(d.summary);
       if (summary) return withText(who, summary);
       const what = e.action.replace(/[._]+/g, " ");
-      return n === null ? `${who}: ${what}.` : `${who}: ${what} (v${n}).`;
+      return version === null ? `${who}: ${what}.` : `${who}: ${what} (${v}).`;
     }
   }
 }
@@ -116,4 +155,14 @@ function text(value: unknown): string {
 
 function numberOr(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The version an event's details name, when its row doesn't: `number`, and `round` (1 when a row from
+ * before rounds has none). The state isn't recorded, so its round shows past the first.
+ */
+function fromDetails(d: Record<string, unknown>): NumberedRound | null {
+  const number = numberOr(d.number);
+  if (number === null) return null;
+  return { number, round: numberOr(d.round) ?? 1, state: "in_review" };
 }

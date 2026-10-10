@@ -11,8 +11,9 @@ type Params = Promise<{ team: string; templateId: string; version: string }>;
 
 async function ReviewData({ params }: { params: Params }) {
   const { team, templateId, version } = await params;
-  // 404 for a template or a version that doesn't exist or that the viewer can't see.
-  const data = await getReviewScreen(team, templateId, Number(version));
+  // 404 for a template or a version that doesn't exist or that the viewer can't see. Null: the number's
+  // head (its released row, else its latest round).
+  const data = await getReviewScreen(team, templateId, Number(version), null);
   const nowDate = await now();
   // Who is looking, for the comments they write (shown with their name at once, before the server confirms them).
   const viewer = await getViewer();

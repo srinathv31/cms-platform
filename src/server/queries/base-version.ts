@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { can } from "@/domain/permissions";
-import type { Channel, JSONContent, SampleSet, Variable, Viewer } from "@/domain/types";
+import type { Channel, JSONContent, SampleSet, Variable, VersionState, Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -18,9 +18,14 @@ import { templates, versions } from "@/server/db/schema/ucomp";
 // never the base of another draft the template has by now (the one on screen was submitted, and
 // someone started a new one).
 
-/** The draft's fields as they are in the version it was started from: its name too. */
+/**
+ * The draft's fields as they are in the version it was started from: its name too. With its number,
+ * round and state, for its label ("Reverted to v1, round 1", `versionLabel`).
+ */
 export interface BaseVersionContent {
   number: number;
+  round: number;
+  state: VersionState;
   name: string;
   body: JSONContent;
   variables: Variable[];
@@ -57,6 +62,7 @@ export async function getBaseVersion(
     .select({
       id: versions.id,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       basedOnVersionId: versions.basedOnVersionId,
       name: versions.name,
@@ -74,12 +80,14 @@ export async function getBaseVersion(
   if (!draft) return refusal(404, REQUEST_REFUSALS.noDraftToRevert);
   if (draft.state !== "draft") return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
   const base = draft.basedOnVersionId ? list.find((v) => v.id === draft.basedOnVersionId) : undefined;
-  if (!base || base.number === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
+  if (!base || base.number === null || base.round === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
 
   return {
     ok: true,
     base: {
       number: base.number,
+      round: base.round,
+      state: base.state,
       name: base.name,
       body: base.body,
       variables: base.variables,

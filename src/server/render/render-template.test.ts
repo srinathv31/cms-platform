@@ -11,8 +11,10 @@ import type { EmailRender } from "@/domain/render/types";
 import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { findRound } from "@/server/queries/find-round";
 import { seedDatabase } from "@/server/seed";
 import { renderFailure } from "./engine";
+import { extractPdf } from "./golden/extract-pdf";
 import { runRender, type RenderInput, type RenderResult } from "./render-template";
 import { checkDocument, type RenderDocumentError } from "./schema-check";
 
@@ -181,6 +183,65 @@ describe("runRender: version rules", () => {
   });
 });
 
+// Consumers never see rounds: a number is its head, the released row or else its latest round. The CMS
+// preview may name a round, and a preview of an unreleased round its label names says so.
+describe("runRender: rounds", () => {
+  const FEE = { ...CUSTOMER, annual_fee: "95" };
+  const eli = viewer("eli", [{ id: "deposits", roles: ["author"] }]);
+  const savingsValues = async (round?: number) =>
+    (await findRound(db, ids["high-yield-savings"]!, 2, round))!.sampleSets.find((s) => s.id === "typical")!.values;
+
+  it("a preview names a round: Cash Back v3's round 1 renders the text that was sent back", async () => {
+    const round1 = ok((await render({ template: "cash-back", version: 3, round: 1, preview: true, viewer: maya, values: FEE })).result);
+    expect(round1.body).toEqual(expect.stringContaining("applies and is billed to your account"));
+    expect(round1.filename).toBe(`${ids["cash-back"]}-v3-round-1.html`);
+    // Without a round, the number's head: round 2, in review, labelled too.
+    const head = ok((await render({ template: "cash-back", version: 3, preview: true, viewer: maya, values: FEE })).result);
+    expect(head.body).toEqual(expect.stringContaining("After your first year"));
+    expect(head).toMatchObject({ versionNumber: 3, filename: `${ids["cash-back"]}-v3-round-2.html` });
+  });
+
+  it("prints a labelled preview round in the PDF's footer and subject", async () => {
+    const { result } = await render({ template: "cash-back", version: 3, round: 2, preview: true, viewer: maya, values: FEE, channel: "pdf" });
+    const out = ok(result);
+    expect(out.filename).toBe(`${ids["cash-back"]}-v3-round-2.pdf`);
+    const pdf = await extractPdf(out.body as Uint8Array);
+    expect(pdf.info.Subject).toBe(`${ids["cash-back"]} · v3 · Round 2`);
+    expect(pdf.pages.flatMap((p) => p.lines.map((l) => l.text)).join("\n")).toContain(`${ids["cash-back"]} · v3 · Round 2`);
+  }, 30_000);
+
+  it("a released row previews as the version consumers know, whatever round it was approved on", async () => {
+    const released = ok((await render({ template: "high-yield-savings", version: 2, preview: true, viewer: eli, values: await savingsValues() })).result);
+    expect(released.filename).toBe(`${ids["high-yield-savings"]}-v2.html`);
+    const round1 = await render({ template: "high-yield-savings", version: 2, round: 1, preview: true, viewer: eli, values: await savingsValues(1) });
+    expect(ok(round1.result).filename).toBe(`${ids["high-yield-savings"]}-v2-round-1.html`);
+    expect(ok(round1.result).body).not.toEqual(expect.stringContaining("Excess withdrawals"));
+    expect(released.body).toEqual(expect.stringContaining("Excess withdrawals"));
+  });
+
+  it("a consumer's number is its released row; a round it sends is ignored", async () => {
+    const values = await savingsValues();
+    const consumer = { template: "high-yield-savings", version: 2, consumerId: "deposits-online", values } as const;
+    const released = ok((await render(consumer)).result);
+    expect(released.filename).toBe(`${ids["high-yield-savings"]}-v2.html`);
+    expect(released.body).toEqual(expect.stringContaining("Excess withdrawals"));
+    const asked = ok((await render({ ...consumer, round: 1 })).result);
+    expect(asked.body).toEqual(released.body);
+  });
+
+  it("a consumer asking for a number whose head is in review gets a 409 that names no round", async () => {
+    for (const round of [undefined, 1]) {
+      const error = failed((await render({ template: "cash-back", version: 3, values: FEE, ...(round ? { round } : {}) })).result);
+      expect(error).toMatchObject({ code: "version_not_released", message: "Version 3 is in review. Version 2 is active." });
+    }
+  });
+
+  it("a preview of a round that doesn't exist is version_not_found", async () => {
+    const error = failed((await render({ template: "cash-back", version: 3, round: 3, preview: true, viewer: maya, values: FEE })).result);
+    expect(error.code).toBe("version_not_found");
+  });
+});
+
 describe("runRender: previews", () => {
   it("previews the open draft for a persona on the team, logged as a preview with no consumer", async () => {
     const { result, rows } = await render({
@@ -224,10 +285,7 @@ describe("runRender: previews", () => {
 
   it("lets someone who decided a version preview it only while they still have active access somewhere", async () => {
     // Naomi (outside Coral Offers) decided Cash-back v3 when a stage named her; that stage has moved on.
-    const [v3] = await db
-      .select({ id: versions.id })
-      .from(versions)
-      .where(and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, 3)));
+    const v3 = await findRound(db, ids["cash-back"]!, 3);
     await db.insert(schema.approvals).values({
       id: "ap_test_naomi",
       versionId: v3!.id,

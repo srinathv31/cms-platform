@@ -65,9 +65,9 @@ export async function ActivityContent({
                   <p className="line-clamp-2 min-w-0 flex-1 text-[14px] leading-6 text-text">
                     <Sentence item={item} />
                   </p>
-                  {item.versionNumber !== null ? (
+                  {item.versionLabel !== null ? (
                     <span className="flex h-6 shrink-0 items-center rounded-md border border-hairline bg-surface-sunken px-1.5 text-[12px] font-medium text-text-muted">
-                      v{item.versionNumber}
+                      {item.versionLabel}
                     </span>
                   ) : null}
                   <span className="flex h-6 w-24 shrink-0 items-center justify-end">

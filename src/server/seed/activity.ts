@@ -1,6 +1,7 @@
 import type { AnyNotificationKind } from "@/domain/access-types";
 import { formatLongDate } from "@/domain/dates";
-import type { SeedCtx } from "./context";
+import { reviewPath, versionLabel, type NumberedRound } from "@/domain/rounds";
+import type { SeedCtx, VersionRef } from "./context";
 import { flaggedMembers, recertSubjectIds } from "./teams";
 import { userName } from "./people";
 
@@ -88,9 +89,12 @@ export function seedActivity(ctx: SeedCtx) {
   const waiver = ctx.template("annual-fee-waiver");
   const balanceTransfer = ctx.template("balance-transfer");
   const holiday = ctx.template("holiday-points");
-  const waiverReason = sink.approvals.find(
-    (a) => a.versionId === waiver.versions.v1.id && a.decision === "changes_requested",
-  )?.reason;
+  const reasonFor = (version: VersionRef) =>
+    sink.approvals.find((a) => a.versionId === version.id && a.decision === "changes_requested")?.reason;
+  const waiverReason = reasonFor(waiver.versions.v1);
+  // A round as the app's notifications name it (rounds.ts): "v3, round 2".
+  const round = (version: VersionRef): NumberedRound => ({ number: version.number!, round: version.round!, state: version.state });
+  const sentence = (version: VersionRef) => versionLabel(round(version), { style: "sentence" });
 
   const note = (n: {
     user: string;
@@ -117,15 +121,15 @@ export function seedActivity(ctx: SeedCtx) {
   note({
     user: "jordan",
     kind: "review_requested",
-    title: `${userName("maya")} submitted ${cashBack.name} v3 for review.`,
+    title: `${userName("maya")} submitted ${cashBack.name} ${sentence(cashBack.versions.v3)} for review.`,
     body: "It adds the required variable annual_fee, a breaking change for consumers.",
-    href: `/${coral}/review/${cashBack.id}/3`,
+    href: reviewPath(coral, cashBack.id, round(cashBack.versions.v3)),
     at: 0.9,
   });
   note({
     user: "maya",
     kind: "changes_requested",
-    title: `${userName("jordan")} requested changes on ${waiver.name} v1.`,
+    title: `${userName("jordan")} requested changes on ${waiver.name} ${sentence(waiver.versions.v1)}.`,
     body: waiverReason ?? undefined,
     href: `/${coral}/templates/${waiver.id}`,
     at: 3.9,
@@ -167,6 +171,15 @@ export function seedActivity(ctx: SeedCtx) {
   });
 
   // Already read: a little history in the bell
+  note({
+    user: "maya",
+    kind: "changes_requested",
+    title: `${userName("jordan")} requested changes on ${cashBack.name} ${sentence(cashBack.versions.v3r1)}.`,
+    body: reasonFor(cashBack.versions.v3r1) ?? undefined,
+    href: `/${coral}/templates/${cashBack.id}`,
+    at: 2.6,
+    read: true,
+  });
   note({
     user: "maya",
     kind: "version_live",

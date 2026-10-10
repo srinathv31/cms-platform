@@ -10,6 +10,8 @@ import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
+import { headOf, isReleased } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
@@ -97,8 +99,9 @@ const tpl = (key: string) => {
   return id;
 };
 const versionsOf = (key: string) => versions.filter((v) => v.templateId === tpl(key));
+/** A number's head (its released row, else its latest round), or the draft (null). */
 const version = (key: string, n: number | null) => {
-  const found = versionsOf(key).find((v) => v.number === n);
+  const found = n === null ? versionsOf(key).find((v) => v.number === null) : headOf(versionsOf(key), n);
   if (!found) throw new Error(`no ${key} v${n}`);
   return found;
 };
@@ -216,25 +219,41 @@ describe("lifecycle states", () => {
     }
   });
 
-  it("numbers versions only after submit, once each", () => {
+  it("numbers versions only after submit: released numbers 1..n, and each number's rounds 1..k", () => {
     for (const t of templates) {
-      const numbers = versions
-        .filter((v) => v.templateId === t.id && v.state !== "draft")
-        .map((v) => v.number)
-        .sort();
-      numbers.forEach((n, i) => expect(n).toBe(i + 1));
+      const own = versions.filter((v) => v.templateId === t.id && v.state !== "draft");
+      const released = own.filter((v) => isReleased(v.state)).map((v) => v.number!).sort((a, b) => a - b);
+      released.forEach((n, i) => expect(n, `${t.id} released numbers`).toBe(i + 1));
+      for (const number of new Set(own.map((v) => v.number!))) {
+        const rounds = own.filter((v) => v.number === number).map((v) => v.round!).sort((a, b) => a - b);
+        rounds.forEach((r, i) => expect(r, `${t.id} v${number} rounds`).toBe(i + 1));
+      }
     }
-    for (const v of versions.filter((x) => x.state === "draft")) expect(v.number).toBeNull();
+    for (const v of versions.filter((x) => x.state === "draft")) expect([v.number, v.round]).toEqual([null, null]);
   });
 
   it("matches the five Coral templates in the build plan", () => {
     const states = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}:${v.state}`).sort();
+    const rounds = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}/${v.round ?? "-"}:${v.state}`).sort();
     expect(states("balance-transfer")).toEqual(["1:superseded", "2:active"]);
-    expect(states("cash-back")).toEqual(["1:superseded", "2:active", "3:in_review"]);
+    // v3 was sent back on round 1 and is in review on round 2.
+    expect(rounds("cash-back")).toEqual(["1/1:superseded", "2/1:active", "3/1:changes_requested", "3/2:in_review"]);
     expect(states("annual-fee-waiver")).toEqual(["1:changes_requested", "draft:draft"]);
     expect(states("holiday-points")).toEqual(["1:revoked", "2:active"]);
     expect(states("rate-change-notice")).toEqual(["1:active"]);
     expect(templates.find((t) => t.id === tpl("rate-change-notice"))?.starterKey).toBe("rate_change_notice");
+  });
+
+  it("gives High-Yield Savings v2 approved on round 3, after Naomi sent rounds 1 and 2 back", async () => {
+    const rounds = versionsOf("high-yield-savings").map((v) => `${v.number}/${v.round}:${v.state}`).sort();
+    expect(rounds).toEqual(["1/1:superseded", "2/1:changes_requested", "2/2:changes_requested", "2/3:active"]);
+    const sentBack = (await db.select().from(ucomp.approvals)).filter(
+      (a) => versionsOf("high-yield-savings").some((v) => v.id === a.versionId) && a.decision === "changes_requested",
+    );
+    expect(sentBack.map((a) => a.actorId)).toEqual(["naomi", "naomi"]);
+    // Each round resubmits the one sent back.
+    const [r1, r2, r3] = [1, 2, 3].map((round) => versionsOf("high-yield-savings").find((v) => v.number === 2 && v.round === round)!);
+    expect([r2!.basedOnVersionId, r3!.basedOnVersionId]).toEqual([r1!.id, r2!.id]);
   });
 
   it("gives Deposits and Card Statements templates in Active and Draft", () => {
@@ -402,6 +421,8 @@ describe("comments", () => {
     expect(threads.length).toBeGreaterThanOrEqual(3);
     for (const t of threads) {
       const origin = versions.find((v) => v.id === t.originVersionId)!;
+      // A thread about the whole version (a change request's reason) has no block.
+      if (t.blockId === DOCUMENT_THREAD) continue;
       const blocks = (v: typeof origin) => (v.body.content ?? []).map((b) => b.attrs?.id);
       expect(blocks(origin)).toContain(t.blockId);
       for (const draft of versions.filter((v) => v.basedOnVersionId === origin.id && v.state === "draft")) {
@@ -640,6 +661,7 @@ describe("determinism", () => {
             id: v.id,
             state: v.state,
             number: v.number,
+            round: v.round,
             body: v.body,
             // Date samples are relative to the base, so compare the contract without them.
             variables: v.variables.map(({ key, label, type, required }) => ({ key, label, type, required })),

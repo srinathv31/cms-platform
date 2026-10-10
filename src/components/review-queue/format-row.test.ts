@@ -16,6 +16,7 @@ const row = (over: Partial<ReviewQueueRow> = {}): ReviewQueueRow => ({
   teamName: "Coral Offers",
   versionId: "ver_1",
   versionNumber: 3,
+  round: 1,
   state: "in_review",
   author: maya,
   submittedAt: ago(3 * DAY),

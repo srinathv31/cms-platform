@@ -28,6 +28,7 @@ import {
 import { sunsetPassed } from "@/domain/lifecycle";
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";
+import { isReleased } from "@/domain/rounds";
 import { type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
@@ -49,8 +50,6 @@ import { currentName } from "./template-name";
 // bars, the heatmap, a consumer's row) count every attempt; "failed" is the subset that errored, and
 // "succeeded" is the rest as a share of attempts. So a template whose only render failed reads "1 render,
 // 0% succeeded, 1 failed" and every card reconciles with every other.
-
-const RELEASED: readonly VersionState[] = ["active", "superseded", "revoked"];
 
 const day = sql<string>`strftime('%Y-%m-%d', ${renderLog.at} / 1000, 'unixepoch')`;
 const isOk = sql`${renderLog.outcome} = 'ok'`;
@@ -88,13 +87,18 @@ function revokedAtOf(state: VersionState, revoke: RevokeRecord | null): Date | n
   return new Date(revoke.confirmedAt ?? revoke.startedAt);
 }
 
-/** Numbered versions of these templates (never the bodies). */
+/**
+ * Numbered versions of these templates (never the bodies), one per number: its head, the released row,
+ * else its latest round (`headOf` in domain/rounds.ts), which is the row a consumer's number means. A
+ * number's sent-back rounds never stand in for the version consumers render.
+ */
 async function loadVersions(templateIds: readonly string[]): Promise<Map<string, VersionInfo>> {
   if (templateIds.length === 0) return new Map();
   const rows = await db
     .select({
       templateId: versions.templateId,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       activatedAt: versions.activatedAt,
       sunsetAt: versions.sunsetAt,
@@ -102,8 +106,12 @@ async function loadVersions(templateIds: readonly string[]): Promise<Map<string,
     })
     .from(versions)
     .where(and(inArray(versions.templateId, [...templateIds]), isNotNull(versions.number)));
+  // The head last, so it is the one the map keeps for its number.
+  const headsLast = rows.sort(
+    (a, b) => Number(isReleased(a.state)) - Number(isReleased(b.state)) || (a.round ?? 0) - (b.round ?? 0),
+  );
   return new Map(
-    rows.map((r) => [
+    headsLast.map((r) => [
       versionKey(r.templateId, r.number!),
       {
         templateId: r.templateId,
@@ -447,7 +455,7 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
   const attempts = ok + errors;
 
   // Released versions, newest first, each with every consumer that ever rendered it.
-  const released = [...versionMap.values()].filter((v) => RELEASED.includes(v.state)).sort((a, b) => b.number - a.number);
+  const released = [...versionMap.values()].filter((v) => isReleased(v.state)).sort((a, b) => b.number - a.number);
   const versionsOut: TemplateUsageVersion[] = released.map((v) => {
     const byConsumer = new Map<string, { id: string; name: string; renders30d: number; errors30d: number; lastRenderAt: number }>();
     for (const c of cells) {

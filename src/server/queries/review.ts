@@ -10,6 +10,7 @@ import { REFUSALS, contractBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
+import { asNumbered } from "@/domain/rounds";
 import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
@@ -39,10 +40,11 @@ export const DECIDED_WINDOW_DAYS = 30;
 
 // ── Queue ─────────────────────────────────────────────────────
 
-// A row is a version, so it carries that version's name: an approver reviews the name it was submitted with.
+// A row is a round, so it carries that round's name: an approver reviews the name it was submitted with.
 const queueColumns = {
   versionId: versions.id,
   versionNumber: versions.number,
+  round: versions.round,
   state: versions.state,
   submittedBy: versions.submittedBy,
   submittedAt: versions.submittedAt,
@@ -63,6 +65,7 @@ const queueColumns = {
 interface QueueVersion {
   versionId: string;
   versionNumber: number | null;
+  round: number | null;
   state: VersionState;
   submittedBy: string | null;
   submittedAt: Date | null;
@@ -97,6 +100,7 @@ function queueRow(
     teamName: v.teamName,
     versionId: v.versionId,
     versionNumber: v.versionNumber ?? 0,
+    round: v.round ?? 0,
     state: v.state,
     author: personOf(people, v.submittedBy ?? v.createdBy),
     submittedAt: iso(v.submittedAt ?? v.createdAt),
@@ -161,10 +165,11 @@ const loadInReview = cache(async (spaceSlug: string) => {
 });
 
 /**
- * The three tabs of `/{team}/review`.
+ * The three tabs of `/{team}/review`. Each row is a round: a number sent back and resubmitted has a
+ * row per round.
  * - waiting: in review on the space's teams, at a stage the viewer may act on, not submitted by them;
  * - submitted: the viewer's own versions still in review;
- * - decided: the latest decision on each version decided in the last 30 days, newest first.
+ * - decided: the latest decision on each round decided in the last 30 days, newest first.
  * "All teams" spans every team (it's open only to cross-team viewers).
  */
 export const getReviewQueue = cache(async (spaceSlug: string): Promise<ReviewQueue> => {
@@ -232,11 +237,16 @@ async function loadBaseline(
   return row ? { id: base.id, number: base.number, state: base.state, body: row.body, variables: row.variables } : null;
 }
 
-/** Everything `/{team}/review/{templateId}/{n}` shows. 404 when the version doesn't exist or isn't visible. */
+/**
+ * Everything `/{team}/review/{templateId}/{n}?round=N` shows: that round, or without a round (null) the
+ * number's head, its released row or else its latest round. 404 when the round doesn't exist or isn't
+ * visible.
+ */
 export const getReviewScreen = cache(
-  async (spaceSlug: string, templateId: string, versionNumber: number): Promise<ReviewScreenData> => {
-    const { space, template, version } = await requireReviewVersion(spaceSlug, templateId, versionNumber);
-    const number = version.number!;
+  async (spaceSlug: string, templateId: string, versionNumber: number, round: number | null): Promise<ReviewScreenData> => {
+    const { space, template, version } = await requireReviewVersion(spaceSlug, templateId, versionNumber, round);
+    const shown = asNumbered(version);
+    const { number } = shown;
 
     const nowDate = await demoNow();
     const zone = await getBusinessZone();
@@ -259,8 +269,8 @@ export const getReviewScreen = cache(
         .from(approvals)
         .where(eq(approvals.versionId, version.id))
         .orderBy(asc(approvals.decidedAt), asc(approvals.id)),
-      // A submitted version is a record: the threads that began after it are not part of it.
-      loadThreads(template.id, version.body, { throughVersion: number }),
+      // A submitted round is a record: the threads that began after it are not part of it.
+      loadThreads(template.id, version.body, { through: shown }),
       loadConsumerUsage(db, template.id, nowDate),
     ]);
 
@@ -293,6 +303,7 @@ export const getReviewScreen = cache(
       version: {
         id: version.id,
         number,
+        round: shown.round,
         state: version.state,
         name: version.name,
         body: version.body,

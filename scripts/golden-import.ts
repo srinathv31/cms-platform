@@ -23,6 +23,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { findRound } from "@/server/queries/find-round";
 import { seedDatabase } from "@/server/seed";
 import { caseDir, inputPath } from "@/server/render/golden/files";
 import { GOLDEN_AT } from "@/server/render/golden/focused-cases";
@@ -53,11 +54,11 @@ async function main() {
     if (!template || !key) {
       throw new Error(`No seeded template "${templateArg}". Seeded ids: ${Object.values(seeded.templates).join(", ")}`);
     }
-    const [row] = await db
-      .select()
-      .from(schema.versions)
-      .where(and(eq(schema.versions.templateId, id), version === "draft" ? isNull(schema.versions.number) : eq(schema.versions.number, version)))
-      .limit(1);
+    // A number is its head: the released row, else its latest round (what a consumer renders, or would).
+    const [row] =
+      version === "draft"
+        ? await db.select().from(schema.versions).where(and(eq(schema.versions.templateId, id), isNull(schema.versions.number))).limit(1)
+        : [await findRound(db, id, version)];
     if (!row) throw new Error(`${id} has no ${version === "draft" ? "open draft" : `version ${version}`}.`);
     const set = row.sampleSets.find((s) => s.id === setArg || s.name === setArg);
     if (!set) throw new Error(`${id} ${versionArg} has no sample set "${setArg}". It has: ${row.sampleSets.map((s) => s.id).join(", ")}`);

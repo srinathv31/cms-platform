@@ -27,6 +27,8 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): T
     quote: patch.quote ?? null,
     status: "open",
     originVersionNumber: 1,
+    originRound: 1,
+    originLabel: "v1",
     comments: [{ id: `c-${id}`, author: JORDAN, body: `Comment ${id}`, kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
     orphaned: false,
     ...patch,

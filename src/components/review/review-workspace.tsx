@@ -419,6 +419,7 @@ export function ReviewWorkspace({
         onOpenChange={(open) => !open && setDialog(null)}
         templateId={template.id}
         versionNumber={version.number}
+        round={version.round}
         previousNumber={data.previousNumber}
         contractChanges={version.contractChanges}
         stage={stage}
@@ -437,6 +438,7 @@ export function ReviewWorkspace({
         onOpenChange={(open) => !open && setDialog(null)}
         templateId={template.id}
         versionNumber={version.number}
+        round={version.round}
         authorName={version.submittedBy.name}
         onRequested={() => {
           decided.current = true;

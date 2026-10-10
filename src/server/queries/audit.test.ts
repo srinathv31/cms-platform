@@ -107,7 +107,7 @@ describe("getAuditPage: who sees what", () => {
     expect(config.category).toBe("platform");
     const submitted = page.rows.find((r) => r.action === "version.submitted")!;
     expect(submitted.template?.id).toMatch(/^UC-/);
-    expect(submitted.versionNumber).toEqual(expect.any(Number));
+    expect(submitted.versionLabel).toMatch(/^v\d+( · Round \d+)?$/);
   });
 });
 
@@ -183,7 +183,11 @@ describe("getAuditExport", () => {
     try {
       const page = await getAuditPage("all", { template: v2!.templateId });
       const named = (number: number | null, action?: string) =>
-        new Set(page.rows.filter((r) => r.versionNumber === number && (!action || r.action === action)).map((r) => r.template?.name));
+        new Set(
+          page.rows
+            .filter((r) => r.versionLabel === (number === null ? null : `v${number}`) && (!action || r.action === action))
+            .map((r) => r.template?.name),
+        );
       expect(named(1)).toEqual(new Set(["Balance Transfer Intro — Terms"]));
       expect(named(2)).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
       expect(named(null, "template.created")).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
