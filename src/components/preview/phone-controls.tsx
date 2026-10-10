@@ -22,7 +22,12 @@ import { cn } from "@/lib/utils";
 // Device button whose popover sets the rest: the screen a push is on, the phone's appearance, its
 // previews setting, its text size and its width. Settled on the phone kit's design page at the
 // tightest well (469px). A row that doesn't apply to what is on screen stays in place, greyed, with
-// why under it ("Push only"), and does nothing.
+// why under it ("Push only"), and does nothing. The popover's geometry is the same in every state: the
+// reason sits in the gap under its control, out of flow, so picking Banner (which blocks Previews) moves
+// no row under the pointer, and Push and SMS open the same popover.
+
+/** The gap between rows: room for a reason's 16px line under its control, nearer it than the next row. The last row is never blocked. */
+const ROW_GAP = "gap-6";
 
 const SCREENS: readonly PushScreen[] = ["lock", "banner", "expanded"];
 const WIDTHS: readonly DeviceWidth[] = ["compact", "standard", "large"];
@@ -92,7 +97,7 @@ function DeviceOptions({
         align="end"
         sideOffset={8}
         aria-label="Device options"
-        className="w-auto gap-3 rounded-xl border border-hairline bg-popover p-3 shadow-pop ring-0"
+        className={cn("w-auto rounded-xl border border-hairline bg-popover p-3 shadow-pop ring-0", ROW_GAP)}
       >
         <Row label="Screen" blocked={sms ? "Push only" : null}>
           {(blocked) => (
@@ -168,19 +173,22 @@ function Row({
   return (
     <div className="grid grid-cols-[5.5rem_auto] items-center gap-x-3">
       <span className="text-[13px] leading-5 text-text-muted">{label}</span>
-      <div
-        role="group"
-        aria-disabled={blocked ? true : undefined}
-        aria-describedby={blocked ? reasonId : undefined}
-        className={cn("w-fit", blocked && "opacity-50 [&_button]:cursor-default [&_button]:hover:bg-transparent [&_button[aria-pressed=true]]:hover:bg-selected")}
-      >
-        {children(guard)}
+      <div className="relative w-fit">
+        <div
+          role="group"
+          aria-disabled={blocked ? true : undefined}
+          aria-describedby={blocked ? reasonId : undefined}
+          className={cn("w-fit", blocked && "opacity-50 [&_button]:cursor-default [&_button]:hover:bg-transparent [&_button[aria-pressed=true]]:hover:bg-selected")}
+        >
+          {children(guard)}
+        </div>
+        {/* Out of flow, in the gap under the control (ROW_GAP), so a row that turns blocked moves nothing. */}
+        {blocked ? (
+          <span id={reasonId} data-slot="row-reason" className="absolute top-full left-0 mt-0.5 text-[12px] leading-4 whitespace-nowrap text-text-subtle">
+            {blocked}
+          </span>
+        ) : null}
       </div>
-      {blocked ? (
-        <span id={reasonId} className="col-start-2 mt-1 text-[12px] leading-4 text-text-subtle">
-          {blocked}
-        </span>
-      ) : null}
     </div>
   );
 }

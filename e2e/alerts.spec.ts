@@ -14,6 +14,7 @@ import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveFi
 //   2. Preview: an iPhone lock screen with the push, the sample values filled in. Typing in the body changes
 //      the phone at once; past the lock screen's four lines, the field warns where the iPhone cuts it.
 //   3. A subtitle shows under the title on the iPhone; Android leaves it out; back on the iPhone it is there.
+//      In the Device options, Banner greys Previews with its reason, and no row of the popover moves.
 //   4. The SMS: its meta line (encoding and parts, with the long values too). A curly apostrophe is flagged
 //      in the text and the line turns to UCS-2 and 3 parts; the phone's Messages thread shows the text.
 //   5. Submit is refused with the reason, and the dialog stays; the flag's Replace fixes the character (the
@@ -193,6 +194,21 @@ test.describe("alerts", () => {
       await tap(platforms.getByRole("button", { name: "iPhone", exact: true }));
       await expect(phone(page)).toHaveAttribute("data-device", "ios");
       await expect(onPhone(page, "subtitle")).toHaveText(SUBTITLE);
+
+      // The Device options hold still: Banner greys Previews with its reason under it, and no row moves.
+      await tap(page.locator('[data-slot="preview-controls"]').getByRole("button", { name: "Device options" }));
+      const options = page.getByRole("dialog", { name: "Device options" });
+      await expect(options).toBeVisible();
+      const geometry = () =>
+        options.evaluate((el) => [el.getBoundingClientRect().height, ...[...el.querySelectorAll('[role="group"]')].map((g) => g.getBoundingClientRect().y)]);
+      const before = await geometry();
+      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Banner", exact: true }));
+      await expect(phone(page).locator("figcaption")).toHaveText("Banner, iOS-style preview");
+      await expect(options.locator('[role="group"][aria-disabled="true"]')).toHaveAccessibleDescription("Lock screen only");
+      expect(await geometry(), "picking Banner moves no row of the popover").toEqual(before);
+      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Lock screen", exact: true }));
+      await page.keyboard.press("Escape");
+      await expect(options).toBeHidden();
     });
 
     await test.step("4. The SMS meta line, and a curly apostrophe flagged where it was typed: UCS-2, 3 parts", async () => {
