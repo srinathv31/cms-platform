@@ -200,8 +200,12 @@ test.describe("alerts", () => {
       await tap(page.locator('[data-slot="preview-controls"]').getByRole("button", { name: "Device options" }));
       const options = page.getByRole("dialog", { name: "Device options" });
       await expect(options).toBeVisible();
+      // Measured once the popover has finished opening (it zooms in from 95%).
       const geometry = () =>
-        options.evaluate((el) => [el.getBoundingClientRect().height, ...[...el.querySelectorAll('[role="group"]')].map((g) => g.getBoundingClientRect().y)]);
+        options.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished));
+          return [el.getBoundingClientRect().height, ...[...el.querySelectorAll('[role="group"]')].map((g) => g.getBoundingClientRect().y)];
+        });
       const before = await geometry();
       await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Banner", exact: true }));
       await expect(phone(page).locator("figcaption")).toHaveText("Banner, iOS-style preview");
@@ -256,6 +260,10 @@ test.describe("alerts", () => {
       await expect(fix).toBeHidden();
       await expect(field(page, "SMS message")).not.toBeFocused();
       expect(await page.evaluate(() => document.activeElement !== document.body), "Tab lands on a control").toBe(true);
+      // Tab landed in the rail, which scrolled the canvas: bring the flag back into view, as a person would,
+      // since a popover whose flag is clipped at the canvas's edge stays hidden.
+      await flags(page).first().evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await untilUncovered(flags(page).first());
       await tap(flags(page).first());
       await tap(fix);
       await expect(flags(page)).toHaveCount(0);
