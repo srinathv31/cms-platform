@@ -254,7 +254,8 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(page).toHaveURL(/\/all\/library$|\/coral-offers\//);
       await page.goto(`/${TEAM}/library`);
       await hydrated(page);
-      await expect(reviewBadge(page)).toHaveText("1");
+      // v4, and the seeded Card Used Abroad alert, which waits on him too.
+      await expect(reviewBadge(page)).toHaveText("2");
       await openQueue(page);
       const row = queueRow(page);
       await expect(row).toBeVisible();
@@ -300,7 +301,7 @@ test.describe("phase 6: two-stage approval", () => {
 
     await test.step("2.3 It has left Jordan's Waiting on me, and the version is still in review", async () => {
       await openQueue(page);
-      await expect(reviewBadge(page), "nothing waits on him now").toHaveCount(0);
+      await expect(reviewBadge(page), "only the seeded Card Used Abroad alert waits on him now").toHaveText("1");
       await expect(queueRow(page), "it moved on, so it isn't in his Waiting on me").toHaveCount(0);
       const [version] = await rows("SELECT state, current_stage FROM versions WHERE id = ?", [versionId]);
       expect(version.state).toBe("in_review");

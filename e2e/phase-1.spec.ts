@@ -424,10 +424,10 @@ test.describe("persona switcher", () => {
     await page.goto("/coral-offers/library");
     await libraryRows(page);
 
-    // Maya → Jordan on the library: same URL, Review badge appears.
+    // Maya → Jordan on the library: same URL, Review badge appears (Cash Back v3 and the Card Used Abroad alert).
     await switchVia(page, "Jordan Ellis");
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
-    await expect(sidebarNav(page).getByRole("link", { name: /^Review/ }).locator("[aria-label='1 waiting']")).toHaveText("1");
+    await expect(sidebarNav(page).getByRole("link", { name: /^Review/ }).locator("[aria-label='2 waiting']")).toHaveText("2");
 
     // Jordan → Alex deep inside a template: same URL, Audit appears, Settings appears.
     await openTemplate(page, "Balance Transfer Intro — Terms");
