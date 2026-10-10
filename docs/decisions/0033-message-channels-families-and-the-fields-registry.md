@@ -18,8 +18,9 @@ nothing stopped a long body from flowing into a text message. The owner confirme
   Email) render the template's one body; `MESSAGE_CHANNELS` (Push, SMS) render only their own fields and never read a
   body (`channelFamily`, `familyOf` in `src/domain/types.ts`). A content type is one family: `channelRuleRefusal`
   refuses turning on a channel of the other family, with a sentence that names where it goes ("Disclosures are
-  documents. Push and SMS go on Alert templates."), and the channel rules matrix shows that switch disabled with it.
-  Since one channel always stays on, a content type's family never changes, and so a template's never does.
+  documents. Push and SMS go on Alert templates."), and the channel rules matrix shows that switch greyed in place,
+  with the sentence as its tooltip. Since one channel always stays on, a content type's family never changes, and so a
+  template's never does.
   Everything that treats a template as a document or an alert (the workspace's editor or composer, the review
   screen, Compare, Copilot) reads its family from its content type (`contentTypeFamily`), never from a version's
   channels, which are the author's to change. A version keeps at least one channel on: the draft save refuses an

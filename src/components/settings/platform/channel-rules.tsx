@@ -1,20 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState, type Ref } from "react";
 import type { ChannelRuleRow, ChannelRulesSection } from "@/domain/access-types";
 import { channelOffConsequences } from "@/domain/platform-config";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { setChannelRule } from "@/server/actions/platform";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Strip } from "../strip";
-import { Blocked, FullRow, useFocusAfterCommit } from "./ui";
+import { FullRow, useFocusAfterCommit } from "./ui";
 
 // Settings > Platform > Channel rules: the content type by channel matrix. Turning a channel on takes
 // effect at once; turning one off says what it stops (from the Active versions that use it) in a strip
-// under the row, and only the strip's confirm commits it. A switch that can't flip (the last channel on)
-// comes decided from the read model, `row.can.toggle`, and shows disabled with its reason.
+// under the row, and only the strip's confirm commits it. A switch that can't flip (the last channel on,
+// or a channel of the other family) comes decided from the read model, `row.can.toggle`, and shows
+// greyed in place with its reason (`ChannelSwitch`).
 
 /** The content type's name, then one column per channel (five: documents and messages side by side). */
 const colsFor = (channels: readonly Channel[]) => `minmax(0,1fr) repeat(${channels.length}, 4.5rem)`;
@@ -78,31 +80,26 @@ function TypeRow({
           ) : null}
         </div>
         {channels.map((channel) => {
-          const on = row.allowed[channel];
           const toggle = row.can.toggle[channel];
-          const blocked = toggle.ok ? null : toggle.reason;
           return (
             <div role="cell" key={channel} className="flex justify-center">
-              <Blocked reason={blocked}>
-                <Switch
-                  ref={(el) => {
-                    switches.current.set(channel, el);
-                  }}
-                  aria-label={`${row.name} on ${CHANNEL_LABELS[channel]}`}
-                  checked={on}
-                  disabled={!!blocked}
-                  readOnly={pending}
-                  onCheckedChange={(next) => {
-                    if (pending) return;
-                    if (next) {
-                      setAsking(null);
-                      run(() => setChannelRule({ contentTypeId: row.contentTypeId, channel, allowed: true }));
-                    } else {
-                      setAsking(channel);
-                    }
-                  }}
-                />
-              </Blocked>
+              <ChannelSwitch
+                ref={(el) => {
+                  switches.current.set(channel, el);
+                }}
+                label={`${row.name} on ${CHANNEL_LABELS[channel]}`}
+                on={row.allowed[channel]}
+                blocked={toggle.ok ? null : toggle.reason}
+                pending={pending}
+                onChange={(next) => {
+                  if (next) {
+                    setAsking(null);
+                    run(() => setChannelRule({ contentTypeId: row.contentTypeId, channel, allowed: true }));
+                  } else {
+                    setAsking(channel);
+                  }
+                }}
+              />
             </div>
           );
         })}
@@ -121,5 +118,63 @@ function TypeRow({
         </FullRow>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One cell's switch. A switch the read model refuses stays in place, greyed and focusable: `aria-disabled`
+ * rather than the native `disabled` (Tab would skip that, and its reason with it), its reason the tooltip
+ * and its accessible description, and a guard that cancels the change, from a click or Space. It is the
+ * same element blocked or not, so a switch whose refusal comes or goes as other channels change keeps
+ * its focus.
+ */
+function ChannelSwitch({
+  ref,
+  label,
+  on,
+  blocked,
+  pending,
+  onChange,
+}: {
+  ref: Ref<HTMLElement>;
+  label: string;
+  on: boolean;
+  /** Why it can't flip, or null. */
+  blocked: string | null;
+  pending: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const reasonId = useId();
+  return (
+    <>
+      <Tooltip disabled={!blocked}>
+        <TooltipTrigger
+          render={
+            <Switch
+              ref={ref}
+              aria-label={label}
+              aria-disabled={blocked ? true : undefined}
+              aria-describedby={blocked ? reasonId : undefined}
+              checked={on}
+              readOnly={pending}
+              className="aria-disabled:cursor-default aria-disabled:opacity-50"
+              onCheckedChange={(next, details) => {
+                if (blocked || pending) {
+                  details.cancel();
+                  return;
+                }
+                onChange(next);
+              }}
+            />
+          }
+        />
+        <TooltipContent>{blocked}</TooltipContent>
+      </Tooltip>
+      {blocked ? (
+        <span id={reasonId} className="sr-only">
+          {blocked}
+        </span>
+      ) : null}
+    </>
   );
 }

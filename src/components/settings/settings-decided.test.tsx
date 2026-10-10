@@ -140,7 +140,7 @@ describe("Channel rules", () => {
   });
   const family = { ok: false, code: "channel_family", reason: "Disclosures are documents. Push and SMS go on Alert templates." } as const;
 
-  it("disables exactly the switches the read model refuses", async () => {
+  it("blocks exactly the switches the read model refuses: greyed in place, still focusable, with the reason", async () => {
     // Three channels on, so the rule alone would refuse none: the refusal here is the server's word.
     await show(
       <ChannelRulesSectionView
@@ -150,13 +150,34 @@ describe("Channel rules", () => {
         }}
       />,
     );
-    const sw = (label: string) => container.querySelector(`[role="switch"][aria-label="${label}"]`)!;
-    expect(sw("Disclosure on Web").hasAttribute("data-disabled")).toBe(true);
-    expect(sw("Disclosure on PDF").hasAttribute("data-disabled")).toBe(false);
-    expect(sw("Disclosure on Email").hasAttribute("data-disabled")).toBe(false);
-    // The other family's channels show disabled, not hidden.
-    expect(sw("Disclosure on Push").hasAttribute("data-disabled")).toBe(true);
-    expect(sw("Disclosure on SMS").hasAttribute("data-disabled")).toBe(true);
+    const sw = (label: string) => container.querySelector<HTMLElement>(`[role="switch"][aria-label="${label}"]`)!;
+    const reason = (el: HTMLElement) => document.getElementById(el.getAttribute("aria-describedby") ?? "")?.textContent ?? null;
+    for (const label of ["Disclosure on Web", "Disclosure on Push", "Disclosure on SMS"]) {
+      const blocked = sw(label);
+      expect(blocked.getAttribute("aria-disabled"), label).toBe("true");
+      expect(blocked.hasAttribute("data-disabled"), `${label}: not disabled, so Tab reaches it and its reason`).toBe(false);
+      expect(blocked.tabIndex, label).toBe(0);
+    }
+    expect(reason(sw("Disclosure on Web"))).toBe("Decided by the server.");
+    // The other family's channels show greyed, not hidden, and say why.
+    expect(reason(sw("Disclosure on Push"))).toBe(family.reason);
+    for (const label of ["Disclosure on PDF", "Disclosure on Email"]) {
+      expect(sw(label).hasAttribute("aria-disabled"), label).toBe(false);
+      expect(sw(label).hasAttribute("aria-describedby"), label).toBe(false);
+    }
+
+    // Pressing a blocked switch does nothing: it doesn't flip, and asks for no turn-off.
+    const { setChannelRule } = await import("@/server/actions/platform");
+    await click(sw("Disclosure on Web"));
+    expect(sw("Disclosure on Web").getAttribute("aria-checked")).toBe("true");
+    expect(strip()).toBeNull();
+    await click(sw("Disclosure on Push"));
+    expect(sw("Disclosure on Push").getAttribute("aria-checked")).toBe("false");
+    expect(setChannelRule).not.toHaveBeenCalled();
+
+    // An unblocked one still asks before turning off.
+    await click(sw("Disclosure on PDF"));
+    expect(strip()).not.toBeNull();
   });
 });
 
