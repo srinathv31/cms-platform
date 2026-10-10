@@ -269,6 +269,7 @@ export async function submitVersion(input: {
           stages: changes.stages,
           currentStage: changes.currentStage,
           contractChanges: changes.contractChanges,
+          smsFooter: changes.smsFooter,
         },
         at,
         REQUEST_REFUSALS.draftChanged,

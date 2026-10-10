@@ -120,7 +120,7 @@ Reads a screen makes on demand, when a dialog or a menu opens, are GET route han
 
 | Route (`/api/templates/[templateId]/…`) | Query | For |
 | --- | --- | --- |
-| `compare?from=&to=` | `loadVersionsToCompare` ([queries/compare.ts](queries/compare.ts)) | The Compare dialog, per pair of versions: names, bodies, channel fields, and the content type's SMS footer (`template.view`). |
+| `compare?from=&to=` | `loadVersionsToCompare` ([queries/compare.ts](queries/compare.ts)) | The Compare dialog, per pair of versions: the template's family, and each version's name, body, channel fields and SMS footer (`template.view`). |
 | `base-version?draft=` | `getBaseVersion` ([queries/base-version.ts](queries/base-version.ts)) | "Revert to v3" (`draft.edit`). |
 | `submit-summary` | `getSubmitSummary` ([queries/submit-summary.ts](queries/submit-summary.ts)) | The submit dialog, and its Refresh summary (`version.submit`). |
 | `copilot-prompt` | `getCopilotPrompt` ([queries/copilot.ts](queries/copilot.ts)) | The Copilot prompt dialog (`draft.edit`). |
@@ -155,7 +155,10 @@ The platform ([seed/platform.ts](seed/platform.ts)) has two content types, each 
 (documents: PDF, Web and Email, three required sections) and Alert (messages: Push and SMS, no sections, the SMS
 footer "Coral Offers: Reply STOP to opt out, HELP for help." and a 3-part budget). Coral Offers sends its messages as
 the app "Coral" and from the short code 26725 ([seed/teams.ts](seed/teams.ts)). The submit action reads the content
-type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)). The
+type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)), and freezes
+the footer into the version (`versions.sms_footer`, migration 0011): render, the review screen, Compare and Coral
+print a submitted version's own footer, and only a draft takes the content type's as it stands (`smsFooterOf`). The
+template's family comes from its content type too (`loadFamily`, `contentTypeFamily`), never a version's channels. The
 workspace's and the review screen's read models carry them and the team's senders (`messageRules`, `senders`) for
 the message composer and the phone preview, which render in the browser
 ([decision 0035](../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)); the workspace's also says

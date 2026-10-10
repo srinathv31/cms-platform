@@ -278,7 +278,10 @@ describe("lifecycle states", () => {
       const template = templates.find((t) => t.id === tpl(key))!;
       expect(template).toMatchObject({ teamId: "coral-offers", contentTypeId: "ct_alert" });
       for (const v of versionsOf(key)) expect(v.channels).toEqual(["push", "sms"]);
+      // Each submitted version froze the Alert's footer, as submit does; a draft shows the content type's.
+      for (const v of versionsOf(key)) expect(v.smsFooter).toBe(v.state === "draft" ? null : "Coral Offers: Reply STOP to opt out, HELP for help.");
     }
+    for (const v of versionsOn("ct_disclosure")) expect(v.smsFooter).toBeNull();
     expect(versionsOf("payment-due-reminder")[0]).toMatchObject({ name: "Payment Due Reminder", stages: [{ id: "stage_alert_0" }] });
     expect(templates.find((t) => t.id === tpl("payment-due-reminder"))?.starterKey).toBe("payment_reminder");
     expect(templates.find((t) => t.id === tpl("card-used-abroad"))?.starterKey).toBe("card_activity");

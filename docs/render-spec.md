@@ -65,7 +65,7 @@ Before stage 1 the route checks the request itself: the body's size (at most 1,0
 
 Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run; for push and SMS, stages 8 and 9 are `renderMessage` in `src/domain/render/message.ts`, the same function the composer's preview runs in the browser). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that stage 7 also checks the channel's own fields and stage 8 resolves them, a message channel skips the body, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
-Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel and, for push, the platform, the content type's SMS footer (`content_types.sms_footer`, or none), and the render time `at` (used only as the PDF's creation and modification date).
+Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel and, for push, the platform, the version's SMS footer (the content type's footer as it stood when the version was submitted, frozen into it as `versions.sms_footer`; a draft preview uses the content type's `content_types.sms_footer` as it stands; or none), and the render time `at` (used only as the PDF's creation and modification date).
 
 ---
 
@@ -669,7 +669,8 @@ A push is one message for both platforms, rendered for the one the request names
 
 The response is `{ "text", "encoding", "parts", "characters", "newerVersion" }`:
 
-- `text` is the message exactly as it must be sent: the resolved message field (section 8, its line breaks as `\n`), then, when the content type has an SMS footer, `\n` and the footer as written. An empty message is the footer alone. Nothing is cut and nothing is transliterated: a value prints as sent, even when it switches the message to UCS-2.
+- `text` is the message exactly as it must be sent: the resolved message field (section 8, its line breaks as `\n`), then, when the version has an SMS footer, `\n` and the footer as written. An empty message is the footer alone. Nothing is cut and nothing is transliterated: a value prints as sent, even when it switches the message to UCS-2.
+- **The footer is the version's.** Submit freezes the content type's footer (brand and opt-out) into the version (`versions.sms_footer`), with the rest of what was reviewed, and every render of that version prints it. A later change to the content type's footer reaches only versions submitted after it, so it goes through approval like any other change to a message. A draft preview prints the content type's footer as it stands. Review and Compare show each version's own footer, and redline it when it changed between the two.
 - `encoding`, `parts` and `characters` measure `text` (below).
 - Over 10 parts, the render is refused: 422 `sms_too_long` (section 11).
 
@@ -768,7 +769,7 @@ src/server/render/golden/
   "body": { "type": "doc", … },             // a message case's is never read
   "channelFields": { "email": { "subject": { "type": "doc", … }, "preheader": { … } } },  // or {} (section 2)
   "channels": [ "pdf", "web", "email" ],    // the channels the case renders: one family
-  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."   // optional: the content type's footer
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."   // optional: the version's SMS footer (section 10)
 }
 ```
 

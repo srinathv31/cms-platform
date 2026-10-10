@@ -23,8 +23,8 @@ export const ALERT_STAGE = { id: "stage_alert_0", name: "Team approver" } as con
 
 /**
  * The seeded content types as a seeded template names its own (`SeedTemplate.contentType`): the row it
- * belongs to, the chain stage its versions go through, the channels it allows and the required sections
- * every version's body has, in order.
+ * belongs to, the chain stage its versions go through, the channels it allows, the required sections
+ * every version's body has, in order, and its SMS footer (which every submitted version froze at submit).
  */
 export const SEED_CONTENT_TYPES = {
   disclosure: {
@@ -32,8 +32,15 @@ export const SEED_CONTENT_TYPES = {
     stage: TEAM_STAGE,
     channels: CHANNELS_ALL,
     requiredSections: REQUIRED_SECTIONS.map((s) => s.key) as string[],
+    smsFooter: null,
   },
-  alert: { id: ALERT_CONTENT_TYPE_ID, stage: ALERT_STAGE, channels: ALERT_CHANNELS, requiredSections: [] as string[] },
+  alert: {
+    id: ALERT_CONTENT_TYPE_ID,
+    stage: ALERT_STAGE,
+    channels: ALERT_CHANNELS,
+    requiredSections: [] as string[],
+    smsFooter: ALERT_SMS_FOOTER,
+  },
 } as const;
 export type SeedContentType = keyof typeof SEED_CONTENT_TYPES;
 

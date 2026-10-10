@@ -78,6 +78,13 @@
       "when": 1791602767181,
       "tag": "0010_coral_phones",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791608508155,
+      "tag": "0011_version_sms_footer",
+      "breakpoints": true
     }
   ]
 }

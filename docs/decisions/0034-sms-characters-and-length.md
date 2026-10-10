@@ -39,6 +39,13 @@ exactly what the author typed and every value as sent.
   composer's "Long values" line alike, so a stale sample set can never switch the budget or the push size check off.
 - **The footer counts.** The content type's footer (the brand and "Reply STOP to opt out", which CTIA asks of a US
   sender) is printed on its own last line, exactly as written, and counts toward the parts.
+- **The footer is frozen into the version at submit** (`versions.sms_footer`), like the version's name and its
+  stages. It is regulated text the approver reviewed, so a later change to the content type's footer must not rewrite
+  every Active alert without approval: render, the review screen, Compare and Coral print each submitted version's own
+  footer, and the new one reaches a template only through its next submitted version. A draft shows the content
+  type's footer as it stands (`smsFooterOf`). Compare and the review redline show a footer that changed between two
+  versions, and count it. Versions submitted before the column existed took their content type's footer as it stood
+  then (migration 0011), which is what they had been rendering.
 - **No public link shorteners** in an SMS or a push body: carriers filter them (CTIA §5.3.2). A branded short domain
   is fine.
 - **Consumers turn off Smart Encoding** and any other provider rewriting: the counts are for the text as rendered,

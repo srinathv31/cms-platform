@@ -38,7 +38,7 @@ vi.mock("@/server/db/client", async () => {
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
-const { commentThreads, versions } = schema;
+const { commentThreads, contentTypes, versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
@@ -296,6 +296,7 @@ describe("getReviewScreen", () => {
             variables: v2.variables,
             channels: v2.channels,
             channelFields: v2.channelFields,
+            smsFooter: null,
           });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
         },
@@ -638,6 +639,22 @@ describe("an alert's family", () => {
       expect((await getReviewScreen("coral-offers", templateId, 1)).template.family).toBe("message");
     } finally {
       await db.update(versions).set({ channels }).where(where);
+    }
+  });
+});
+
+describe("an alert's SMS footer", () => {
+  it("is the one frozen into the version at submit, for the preview and the fields, whatever the content type's is now", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const frozen = "Coral Offers: Reply STOP to opt out, HELP for help.";
+    await db.update(contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(contentTypes.id, "ct_alert"));
+    try {
+      as("jordan");
+      const screen = await getReviewScreen("coral-offers", templateId, 1);
+      expect(screen.version.smsFooter).toBe(frozen);
+      expect(screen.messageRules.smsFooter).toBe(frozen);
+    } finally {
+      await db.update(contentTypes).set({ smsFooter: frozen }).where(eq(contentTypes.id, "ct_alert"));
     }
   });
 });

@@ -96,11 +96,7 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
     readTemplate<ComparePair>(templateId, "compare", { from: fromId, to: toId })
       .then((result) => {
         if (!live) return;
-        setLoaded(
-          result.ok
-            ? { key, ok: true, family: result.family, from: result.from, to: result.to, smsFooter: result.smsFooter }
-            : { key, ok: false },
-        );
+        setLoaded(result.ok ? { key, ok: true, family: result.family, from: result.from, to: result.to } : { key, ok: false });
       })
       .catch(() => live && setLoaded({ key, ok: false }));
     return () => {
@@ -110,7 +106,7 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
 
   const ready = loaded?.key === key ? loaded : null;
   const redline = useMemo(() => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null), [ready]);
-  // Each channel's own fields, over the registry: a field's change counts with the body's.
+  // Each channel's own fields, over the registry, and the SMS footer each version sends: a change counts with the body's.
   const fields = useMemo(() => (ready?.ok ? diffChannelFields(ready.from, ready.to) : null), [ready]);
   // A message (an Alert) has no body: its fields are all there is to compare. Its content type says so.
   const message = ready?.ok ? ready.family === "message" : false;
@@ -174,7 +170,7 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
                 layout={message ? "sections" : "details"}
                 headingLevel={3}
                 changesOnly={changesOnly}
-                smsFooter={ready?.ok ? ready.smsFooter : null}
+                footer={fields.footer}
                 className={cn("[--ucomp-doc-gutter:3.5rem]", !message && "mb-6")}
               />
             ) : null}

@@ -157,6 +157,11 @@ export const versions = sqliteTable(
     // { "email": { "subject": <doc>, "preheader": <doc> } }. A field with no value is absent.
     channelFields: json<ChannelFields>("channel_fields").notNull().default(sql`'{}'`),
     channels: json<Channel[]>("channels").notNull(),
+    // The content type's SMS footer as it stood when this version was submitted, frozen with it (decision
+    // 0034): render, review, Compare and Coral print this one, so a later footer change reaches only versions
+    // submitted after it, through approval. Null on a draft (it shows the content type's footer as it stands,
+    // `smsFooterOf`) and on a version whose content type had none.
+    smsFooter: text("sms_footer"),
     variables: json<Variable[]>("variables").notNull(),
     sampleSets: json<SampleSet[]>("sample_sets").notNull(),
     contractChanges: json<ContractChange[]>("contract_changes"),

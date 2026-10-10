@@ -460,10 +460,25 @@ export interface SubmitChanges {
   currentStage: 0;
   /** How the variable list differs from the baseline's (`contractBaseline`); null when there is no baseline. */
   contractChanges: ContractChange[] | null;
+  /**
+   * The content type's SMS footer as it stands now, frozen into the version with the rest of what was
+   * submitted (`versions.sms_footer`): every render of this version prints it, whatever the content type's
+   * footer becomes later. Null when the content type has none (a document's never does).
+   */
+  smsFooter: string | null;
 }
 
 /** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
 export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
+
+/**
+ * The SMS footer a version prints (decision 0034): a draft's is its content type's as it stands, since it
+ * isn't submitted yet; every submitted version's is the one frozen into it at submit (`SubmitChanges.smsFooter`),
+ * so a later change to the content type's footer never reaches a version that was already reviewed.
+ */
+export function smsFooterOf(version: { state: VersionState; smsFooter: string | null }, contentTypeFooter: string | null): string | null {
+  return version.state === "draft" ? contentTypeFooter : version.smsFooter;
+}
 
 export interface SubmitInput {
   draft: SubmitDraft;
@@ -495,8 +510,9 @@ export interface SubmitInput {
 
 /**
  * Draft → In review, as the template's next version: a version number, the contract changes, the note,
- * the stages it will go through (the chain as it is now), an audit event, and a `review_requested`
- * notification to the first stage's approvers (never anyone who wrote it, the submitter included).
+ * the stages it will go through (the chain as it is now), the content type's SMS footer (frozen with it),
+ * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone who
+ * wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
@@ -555,6 +571,7 @@ export function submit(input: SubmitInput): SubmitResult {
       stages,
       currentStage: 0,
       contractChanges,
+      smsFooter: input.messageRules.smsFooter,
     },
     effects: [
       {

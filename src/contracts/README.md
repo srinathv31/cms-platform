@@ -43,7 +43,7 @@ as an Alert: its own short fields). A template is one or the other, so a version
   Android, and only when it has text) and the body, all in full, and `payloadBytes`, the UTF-8 size of the
   notification JSON this text makes (APNs' for iOS, FCM's for Android). The consumer's own keys add to it: they have
   4,096 − `payloadBytes` left, 2,048 for an FCM topic message. Over 4,096 is 422 `push_payload_too_large`.
-- **SMS** answers `ApiSmsResponse`: the text to send as is, the content type's footer on its last line, its
+- **SMS** answers `ApiSmsResponse`: the text to send as is, the version's footer (frozen at submit) on its last line, its
   `encoding` (`ApiSmsEncoding`, `GSM-7` or `UCS-2`), `parts` and `characters`. A value is never transliterated: one
   outside GSM-7 switches the message to UCS-2, and `encoding` says so. Over 10 parts is 422 `sms_too_long`. Turn off
   provider rewriting such as Twilio's Smart Encoding: the counts are for this text

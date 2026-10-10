@@ -19,6 +19,7 @@ import {
   reviewBaseline,
   revokePending,
   setSunset,
+  smsFooterOf,
   startRevoke,
   submit,
   sunsetPassed,
@@ -543,6 +544,7 @@ describe("submit", () => {
         stages: [{ id: "st_team", name: "Team approver" }],
         currentStage: 0,
         contractChanges: null,
+        smsFooter: null,
       },
       effects: [submitted(1), reviewRequested(1)],
     });
@@ -766,6 +768,15 @@ describe("submit", () => {
 
     it("submits a push and an SMS that keep every rule", () => {
       expect(alert().ok).toBe(true);
+    });
+
+    it("freezes the content type's SMS footer into the version, which every render of it prints from then on", () => {
+      const result = alert();
+      expect(result.ok && result.changes.smsFooter).toBe(ALERT.smsFooter);
+      // A draft shows the content type's footer as it stands; a submitted version keeps its own.
+      expect(smsFooterOf({ state: "draft", smsFooter: null }, "Now")).toBe("Now");
+      expect(smsFooterOf({ state: "active", smsFooter: "Then" }, "Now")).toBe("Then");
+      expect(smsFooterOf({ state: "superseded", smsFooter: null }, "Now"), "frozen as none").toBeNull();
     });
 
     it("needs every required field of each channel that is on, from the registry", () => {

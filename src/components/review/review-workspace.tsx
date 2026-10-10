@@ -87,8 +87,9 @@ export function ReviewWorkspace({
     () => (baseline ? diffDocuments(baseline.body, version.body) : null),
     [baseline, version.body],
   );
-  // Each channel's own fields, as they stand and against the baseline: an email's subject, an alert's push and SMS.
-  const fieldsNow = useMemo(() => diffChannelFields(null, version).fields, [version]);
+  // Each channel's own fields, as they stand and against the baseline: an email's subject, an alert's push and SMS
+  // (with the SMS footer each version was submitted with, so a footer change is redlined too).
+  const fieldsNow = useMemo(() => diffChannelFields(null, version), [version]);
   const fieldsRedline = useMemo(() => (baseline ? diffChannelFields(baseline, version) : null), [baseline, version]);
   const counts = redline && fieldsRedline ? addCounts(redline.counts, fieldsRedline.counts) : null;
   const changeCount = counts ? counts.added + counts.removed + counts.changed + counts.moved : 0;
@@ -334,8 +335,8 @@ export function ReviewWorkspace({
         <DocumentView
           versionId={version.id}
           family={family}
-          fields={showChanges && fieldsRedline ? fieldsRedline.fields : fieldsNow}
-          smsFooter={data.messageRules.smsFooter}
+          fields={(showChanges && fieldsRedline ? fieldsRedline : fieldsNow).fields}
+          footer={(showChanges && fieldsRedline ? fieldsRedline : fieldsNow).footer}
           body={version.body}
           variables={version.variables}
           baselineVariables={baseline?.variables ?? null}

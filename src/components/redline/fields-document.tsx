@@ -7,7 +7,8 @@
 // the diff against no base (every field "unchanged"), so one component draws both.
 //
 //   layout "sections"  a message: each channel a section under its display heading ("Push notification"),
-//                      its fields in the composer's boxes (label, "iPhone only" tag, the SMS's locked footer)
+//                      its fields in the composer's boxes (label, "iPhone only" tag, the SMS's locked footer:
+//                      the version's own, and its redline when it changed between the two versions)
 //   layout "details"   a document: a caps label ("EMAIL") over each channel's fields, above the body
 //   status             a field that changed gets the redline's bar in the gutter; an added one is under an
 //                      <ins>, a removed one struck whole; inside a changed one, the word diff's marks
@@ -23,7 +24,7 @@ import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { FieldLabel, LockedFooter } from "@/components/workspace/content/field-chrome";
 import { channelFieldsHeading, fieldName, fieldPlatformTag } from "@/domain/channel-fields";
-import type { FieldRedline, RedlineBlock } from "@/domain/review-types";
+import type { FieldRedline, FooterRedline, RedlineBlock } from "@/domain/review-types";
 import type { Channel } from "@/domain/types";
 import { staticHardBreak } from "@/editor/components/static-document";
 import { VariableChipView } from "@/editor/components/variable-chip";
@@ -50,8 +51,12 @@ export interface FieldsDocumentProps {
   changesOnly?: boolean;
   /** The field a comment thread is being read on: tinted, and shown in full with Changes only. */
   activeBlockId?: string | null;
-  /** The content type's SMS footer, locked under the message as the composer shows it. */
-  smsFooter?: string | null;
+  /**
+   * The SMS's locked footer under its message, as the composer shows it: `diffChannelFields(…).footer`, the
+   * version's own (frozen at submit) and, against a base, how it changed. A changed footer keeps the SMS shown
+   * in full with Changes only.
+   */
+  footer?: FooterRedline | null;
   /** Match the document's `align` ("start": the text on the column's left edge). Default "center". */
   align?: DocumentAlign;
   className?: string;
@@ -98,6 +103,32 @@ function FieldText({ blocks, variables }: { blocks: readonly RedlineBlock[]; var
       },
     },
   });
+}
+
+/** The SMS's locked footer as this version sends it, struck and inserted where it changed. */
+function FooterLine({ footer }: { footer: FooterRedline }) {
+  switch (footer.status) {
+    case "unchanged":
+      return footer.to ? <LockedFooter text={footer.to} /> : null;
+    case "added":
+      return (
+        <LockedFooter status="added">
+          <ins>{footer.to}</ins>
+        </LockedFooter>
+      );
+    case "removed":
+      return (
+        <LockedFooter status="removed">
+          <del>{footer.from}</del>
+        </LockedFooter>
+      );
+    case "changed":
+      return (
+        <LockedFooter status="changed">
+          <del>{footer.from}</del> <ins>{footer.to}</ins>
+        </LockedFooter>
+      );
+  }
 }
 
 function Field({
@@ -153,7 +184,7 @@ export function FieldsDocument({
   headingLevel = 2,
   changesOnly = false,
   activeBlockId = null,
-  smsFooter = null,
+  footer = null,
   align = "center",
   className,
 }: FieldsDocumentProps) {
@@ -181,16 +212,20 @@ export function FieldsDocument({
             >
               {channelFieldsHeading(channel)}
             </div>
-            {own.map((item) => (
-              <Field
-                key={item.field.id}
-                item={item}
-                variables={variables}
-                collapsed={changesOnly && item.status === "unchanged" && item.field.id !== activeBlockId}
-                active={item.field.id === activeBlockId}
-                footer={item.field.channel === "sms" && smsFooter ? <LockedFooter text={smsFooter} /> : null}
-              />
-            ))}
+            {own.map((item) => {
+              const smsFooter = item.field.channel === "sms" ? footer : null;
+              const unchanged = item.status === "unchanged" && (smsFooter?.status ?? "unchanged") === "unchanged";
+              return (
+                <Field
+                  key={item.field.id}
+                  item={item}
+                  variables={variables}
+                  collapsed={changesOnly && unchanged && item.field.id !== activeBlockId}
+                  active={item.field.id === activeBlockId}
+                  footer={smsFooter ? <FooterLine footer={smsFooter} /> : null}
+                />
+              );
+            })}
           </Fragment>
         ))}
       </div>

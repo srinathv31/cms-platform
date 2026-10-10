@@ -280,6 +280,8 @@ the thread's block, `commentAnchors`): the handle finds a field by `data-field` 
 
 The composer's field label and the SMS's locked footer (`content/field-chrome.tsx`) are shared with the review's and
 Compare's read-only fields (`redline/fields-document.tsx`), so a field looks the same written, reviewed and compared.
+The composer shows the content type's footer (a draft's); the review and Compare show each version's own, frozen at
+submit, and a footer that changed between the two versions struck and inserted (`diffChannelFields(…).footer`).
 
 ## Copy these
 

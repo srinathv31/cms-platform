@@ -1221,6 +1221,24 @@ describe("the writers backfill in the migration", () => {
   });
 });
 
+// The SQL that filled `sms_footer` for versions submitted before the column existed: every submitted version
+// takes its content type's footer, as the seed and submit freeze it, and a draft keeps none.
+describe("the SMS footer backfill in the migration", () => {
+  it("gives every submitted version its content type's footer, and leaves drafts and documents without one", async () => {
+    const folder = "./src/server/db/migrations";
+    const file = readdirSync(folder).find((name) => name.endsWith("_version_sms_footer.sql"))!;
+    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split("--> statement-breakpoint");
+    const footers = async () =>
+      Object.fromEntries((await db.select({ id: versions.id, smsFooter: versions.smsFooter }).from(versions)).map((v) => [v.id, v.smsFooter]));
+
+    const recorded = await footers();
+    expect(Object.values(recorded).filter(Boolean).length, "some alert versions are submitted").toBeGreaterThan(0);
+    await libsql.execute("UPDATE versions SET sms_footer = NULL");
+    await libsql.execute(backfill!);
+    expect(await footers()).toEqual(recorded);
+  });
+});
+
 // ── Submitting an alert: the message rules (decisions 0033 and 0034) ──────────
 
 describe("submitting an alert", () => {
@@ -1276,6 +1294,21 @@ describe("submitting an alert", () => {
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
     expect((await version(templateId, 1))?.state).toBe("in_review");
+  });
+
+  it("freezes the content type's SMS footer into the version: a later change to it doesn't reach the submitted text", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
+    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+    expect(footer).toBeTruthy();
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect((await version(templateId, 1))?.smsFooter).toBe(footer);
+    await db.update(schema.contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(schema.contentTypes.id, "ct_alert"));
+    try {
+      expect((await version(templateId, 1))?.smsFooter).toBe(footer);
+    } finally {
+      await db.update(schema.contentTypes).set({ smsFooter: footer }).where(eq(schema.contentTypes.id, "ct_alert"));
+    }
   });
 
   it("refuses a public link shortener in the SMS", async () => {

@@ -567,6 +567,23 @@ describe("diffChannelFields", () => {
     expect(result.fields[0]!.doc.blocks[0]!.node.content).toEqual(inline(["Was this you?"]));
   });
 
+  it("carries the SMS footer each side prints, and counts a footer that changed while SMS stayed on", () => {
+    const sms = (smsFooter: string | null, channels: Channel[] = ["push", "sms"]) => ({ ...alert({ sms: { text: field("Hi") } }, channels), smsFooter });
+    expect(diffChannelFields(null, sms("Reply STOP")).footer).toEqual({ from: null, to: "Reply STOP", status: "unchanged" });
+    expect(diffChannelFields(sms("Reply STOP"), sms("Reply STOP")).footer?.status).toBe("unchanged");
+    const changed = diffChannelFields(sms("Reply STOP"), sms("Coral: Reply STOP"));
+    expect(changed.footer).toEqual({ from: "Reply STOP", to: "Coral: Reply STOP", status: "changed" });
+    expect(changed.counts).toEqual({ ...NO_CHANGES, changed: 1 });
+    expect(diffChannelFields(sms(null), sms("Reply STOP")).footer?.status).toBe("added");
+    expect(diffChannelFields(sms("Reply STOP"), sms(null)).footer?.status).toBe("removed");
+    // SMS turned on: its message counts as added, and its footer comes with it, uncounted.
+    const on = diffChannelFields(sms("Reply STOP", ["push"]), sms("Reply STOP"));
+    expect(on.footer?.status).toBe("added");
+    expect(on.counts).toEqual({ ...NO_CHANGES, added: 1 });
+    // No SMS on either side: no footer.
+    expect(diffChannelFields(sms("Reply STOP", ["push"]), sms("Other", ["push"])).footer).toBeNull();
+  });
+
   it("word-diffs a changed field, an email subject among them, and counts it once", () => {
     const email = (subject: JSONContent) => ({ channels: ["pdf", "email"] as Channel[], channelFields: { email: { subject } } });
     const result = diffChannelFields(email(field("Your rate is changing on {effective_date}")), email(field("Your rate changes soon")));
