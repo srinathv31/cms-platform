@@ -17,8 +17,9 @@ import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveFi
 //      In the Device options, Banner greys Previews with its reason, and no row of the popover moves.
 //   4. The SMS: its meta line (encoding and parts, with the long values too). A curly apostrophe is flagged
 //      in the text and the line turns to UCS-2 and 3 parts; the phone's Messages thread shows the text.
-//   5. Submit is refused with the reason, and the dialog stays; the flag's Replace fixes the character (the
-//      line is back to GSM-7); submit goes through and v1 is In review.
+//   5. Submit is refused with the reason, and the dialog stays; Tab reaches the flag's Replace and goes on
+//      past the field from it; Replace fixes the character (the line is back to GSM-7); submit goes through
+//      and v1 is In review.
 //   6. Jordan opens v1: the Document view is the alert's fields, read-only, with no Show changes (nothing to
 //      compare with yet). He approves: v1 is Active.
 //   7. Maya edits (v2): a word on the push title and a sentence on the SMS, and submits v2.
@@ -242,7 +243,21 @@ test.describe("alerts", () => {
       await untilUncovered(flags(page).first());
       await tap(flags(page).first());
       await expect(page.getByRole("heading", { name: "’ isn't in the SMS character set." }), "the flag says why").toBeVisible();
-      await tap(page.getByRole("button", { name: "Replace with '" }));
+      // The fix stands in the field's place in the Tab order: Tab reaches it and Shift+Tab goes back; Tab
+      // from it closes the popover and goes on past the field, never round to the field again.
+      const fix = page.getByRole("button", { name: "Replace with '" });
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(field(page, "SMS message")).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(fix).toBeHidden();
+      await expect(field(page, "SMS message")).not.toBeFocused();
+      expect(await page.evaluate(() => document.activeElement !== document.body), "Tab lands on a control").toBe(true);
+      await tap(flags(page).first());
+      await tap(fix);
       await expect(flags(page)).toHaveCount(0);
       await expect(smsMeta(page)).toHaveText(/^GSM-7 · 2 parts/);
       await expectAutosaved(page);
