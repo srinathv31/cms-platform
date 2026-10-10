@@ -11,7 +11,7 @@ import { db } from "@/server/db/client";
 import { teams, uploads } from "@/server/db/schema/ucomp";
 import { prepareBody } from "@/server/documents/prepare";
 import { newId } from "@/server/ids";
-import { conformToContentType, disclosureContentType, freshTemplateId, insertNewTemplate } from "@/server/templates/create";
+import { conformToContentType, freshTemplateId, insertNewTemplate, newTemplateType } from "@/server/templates/create";
 import { convertFile } from "./convert";
 import { sniffKind } from "./sniff";
 import { defaultUploadsRoot, removeUpload, writeUpload } from "./store";
@@ -80,7 +80,10 @@ export async function importTemplate(
   const converted = await convertFile(kind, file.bytes);
   if (!converted.ok) return refuse(converted.code);
 
-  const contentType = await disclosureContentType();
+  // Import makes documents (`importUnavailable`): a file's text becomes the body.
+  const chosen = await newTemplateType("document");
+  if (!chosen.ok) throw new Error(chosen.reason);
+  const { contentType } = chosen;
   const finished = finishImport({
     file: converted.file,
     filename: file.name,

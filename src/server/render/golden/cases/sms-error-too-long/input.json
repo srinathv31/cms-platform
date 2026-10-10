@@ -1,0 +1,59 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "SMS over 10 parts",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "note",
+      "label": "Note",
+      "type": "text",
+      "required": true,
+      "sample": "x"
+    }
+  ],
+  "values": {
+    "note": "Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note Long note "
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "note"
+                }
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "note"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ],
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."
+}

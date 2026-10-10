@@ -14,7 +14,15 @@ export type VarKey =
   | "effective_date"
   | "apy"
   | "minimum_balance"
-  | "monthly_fee";
+  | "monthly_fee"
+  // Alerts: push and SMS (decision 0034).
+  | "amount_due"
+  | "due_date"
+  | "statement_balance"
+  | "card_last4"
+  | "transaction_amount"
+  | "merchant"
+  | "country";
 
 interface Def {
   label: string;
@@ -42,6 +50,16 @@ export class VariableKit {
       apy: { label: "APY", type: "percent", required: true, typical: "4.25", long: "5.00", minimum: "0.10" },
       minimum_balance: { label: "Minimum balance", type: "currency", required: true, typical: "1000", long: "100000", minimum: "500" },
       monthly_fee: { label: "Monthly fee", type: "currency", required: true, typical: "12", long: "25", minimum: "0" },
+      // An alert's values are short, but the long set still has the widest each can be: it is what
+      // submit measures an SMS's parts and a push's bytes with. Every typical and long value is GSM-7
+      // (é is), so the seeded SMS stay GSM-7 with their sample values.
+      amount_due: { label: "Amount due", type: "currency", required: true, typical: "35.00", long: "4975.62", minimum: "25.00" },
+      due_date: { label: "Due date", type: "date", required: true, typical: isoDate(base + 12 * DAY), long: isoDate(base + 30 * DAY), minimum: isoDate(base + 3 * DAY) },
+      statement_balance: { label: "Statement balance", type: "currency", required: true, typical: "1248.30", long: "48750.99", minimum: "25.00" },
+      card_last4: { label: "Card last 4", type: "text", required: true, typical: "4821", long: "9037", minimum: "0012" },
+      transaction_amount: { label: "Purchase amount", type: "currency", required: true, typical: "48.20", long: "9875.40", minimum: "1.00" },
+      merchant: { label: "Merchant", type: "text", required: true, typical: "Café Lisboa", long: "Pastelaria e Confeitaria Nacional de Belém", minimum: "Kiosk" },
+      country: { label: "Country", type: "text", required: true, typical: "Portugal", long: "United Kingdom of Great Britain and Northern Ireland", minimum: "Peru" },
     };
   }
 

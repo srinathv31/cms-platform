@@ -25,8 +25,8 @@ function input(body: RenderFixture["body"], extra: Partial<RenderFixture> = {}):
     variables: [],
     values: {},
     body,
-    emailSubject: null,
-    emailPreheader: null,
+    channelFields: {},
+    channels: ["pdf"],
     ...extra,
   };
 }
@@ -46,7 +46,7 @@ const SOFT_HYPHEN_DOC: RenderDoc = {
 const NBSP_LEAD = input(doc(p(t("    Indented by four no-break spaces"))));
 const ASCII_LEAD = input(doc(p(t("    Indented by four spaces"))));
 
-const pdf = (name: string, source: RenderFixture): FreshJob => ({ name, input: source, channel: "pdf" });
+const pdf = (name: string, source: RenderFixture): FreshJob => ({ name, input: source, target: { channel: "pdf" } });
 
 interface Glyph {
   ch: string;

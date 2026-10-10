@@ -22,26 +22,34 @@
       }
     ]
   },
-  "emailSubject": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
+  "channelFields": {
+    "email": {
+      "subject": {
+        "type": "doc",
         "content": [
           {
-            "type": "text",
-            "text": "Your rate"
-          },
-          {
-            "type": "hardBreak"
-          },
-          {
-            "type": "text",
-            "text": "is changing"
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Your rate"
+              },
+              {
+                "type": "hardBreak"
+              },
+              {
+                "type": "text",
+                "text": "is changing"
+              }
+            ]
           }
         ]
       }
-    ]
+    }
   },
-  "emailPreheader": null
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
 }

@@ -88,8 +88,7 @@ async function seed() {
     channels: ["pdf"],
     variables: [variable("first_name")],
     sampleSets: [],
-    emailSubject: null,
-    emailPreheader: null,
+    channelFields: {},
     rev: 5,
     createdBy: "maya",
     writers: ["maya"],
@@ -143,7 +142,7 @@ describe("applyDraftPatch: a good save", () => {
     expect(after.variables).toEqual(before.variables);
     expect(after.channels).toEqual(before.channels);
     expect(after.sampleSets).toEqual(before.sampleSets);
-    expect(after.emailSubject).toBeNull();
+    expect(after.channelFields).toEqual({});
     expect(after.state).toBe("draft");
   });
 
@@ -153,8 +152,8 @@ describe("applyDraftPatch: a good save", () => {
       body: doc(para("B", "p1")),
       variables: [variable("a"), variable("b")],
       channels: ["pdf", "web"],
-      emailSubject: subject,
-      emailPreheader: doc(para("Pre", "h1")),
+      "email.subject": subject,
+      "email.preheader": doc(para("Pre", "h1")),
       sampleSets: [{ id: "s1", name: "Maya", values: { a: "1", b: 2 } }],
       name: "New name",
     });
@@ -162,16 +161,23 @@ describe("applyDraftPatch: a good save", () => {
     const after = await draft();
     expect(after.variables.map((v) => v.key)).toEqual(["a", "b"]);
     expect(after.channels).toEqual(["pdf", "web"]);
-    expect(after.emailSubject).toEqual(subject);
-    expect(after.emailPreheader).toEqual(doc(para("Pre", "h1")));
+    expect(after.channelFields).toEqual({ email: { subject, preheader: doc(para("Pre", "h1")) } });
     expect(after.sampleSets).toEqual([{ id: "s1", name: "Maya", values: { a: "1", b: 2 } }]);
     expect((await draft()).name).toBe("New name");
   });
 
-  it("clears the email subject with null", async () => {
-    await save({ emailSubject: doc(para("Hi", "s1")) });
-    await save({ rev: 6, emailSubject: null });
-    expect((await draft()).emailSubject).toBeNull();
+  it("clears the email subject with null, and keeps the fields a save doesn't name", async () => {
+    await save({ "email.subject": doc(para("Hi", "s1")), "email.preheader": doc(para("Pre", "h1")) });
+    await save({ rev: 6, "email.subject": null });
+    expect((await draft()).channelFields).toEqual({ email: { preheader: doc(para("Pre", "h1")) } });
+    await save({ rev: 7, "email.preheader": null });
+    expect((await draft()).channelFields).toEqual({});
+  });
+
+  it("records each channel field it changed, by id, in the session's audit row", async () => {
+    await save({ "email.subject": doc(para("Hi", "s1")) });
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.action, "draft.edited"));
+    expect((row!.details as { fields: string[] }).fields).toEqual(["email.subject"]);
   });
 
   it("renames the draft, trimmed, and still bumps the version's rev", async () => {
@@ -266,9 +272,9 @@ describe("applyDraftPatch: the body is stored normalized (docs/render-spec.md §
   });
 
   it("the email fields: one line, no marks", async () => {
-    const res = await save({ emailSubject: doc(node("paragraph", null, t("Your\tAPR", [{ type: "bold" }]), { type: "hardBreak" }, t("changes"))) });
+    const res = await save({ "email.subject": doc(node("paragraph", null, t("Your\tAPR", [{ type: "bold" }]), { type: "hardBreak" }, t("changes"))) });
     expect(res.ok).toBe(true);
-    expect((await draft()).emailSubject).toEqual(doc(node("paragraph", null, t("Your APR"), t(" "), t("changes"))));
+    expect((await draft()).channelFields.email?.subject).toEqual(doc(node("paragraph", null, t("Your APR"), t(" "), t("changes"))));
   });
 });
 
@@ -299,7 +305,7 @@ describe("applyDraftPatch: a document the check refuses is not saved, and says w
   });
 
   it("refuses an email subject that isn't one line", async () => {
-    const res = failure(await save({ emailSubject: doc(para("a"), { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "b" }] }) }));
+    const res = failure(await save({ "email.subject": doc(para("a"), { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "b" }] }) }));
     expect(res.message).toBe("The email subject and preheader can hold only one line of text and variables.");
   });
 });
@@ -377,6 +383,11 @@ describe("applyDraftPatch: refusals change nothing", () => {
   it("invalid for a channel the content type doesn't allow", async () => {
     const res = await expectUntouched(() => save({ channels: ["pdf", "email"] }));
     expect(res.error).toBe("invalid");
+  });
+
+  it("invalid for no channels at all, which the parse refuses too: the draft keeps its own", async () => {
+    const res = await expectUntouched(() => save({ channels: [] }));
+    expect(res).toMatchObject({ error: "invalid", message: "Turn on at least one channel." });
   });
 
   it("does not leave half a save behind when the name is the bad part", async () => {

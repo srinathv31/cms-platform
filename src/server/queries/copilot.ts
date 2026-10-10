@@ -2,10 +2,10 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { buildCopilotPrompt } from "@/domain/copilot";
+import { buildCopilotPrompt, copilotUnavailable } from "@/domain/copilot";
 import type { CopilotPrompt } from "@/domain/import-types";
 import { can } from "@/domain/permissions";
-import type { Viewer } from "@/domain/types";
+import { contentTypeFamily, type Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -30,6 +30,7 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
       teamName: teams.name,
       contentTypeName: contentTypes.name,
       requiredSections: contentTypes.requiredSections,
+      allowedChannels: contentTypes.allowedChannels,
     })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
@@ -49,6 +50,8 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
     .limit(1)
     .then((rows) => rows[0]);
   if (!draft) return refusal(409, REQUEST_REFUSALS.noDraftToWrite);
+  // The content type's family, never the draft's channels: a draft can't change what kind of template it is.
+  if (copilotUnavailable(contentTypeFamily(template.allowedChannels))) return refusal(409, REQUEST_REFUSALS.copilotDocumentsOnly);
 
   const prompt = buildCopilotPrompt({
     templateName: draft.name,

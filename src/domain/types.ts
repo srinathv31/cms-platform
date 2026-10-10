@@ -15,11 +15,85 @@ export type {
 export { VARIABLE_TYPES } from "@/editor/model/types";
 
 import type { JSONContent, SampleSet, Variable } from "@/editor/model/types";
+import { assertNever } from "./assert-never";
+import type { ChannelFieldsPatch } from "./channel-fields";
 import type { Refused } from "./refusals";
 
 // ── Channels ──────────────────────────────────────────────────
-export const CHANNELS = ["pdf", "web", "email"] as const;
+// Two families, never mixed on one content type or template (docs/decisions/0034):
+//   - documents render the one long body: PDF, Web and Email (Email adds its subject and preheader);
+//   - messages render their own short fields and nothing from a body: Push and SMS.
+export const CHANNELS = ["pdf", "web", "email", "push", "sms"] as const;
 export type Channel = (typeof CHANNELS)[number];
+
+/** The channels that render the template's document. */
+export const DOCUMENT_CHANNELS = ["pdf", "web", "email"] as const satisfies readonly Channel[];
+/** The channels that render only their own short fields (channel-fields.ts). */
+export const MESSAGE_CHANNELS = ["push", "sms"] as const satisfies readonly Channel[];
+export type DocumentChannel = (typeof DOCUMENT_CHANNELS)[number];
+export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+
+export const CHANNEL_FAMILIES = ["document", "message"] as const;
+export type ChannelFamily = (typeof CHANNEL_FAMILIES)[number];
+
+/** Which family a channel belongs to. */
+export function channelFamily(channel: Channel): ChannelFamily {
+  switch (channel) {
+    case "pdf":
+    case "web":
+    case "email":
+      return "document";
+    case "push":
+    case "sms":
+      return "message";
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
+/**
+ * What a template of each family is called where an author chooses one (New template). A template is
+ * one or the other for life: its content type is one family and never changes family.
+ */
+export const TEMPLATE_KIND_LABELS: { readonly [F in ChannelFamily]: string } = {
+  document: "Document",
+  message: "Alert",
+};
+
+/** The family's channels, in `CHANNELS` order. */
+export function familyChannels(family: ChannelFamily): readonly Channel[] {
+  return family === "document" ? DOCUMENT_CHANNELS : MESSAGE_CHANNELS;
+}
+
+/**
+ * The family a set of channels belongs to: a content type's allowed channels or a version's channels,
+ * which never mix. Null for no channels. When they do mix (stored data a rule should have refused),
+ * the first channel's family.
+ */
+export function familyOf(channels: readonly Channel[]): ChannelFamily | null {
+  const first = CHANNELS.find((channel) => channels.includes(channel));
+  return first === undefined ? null : channelFamily(first);
+}
+
+/**
+ * A template's family, from its content type's allowed channels: what decides whether it is written in the
+ * editor or the composer, reviewed as a document or as fields, and whether Copilot drafts it. Always the
+ * content type's, never a version's channels: a content type always allows one channel, and keeps its
+ * family for life, while a version's channels are the author's to change (and a crafted save could empty them).
+ */
+export function contentTypeFamily(allowedChannels: readonly Channel[]): ChannelFamily {
+  return familyOf(allowedChannels) ?? "document";
+}
+
+/** True for PDF, Web and Email. */
+export function isDocumentChannel(channel: Channel): channel is DocumentChannel {
+  return channelFamily(channel) === "document";
+}
+
+/** True for Push and SMS. */
+export function isMessageChannel(channel: Channel): channel is MessageChannel {
+  return channelFamily(channel) === "message";
+}
 
 // ── Lifecycle ─────────────────────────────────────────────────
 export const VERSION_STATES = [
@@ -136,19 +210,21 @@ export type RenderOutcome = "ok" | "error";
  * Body of an autosave. Only the fields that changed since the last save are sent.
  * The server checks `draft.edit`, accepts only versions in the `draft` state, and merges every
  * save of one editing session (`sessionKey`) into a single `draft.edited` audit row.
+ *
+ * Each channel field is a key of its own, its id from the registry (`ChannelFieldsPatch`,
+ * channel-fields.ts): `"email.subject": { "type": "doc", … }` sets it and `"email.subject": null`
+ * clears it. The server lays them over the version's stored `channel_fields`.
  */
-export interface DraftPatch {
+export interface DraftPatch extends ChannelFieldsPatch {
   /** The rev the client last saw. A stale rev gets a `conflict` response carrying the current rev. */
   rev: number;
   /** One per editing session (one page visit). */
   sessionKey: string;
   body?: JSONContent;
   variables?: Variable[];
-  /** The template's name (lives on the template; editable only while a draft is open). */
+  /** The draft's name (a version field: editable only while a draft is open). */
   name?: string;
   channels?: Channel[];
-  emailSubject?: JSONContent | null;
-  emailPreheader?: JSONContent | null;
   sampleSets?: SampleSet[];
 }
 

@@ -30,13 +30,15 @@ afterEach(() => {
   editors.splice(0).forEach((e) => e.destroy());
 });
 
-function mount(kind: "body" | "inline" = "body", content?: JSONContent) {
+/** `"lines"`: an inline field that keeps its line breaks (an SMS message). */
+function mount(kind: "body" | "inline" | "lines" = "body", content?: JSONContent) {
   const root = createEditorRootRuntime({ variables: KNOWN });
-  root.registerField({ id: "f", label: kind === "body" ? "Document" : "Email subject", kind });
-  const options = { store: root.variables, binding: { fieldId: "f", kind, root, chip: createChipPopoverStore() } };
+  const fieldKind: "body" | "inline" = kind === "body" ? "body" : "inline";
+  root.registerField({ id: "f", label: kind === "body" ? "Document" : "Email subject", kind: fieldKind });
+  const options = { store: root.variables, binding: { fieldId: "f", kind: fieldKind, root, chip: createChipPopoverStore() } };
   const editor = new Editor({
     element: document.createElement("div"),
-    extensions: kind === "body" ? editorExtensions(options) : inlineFieldExtensions(options),
+    extensions: kind === "body" ? editorExtensions(options) : inlineFieldExtensions(options, kind === "lines" ? "lines" : "line"),
     content: content ?? { type: "doc", content: [{ type: "paragraph" }] },
   });
   editors.push(editor);
@@ -333,6 +335,16 @@ describe("{{key}} in pasted text", () => {
     editor.view.pasteHTML(fixture("word-windows.html"));
     expect(editor.state.doc.childCount).toBe(1);
     expect(editor.state.doc.textContent.startsWith("Cash Rewards Card offer Hi ")).toBe(true);
+  });
+
+  it("a field that keeps its lines pastes each line break as a hard break, blank lines included", () => {
+    const { editor } = mount("lines");
+    editor.view.pasteText("Your offer\nends {{offer_end_date}}\n\nsoon");
+    expect(doc(editor)).toEqual(["p: Your offer\\nends {{offer_end_date}}\\n\\nsoon"]);
+    editor.commands.setContent({ type: "doc", content: [{ type: "paragraph" }] });
+    editor.view.pasteHTML("<p><b>Hi</b> there</p><p>Second</p>");
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(doc(editor)).toEqual(["p: Hi there\\nSecond"]);
   });
 });
 

@@ -1,0 +1,88 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Plain GSM-7",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "due_date",
+      "label": "Due date",
+      "type": "date",
+      "required": true,
+      "sample": "2026-11-03"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "due_date": "2027-03-04"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", your café rebate (£5 or ¥700) posts "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "due_date"
+                }
+              },
+              {
+                "type": "text",
+                "text": "."
+              },
+              {
+                "type": "hardBreak"
+              },
+              {
+                "type": "hardBreak"
+              },
+              {
+                "type": "text",
+                "text": "Questions? Reply HELP."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ]
+}

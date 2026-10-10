@@ -12,7 +12,7 @@ import path from "node:path";
 
 export const openDb = (): Client => createClient({ url: `file:${path.resolve(process.cwd(), "data", "ucomp.db")}` });
 
-export type Channel = "pdf" | "web" | "email";
+export type Channel = "pdf" | "web" | "email" | "push" | "sms";
 export type VariableType = "text" | "currency" | "percent" | "date" | "number" | "us_state";
 
 export interface Variable {
@@ -76,6 +76,12 @@ export async function allVersions(db: Client): Promise<SeedVersion[]> {
     };
   });
 }
+
+/**
+ * A document's version (PDF, Web, Email), not an alert's (Push, SMS): what the specs that render and
+ * check documents pick from. The seed has both (decision 0034).
+ */
+export const isDocument = (v: SeedVersion) => v.channels.some((c) => c === "pdf" || c === "web" || c === "email");
 
 /** The first version that fits, or a failure that says what the seed is missing. */
 export function pick(versions: readonly SeedVersion[], what: string, fits: (v: SeedVersion) => boolean): SeedVersion {
@@ -312,7 +318,7 @@ export async function expectError(res: APIResponse, status: number, code: string
   return body.error;
 }
 
-export const LABEL: Record<Channel, string> = { pdf: "PDF", web: "Web", email: "Email" };
+export const LABEL: Record<Channel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
 
 /** "PDF", "PDF and Web", "PDF, Web and Email". */
 export function andList(items: readonly string[]): string {

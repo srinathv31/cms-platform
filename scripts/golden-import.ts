@@ -4,7 +4,8 @@
 // src/server/render/golden/cases (see docs/render-spec.md section 13).
 //
 // Freezes one seeded version into a new golden case: cases/<case-name>/input.json holds the version's
-// document, variable list, email fields and one sample set's values, copied. Editing the seed later
+// document, variable list, channel fields and one sample set's values, copied, with every channel of
+// its family (and a message's SMS footer). Editing the seed later
 // never moves the golden. The case name defaults to seed-<template key>-v<version>-<sample set>
 // (version "draft" for the open draft). Then run `npm run golden:update` to write the expected files.
 //
@@ -21,6 +22,8 @@ import { createClient } from "@libsql/client";
 import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import { smsFooterOf } from "@/domain/lifecycle";
+import { contentTypeFamily, familyChannels } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/queries/find-round";
@@ -67,6 +70,11 @@ async function main() {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`"${slug}" is not a usable case name (lowercase letters, digits and dashes).`);
     if (existsSync(inputPath(slug))) throw new Error(`cases/${slug}/input.json exists. Delete the folder to freeze it again, or pick another name.`);
 
+    // Every channel of the template's family (its content type's), on or not, so the case checks all of
+    // them; and for a message, the SMS footer the version prints (frozen at submit; a draft's the content type's).
+    const [contentType] = await db.select().from(schema.contentTypes).where(eq(schema.contentTypes.id, template.contentTypeId)).limit(1);
+    const family = contentTypeFamily(contentType?.allowedChannels ?? []);
+    const smsFooter = smsFooterOf(row, contentType?.smsFooter ?? null);
     const input: RenderFixture = {
       templateId: id,
       templateName: row.name,
@@ -75,8 +83,9 @@ async function main() {
       variables: row.variables,
       values: set.values,
       body: row.body,
-      emailSubject: row.emailSubject,
-      emailPreheader: row.emailPreheader,
+      channelFields: row.channelFields,
+      channels: [...familyChannels(family)],
+      ...(family === "message" && smsFooter ? { smsFooter } : {}),
     };
     mkdirSync(caseDir(slug), { recursive: true });
     writeFileSync(inputPath(slug), json(input));

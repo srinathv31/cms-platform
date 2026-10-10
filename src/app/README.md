@@ -84,6 +84,7 @@ persona; the mocks read their deep-link search params.
 | --- | --- |
 | `/design` | Design-system sample: type, color, surfaces, the SHARE ring. `/design/sample-sets` is a harness for the sample-set switcher. |
 | `/design/audit`, `/comments`, `/preview`, `/review`, `/settings`, `/simulator`, `/usage-dashboard`, `/workspace` | Static mocks of one screen on fixture data, with a dev bar. Each page's header comment lists its deep-link params. |
+| `/design/device` | The phone kit ([src/components/device](../components/device/README.md)) on fixtures: every push and SMS view on iPhone and Android at 1:1 and in the 469px preview well, and a mock of the rail's controls for message channels. |
 | `/editor-lab` | The live editor on fixtures, beside a server-rendered `StaticDocument`. |
 | `/pdf-lab` | The PDF viewer, fed from a file input or `?src=`. |
 

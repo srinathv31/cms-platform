@@ -1,0 +1,60 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "An emoji at a part boundary",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "reaction",
+      "label": "Reaction",
+      "type": "text",
+      "required": true,
+      "sample": "👍"
+    }
+  ],
+  "values": {
+    "reaction": "😀"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "reaction"
+                }
+              },
+              {
+                "type": "text",
+                "text": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ]
+}

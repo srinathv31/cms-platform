@@ -15,7 +15,8 @@ actions counted them as named for every thread on the template while any version
 begun in an open draft, which they can't see. Finding
 [S9](../handoff-review.md#s9--low-cross-team-stage-reviewers-can-act-on-any-thread-of-the-template).
 
-Threads belong to the template, not to one version. They anchor to block ids, so one thread shows on several
+Threads belong to the template, not to one version. They anchor to block ids (a message, which has no body,
+anchors them to its channel fields' ids, such as `push.title`: `commentAnchors`), so one thread shows on several
 versions. "The version a thread is on" therefore isn't one row.
 
 ## Decision

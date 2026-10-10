@@ -10,7 +10,9 @@ import { authorMessage } from "./error-copy";
  * A render the route refused, shown in the output area, in an author's words (error-copy.ts: the
  * variables by their labels, "First name needs a value."), and the one thing that can be done about
  * it. A problem with the values opens the sample-set editor; a failure on the server's side can be
- * tried again. Anything else (the template isn't visible, say) is just the route's sentence.
+ * tried again, where there is a request to try again (`onRetry`: the document channels). Anything else
+ * (the template isn't visible, say, or a message the browser couldn't render, which the same input
+ * fails the same way) is just the sentence.
  */
 export function OutputError({
   error,
@@ -22,10 +24,11 @@ export function OutputError({
   /** The version's variables, for their labels. */
   variables: readonly Pick<Variable, "key" | "label">[];
   onEditValues: () => void;
-  onRetry: () => void;
+  /** Sends the render again. None where nothing was sent: a message channel renders in the browser. */
+  onRetry?: () => void;
 }) {
   const aboutValues = error.code === "missing_variables" || error.code === "invalid_values";
-  const retryable = error.code === "render_failed";
+  const retryable = error.code === "render_failed" && onRetry !== undefined;
   return (
     <div role="alert" className="grid min-h-full place-items-center px-8 py-12">
       <div className="flex max-w-80 flex-col items-center gap-4 text-center">

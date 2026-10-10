@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 import { ArrowRight } from "lucide-react";
+import { FieldsDocument } from "@/components/redline/fields-document";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { RedlineDocument } from "@/components/redline/redline-document";
 import { redlineSummary } from "@/components/redline/blocks";
@@ -10,19 +11,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { diffDocuments, nameChange } from "@/domain/redline";
+import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
 import type { CompareOption, RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
 import { readTemplate } from "@/lib/template-reads";
-import type { CompareVersion } from "@/server/queries/compare";
+import { cn } from "@/lib/utils";
+import type { ComparePair } from "@/server/queries/compare";
 
-// The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline.
+// The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline: the
+// name, each channel's own fields (an email's subject and preheader, above the body; an alert's push and
+// SMS, which are its whole content), then the body.
 // The pickers only offer pairs that read forward in time (From is the older one, always), so the
 // diff never runs backwards and no combination is empty. They list every round, and open on the two
 // newest versions (`openingPair`). Each pair is read from GET /api/templates/[templateId]/compare.
 
-type Loaded = { key: string; ok: true; from: CompareVersion; to: CompareVersion } | { key: string; ok: false };
+type Loaded = ({ key: string; ok: true } & ComparePair) | { key: string; ok: false };
 
 // One line at every width: the pickers and the switch keep their size, and the summary, which is the
 // one part that can be long, gives way (it truncates, and says all of it on hover).
@@ -100,10 +104,10 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
   const key = `${fromId}:${toId}:${attempt}`;
   useEffect(() => {
     let live = true;
-    readTemplate<{ from: CompareVersion; to: CompareVersion }>(templateId, "compare", { from: fromId, to: toId })
+    readTemplate<ComparePair>(templateId, "compare", { from: fromId, to: toId })
       .then((result) => {
         if (!live) return;
-        setLoaded(result.ok ? { key, ok: true, from: result.from, to: result.to } : { key, ok: false });
+        setLoaded(result.ok ? { key, ok: true, family: result.family, from: result.from, to: result.to } : { key, ok: false });
       })
       .catch(() => live && setLoaded({ key, ok: false }));
     return () => {
@@ -113,10 +117,14 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
 
   const ready = loaded?.key === key ? loaded : null;
   const redline = useMemo(() => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null), [ready]);
+  // Each channel's own fields, over the registry, and the SMS footer each version sends: a change counts with the body's.
+  const fields = useMemo(() => (ready?.ok ? diffChannelFields(ready.from, ready.to) : null), [ready]);
+  // A message (an Alert) has no body: its fields are all there is to compare. Its content type says so.
+  const message = ready?.ok ? ready.family === "message" : false;
   // The name is versioned, so a rename between the two shows with the redline, above the document, and
   // the summary counts it ("Renamed", "Renamed, 2 added and 1 changed") rather than saying "No changes".
   const rename = ready?.ok ? nameChange(ready.from.name, ready.to.name) : null;
-  const summary = redline ? withRename(redline.counts, rename !== null) : "";
+  const summary = redline && fields ? withRename(addCounts(redline.counts, fields.counts), rename !== null) : "";
   const variables = useMemo<Variable[]>(() => {
     if (!ready?.ok) return [];
     const known = new Set(ready.to.variables.map((v) => v.key));
@@ -166,7 +174,20 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
                 <NameChangeLine change={rename} />
               </div>
             ) : null}
-            <RedlineDocument doc={redline} variables={variables} changesOnly={changesOnly} className="[--ucomp-doc-gutter:3.5rem]" />
+            {fields ? (
+              <FieldsDocument
+                fields={fields.fields}
+                variables={variables}
+                layout={message ? "sections" : "details"}
+                headingLevel={3}
+                changesOnly={changesOnly}
+                footer={fields.footer}
+                className={cn("[--ucomp-doc-gutter:3.5rem]", !message && "mb-6")}
+              />
+            ) : null}
+            {message ? null : (
+              <RedlineDocument doc={redline} variables={variables} changesOnly={changesOnly} className="[--ucomp-doc-gutter:3.5rem]" />
+            )}
           </>
         ) : ready && !ready.ok ? (
           <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-[14px] text-text-muted">

@@ -3,6 +3,7 @@ import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { channelFieldValues } from "@/domain/channel-fields";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -69,9 +70,9 @@ describe("getBaseVersion", () => {
         body: v1.body,
         variables: v1.variables,
         channels: v1.channels,
-        emailSubject: v1.emailSubject,
-        emailPreheader: v1.emailPreheader,
         sampleSets: v1.sampleSets,
+        // Every field of every channel, by id: null when the version has none.
+        ...channelFieldValues(v1.channelFields),
       },
     });
   });

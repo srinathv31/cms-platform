@@ -1,7 +1,8 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
-import { withWriter } from "@/domain/lifecycle";
+import { ALL_CHANNEL_FIELDS, withChannelFieldValues, type ChannelFieldsPatch } from "@/domain/channel-fields";
+import { draftChannelsRefusal, withWriter } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -13,7 +14,7 @@ import { NAME_MESSAGE, normalizeName } from "./parse-patch";
 
 // The database half of an autosave. `saveDraft` (save-draft.ts) supplies the real database and the
 // demo clock; this takes both as arguments so the tests can run it against a temporary database.
-// The body and the email fields are stored as src/server/documents/prepare.ts makes them (normalized,
+// The body and the channel fields are stored as src/server/documents/prepare.ts makes them (normalized,
 // checked, with block ids); a document it refuses is `invalid` with the check's sentence. Every field,
 // the name too, is the draft's own: nothing here changes another version or what customers see.
 
@@ -101,19 +102,20 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
     body = prepared.doc;
   }
 
-  // The email fields: null clears one.
-  const fields: Partial<Record<"emailSubject" | "emailPreheader", JSONContent | null>> = {};
-  for (const key of ["emailSubject", "emailPreheader"] as const) {
-    const value = patch[key];
+  // The channel fields, each prepared for its shape: null clears one.
+  const fields: ChannelFieldsPatch = {};
+  for (const field of ALL_CHANNEL_FIELDS) {
+    const value = patch[field.id];
     if (value === undefined) continue;
     if (value === null) {
-      fields[key] = null;
+      fields[field.id] = null;
       continue;
     }
-    const prepared = prepareField(value);
+    const prepared = prepareField(value, field);
     if (!prepared.ok) return fail("invalid", prepared.message);
-    fields[key] = prepared.doc;
+    fields[field.id] = prepared.doc;
   }
+  const fieldsChanged = Object.keys(fields).length > 0;
 
   const changed = changedFields({ ...patch, name });
 
@@ -124,6 +126,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
         rev: versions.rev,
         state: versions.state,
         writers: versions.writers,
+        channelFields: versions.channelFields,
         templateId: versions.templateId,
         teamId: templates.teamId,
         allowedChannels: contentTypes.allowedChannels,
@@ -163,9 +166,8 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       return fail("conflict", "This draft changed elsewhere.", row.rev);
     }
 
-    if (patch.channels && !patch.channels.every((channel) => row.allowedChannels.includes(channel))) {
-      return fail("invalid", "That channel isn't available for this content type.");
-    }
+    const channelsRefused = patch.channels ? draftChannelsRefusal(patch.channels, row.allowedChannels) : null;
+    if (channelsRefused) return fail("invalid", channelsRefused.reason);
 
     // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
     const set: SQLiteUpdateSetSource<typeof versions> = {
@@ -177,8 +179,8 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
     if (body !== undefined) set.body = body;
     if (patch.variables !== undefined) set.variables = patch.variables;
     if (patch.channels !== undefined) set.channels = patch.channels;
-    if (fields.emailSubject !== undefined) set.emailSubject = fields.emailSubject;
-    if (fields.emailPreheader !== undefined) set.emailPreheader = fields.emailPreheader;
+    // Laid over the stored fields, read in this transaction: the ones the patch doesn't name are kept.
+    if (fieldsChanged) set.channelFields = withChannelFieldValues(row.channelFields, fields);
     if (patch.sampleSets !== undefined) set.sampleSets = patch.sampleSets;
 
     // The rev and state in the WHERE make this a compare-and-set, whatever the transaction mode.

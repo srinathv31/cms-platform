@@ -167,7 +167,8 @@ async function activeUsing(tx: Tx, contentTypeId: string, channel: Channel): Pro
 
 /**
  * Turns a channel on or off for a content type. Off takes effect at once: the render API refuses the
- * channel for the type's templates, Active versions included (the confirm named how many).
+ * channel for the type's templates, Active versions included (the confirm named how many). A channel
+ * of the other family (a document type's Push or SMS, a message type's PDF, Web or Email) is refused.
  */
 export async function setChannelRule(input: {
   contentTypeId: string;
@@ -185,6 +186,8 @@ export async function setChannelRule(input: {
         channel: input.channel,
         allowed: input.allowed,
         activeUsing: await activeUsing(tx, type.id, input.channel),
+        // To name, in a refusal, the content types a channel of the other family goes on.
+        contentTypes: await tx.select({ name: contentTypes.name, allowedChannels: contentTypes.allowedChannels }).from(contentTypes),
         actor: actorOf(viewer),
         now: at,
       });

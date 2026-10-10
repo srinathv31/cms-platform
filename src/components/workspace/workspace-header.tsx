@@ -25,6 +25,9 @@ import { WorkspaceShare } from "./workspace-share";
 // two rows, and only a wrapped name, or saving stopping for good (its third line), makes the header grow.
 const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
 
+/** One item of the status row: 16px of left padding, the room a separator takes (and the row pulls back). */
+const META_ITEM = "flex shrink-0 items-center pl-4 whitespace-nowrap";
+
 /**
  * Name, then the status row, with the Template ID and (on Active) the SHARE ring at the right.
  * The badge carries the state, so the label beside it never repeats it:
@@ -50,28 +53,38 @@ export async function WorkspaceHeader({
         <NameField name={t.name} editable={t.editable} />
       </div>
       {/* After a submit or a revert, focus lands here (workspace-actions.tsx, save-status.tsx), where the outcome reads. */}
+      {/* The separator sits in its item's left padding, and the items are pulled left by that padding inside the
+          row's horizontal clip (as in versions/version-entry.tsx): an item that starts a line has its "·" clipped,
+          so a wrap never leaves one dangling at either end of a line. The row's own 6px inset keeps the
+          controls' focus rings inside the clip. */}
       <StatusRow
         state={t.status}
-        className="col-start-1 row-start-2 -mx-1.5 flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5 self-end justify-self-start rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="col-start-1 row-start-2 -mx-1.5 min-h-7 self-end justify-self-start overflow-x-clip rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <StatusBadge state={t.status} sunsetDay={t.sunsetDay} now={nowDate} />
-        {t.versionLabel ? <span className="text-[14px] leading-6 text-text-muted">{t.versionLabel}</span> : null}
-        {t.editable ? (
-          <>
-            {t.versionLabel ? (
-              <span aria-hidden className="-mx-1.5 text-text-subtle">
-                ·
-              </span>
-            ) : null}
-            <SaveStatus templateId={t.id} basedOn={t.basedOn} />
-          </>
-        ) : null}
-        {!t.canEdit ? (
-          <Badge variant="outline" className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted">
-            <Eye aria-hidden strokeWidth={1.75} />
-            View only
-          </Badge>
-        ) : null}
+        <div className="-ml-4 flex min-h-7 flex-wrap items-center gap-y-1.5">
+          <span className={META_ITEM}>
+            <StatusBadge state={t.status} sunsetDay={t.sunsetDay} now={nowDate} />
+          </span>
+          {t.versionLabel ? <span className={cn(META_ITEM, "text-[14px] leading-6 text-text-muted")}>{t.versionLabel}</span> : null}
+          {t.editable ? (
+            <span className={cn(META_ITEM, "relative")}>
+              {t.versionLabel ? (
+                <span aria-hidden className="absolute left-[5px] text-[14px] leading-6 text-text-subtle">
+                  ·
+                </span>
+              ) : null}
+              <SaveStatus templateId={t.id} basedOn={t.basedOn} />
+            </span>
+          ) : null}
+          {!t.canEdit ? (
+            <span className={META_ITEM}>
+              <Badge variant="outline" className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted">
+                <Eye aria-hidden strokeWidth={1.75} />
+                View only
+              </Badge>
+            </span>
+          ) : null}
+        </div>
       </StatusRow>
       {/* The value row sits on the status row's line. */}
       <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
@@ -92,7 +105,7 @@ export function WorkspaceHeaderSkeleton() {
   return (
     <div aria-hidden className={cn(WS.header, HEADER)}>
       <Skeleton className="col-span-2 col-start-1 row-start-1 my-[3px] h-7 w-72" />
-      <div className="col-start-1 row-start-2 flex min-h-[2.625rem] items-end gap-3 pb-[3px]">
+      <div className="col-start-1 row-start-2 flex min-h-[2.625rem] items-end gap-4 pb-[3px]">
         <Skeleton className="h-[22px] w-20 rounded-md" />
         <Skeleton className="h-4 w-24" />
       </div>

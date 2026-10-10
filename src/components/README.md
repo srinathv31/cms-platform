@@ -51,22 +51,23 @@ Feature folders:
 | `access/` | Request-access cards and `RolePicker`. | `/request-access` |
 | `activity/` | The template's Activity tab. | `/[team]/templates/[templateId]/activity` |
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
-| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). | `workspace/`, `review/` |
+| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block, or on a message to a channel field (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
+| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
-| `library/` | Library view and browser, New template dialog, starter gallery, file upload. | `/[team]/library`, and under the settings dialog |
+| `library/` | Library view and browser, New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
-| `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. | `workspace/`, `review/` |
-| `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
-| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. | `/[team]/review/[templateId]/[version]` |
+| `preview/` | The preview rail: channel and device controls, sample sets, and the output on its well. PDF, Web and Email come from the render route (`render-preview.ts`, `use-preview-render.ts`; pdf.js viewer in `pdf/`). Push and SMS render in the browser on every keystroke through the route's own `renderMessage` (`message-preview.ts`, [decision 0036](../../docs/decisions/0036-message-previews-resolve-in-the-browser.md)) and show on the phone kit (`phone-output.tsx`), with iPhone · Android and the Device options in the controls row (`phone-controls.tsx`). See [The preview](#the-preview). | `workspace/`, `review/` |
+| `redline/` | `RedlineDocument`, a version diff painted like the document; `FieldsDocument`, a version's channel fields painted as the composer shows them (a message's push and SMS under display headings, a document's email details under a caps label), clean or with their redline (`diffChannelFields`); and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
+| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. The Document view is a document's body under its email details, or a message's fields alone (`fields-view.tsx`), each with its redline and comments. | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows; a row links to its own round. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
 | `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round, opening on the two newest versions), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
-| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`), autosave, session store, Copilot prompt, save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
+| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks
 
@@ -101,13 +102,17 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
 | `useActionRun`, `runAction` | [use-action-run.ts](primitives/use-action-run.ts) | Running a server action: one at a time, in a transition, with the refusal's sentence (`error`) and `onOk` / `onRefused`. A call that throws becomes the code `failed` with the screen's sentence; Next's redirect is handed back to Next (client). |
 | `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, the Versions tab's passed sunset (client). |
-| `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon); `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
+| `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon, New template's Document · Alert), `disabled` while what it switches is busy; `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
 | `Tabs`, `TabList`, `Tab`, `TabPanel`, `TabUnderline` | [tabs.tsx](primitives/tabs.tsx), [tab-styles.ts](primitives/tab-styles.ts) | View switches in the page: Base UI Tabs in the workspace tab bar's look (15px text, the 2px underline sliding on a hairline, the ring round the label). Usage, the review's Document and Preview, the review queue. Links that look like tabs (`workspace/workspace-tabs.tsx`) and skeletons take the classes from `tab-styles.ts`, which a server component can import. Client. |
 | `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |
 | `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
+| `ScaledViewport`, `ScaledBox`, `containScale` | [scaled-viewport.tsx](primitives/scaled-viewport.tsx) | Content laid out at a fixed size in CSS px and scaled down (never up) with a transform, so it wraps and cuts exactly as at 1:1 and stays crisp. `ScaledViewport` fills its box at a fixed width (Web's 800px Desktop page); `ScaledBox` keeps the content's proportions, fits it to the box down to a minimum scale for height, and reserves its scaled size (the phone kit). Client. |
 | `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
 
-A channel's name ("PDF", "Web", "Email") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere.
+A channel's name ("PDF", "Web", "Email", "Push", "SMS") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere, and a push platform's ("iPhone", "Android") is `PLATFORM_LABELS`.
+Anything else that differs by channel is a `Record<Channel, …>` or a `switch` that ends in `assertNever` from
+`src/domain/assert-never.ts` (the preview's output and its controls row, `renderPreview`, the usage charts' hues),
+never an `if` with a fallthrough: a new channel is then a compile error at each place that must handle it.
 [primitives/one-copy.test.ts](primitives/one-copy.test.ts) fails when a component pastes a second copy of one of
 these (the segmented track, a hand-rolled tablist, the clipboard, the stat numeral, the team icons, a channel label
 map).
@@ -125,9 +130,12 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 `border-hairline`, `text-text-muted`, `text-label`, `bg-selected`, `bg-brand`, `text-danger-text`, `bg-chip`,
 `bg-status-review` (one set per lifecycle state; to show a state, use `StatusBadge`), and the shadcn names
 (`bg-primary`, `border-border`). Light theme only: `globals.css` defines no dark theme, so don't add `dark:` classes.
+The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.css) have a light set and a
+`[data-appearance="dark"]` set for a phone in dark mode, read as `bg-(--device-…)` inside `device/` only.
 
 - **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
-  use `series-1…4`, four hues in a fixed order, checked as a set for colour-blind separation
+  use `series-1…5`, five hues in a fixed order, one per channel (a version chart uses the first four, then taupe),
+  checked as a set for colour-blind separation
   ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)). No value is hover-only: a chart's
   readable marks are one Tab stop with arrow keys between them (`usage/chart-keys.tsx`), and a chart whose values
   aren't printed is followed by an sr-only table of them.
@@ -135,7 +143,8 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 - **Radius:** `rounded-md` 6px chips, `rounded-lg` 8px controls, `rounded-xl` 14px cards, `rounded-2xl` 18px
   large cards, `rounded-3xl` 22px modals, `rounded-4xl` 24px the canvas panel (`xs` 4px, `sm` 5px).
 - **Fonts** ([src/styles/fonts.ts](../styles/fonts.ts)): `font-sans` Figtree (the default), `font-display` (or
-  `font-heading`) Newsreader, `font-mono` Geist Mono for variable keys.
+  `font-heading`) Newsreader, `font-mono` Geist Mono for variable keys. The phone kit loads its own device faces
+  (Inter and Google Sans Flex, scoped to the kit) in [device/fonts.ts](device/fonts.ts).
 - **Utility classes:** `.display-xl` (page titles), `.display-lg` (dialog titles), `.caps-label` (tracked caps
   labels), `.numeral` (big tabular numbers). Also `shadow-pop`, `shadow-modal` (modals only; elsewhere
   borders, not shadows), `ease-soft`, and `animate-stream-in`.
@@ -210,10 +219,18 @@ answer, which the caller shows as its own failure. The Compare panel (`versions/
 (`workspace/copilot/copilot-prompt.tsx`) and the SHARE panel (`workspace/workspace-share.tsx`) read this way.
 
 **Other paths.** Some client code `fetch`es other route handlers: autosave (`workspace/autosave/save-transport.ts`),
-the preview render (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and the ⌘K palette.
+the preview render for the document channels (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and
+the ⌘K palette. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
+The Content page's draft as typed, ahead of autosave (each channel field and the sample sets), is another
+(`workspace/session/live-draft.ts`): the composer writes it on every keystroke, and the phone preview, the meta line
+and the cut warnings read it.
 The workspace header, in the template layout, binds it to the draft it shows (`BindDraft`), so autosave runs on every
 tab and a rename on Versions saves like one on Content; the Content page binds the same draft, which is one session.
+The session's fields are the draft patch's (`SaveFields`): `body`, `variables`, `name`, `channels`, `sampleSets`, and
+one key per channel field, its id from the registry (`"email.subject"`, `src/domain/channel-fields.ts`), so a revert, a
+merge or an undo treats each channel field like any other field. `content/email-details.tsx` renders Email's fields
+from the registry.
 The same store holds the workspace still (`makeInert`, read with `useInert`): Submit holds it from its click until its
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
 A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the
@@ -223,6 +240,65 @@ status row, the Preview toggle and the rail's Original tab register themselves w
 an Esc, a submit or a revert asks for them by name, or waits for one to mount, rather than querying the page by label
 ([decision 0027](../../docs/decisions/0027-focus-targets-register-with-the-session.md)). A new control that code
 focuses registers the same way.
+
+## The preview
+
+`preview/preview-surface.tsx` (the workspace's rail) and `review/preview-view.tsx` (the approver's Preview tab) both
+draw `PreviewPane`: a 32px controls row (the channel at the left, the channel's own controls at the right), then the
+output on a tinted well whose top never moves. Where the output comes from depends on the channel's family:
+
+| | PDF, Web, Email | Push, SMS |
+| --- | --- | --- |
+| Rendered by | the render route, `preview: true` (`render-preview.ts`) | the browser, through the route's own `renderMessage` (`message-preview.ts`) |
+| From | the saved draft (every request waits for `session.flush()`), or the version | the fields as typed (`live-draft.ts`), or the review's stored version |
+| When | on open, on a save, on a channel or values change (`use-preview-render.ts`: one request at a time, the last good output kept) | on every change, synchronously: no loading state, no request |
+| Shown | `PdfViewer`, `WebOutput`, `EmailOutput`, on the well's mat (16px, 40px below for the Demo pill) | the phone kit, `PushOutput` and `SmsOutput` (`phone-output.tsx`): the whole phone in its real proportions, scaled to fit the well on an even 16px mat; where the well is too short for the kit's smallest scale (the 1000 × 700 overlay) it scrolls (`well.ts`) |
+| Its controls | Download PDF; Desktop · Mobile | iPhone · Android, and the 32px Device options (`phone-controls.tsx`): screen (push only), appearance, previews (lock screen only), text size, width in the platform's own units. A row that doesn't apply stays, greyed, with why under it. |
+
+Either way, values the route would refuse show as `OutputError`, in the author's words, with Edit values. Its Try
+again is for a document channel's failed request; a message renders in the browser, where the same fields fail the
+same way, so its failure offers no button. A message the route would
+refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
+sentence above it. That sentence carries the live size, so it is no live region: a polite one says a fixed sentence
+(`refusalNotice`: "The SMS is over 10 parts.") once, when the message turns refused. In the workspace the phone's settings and Push's screen live in the session's preview state
+(`phone`, `pushScreen`), like Web's `device`; the review keeps its own. The phone's sender is the team's app name
+(else its name) and short code (else none: the thread shows a muted "No sender", never a made-up number or the
+team's name), its date the demo clock's day (`preview-sender.ts`).
+
+## The message composer
+
+A message template (an Alert, family `message` in the workspace read model) has no document: its Content tab's main
+column is `workspace/content/message-composer.tsx`, a section per channel that is on (Push notification: title,
+subtitle tagged "iPhone only", body; Text message: the message, with the content type's footer locked inside the
+field's box). A section whose channel chip is off is hidden, not unmounted, so its chips still count and follow
+renames (decision 0004). Each field is an `InlineVariableField` (`size="md"`) in the page's editor root, so the `{{`
+picker, chips, the variables panel and undo work as in a document, and it saves through the session under its id
+(`"push.title"`) as the email subject does, and writes the live draft for the preview.
+
+What it measures, shown only when it matters and never animated:
+
+- **The SMS meta line** (`sms-meta.ts`): encoding and parts with the selected sample set, and parts with the long
+  values submit measures (`longSampleValues`), turning to the warning colour with "over the 3-part limit".
+- **Flags in the text**: characters outside GSM-7 in an SMS, public shorteners in an SMS or a push body
+  (`messageFieldFlags`), underlined through the field's `flags`, with Replace or Remove where there is a fix.
+- **Cut warnings** under a push field (`push-fit.tsx`): two hidden phones, one per platform, at the lock screen,
+  standard width and default text size, report through the kit's `onMeasure` where they clamp each field (they
+  redraw only when the push does: `usePushContent` reads the push's own fields, so an SMS keystroke leaves them);
+  `truncationWarnings` says it ("iPhone lock screen cuts after “…payment of”."). The title on either platform; the
+  subtitle and body on iPhone only (Android's one-line body is how Android shows it).
+
+The composer hands the session a document-editor handle whose `focus` puts the caret in the first field on screen, so
+the name field's Enter lands there. A message has no blocks, so its review threads are on its fields (a field's id is
+the thread's block, `commentAnchors`): the handle finds a field by `data-field` (the redline's DOM handle with its own
+`anchor`), so the markers sit beside the fields and choosing a card scrolls to its field. A thread is on a whole field
+(there is no selection to quote): the hover marker beside a field starts one, in the composer (each field carries
+`data-id`, which `GutterMarkers` finds through its `blocks` selector) and on the review screen, where the rail's
+"Comment on a field" menu is the keyboard path.
+
+The composer's field label and the SMS's locked footer (`content/field-chrome.tsx`) are shared with the review's and
+Compare's read-only fields (`redline/fields-document.tsx`), so a field looks the same written, reviewed and compared.
+The composer shows the content type's footer (a draft's); the review and Compare show each version's own, frozen at
+submit, and a footer that changed between the two versions struck and inserted (`diffChannelFields(…).footer`).
 
 ## Copy these
 
@@ -284,7 +360,9 @@ focuses registers the same way.
 - Keep logic in pure `.ts` modules so it tests without a DOM: `review/decision-model.ts`, `palette/commands.ts`,
   `comments/thread-state.ts`, `workspace/session/session-store.ts`, `workspace/autosave/autosave-scheduler.ts`.
 - End-to-end: `e2e/scenario-02.spec.ts` through `e2e/scenario-10.spec.ts` follow the demo scenarios (create,
-  review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`,
+  review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/alerts.spec.ts` follows an alert from the
+  composer and its live phone through submit, a field-redlined review, a comment on a field and Compare;
+  `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`,
   and `e2e/principles.spec.ts` cover the shell, Back and Forward, and the settings modal. The auto fixture in
   [e2e/helpers/scenario.ts](../../e2e/helpers/scenario.ts) fails a test on any console error.
 - Specs select by accessible name and by `data-slot` and `data-status` attributes: grep `e2e/` before you rename

@@ -1,8 +1,9 @@
 import "server-only";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import { assertNever } from "./assert-never";
 import { simDb } from "./db";
 import { SIM_FIELDS, simField } from "./fields";
 import { blockedSentence, missingRequired, suggestMapping } from "./mapping";
@@ -20,7 +21,9 @@ import type {
   SimOfferCard,
   SimOfferPage,
   SimOfferRecord,
+  SimPush,
   SimResultRow,
+  SimSms,
   SimUpgrade,
 } from "./types";
 import { ucompApi, type EmailOutput, type UcompApi } from "./ucomp-api";
@@ -36,6 +39,10 @@ type DeliveryRow = typeof simDeliveries.$inferSelect;
 
 /** Sender shown in the inbox view. */
 export const CORAL_SENDER = "Coral Card <offers@coral.example>";
+/** Coral's app, which its push notifications come from. */
+export const CORAL_APP = "Coral";
+/** Coral's US short code, which its texts come from (a US text shows the number, not a name). */
+export const CORAL_SHORT_CODE = "26725";
 
 // ── Small mappers ────────────────────────────────────────────────────────────
 
@@ -47,17 +54,22 @@ export const customerRecord = (c: CustomerRow): SimCustomerRecord => ({
   homeState: c.homeState,
   purchaseApr: c.purchaseApr,
   annualFee: c.annualFee,
+  cardLast4: c.cardLast4,
+  statement: c.statement ?? null,
+  lastPurchase: c.lastPurchase ?? null,
 });
 
-export const offerRecord = (o: OfferRow): SimOfferRecord => ({ id: o.id, name: o.name, headline: o.headline, terms: o.terms });
+export const offerRecord = (o: OfferRow): SimOfferRecord => ({ id: o.id, name: o.name, headline: o.headline, terms: o.terms ?? null });
 
-const customerRow = (c: CustomerRow): SimCustomerRow => ({
+export const customerRow = (c: CustomerRow): SimCustomerRow => ({
   id: c.id,
   name: `${c.firstName} ${c.lastName}`,
   email: c.email,
   homeState: c.homeState,
   purchaseApr: c.purchaseApr,
   annualFee: c.annualFee,
+  phone: c.phone,
+  platform: c.platform,
 });
 
 /** The link as Coral stores it plus what UCOMP says about the pinned version today. */
@@ -197,7 +209,16 @@ export async function loadBatch(batchId: string): Promise<SimBatch | null> {
       row = { customerId: d.customerId, customerName: firstName === null ? d.customerId : `${firstName} ${lastName}`, results: [] };
       byCustomer.set(d.customerId, row);
     }
-    row.results.push({ deliveryId: d.id, channel: d.channel, status: d.status, error: d.error ?? null, newerVersion: d.newerVersion ?? null });
+    const sms = d.channel === "sms" && d.status === "delivered" ? parseSms(d.output) : null;
+    row.results.push({
+      deliveryId: d.id,
+      channel: d.channel,
+      status: d.status,
+      error: d.error ?? null,
+      newerVersion: d.newerVersion ?? null,
+      platform: d.platform ?? null,
+      sms: sms ? { encoding: sms.encoding, parts: sms.parts } : null,
+    });
   }
   for (const row of byCustomer.values()) row.results.sort((a, b) => channels.indexOf(a.channel) - channels.indexOf(b.channel));
   const first = rows[0].d;
@@ -242,6 +263,7 @@ export async function getSimHome(): Promise<SimHome> {
         return {
           card: {
             id: offer.id,
+            kind: offer.kind,
             name: offer.name,
             headline: offer.headline,
             link: state?.summary ?? null,
@@ -299,7 +321,7 @@ export async function getSimOfferPage(offerId: string): Promise<SimOfferPage | n
   }
 
   return {
-    offer: { id: offer.id, name: offer.name, headline: offer.headline, terms: offer.terms },
+    offer: { id: offer.id, kind: offer.kind, name: offer.name, headline: offer.headline, terms: offer.terms ?? null },
     link: state ? { ...state.summary, mapping: state.contract ? mappingRows(state.contract, link!.mapping) : [] } : null,
     upgrade: state?.upgrade ?? null,
     blocked,
@@ -358,21 +380,47 @@ export async function getSimLinkFlow(offerId: string, templateId?: string | null
     }
   }
 
-  return { offer: { id: offer.id, name: offer.name }, current: state?.summary ?? null, candidate, fields: SIM_FIELDS, apiError };
+  return { offer: { id: offer.id, kind: offer.kind, name: offer.name }, current: state?.summary ?? null, candidate, fields: SIM_FIELDS, apiError };
 }
 
 // ── Deliveries ───────────────────────────────────────────────────────────────
 
 export const deliveryFileHref = (deliveryId: string) => `/sim/deliveries/${encodeURIComponent(deliveryId)}/file`;
 
-function parseEmail(output: string | null): EmailOutput | null {
+/** A stored JSON output, or null when it isn't JSON with `key` a string (old or hand-edited data). */
+function parseOutput<T>(output: string | null, key: keyof T & string): T | null {
   if (!output) return null;
   try {
-    const email = JSON.parse(output) as EmailOutput;
-    return typeof email?.html === "string" ? email : null;
+    const value = JSON.parse(output) as T;
+    return typeof (value as Record<string, unknown> | null)?.[key] === "string" ? value : null;
   } catch {
     return null;
   }
+}
+
+const parseEmail = (output: string | null) => parseOutput<EmailOutput>(output, "html");
+const parsePush = (output: string | null) => parseOutput<SimPush>(output, "title");
+const parseSms = (output: string | null) => parseOutput<Omit<SimSms, "deliveryId" | "at">>(output, "text");
+
+/**
+ * The customer's thread with Coral's short code: every text delivered to them, from any offer or alert,
+ * oldest first, up to and including `upTo`. `at` is to the second, so two sends in one second tie on it;
+ * SQLite's rowid (the order the rows went in, as a send writes its batch in one insert) breaks the tie. The
+ * id can't: a batch's ids start with a random key.
+ */
+async function smsThread(customerId: string, upTo: DeliveryRow): Promise<SimSms[]> {
+  const rows = await simDb
+    .select({ id: simDeliveries.id, at: simDeliveries.at, output: simDeliveries.output })
+    .from(simDeliveries)
+    .where(and(eq(simDeliveries.customerId, customerId), eq(simDeliveries.channel, "sms"), eq(simDeliveries.status, "delivered")))
+    .orderBy(asc(simDeliveries.at), asc(sql`rowid`));
+  const thread: SimSms[] = [];
+  for (const row of rows) {
+    const sms = parseSms(row.output);
+    if (sms) thread.push({ deliveryId: row.id, at: row.at.toISOString(), ...sms });
+    if (row.id === upTo.id) break;
+  }
+  return thread;
 }
 
 /** The customer view of one delivery; null when there's no such delivery. */
@@ -390,17 +438,36 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
   const src = deliveryFileHref(d.id);
   let view: SimDeliveryView["view"] = null;
   if (d.status === "delivered" && d.output) {
-    if (d.channel === "web") view = { kind: "phone", src };
-    else if (d.channel === "pdf") view = { kind: "pdf", src };
-    else {
-      const email = parseEmail(d.output);
-      view = { kind: "inbox", src, from: CORAL_SENDER, subject: email?.subject ?? "", preheader: email?.preheader ?? "" };
+    switch (d.channel) {
+      case "web":
+        view = { kind: "phone", src };
+        break;
+      case "pdf":
+        view = { kind: "pdf", src };
+        break;
+      case "email": {
+        const email = parseEmail(d.output);
+        view = { kind: "inbox", src, from: CORAL_SENDER, subject: email?.subject ?? "", preheader: email?.preheader ?? "" };
+        break;
+      }
+      case "push": {
+        const push = parsePush(d.output);
+        if (push) view = { kind: "push", appName: CORAL_APP, platform: d.platform ?? customer?.platform ?? "ios", push };
+        break;
+      }
+      case "sms":
+        view = { kind: "sms", sender: CORAL_SHORT_CODE, thread: await smsThread(d.customerId, d) };
+        break;
+      default:
+        assertNever(d.channel, "channel");
     }
   }
 
   return {
     id: d.id,
-    customer: customer ? { name: `${customer.firstName} ${customer.lastName}`, email: customer.email } : { name: d.customerId, email: "" },
+    customer: customer
+      ? { name: `${customer.firstName} ${customer.lastName}`, email: customer.email, phone: customer.phone, platform: customer.platform }
+      : { name: d.customerId, email: "", phone: "", platform: d.platform ?? "ios" },
     offerName: row.offerName ?? d.offerId,
     templateName: link && link.templateId === d.templateId ? link.templateName : (d.templateId ?? ""),
     versionNumber: d.versionNumber ?? 0,
@@ -419,10 +486,20 @@ export async function loadDeliveryFile(
   const [d]: DeliveryRow[] = await simDb.select().from(simDeliveries).where(eq(simDeliveries.id, deliveryId));
   if (!d || d.status !== "delivered" || !d.output) return null;
   const name = `${d.templateId ?? "delivery"}-v${d.versionNumber ?? 0}-${d.channel}`.replace(/[^\w.-]/g, "_");
-  if (d.channel === "pdf") {
-    return { contentType: "application/pdf", body: new Uint8Array(Buffer.from(d.output, "base64")), filename: `${name}.pdf` };
+  switch (d.channel) {
+    case "pdf":
+      return { contentType: "application/pdf", body: new Uint8Array(Buffer.from(d.output, "base64")), filename: `${name}.pdf` };
+    case "web":
+      return { contentType: "text/html; charset=utf-8", body: d.output, filename: `${name}.html` };
+    case "email": {
+      const email = parseEmail(d.output);
+      return email ? { contentType: "text/html; charset=utf-8", body: email.html, filename: `${name}.html` } : null;
+    }
+    // What Stencil answered, as Coral keeps it: a phone shows these, so the file is the JSON.
+    case "push":
+    case "sms":
+      return { contentType: "application/json; charset=utf-8", body: d.output, filename: `${name}.json` };
+    default:
+      return assertNever(d.channel, "channel");
   }
-  if (d.channel === "web") return { contentType: "text/html; charset=utf-8", body: d.output, filename: `${name}.html` };
-  const email = parseEmail(d.output);
-  return email ? { contentType: "text/html; charset=utf-8", body: email.html, filename: `${name}.html` } : null;
 }

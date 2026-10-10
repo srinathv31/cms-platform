@@ -57,15 +57,23 @@ export function TemplateTab({ page }: { page: SimOfferPage }) {
           </div>
         )}
       </Panel>
-      <Panel title="Offer terms">
-        <dl className="m-0">
-          <Row label="Spend">{money(t.spend)}</Row>
-          <Row label="Bonus">{money(t.bonus)}</Row>
-          <Row label="Months">{t.months}</Row>
-          <Row label="Annual fee">{t.annualFee === undefined ? <span className="text-(--sim-muted)">None</span> : money(t.annualFee)}</Row>
-          <Row label="Ends on">{t.endsOn ? dayLabel(t.endsOn) : <span className="text-(--sim-muted)">None</span>}</Row>
-        </dl>
-      </Panel>
+      {t ? (
+        <Panel title="Offer terms">
+          <dl className="m-0">
+            <Row label="Spend">{money(t.spend)}</Row>
+            <Row label="Bonus">{money(t.bonus)}</Row>
+            <Row label="Months">{t.months}</Row>
+            <Row label="Annual fee">{t.annualFee === undefined ? <span className="text-(--sim-muted)">None</span> : money(t.annualFee)}</Row>
+            <Row label="Ends on">{t.endsOn ? dayLabel(t.endsOn) : <span className="text-(--sim-muted)">None</span>}</Row>
+          </dl>
+        </Panel>
+      ) : (
+        <Panel title="Alert">
+          <dl className="m-0">
+            <Row label="Sent when">{offer.headline}</Row>
+          </dl>
+        </Panel>
+      )}
     </div>
   );
 }

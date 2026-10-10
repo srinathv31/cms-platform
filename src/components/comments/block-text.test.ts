@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JSONContent } from "@/domain/types";
-import { blockTextOf } from "./block-text";
+import { blockTextOf, fieldTextOf } from "./block-text";
 
 const text = (value: string): JSONContent => ({ type: "text", text: value });
 const para = (id: string, ...content: JSONContent[]): JSONContent => ({ type: "paragraph", attrs: { id }, content });
@@ -48,5 +48,21 @@ describe("blockTextOf", () => {
 
   it("keeps a very long block short enough to hold in a line of the DOM", () => {
     expect(blockTextOf(DOC, "long")!.length).toBeLessThanOrEqual(240);
+  });
+});
+
+describe("fieldTextOf", () => {
+  const title: JSONContent = {
+    type: "doc",
+    content: [{ type: "paragraph", content: [text("Was "), { type: "variable", attrs: { key: "first_name" } }, text("  there?")] }],
+  };
+
+  it("is the field's full name and its text on one line, chips as their labels", () => {
+    expect(fieldTextOf({ "push.title": title }, "push.title", { first_name: "First name" })).toBe("Push title: Was First name there?");
+  });
+
+  it("is the name alone for an empty field, and null for an id that isn't a field's", () => {
+    expect(fieldTextOf({ "push.title": title }, "push.body")).toBe("Push body");
+    expect(fieldTextOf({ "push.title": title }, "p1")).toBeNull();
   });
 });

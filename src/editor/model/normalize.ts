@@ -13,8 +13,9 @@
 //   CR LF, CR, LF, U+2028, U+2029 in text   → a hardBreak
 //   other control characters                → removed (U+0000–U+0008, U+000B, U+000C, U+000E–U+001F, U+007F–U+009F)
 //   invisible characters                    → removed (links.ts, INVISIBLE_CHARACTERS: soft hyphen,
-//                                             zero-width and bidirectional marks, variation selectors, …)
-//   a link mark                             → its href normalized (links.ts), or the mark removed (text kept)
+//                                             zero-width and bidirectional marks, variation selectors, …),
+//                                             except in a push's or an SMS's field (kept)
+//   a link mark                            → its href normalized (links.ts), or the mark removed (text kept)
 //   a heading in a table cell               → a paragraph with the same content
 //   a callout in a table cell               → its paragraphs
 //   a rule in a table cell                  → an empty paragraph (it held no text)
@@ -32,10 +33,15 @@
 // is left for the document check (schema-check.ts), which refuses it with a message.
 // Normalizing twice gives the same result.
 //
-// One-line fields (email subject and preheader) take `normalizeField`: the same text rules, but a
-// line break (character or hardBreak) becomes one space, and marks are removed (the field has none).
+// Channel fields (the email subject, a push title, an SMS message) take `normalizeField`: the same text
+// rules, marks removed (a field has none), and the paragraphs joined into one. A one-line field
+// (`"line"`) turns each line break (character or hardBreak) into one space and joins paragraphs with a
+// space; a field that keeps its line breaks (`"lines"`, an SMS message) keeps each as a hardBreak and
+// joins paragraphs with one, so an empty paragraph stays a blank line. A message's field (a push's, an
+// SMS's: `characters: "message"`) keeps its invisible characters, which a phone draws with (the joiner in
+// an emoji sequence, the non-joiner in a Persian name); only its control characters go (characters.ts).
 
-import { LINE_BREAKS, cleanCharacters } from "./characters";
+import { LINE_BREAKS, cleanCharacters, type CharacterRules } from "./characters";
 import { normalizeLink } from "./links";
 import { LIST_START_MAX, LIST_START_MIN } from "./list-markers";
 import { MAX_TABLE_COLUMNS, linesUp, tableGrid, type GridCell } from "./table-grid";
@@ -64,11 +70,19 @@ interface Edges {
   openEnd: number;
 }
 
+/**
+ * How a channel field holds its text: `"line"` on one line (a line break becomes a space), `"lines"`
+ * with its line breaks kept as hardBreaks. Either way it is one paragraph with no marks.
+ */
+export type FieldLines = "line" | "lines";
+
 interface Options {
-  /** A one-line field: breaks become spaces, marks go. */
-  field: boolean;
+  /** A channel field: marks go, paragraphs join, and on `"line"` breaks become spaces. */
+  field: FieldLines | false;
   /** A paste into the editor: what the author will see is brought inside the limits (a list's start). */
   paste?: boolean;
+  /** Which characters text keeps (characters.ts): a document's (the default) or a message field's. */
+  characters?: CharacterRules;
 }
 
 const CLOSED: Edges = { openStart: 0, openEnd: 0 };
@@ -78,19 +92,29 @@ export function normalizeDocument(doc: JSONContent): JSONContent {
   return normalizeNode(doc, CLOSED, { field: false })[0] ?? doc;
 }
 
-/** A one-line field (email subject, preheader), normalized. */
-export function normalizeField(doc: JSONContent): JSONContent {
-  return normalizeNode(doc, CLOSED, { field: true })[0] ?? doc;
+/**
+ * A channel field, normalized: on one line (the email subject, a push title), or keeping its line breaks (an SMS
+ * message). `characters`: `"message"` for a push's or an SMS's field, which keeps its invisible characters.
+ */
+export function normalizeField(doc: JSONContent, lines: FieldLines = "line", characters: CharacterRules = "document"): JSONContent {
+  return normalizeNode(doc, CLOSED, { field: lines, characters })[0] ?? doc;
 }
 
 /**
  * A pasted fragment's nodes (a ProseMirror slice as JSON), normalized. `openStart` / `openEnd` are
  * the slice's: nodes on an open edge keep their structure, so the slice still fits where it lands.
  * `inCell`: the paste lands inside a table cell (at any depth), so its blocks become what a cell
- * holds. A table is the exception: the table plugin pastes it as cells into the grid.
+ * holds. A table is the exception: the table plugin pastes it as cells into the grid. `characters`:
+ * as `normalizeField`'s, for a paste into a message's field.
  */
-export function normalizeFragment(nodes: readonly JSONContent[], edges: Edges, field = false, inCell = false): JSONContent[] {
-  const out = normalizeChildren(nodes, edges, { field, paste: true }, null, inCell);
+export function normalizeFragment(
+  nodes: readonly JSONContent[],
+  edges: Edges,
+  field: FieldLines | false = false,
+  inCell = false,
+  characters: CharacterRules = "document",
+): JSONContent[] {
+  const out = normalizeChildren(nodes, edges, { field, paste: true, characters }, null, inCell);
   return inCell ? cellContent(out, edges, { keepTables: true, fill: false }) : out;
 }
 
@@ -136,7 +160,7 @@ function normalizeChildren(
 function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent: string | null = null, inCell = false): JSONContent[] {
   if (!isNode(node)) return [node];
   if (node.type === "text") return normalizeText(node, options);
-  if (node.type === "hardBreak" && options.field) return [{ type: "text", text: " " }];
+  if (node.type === "hardBreak" && options.field === "line") return [{ type: "text", text: " " }];
   if (node.type === "variable") return [withMarks(node, normalizeMarks(node.marks, options))];
 
   const open = edges.openStart > 0 || edges.openEnd > 0;
@@ -170,8 +194,8 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
   // A text block whose text was all removed (control or invisible characters) has no `content`.
   if (TEXTBLOCKS.has(node.type ?? "") && children && children.length === 0) next = withoutKey(next, "content");
 
-  // A field's paragraphs join into one line.
-  if (options.field && node.type === "doc" && parent === null) next = joinFieldParagraphs(next);
+  // A field's paragraphs join into one.
+  if (options.field && node.type === "doc" && parent === null) next = joinFieldParagraphs(next, options.field);
   return [next];
 }
 
@@ -180,8 +204,8 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
 function normalizeText(node: JSONContent, options: Options): JSONContent[] {
   if (typeof node.text !== "string") return [node]; // the check refuses it
   const marks = normalizeMarks(node.marks, options);
-  let text = cleanCharacters(node.text);
-  if (options.field) text = text.replace(LINE_BREAKS, " ");
+  let text = cleanCharacters(node.text, options.characters);
+  if (options.field === "line") text = text.replace(LINE_BREAKS, " ");
   const out: JSONContent[] = [];
   text.split(LINE_BREAKS).forEach((part, i) => {
     if (i > 0) out.push({ type: "hardBreak" });
@@ -212,15 +236,24 @@ function withMarks<T extends JSONContent>(node: T, marks: Marks): T {
   return withoutKey(node, "marks");
 }
 
-function joinFieldParagraphs(doc: JSONContent): JSONContent {
+/**
+ * A field's paragraphs as one. On one line, joined by a space, empty ones skipped; keeping its line
+ * breaks, joined by a hardBreak, so an empty paragraph is a blank line.
+ */
+function joinFieldParagraphs(doc: JSONContent, lines: FieldLines): JSONContent {
   const blocks = doc.content ?? [];
   if (blocks.length < 2 || !blocks.every((b) => isNode(b) && b.type === "paragraph")) return doc;
   const inline: JSONContent[] = [];
-  for (const block of blocks) {
-    if (!block.content?.length) continue;
+  blocks.forEach((block, i) => {
+    if (lines === "lines") {
+      if (i > 0) inline.push({ type: "hardBreak" });
+      inline.push(...(block.content ?? []));
+      return;
+    }
+    if (!block.content?.length) return;
     if (inline.length) inline.push({ type: "text", text: " " });
     inline.push(...block.content);
-  }
+  });
   const first = blocks[0];
   return { ...doc, content: [inline.length ? { ...first, content: inline } : withoutKey(first, "content")] };
 }

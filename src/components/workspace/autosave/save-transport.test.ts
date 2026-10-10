@@ -83,7 +83,7 @@ describe("createFetchSend", () => {
       message: DOCUMENT_MESSAGES.listStart,
     });
     const subject: JSONContent = { type: "doc", content: [{ type: "heading", attrs: { level: 1 } }, { type: "paragraph" }] };
-    await expect(sendWith(fetchImpl)({ ...patch, emailSubject: subject }, { keepalive: false })).resolves.toMatchObject({
+    await expect(sendWith(fetchImpl)({ ...patch, "email.subject": subject }, { keepalive: false })).resolves.toMatchObject({
       ok: false,
       error: "invalid",
     });

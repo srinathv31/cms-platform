@@ -15,6 +15,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { runAction } from "@/components/primitives/use-action-run";
+import { CHANNEL_FIELD_IDS } from "@/domain/channel-fields";
 import { formatAgo } from "@/domain/dates";
 import { versionLabel } from "@/domain/rounds";
 import { isApple } from "@/editor/lib/platform";
@@ -25,8 +26,8 @@ import { SaveIndicator } from "./autosave/save-indicator";
 import type { WorkspaceSession } from "./session/session-store";
 import { useCanRevert, useHistoryControls, useInert, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
 
-/** What "Revert to v3" replaces: every versioned field of the draft, its name included. */
-const VERSION_FIELDS = ["name", "body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
+/** What "Revert to v3" replaces: every versioned field of the draft, its name and every channel field included. */
+const VERSION_FIELDS = ["name", "body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
 
 export interface SaveStatusProps {
   templateId: string;

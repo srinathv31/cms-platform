@@ -10,8 +10,8 @@ describe("changedFields", () => {
     expect(changedFields({ sampleSets: [], body: {}, name: "A" })).toEqual(["body", "name", "sampleSets"]);
   });
 
-  it("counts null (it clears the email subject) but not undefined", () => {
-    expect(changedFields({ emailSubject: null, emailPreheader: undefined })).toEqual(["emailSubject"]);
+  it("counts null (it clears a channel field) but not undefined", () => {
+    expect(changedFields({ "email.subject": null, "email.preheader": undefined })).toEqual(["email.subject"]);
   });
 
   it("ignores everything that is not a draft field", () => {

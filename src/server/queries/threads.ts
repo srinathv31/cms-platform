@@ -5,15 +5,15 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { threadBeganBy } from "@/domain/comments";
 import { DOCUMENT_THREAD, type CommentView, type ThreadView } from "@/domain/review-types";
 import { asNumbered, nextRound, versionLabel, type RoundRef } from "@/domain/rounds";
-import type { JSONContent } from "@/domain/types";
 import { db } from "@/server/db/client";
 import { commentThreads, comments, versions } from "@/server/db/schema/ucomp";
 import { pickLatest } from "./library";
-import { blockIdsOf, getPeople, iso, isoOrUndefined, personOf, requireTemplate } from "./review-shared";
+import { anchorIdsOf, getPeople, iso, isoOrUndefined, personOf, requireTemplate } from "./review-shared";
 
-// Review threads. A thread belongs to the template and anchors to a stable block id, so a draft made
-// from a version (same block ids) shows the version's threads in its margin with no copying. A frozen
-// round shows the threads that began by it (`threadBeganBy` in domain/comments.ts).
+// Review threads. A thread belongs to the template and anchors to a stable block id (or a channel field's
+// id, "push.title": an alert's threads are on its fields), so a draft made from a version (same block ids)
+// shows the version's threads in its margin with no copying. A frozen round shows the threads that began
+// by it (`threadBeganBy` in domain/comments.ts).
 
 export interface LoadThreadsOptions {
   /**
@@ -24,13 +24,14 @@ export interface LoadThreadsOptions {
 }
 
 /**
- * The template's threads, seen against one version's body.
+ * The template's threads, seen against one version's anchors (`anchorIdsOf`: its channels' fields, then
+ * its body's blocks).
  * Order: the document thread (a change request's reason) first, then threads in the order their
- * blocks appear, then orphaned threads (their block isn't in this body any more), oldest first.
+ * anchors appear, then orphaned threads (their block isn't in this version any more), oldest first.
  */
 export async function loadThreads(
   templateId: string,
-  body: JSONContent | null,
+  anchors: readonly string[],
   { through = null }: LoadThreadsOptions = {},
 ): Promise<ThreadView[]> {
   const allRows = await db
@@ -90,7 +91,7 @@ export async function loadThreads(
     else byThread.set(c.threadId, [view]);
   }
 
-  const position = new Map(blockIdsOf(body).map((id, index) => [id, index] as const));
+  const position = new Map(anchors.map((id, index) => [id, index] as const));
   const rank = (blockId: string) => (blockId === DOCUMENT_THREAD ? -1 : (position.get(blockId) ?? Infinity));
 
   return threadRows
@@ -130,11 +131,11 @@ export const getThreads = cache(
       .where(versionId ? and(eq(versions.templateId, template.id), eq(versions.id, versionId)) : eq(versions.templateId, template.id));
     const shown = versionId ? list[0] : pickLatest(list);
     if (!shown) notFound();
-    const body = await db
-      .select({ body: versions.body })
+    const anchors = await db
+      .select({ body: versions.body, channels: versions.channels })
       .from(versions)
       .where(eq(versions.id, shown.id))
-      .then((rows) => rows[0]?.body ?? null);
-    return loadThreads(template.id, body, { through: shown.number === null ? null : asNumbered(shown) });
+      .then((rows) => (rows[0] ? anchorIdsOf(rows[0]) : []));
+    return loadThreads(template.id, anchors, { through: shown.number === null ? null : asNumbered(shown) });
   },
 );

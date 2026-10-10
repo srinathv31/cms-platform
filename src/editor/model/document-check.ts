@@ -13,7 +13,8 @@ import {
   isMarkerDelimiter,
   isMarkerFormat,
 } from "./list-markers";
-import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, normalizeDocument, normalizeField } from "./normalize";
+import type { CharacterRules } from "./characters";
+import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, normalizeDocument, normalizeField, type FieldLines } from "./normalize";
 import { MAX_TABLE_COLUMNS, linesUp, tableGrid } from "./table-grid";
 import { isNode, type JSONContent } from "./types";
 
@@ -28,6 +29,8 @@ export const DOCUMENT_MESSAGES = {
   tableShape: "This table's cells don't line up into rows and columns.",
   tableColumns: `Tables can have at most ${MAX_TABLE_COLUMNS} columns.`,
   field: "The email subject and preheader can hold only one line of text and variables.",
+  pushField: "The push title, subtitle and body can hold only text and variables, with no line breaks.",
+  smsField: "The SMS message can hold only text, line breaks and variables.",
 } as const;
 
 export type DocumentProblem = keyof typeof DOCUMENT_MESSAGES;
@@ -99,22 +102,42 @@ export function normalizeAndCheckBody(doc: JSONContent): Checked {
   return { doc: normalized, problem: documentProblem(normalized) };
 }
 
-/** An email subject or preheader as every save takes it: normalized to one line, then the field check. */
-export function normalizeAndCheckField(doc: JSONContent): Checked {
-  const normalized = normalizeField(doc);
-  return { doc: normalized, problem: fieldProblem(normalized) };
+/** The sentences a channel field's check can refuse with: the email's, a push's, an SMS's. */
+export type FieldProblem = Extract<DocumentProblem, "field" | "pushField" | "smsField">;
+
+/**
+ * How a field is checked: whether it keeps its line breaks (`lines`, default `"line"`), the problem it
+ * is refused with (`problem`, default `"field"`, the email's sentence), and which characters its text
+ * keeps (`characters`, default `"document"`; a push's or an SMS's field is `"message"`, characters.ts).
+ * The caller, which knows the field's channel, picks them (`normalizeAndCheckChannelField` in
+ * src/domain/channel-fields.ts).
+ */
+export interface FieldCheck {
+  lines?: FieldLines;
+  problem?: FieldProblem;
+  characters?: CharacterRules;
+}
+
+/** A channel field as every save takes it: normalized for its lines and characters, then the field check. */
+export function normalizeAndCheckField(doc: JSONContent, check: FieldCheck = {}): Checked {
+  const normalized = normalizeField(doc, check.lines, check.characters);
+  return { doc: normalized, problem: fieldProblem(normalized, check) };
 }
 
 /**
- * A one-line field (email subject, preheader): one paragraph of text and variables, no marks and no
- * breaks. Null when it is one; "field" when it isn't (the body rules don't apply to it).
+ * A channel field: one paragraph of text and variables, no marks; hardBreaks only when it keeps its
+ * line breaks (`lines: "lines"`). Null when it is one; `check.problem` when it isn't (the body rules
+ * don't apply to it).
  */
-export function fieldProblem(doc: JSONContent): DocumentProblem | null {
-  if (!isNode(doc) || doc.type !== "doc" || !Array.isArray(doc.content) || doc.content.length !== 1) return "field";
+export function fieldProblem(doc: JSONContent, check: FieldCheck = {}): FieldProblem | null {
+  const problem = check.problem ?? "field";
+  const breaks = check.lines === "lines";
+  if (!isNode(doc) || doc.type !== "doc" || !Array.isArray(doc.content) || doc.content.length !== 1) return problem;
   const paragraph = doc.content[0];
-  if (!isNode(paragraph) || paragraph.type !== "paragraph" || paragraph.marks?.length) return "field";
+  if (!isNode(paragraph) || paragraph.type !== "paragraph" || paragraph.marks?.length) return problem;
   for (const child of paragraph.content ?? []) {
-    if (!isNode(child) || (child.type !== "text" && child.type !== "variable") || child.marks?.length) return "field";
+    if (!isNode(child) || child.marks?.length) return problem;
+    if (child.type !== "text" && child.type !== "variable" && !(breaks && child.type === "hardBreak")) return problem;
   }
   return null;
 }

@@ -1,10 +1,12 @@
 import "server-only";
 import { ensureBlockIds } from "@/editor/schema";
 import type { StarterContent } from "@/domain/lifecycle";
+import { assertNever } from "@/domain/assert-never";
 import { VariableKit } from "../seed/variables";
+import { blankAlert, cardActivity, paymentReminder, statementReady, type AlertStarter } from "./alerts";
 import { blankBody } from "./blank";
 import { cardOfferTermsBody, cardOfferTermsVariables } from "./card-offer-terms";
-import { STARTERS, type StarterKey, type StarterMeta } from "./catalog";
+import { STARTERS, type StarterChoice, type StarterKey } from "./catalog";
 import { feeScheduleBody, feeScheduleVariables } from "./fee-schedule";
 import {
   rateChangeNoticeBody,
@@ -12,7 +14,14 @@ import {
   rateChangeNoticeVariables,
 } from "./rate-change-notice";
 
-export { STARTERS, STARTER_KEYS, isStarterKey, type StarterKey, type StarterMeta } from "./catalog";
+export {
+  STARTERS,
+  STARTER_KEYS,
+  isStarterKey,
+  type StarterChoice,
+  type StarterKey,
+  type StarterMeta,
+} from "./catalog";
 
 export interface BuildStarterOptions {
   /**
@@ -24,15 +33,14 @@ export interface BuildStarterOptions {
   now: Date;
 }
 
-const BY_KEY = new Map<StarterKey, StarterMeta>(STARTERS.map((s) => [s.key, s]));
-
 /**
- * A starter's content, ready to become a template's first draft. Every body has the content
- * type's three required H2 sections in order, and every block (nested ones too) has its id.
+ * A starter's content, ready to become a template's first draft. A document's body has the content
+ * type's three required H2 sections in order; an alert's is one empty paragraph, beside its push and
+ * SMS fields. Every block (nested ones too) has its id.
  */
-export function buildStarter(key: StarterKey, { scope, now }: BuildStarterOptions): StarterContent {
-  const meta = BY_KEY.get(key)!;
+export function buildStarter(choice: StarterChoice, { scope, now }: BuildStarterOptions): StarterContent {
   const kit = new VariableKit(now.getTime());
+  const meta = STARTERS[choice.family].find((s) => s.key === choice.starterKey)!;
 
   const base = (body: StarterContent["body"], variables: StarterContent["variables"]): StarterContent => ({
     key: meta.key,
@@ -41,22 +49,52 @@ export function buildStarter(key: StarterKey, { scope, now }: BuildStarterOption
     variables,
     sampleSets: kit.sampleSets(variables),
   });
+  const message = (starter: AlertStarter): StarterContent => ({
+    ...base(starter.body, starter.variables),
+    channels: starter.channels,
+    channelFields: starter.channelFields,
+  });
 
-  switch (key) {
-    case "blank":
-      return base(blankBody(scope), []);
-    case "card_offer_terms":
-      return base(cardOfferTermsBody(scope), cardOfferTermsVariables(kit));
-    case "rate_change_notice": {
-      const email = rateChangeNoticeEmail();
-      return {
-        ...base(rateChangeNoticeBody(scope), rateChangeNoticeVariables(kit)),
-        channels: ["pdf", "web", "email"],
-        emailSubject: email.subject,
-        emailPreheader: email.preheader,
-      };
+  switch (choice.family) {
+    case "document":
+      return documentStarter(choice.starterKey);
+    case "message":
+      return alertStarter(choice.starterKey);
+    default:
+      return assertNever(choice, "starter family");
+  }
+
+  function documentStarter(key: StarterKey<"document">): StarterContent {
+    switch (key) {
+      case "blank":
+        return base(blankBody(scope), []);
+      case "card_offer_terms":
+        return base(cardOfferTermsBody(scope), cardOfferTermsVariables(kit));
+      case "rate_change_notice":
+        return {
+          ...base(rateChangeNoticeBody(scope), rateChangeNoticeVariables(kit)),
+          channels: ["pdf", "web", "email"],
+          channelFields: { email: rateChangeNoticeEmail() },
+        };
+      case "fee_schedule":
+        return base(feeScheduleBody(scope), feeScheduleVariables(kit));
+      default:
+        return assertNever(key, "document starter");
     }
-    case "fee_schedule":
-      return base(feeScheduleBody(scope), feeScheduleVariables(kit));
+  }
+
+  function alertStarter(key: StarterKey<"message">): StarterContent {
+    switch (key) {
+      case "blank":
+        return message(blankAlert(scope, kit));
+      case "payment_reminder":
+        return message(paymentReminder(scope, kit));
+      case "card_activity":
+        return message(cardActivity(scope, kit));
+      case "statement_ready":
+        return message(statementReady(scope, kit));
+      default:
+        return assertNever(key, "alert starter");
+    }
   }
 }

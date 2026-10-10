@@ -68,9 +68,9 @@ describe("mergeFields", () => {
   });
 
   it("ignores undefined but takes null", () => {
-    expect(mergeFields({ name: "A", emailSubject: doc("s") }, { name: undefined, emailSubject: null })).toEqual({
+    expect(mergeFields({ name: "A", "email.subject": doc("s") }, { name: undefined, "email.subject": null })).toEqual({
       name: "A",
-      emailSubject: null,
+      "email.subject": null,
     });
   });
 

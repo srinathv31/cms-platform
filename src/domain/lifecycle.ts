@@ -6,6 +6,7 @@
 // `effects` are the side records (audit events, notifications, consumer notices) that
 // `server/effects.ts` writes in the same transaction.
 //
+//   newTemplateContentType  the content type a new Document or Alert is made on, for life
 //   createDraft    — → Draft (a new template from a starter)
 //   editLatest     the latest version, Active or Revoked → a new Draft copied from it ("Based on v3")
 //   submit         Draft → In review, numbered: round 1 of the next version after a release, or the next
@@ -35,6 +36,7 @@
 // number has been sent back, then "v2, round 2". Sunset and revoke are about released versions: "v2".
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
+import { withoutInvisible } from "@/editor/model/links";
 import { usageFromJSON } from "@/editor/model/usage";
 import {
   approvedThisRound,
@@ -46,9 +48,27 @@ import {
   type RecordedDecision,
 } from "./approval-chain";
 import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "./business-zone";
+import {
+  channelFieldValue,
+  channelFieldsOf,
+  fieldNoun,
+  fieldsOfChannels,
+  typedText,
+  type ChannelField,
+  type ChannelFields,
+  type ChannelFieldSpec,
+} from "./channel-fields";
 import { describeChanges } from "./contract";
+import { nonGsmCharacters, smsLength } from "./messages/gsm7";
+import { findPublicShorteners } from "./messages/links";
+import { PUSH_MAX_BYTES, PUSH_PLATFORMS, pushPayloadBytes, type PushPlatform } from "./messages/push";
+import { formatCount } from "./numbers";
 import { REASONS, makerCheckerRefusal } from "./permissions";
+import type { MessageTypeRules } from "./platform-config";
+import { plural } from "./plural";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
+import { characterLabel, joinWithAnd, PLATFORM_LABELS } from "./render/errors";
+import { longSampleValues, resolveMessage } from "./render/message";
 import {
   compareRounds,
   isReleased,
@@ -58,7 +78,7 @@ import {
   type NumberedRound,
   type RoundRow,
 } from "./rounds";
-import { formatLongDate } from "./dates";
+import { formatLongDate, utcDay } from "./dates";
 import {
   DOCUMENT_THREAD,
   type ApprovalStage,
@@ -67,14 +87,18 @@ import {
   type Recipients,
   type VersionStage,
 } from "./review-types";
-import type {
-  Channel,
-  ContractChange,
-  JSONContent,
-  RevokeRecord,
-  SampleSet,
-  Variable,
-  VersionState,
+import {
+  TEMPLATE_KIND_LABELS,
+  contentTypeFamily,
+  familyOf,
+  type Channel,
+  type ChannelFamily,
+  type ContractChange,
+  type JSONContent,
+  type RevokeRecord,
+  type SampleSet,
+  type Variable,
+  type VersionState,
 } from "./types";
 
 export type {
@@ -92,8 +116,39 @@ export const UNTITLED_TEMPLATE_NAME = "Untitled template";
 /** Key of the starter that has no example content (just the required sections). */
 export const BLANK_STARTER_KEY = "blank";
 
-/** A new template renders PDF and Web. Email is a deliberate opt-in, as in the seed. */
-export const DEFAULT_CHANNELS: readonly Channel[] = ["pdf", "web"];
+/**
+ * The channels a new template starts with, by its content type's family: a document renders PDF and Web
+ * (Email is a deliberate opt-in, as in the seed); a message (an Alert) renders Push and SMS.
+ */
+export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel[] } = {
+  document: ["pdf", "web"],
+  message: ["push", "sms"],
+};
+
+/**
+ * A new template's channels, given the ones its starter wants (none: the family's defaults) and the ones
+ * its content type allows: the wanted ones the type allows; else the family's defaults it allows; else
+ * the first channel it allows. A content type is one family, so these never mix.
+ */
+export function newTemplateChannels(wanted: readonly Channel[] | undefined, allowed: readonly Channel[]): Channel[] {
+  const family = contentTypeFamily(allowed);
+  const fits = (channels: readonly Channel[]) => channels.filter((c) => allowed.includes(c));
+  const fromStarter = fits(wanted ?? []);
+  if (fromStarter.length > 0) return fromStarter;
+  const defaults = fits(DEFAULT_CHANNELS[family]);
+  return defaults.length > 0 ? defaults : allowed.slice(0, 1);
+}
+
+/**
+ * Why a draft can't be saved with these channels, or null: at least one is on (the channel chips never turn
+ * off the last one, so only a crafted save sends none), and every one is a channel its content type allows,
+ * which keeps a template in its content type's family.
+ */
+export function draftChannelsRefusal(channels: readonly Channel[], allowed: readonly Channel[]): Refusal | null {
+  if (channels.length === 0) return REFUSALS.noChannels;
+  if (!channels.every((channel) => allowed.includes(channel))) return REFUSALS.channelNotAllowed;
+  return null;
+}
 
 // ── Shapes ────────────────────────────────────────────────────
 
@@ -111,10 +166,13 @@ export interface StarterContent {
   body: JSONContent;
   variables: Variable[];
   sampleSets: SampleSet[];
-  /** Defaults to `DEFAULT_CHANNELS`. */
+  /**
+   * The channels it renders. A starter without any is a document's (it has a body): `DEFAULT_CHANNELS.document`.
+   * Fitted to the content type before the draft is made (`newTemplateChannels`, via `conformToContentType`).
+   */
   channels?: readonly Channel[];
-  emailSubject?: JSONContent | null;
-  emailPreheader?: JSONContent | null;
+  /** The channel fields it ships with (an email subject, say). Defaults to none. */
+  channelFields?: ChannelFields;
 }
 
 /** The content of a version that a draft is made from. */
@@ -127,8 +185,7 @@ export interface VersionSnapshot {
   /** The template's name as this version has it. A draft copies it; renaming the draft changes only the draft. */
   name: string;
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  channelFields: ChannelFields;
   channels: readonly Channel[];
   variables: readonly Variable[];
   sampleSets: readonly SampleSet[];
@@ -145,8 +202,8 @@ export interface DraftFields {
   /** The template's name in this draft: what the author renames, and what customers see once it goes live. */
   name: string;
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** Each channel's own fields (channel-fields.ts), kept whether or not the channel is on. */
+  channelFields: ChannelFields;
   channels: Channel[];
   variables: Variable[];
   sampleSets: SampleSet[];
@@ -185,6 +242,28 @@ export interface NewTemplateChanges {
   draft: DraftFields;
 }
 
+/** A content type as New template and Import choose one: its name and the channels it allows. */
+export interface NewTemplateType {
+  name: string;
+  allowedChannels: readonly Channel[];
+}
+
+/**
+ * The content type a new template of `family` is made on (the author chose Document or Alert): the
+ * platform's content type of that family, the first by name when there are several. The template keeps
+ * it for life, and so keeps its family: a content type never changes family (decision 0034). Refused,
+ * with the sentence the author reads, when no content type is of that family.
+ */
+export function newTemplateContentType<T extends NewTemplateType>(
+  family: ChannelFamily,
+  contentTypes: readonly T[],
+): Outcome<{ contentType: T }> {
+  const [contentType] = contentTypes
+    .filter((type) => familyOf(type.allowedChannels) === family)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return contentType ? { ok: true, contentType } : refuse(REFUSALS.noContentType(family));
+}
+
 /** The template's first name: Blank is untitled (renamed at once), an example keeps its own name. */
 export function initialTemplateName(starter: Pick<StarterContent, "key" | "name">): string {
   return starter.key === BLANK_STARTER_KEY ? UNTITLED_TEMPLATE_NAME : starter.name;
@@ -210,9 +289,8 @@ export function createDraft(input: {
         basedOnVersionId: null,
         name,
         body: clone(starter.body),
-        emailSubject: clone(starter.emailSubject ?? null),
-        emailPreheader: clone(starter.emailPreheader ?? null),
-        channels: [...(starter.channels ?? DEFAULT_CHANNELS)],
+        channelFields: clone(starter.channelFields ?? {}),
+        channels: [...(starter.channels ?? DEFAULT_CHANNELS.document)],
         variables: clone([...starter.variables]),
         sampleSets: clone([...starter.sampleSets]),
         contractChanges: null,
@@ -270,7 +348,7 @@ export function planDraftStart(versions: readonly (RoundRow & { id: string })[])
 /**
  * A new draft copied from the version `planDraftStart` chose, the template's latest, Active or
  * Revoked: its name, body (block ids included, so comments and the redline keep their anchors),
- * variables, channels, email fields and sample sets. `basedOnVersionId` is that version, revoked or not.
+ * variables, channels, channel fields and sample sets. `basedOnVersionId` is that version, revoked or not.
  * Contract changes are worked out at submit, against `contractBaseline`, so none are recorded here.
  * Its writers start afresh with the person who pressed Edit: who wrote a released version doesn't
  * keep anyone from deciding the next one.
@@ -396,9 +474,10 @@ export interface SubmitDraft {
   state: VersionState;
   variables: readonly Variable[];
   body: JSONContent;
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  channelFields: ChannelFields;
   channels: readonly Channel[];
+  /** Its sample sets: a message is measured with the "long" one (or that set's defaults when it has none). */
+  sampleSets: readonly SampleSet[];
   /** Who has written the draft (`DraftFields.writers`). */
   writers: readonly string[];
   /** Moves with every write to the version row: each autosave that lands, and every transition. */
@@ -429,10 +508,25 @@ export interface SubmitChanges {
   currentStage: 0;
   /** How the variable list differs from the baseline's (`contractBaseline`); null when there is no baseline. */
   contractChanges: ContractChange[] | null;
+  /**
+   * The content type's SMS footer as it stands now, frozen into the version with the rest of what was
+   * submitted (`versions.sms_footer`): every render of this version prints it, whatever the content type's
+   * footer becomes later. Null when the content type has none (a document's never does).
+   */
+  smsFooter: string | null;
 }
 
 /** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
 export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
+
+/**
+ * The SMS footer a version prints (decision 0035): a draft's is its content type's as it stands, since it
+ * isn't submitted yet; every submitted version's is the one frozen into it at submit (`SubmitChanges.smsFooter`),
+ * so a later change to the content type's footer never reaches a version that was already reviewed.
+ */
+export function smsFooterOf(version: { state: VersionState; smsFooter: string | null }, contentTypeFooter: string | null): string | null {
+  return version.state === "draft" ? contentTypeFooter : version.smsFooter;
+}
 
 export interface SubmitInput {
   draft: SubmitDraft;
@@ -458,21 +552,30 @@ export interface SubmitInput {
    * approver"). The version records its stages, and its first stage's rule says who is asked to review.
    */
   chain: readonly ApprovalStage[];
+  /** The content type's SMS footer and part budget: a message's checks measure the SMS with them. */
+  messageRules: MessageTypeRules;
 }
 
 /**
  * Draft → In review, as the template's next round (`nextRound`): round 1 of the next version number after
  * a release, or the next round of the number sent back. With it, the contract changes, the note,
- * the stages it will go through (the chain as it is now), an audit event, and a `review_requested`
- * notification to the first stage's approvers (never anyone who wrote it, the submitter included).
+ * the stages it will go through (the chain as it is now), the content type's SMS footer (frozen with it),
+ * an audit event, and a `review_requested` notification to the first stage's approvers (never anyone who
+ * wrote it, the submitter included).
  *
  * Refuses, with the sentence the author reads, when
  *   - the version isn't a draft (a second tab, a double click);
  *   - the draft changed after the submitter's summary was read (`seenRev`): a save that landed
  *     meanwhile, from this page or another, would otherwise be frozen without being shown;
- *   - a chip names a key the variable list doesn't have: in the document, and in the email subject
- *     and preheader while Email is on (they are not part of the output otherwise);
- *   - Email is on and the subject is empty.
+ *   - no channel is on (only a crafted save can store that: it would render nothing and skip every
+ *     channel's rules);
+ *   - a chip names a key the variable list doesn't have: in the document, and in the fields of the
+ *     channels that are on (channel-fields.ts; a field isn't part of the output while its channel is off);
+ *   - a required field of a channel that is on is blank (Email's subject): the first such field;
+ *   - a message breaks a rule its channels have (`messageRefusal`, decisions 0034 and 0035): the SMS has
+ *     characters the author typed outside GSM-7, or takes more parts than the content type allows with
+ *     the "long" sample values; a push body or SMS links through a public shortener; or a push is over
+ *     4,096 bytes on either platform with the long values.
  *
  * A renamed key is one `key_renamed` change: the renamed variable keeps its identity as its id
  * (`Variable.id`), so `diffVariables` pairs it with the baseline's variable whatever it is keyed now.
@@ -483,15 +586,20 @@ export function submit(input: SubmitInput): SubmitResult {
   if (draft.state === "in_review") return refuse(REFUSALS.alreadyInReview);
   if (draft.state !== "draft") return refuse(REFUSALS.notDraft);
   if (draft.rev !== input.seenRev) return refuse(REFUSALS.summaryStale);
+  if (draft.channels.length === 0) return refuse(REFUSALS.noChannels);
 
-  const emailOn = draft.channels.includes("email");
+  const fields = fieldsOfChannels(draft.channels);
 
   const defined = new Set(draft.variables.map((v) => v.key));
-  const fields = emailOn ? [draft.body, draft.emailSubject, draft.emailPreheader] : [draft.body];
-  const undefinedKeys = unique(fields.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
+  const docs = [draft.body, ...fields.map((field) => channelFieldValue(draft.channelFields, field))];
+  const undefinedKeys = unique(docs.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
   if (undefinedKeys.length > 0) return refuse(REFUSALS.undefinedVariables(undefinedKeys));
 
-  if (emailOn && isBlankField(draft.emailSubject)) return refuse(REFUSALS.emailSubjectMissing);
+  const missing = fields.find((field) => field.required && isBlankField(channelFieldValue(draft.channelFields, field)));
+  if (missing) return refuse(REFUSALS.fieldMissing(missing));
+
+  const message = messageRefusal(draft, input.messageRules, now);
+  if (message) return refuse(message);
 
   const { number, round } = nextRound(input.versions);
   const submitted: NumberedRound = { number, round, state: "in_review" };
@@ -514,6 +622,7 @@ export function submit(input: SubmitInput): SubmitResult {
       stages,
       currentStage: 0,
       contractChanges,
+      smsFooter: input.messageRules.smsFooter,
     },
     effects: [
       {
@@ -539,6 +648,54 @@ export function submit(input: SubmitInput): SubmitResult {
   };
 }
 
+/**
+ * Why a message can't be submitted, or null: the rules of Push and SMS that render can't check, because
+ * they hold for any values, or are tighter than render's own limits. In this order, the first that fails:
+ *   1. SMS characters: every character the author typed in an SMS field is GSM-7. One that isn't would
+ *      switch every message to UCS-2 (a third of the room); the composer offers a fix for each. Values
+ *      aren't checked: a customer's "Gómez" prints as sent and the API reports the encoding.
+ *   2. SMS parts: with the "long" sample values and the footer, the SMS takes at most the content
+ *      type's budget of parts (`smsMaxParts`).
+ *   3. Public shorteners: no link the author typed in a push body or SMS (`refusesShorteners`) is on a
+ *      public URL shortener.
+ *   4. Push size: with the long sample values, the push is at most PUSH_MAX_BYTES on each platform.
+ * The long values are the draft's "long" sample set (its defaults when the draft has none). A value in
+ * it that no longer validates (its variable changed type since) gives way to the generated long value
+ * (`longSampleValues`), so 2 and 4 always measure something, as the composer's meta line does.
+ */
+function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date): Refusal | null {
+  const on = (channel: Channel) => draft.channels.includes(channel);
+  if (!on("push") && !on("sms")) return null;
+  const valueOf = (field: ChannelField) => channelFieldValue(draft.channelFields, field);
+
+  if (on("sms")) {
+    for (const field of channelFieldsOf("sms")) {
+      const outside = nonGsmCharacters(typedText(valueOf(field)));
+      if (outside.length > 0) return REFUSALS.smsCharacters(field, outside.map((c) => c.char));
+    }
+  }
+
+  const input = { fields: draft.channelFields, variables: draft.variables, values: longSampleValues(draft, utcDay(now)), rules };
+  if (on("sms")) {
+    const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
+    if (parts > rules.smsMaxParts) return REFUSALS.smsParts(parts, rules.smsMaxParts);
+  }
+
+  for (const field of fieldsOfChannels(draft.channels)) {
+    if (!field.refusesShorteners) continue;
+    const links = findPublicShorteners(typedText(valueOf(field)));
+    if (links.length > 0) return REFUSALS.publicShortener(field, links.map((link) => link.domain));
+  }
+
+  if (on("push")) {
+    for (const platform of PUSH_PLATFORMS) {
+      const bytes = pushPayloadBytes(platform, resolveMessage({ channel: "push", platform }, input));
+      if (bytes > PUSH_MAX_BYTES) return REFUSALS.pushTooLarge(platform, bytes);
+    }
+  }
+  return null;
+}
+
 /** The keys of the chips in a document, in order of first use. */
 function chipKeys(doc: JSONContent | null): string[] {
   return doc ? [...usageFromJSON(doc, { sections: false }).keys()] : [];
@@ -550,11 +707,14 @@ function listKeys(keys: readonly string[]): string {
   return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
-/** True when a one-line field has no text (spaces don't count) and no chip. */
+/**
+ * True when a field has no text and no chip. Spaces don't count, and neither do invisible characters, which a
+ * message's field keeps (src/editor/model/characters.ts): a push title of a zero-width space shows nothing.
+ */
 function isBlankField(doc: JSONContent | null): boolean {
   if (!doc) return true;
   if (doc.type === "variable") return false;
-  if (typeof doc.text === "string" && doc.text.trim() !== "") return false;
+  if (typeof doc.text === "string" && withoutInvisible(doc.text).trim() !== "") return false;
   return (doc.content ?? []).every(isBlankField);
 }
 
@@ -573,18 +733,61 @@ export type Outcome<T> = Ok<T> | Refused;
  * (maker-checker refusals come from `REASONS`).
  */
 export const REFUSALS = {
+  /** New template (`newTemplateContentType`): "No content type makes alerts yet." */
+  noContentType: refusal(
+    "no_content_type",
+    (family: ChannelFamily) => `No content type makes ${TEMPLATE_KIND_LABELS[family].toLowerCase()}s yet.`,
+  ),
   /** Edit (`planDraftStart`): a newer version is in review, so a draft now would fork the template. */
   newerInReview: refusal("newer_in_review", "A newer version is in review."),
   notEditable: refusal("not_editable", "Only an Active or Revoked template can be edited."),
   alreadyInReview: refusal("already_in_review", "This version is already in review."),
   notDraft: refusal("not_draft", "Only a draft can be submitted."),
+  /** `submit` and a draft save (`draftChannelsRefusal`): a version with no channel renders nothing and skips every channel's rules. */
+  noChannels: refusal("no_channels", "Turn on at least one channel."),
+  /** A draft save (`draftChannelsRefusal`): a channel its content type doesn't allow, which would mix families. */
+  channelNotAllowed: refusal("channel_unavailable", "That channel isn't available for this content type."),
   /** `submit`, when the draft changed after the summary the submitter saw. The submit dialog offers to refresh it. */
   summaryStale: refusal("summary_stale", "This draft changed after this summary was made."),
   undefinedVariables: refusal(
     "undefined_variables",
     (keys: readonly string[]) => `Define or remove ${listKeys(keys)} before submitting.`,
   ),
-  emailSubjectMissing: refusal("email_subject_missing", "Add an email subject before submitting."),
+  /** `submit`, when a required channel field (channel-fields.ts) is blank: "Add an email subject before submitting." */
+  fieldMissing: refusal(
+    "field_missing",
+    (field: Pick<ChannelFieldSpec, "name">) => `Add ${fieldNoun(field)} before submitting.`,
+  ),
+  /**
+   * `submit`: characters the author typed in an SMS that aren't in GSM-7, each once, in order:
+   * "Replace ’ and – in the SMS message before submitting. They aren't in the SMS character set."
+   */
+  smsCharacters: refusal("sms_characters", (field: Pick<ChannelFieldSpec, "name">, chars: readonly string[]) => {
+    const labels = unique(chars.map(characterLabel));
+    const they = labels.length === 1 ? "It isn't" : "They aren't";
+    return `Replace ${joinWithAnd(labels)} in the ${field.name} before submitting. ${they} in the SMS character set.`;
+  }),
+  /** `submit`: "With the long sample values, the SMS is 4 parts. Keep it to 3 parts or fewer." */
+  smsParts: refusal(
+    "sms_too_many_parts",
+    (parts: number, max: number) =>
+      `With the long sample values, the SMS is ${plural(parts, "part")}. Keep it to ${plural(max, "part")} or fewer.`,
+  ),
+  /** `submit`: "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain." */
+  publicShortener: refusal(
+    "public_shortener",
+    (field: Pick<ChannelFieldSpec, "name">, domains: readonly string[]) => {
+      const names = unique(domains);
+      const what = names.length === 1 ? "a public link shortener" : "public link shorteners";
+      return `The ${field.name} links through ${joinWithAnd(names)}, ${what} carriers filter. Use a link on your own domain.`;
+    },
+  ),
+  /** `submit`: "With the long sample values, the push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." */
+  pushTooLarge: refusal(
+    "push_too_large",
+    (platform: PushPlatform, bytes: number) =>
+      `With the long sample values, the push is ${formatCount(bytes)} bytes on ${PLATFORM_LABELS[platform]}. It can be at most ${formatCount(PUSH_MAX_BYTES)} bytes.`,
+  ),
   notInReview: refusal("not_in_review", "This version isn't in review."),
   stageMissing: refusal("stage_missing", "This version's approval stage no longer exists."),
   giveReason: refusal("reason_missing", "Give a reason."),
@@ -1317,7 +1520,7 @@ function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string |
 /**
  * A new draft copied from a version (Edit on the latest version, or a change request): its name, body
  * with every block id (so comment threads and the redline keep their anchors), variables, channels,
- * email fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
+ * channel fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */
 function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, writers: readonly string[]): DraftFields {
   return {
@@ -1327,8 +1530,7 @@ function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, wri
     basedOnVersionId: version.id,
     name: version.name,
     body: clone(version.body),
-    emailSubject: clone(version.emailSubject),
-    emailPreheader: clone(version.emailPreheader),
+    channelFields: clone(version.channelFields),
     channels: [...version.channels],
     variables: clone([...version.variables]),
     sampleSets: clone([...version.sampleSets]),

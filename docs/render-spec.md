@@ -1,6 +1,8 @@
 # Render engine specification
 
-This document specifies Stencil's render engine: how a template version's stored document and a request's variable values become a web page, an email (subject, preheader, HTML and plain text) and a PDF. It is written so a second engine (the planned Java service) can be built from it without reading the TypeScript, and so the Node engine can be checked against it.
+This document specifies Stencil's render engine: how a template version's stored document and a request's variable values become a web page, an email (subject, preheader, HTML and plain text) and a PDF, and how a message template's own short fields become a push notification or an SMS. It is written so a second engine (the planned Java service) can be built from it without reading the TypeScript, and so the Node engine can be checked against it.
+
+A template is a **document** or a **message**, never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)). A document (a Disclosure) renders its one body to PDF, Web and Email. A message (an Alert) renders its own fields to Push and SMS and never reads a body. A content type allows the channels of one family only.
 
 The product rule behind every section:
 
@@ -17,6 +19,9 @@ Where this document and the code disagree, one of them has a bug. The example ta
 | Values | `src/editor/model/variables.test.ts` (`variables.ts`) |
 | JSON numbers in requests | `src/domain/render/json-number-text.test.ts` |
 | Value checks, the length limit among them | `src/domain/render/validate.test.ts` (`validate.ts`) |
+| Push and SMS output | `src/domain/render/message.test.ts` (`message.ts`) |
+| SMS encoding, characters and parts | `src/domain/messages/gsm7.test.ts` (`gsm7.ts`) |
+| Push payload size | `src/domain/messages/push.test.ts` (`push.ts`) |
 | Byte-level channel output | the golden files, `src/server/render/golden/` |
 | RenderDoc shape | `src/domain/render/types.ts` |
 
@@ -31,7 +36,7 @@ Contents:
 7. Lists and markers
 8. Resolution: from TipTap JSON to RenderDoc
 9. The RenderDoc
-10. Channels: web, email, PDF
+10. Channels: web, email, PDF, push, SMS
 11. Errors
 12. Determinism
 13. Golden files
@@ -51,16 +56,16 @@ Contents:
 | 4 | Version rules (consumers only): released, not sunset, not revoked | 409 / 410 |
 | 5 | The channel is allowed by the content type and enabled on the version | 422 `channel_not_allowed` / `channel_not_enabled` |
 | 6 | **Validate values** against the version's variable list (section 5) | 422 `missing_variables` / `invalid_values` |
-| 7 | **Check the document**: the body passes the document check (section 3). For email only, the subject and then the preheader, when not null, pass the one-line field check (a `doc` holding exactly one `paragraph`, no marks anywhere, children only `text` and `variable`), then the schema parse | 500 `render_failed` |
-| 8 | **Resolve** the TipTap JSON and the canonical values into a RenderDoc (section 8) | 500 `render_failed` |
-| 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF (section 10) | 500 `render_failed` |
+| 7 | **Check the document**: a document channel's body passes the document check (section 3); a message channel never reads the body. Then the rendered channel's own fields (for email, the subject and then the preheader; for push, the title, subtitle and body; for SMS, the message), each that has a value, pass the check for its shape (section 2, "Field shapes"), then the schema parse | 500 `render_failed` |
+| 8 | **Resolve**: a document's TipTap JSON and the canonical values into a RenderDoc (section 8), and the channel's fields into text | 500 `render_failed` |
+| 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF; or the message's text → a push for its platform, or an SMS, measured against its limit (section 10) | 500 `render_failed`; a message over its limit: 422 `push_payload_too_large` / `sms_too_long` |
 | 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values) | — |
 
-Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, `round` only with `preview: true` (a whole number from 1; without `preview` it is ignored, whatever it holds, since consumers never see rounds), and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
+Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, `round` only with `preview: true` (a whole number from 1; without `preview` it is ignored, whatever it holds, since consumers never see rounds), a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
-Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that for email stage 7 also checks the subject and preheader and stage 8 resolves them, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
+Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run; for push and SMS, stages 8 and 9 are `renderMessage` in `src/domain/render/message.ts`, the same function the composer's preview runs in the browser). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that stage 7 also checks the channel's own fields and stage 8 resolves them, a message channel skips the body, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
-Inputs to the engine (and nothing else): the version's `body`, `emailSubject` and `emailPreheader` (TipTap JSON), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), on a CMS preview of an unreleased round whose label names it (a round sent back, or past the first) that round, the channel, and the render time `at` (used only as the PDF's creation and modification date).
+Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), on a CMS preview of an unreleased round whose label names it (a round sent back, or past the first) that round, the channel and, for push, the platform, the version's SMS footer (the content type's footer as it stood when the version was submitted, frozen into it as `versions.sms_footer`; a draft preview uses the content type's `content_types.sms_footer` as it stands; or none), and the render time `at` (used only as the PDF's creation and modification date).
 
 ---
 
@@ -110,9 +115,32 @@ The `link` mark may also carry `target`, `rel`, `class` and `title`; the engine 
 
 In the editor's HTML (clipboard, static render) the numbering attributes appear as `data-marker-format` and `data-marker-delimiter` on the `<ol>`, and `start` as the `start` attribute.
 
-### One-line fields
+### Channel fields
 
-The email subject and preheader are separate one-line documents: `{ "type": "doc", "content": [ one paragraph ] }`, whose paragraph holds only `text` and `variable` nodes. Neither those nodes nor the paragraph carry marks. The paragraph may be empty. No hard breaks. A field may be `null` (none).
+A channel can have short fields of its own, printed by that channel only. They are declared once, in a registry (in the Node code, `src/domain/channel-fields.ts`), each with a key, a label, a shape and whether submit requires it:
+
+| Channel | Field | Shape | Required at submit | Notes |
+| --- | --- | --- | --- | --- |
+| Email | `subject` | `line` | yes | |
+| Email | `preheader` | `line` | no | |
+| Push | `title` | `line` | yes | |
+| Push | `subtitle` | `line` | no | iPhone only: Android's push never carries it |
+| Push | `body` | `paragraph` | yes | no public link shortener (submit) |
+| SMS | `text` | `lines` | yes | GSM-7 as typed, no public link shortener (submit) |
+
+PDF and Web have none. A version stores them as one JSON object, `channelFields` (the `versions.channel_fields` column), keyed by channel and then by field key: `{ "email": { "subject": { "type": "doc", … }, "preheader": { "type": "doc", … } } }`, `{ "push": { "title": …, "body": … }, "sms": { "text": … } }`. A field with no value is absent, and so is a channel with none, so a version without any holds `{}`. A field keeps its value while its channel is off; only its own channel's render reads it.
+
+### Field shapes
+
+Every channel field is a separate document, `{ "type": "doc", "content": [ one paragraph ] }`, whose paragraph holds only `text` and `variable` nodes, and `hardBreak` nodes in a `lines` field. Neither those nodes nor the paragraph carry marks: no bold, no links. The paragraph may be empty.
+
+| Shape | Holds | Line breaks | Used by |
+| --- | --- | --- | --- |
+| `line` | one line of text and variables | none: a typed or pasted line break is saved as one space | the email subject and preheader, a push title and subtitle |
+| `paragraph` | one paragraph of text and variables, shown wrapping | none, as `line` | a push body |
+| `lines` | text and variables over several lines | each is a `hardBreak`; several pasted paragraphs join with one each, so a blank line stays | an SMS message |
+
+The field check refuses anything else in the channel's own words (section 3).
 
 ### Limits
 
@@ -130,7 +158,7 @@ The email subject and preheader are separate one-line documents: `{ "type": "doc
 
 Some things can only arrive through paste, import or JSON. They are normalized when the document is saved (every autosave, the import, and paste into the editor), so the editor and every channel see the same document. Normalization is idempotent and never drops content: what can't stay where it is is moved or converted, and what can't be fixed without guessing (an unknown node, a bad span, a list start of 20000, lists ten deep) is left for the document check, which refuses it with a message instead of storing or rendering it.
 
-Every write of a body (an autosave, an import) stores it as: normalize → check → add ids → normalize again (in the Node code, `prepareBody` in `src/server/documents/prepare.ts`; the editor's autosave runs the first two steps before sending, with the same sentences). Adding ids is a ProseMirror round trip: every attribute default is written, unknown attributes are dropped, adjacent text with equal marks merges, and every block without an `id` gets one; the second normalize takes the written defaults (`align: null`, `type: null`) out again. A subject or preheader: normalize as a field → the field check → store. An autosave refusal answers `{ "ok": false, "error": "invalid", "message" }` with the check's sentence (anything else thrown while preparing gives the "unsupported" sentence), checked in the order name, body, subject, preheader. An import whose converted body the check refuses is refused with the `content` code (400) and the reason "This file can't be imported as it is." followed by the check's sentence; nothing is stored or written. The engine's check before every render (pipeline stage 7) still applies to every stored document.
+Every write of a body (an autosave, an import) stores it as: normalize → check → add ids → normalize again (in the Node code, `prepareBody` in `src/server/documents/prepare.ts`; the editor's autosave runs the first two steps before sending, with the same sentences). Adding ids is a ProseMirror round trip: every attribute default is written, unknown attributes are dropped, adjacent text with equal marks merges, and every block without an `id` gets one; the second normalize takes the written defaults (`align: null`, `type: null`) out again. A channel field (the subject, the preheader): normalize for its shape → the check for its shape → store (`prepareField`). An autosave refusal answers `{ "ok": false, "error": "invalid", "message" }` with the check's sentence (anything else thrown while preparing gives the "unsupported" sentence), checked in the order name, body, then the channel fields in the registry's order (subject, preheader). An import whose converted body the check refuses is refused with the `content` code (400) and the reason "This file can't be imported as it is." followed by the check's sentence; nothing is stored or written. The engine's check before every render (pipeline stage 7) still applies to every stored document.
 
 ### Normalization (the CMS, at save; the resolver repeats the text rules defensively)
 
@@ -144,7 +172,7 @@ Every write of a body (an autosave, an import) stores it as: normalize → check
 | A line break character inside a text node (CR LF once, CR, LF, U+2028, U+2029), after tabs and control characters | a `hardBreak` node; the pieces keep the node's marks |
 | A text node that is empty, or left empty | removed |
 | Other control characters in text (U+0000–U+0008, U+000B, U+000C, U+000E–U+001F, U+007F–U+009F) | removed |
-| An invisible character in text (section 4: soft hyphen, zero-width and bidirectional marks, variation selectors, …) | removed (also on paste and import) |
+| An invisible character in text (section 4: soft hyphen, zero-width and bidirectional marks, variation selectors, …) | removed (also on paste and import); in a push's or an SMS's field, kept (section 4) |
 | A paragraph or heading whose text was all removed | no `content` (its hard breaks, if any, stay: every hard break is kept) |
 | A link mark whose `href` passes the link check | `href` replaced by its normalized form |
 | A link mark whose `href` fails the link check | the mark removed, the text kept |
@@ -162,6 +190,8 @@ A paste that lands inside a table cell (at any depth, a list in a cell included)
 
 A one-line field (subject, preheader) takes the same text rules, except: each line break character becomes one space (CR LF is one); each `hardBreak` becomes a separate `{ "type": "text", "text": " " }`, with no merging; all marks are removed; and when the doc has two or more blocks and all are paragraphs, the non-empty ones join into the first paragraph, which keeps its attributes, with a `{ "type": "text", "text": " " }` between them.
 
+A message's field (a push's title, subtitle and body, an SMS's message) takes the rules of its shape, with one difference in characters: its invisible characters are kept, and only control characters are removed and tabs made spaces (section 4). The editor's paste into those fields keeps them too.
+
 ### The document check (refuses; used at save and again before every render)
 
 The check walks the document depth-first, a node before its children, applying these rules at each node in this order; the first broken rule wins:
@@ -176,7 +206,13 @@ The check walks the document depth-first, a node before its children, applying t
 | A list has at most 8 list ancestors (bullet or ordered, counted through anything, cells included) | "Lists can nest at most 9 levels deep." |
 | Every child of a cell, and of every list item inside a cell (at any depth), is a paragraph or a list (an unknown node or `text` there too) | "Table cells can hold only paragraphs and lists." |
 
-Only then the document is parsed against the editor schema (section 2). The parse refuses an unknown node or mark, a misplaced node, an empty `doc` or a root that isn't `doc`, an empty text node, a node that isn't an object, duplicate marks and marks on a block, all with "This document has content Stencil doesn't support." A one-line field takes the field check instead of these rules ("The email subject and preheader can hold only one line of text and variables."), then the same parse.
+Only then the document is parsed against the editor schema (section 2). The parse refuses an unknown node or mark, a misplaced node, an empty `doc` or a root that isn't `doc`, an empty text node, a node that isn't an object, duplicate marks and marks on a block, all with "This document has content Stencil doesn't support." A channel field takes the field check for its shape instead of these rules (section 2, "Field shapes"), then the same parse. The field check's sentence is its channel's:
+
+| Channel | Sentence |
+| --- | --- |
+| Email | "The email subject and preheader can hold only one line of text and variables." |
+| Push | "The push title, subtitle and body can hold only text and variables, with no line breaks." |
+| SMS | "The SMS message can hold only text, line breaks and variables." |
 
 Link hrefs are normalized at save rather than refused, so the check does not refuse a document for a link (the resolver drops a link that fails the link check, keeping its text).
 
@@ -189,7 +225,8 @@ The engine runs the same check before resolving (pipeline stage 7). A stored doc
 ### Characters
 
 - Text is NFC-normalized at resolve (Unicode Normalization Form C). Java: `java.text.Normalizer.normalize(s, Normalizer.Form.NFC)`.
-- The **invisible characters** render as nothing in every channel, because the editor shows nothing for them: they are removed at save (section 3) and again by the resolver, so the editor, the stored document and every channel agree, and the PDF never fails on a character the author can't see. They are the format and default-ignorable characters: U+00AD (soft hyphen), U+034F, U+061C, U+115F, U+1160, U+17B4, U+17B5, U+180B–U+180F, U+200B–U+200F (zero-width space, non-joiner, joiner, left-to-right and right-to-left marks), U+202A–U+202E (embeddings and overrides), U+2060–U+206F (word joiner, invisible operators, isolates), U+3164, U+FE00–U+FE0F (variation selectors), U+FEFF, U+FFA0, U+FFF0–U+FFFB, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF (tags, variation selectors supplement). The same set a link may not contain (section 6; `INVISIBLE_CHARACTERS` in `links.ts`). A soft hyphen is removed, not hyphenated: no channel inserts a hyphen.
+- The **invisible characters** render as nothing in every document channel (the body, and the email's subject and preheader), because the editor shows nothing for them: they are removed at save (section 3) and again by the resolver, so the editor, the stored document and every channel agree, and the PDF never fails on a character the author can't see. They are the format and default-ignorable characters: U+00AD (soft hyphen), U+034F, U+061C, U+115F, U+1160, U+17B4, U+17B5, U+180B–U+180F, U+200B–U+200F (zero-width space, non-joiner, joiner, left-to-right and right-to-left marks), U+202A–U+202E (embeddings and overrides), U+2060–U+206F (word joiner, invisible operators, isolates), U+3164, U+FE00–U+FE0F (variation selectors), U+FEFF, U+FFA0, U+FFF0–U+FFFB, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF (tags, variation selectors supplement). The same set a link may not contain (section 6; `INVISIBLE_CHARACTERS` in `links.ts`). A soft hyphen is removed, not hyphenated: no channel inserts a hyphen.
+- **A message keeps them.** In a push's or an SMS's fields, and in the values those fields print, the invisible characters are kept exactly as typed or sent, at save and at render: a phone draws with them, and dropping one changes what the reader sees. The zero-width joiner holds an emoji sequence together (👨‍👩‍👧 is man, ZWJ, woman, ZWJ, girl; without the joiners it is three faces), U+FE0F asks for the emoji form (❤️, 1️⃣), the tag characters U+E0020–U+E007F spell a subdivision flag (🏴󠁧󠁢󠁥󠁮󠁧󠁿, England), and the zero-width non-joiner (and joiner) are part of how Persian and Indic names are spelled. Only the control characters go there, and a tab becomes a space. This is the one difference between a message's characters and a document's (in the Node code, `CharacterRules` in `src/editor/model/characters.ts`, chosen per field by `fieldCharacters`). An SMS's typed text is still held to GSM-7 at submit (section 10, "SMS encoding"): an invisible character the author typed there is flagged where it sits, with a one-click removal, and submit refuses it; one that arrives in a value prints as sent, like any other character outside GSM-7. The email's subject and preheader follow the document's rules.
 - The control characters listed in section 3 never reach a channel (normalized at save, removed again by the resolver).
 - A tab becomes one space (normalized at save, and again by the resolver).
 - Line break characters in a text node become hard breaks (normalized at save, and again by the resolver). In a variable's display text and in the email subject and preheader they become one space (section 8).
@@ -275,7 +312,7 @@ Display: currency `-$1,234.5` (the sign goes before the `$`), percent `21.90%`, 
 
 **us_state.** A USPS code or the full name of one of the 50 states or DC, any case (runs of whitespace inside a name, the set above, count as one space). A code must be the whole trimmed value (`N J` and `N.J.` are refused). Case is compared with Unicode's locale-free mapping (Java: `toUpperCase(Locale.ROOT)` / `toLowerCase(Locale.ROOT)`, never the default locale). Canonical: the code. Display: the full name from the fixed table.
 
-**text.** Canonical: as sent. Display, in this order: each run of whitespace (the set above) that contains at least one CR or LF becomes one space; the ends are trimmed (the set above); then, as in section 4 but on one line, each U+2028 or U+2029 becomes one space, a tab becomes one space, the invisible and control characters are removed, and the result is NFC. The ends are not trimmed again. Runs of spaces inside stay. A value never produces a hard break.
+**text.** Canonical: as sent. Display, in this order: each run of whitespace (the set above) that contains at least one CR or LF becomes one space; the ends are trimmed (the set above); then, as in section 4 but on one line, each U+2028 or U+2029 becomes one space, a tab becomes one space, the invisible and control characters are removed (in a push's or an SMS's field, only the control characters: section 4), and the result is NFC. The ends are not trimmed again. Runs of spaces inside stay. A value never produces a hard break.
 
 **JSON numbers.** A JSON number in a request's `values` is read from its exact source text (Node: the `JSON.parse` reviver's `context.source`; Java: the parser's raw token text) and then follows the same grammar as a string: `{"apr": 21.90}` is `"21.90"` and displays `21.90%`; `1e3` is refused; `1000000000000000000000` keeps every digit. This applies to the direct members of `values`. A number becomes a string, so a text variable gets its source text (`7` is `"7"`), and a date or us_state variable refuses it. `true`, `false`, objects and arrays are invalid for every type (`first_name must be text.`). When a key repeats, the last one counts. An engine that can't read a number's source text refuses the number; it never guesses digits.
 
@@ -485,16 +522,17 @@ Ordered list items are numbered after removal (`start + index among the remainin
 
 After removal, empty paragraphs (no inline content at all) at the end of the top-level block list are dropped, repeatedly. This includes a paragraph whose only content was invisible or control characters. Nothing else at the end is dropped: a trailing paragraph of spaces stays, so does one of hard breaks, and so does an empty heading.
 
-### Email subject and preheader
+### Channel fields: email subject and preheader, push, SMS
 
-Each one-line field resolves to a plain string; a missing field is `""`. Its lines are the `doc`'s children (a bare paragraph is one line), each a paragraph or heading.
+Each channel field resolves to a plain string; a missing field is `""`. Its lines are the `doc`'s children (a bare paragraph is one line), each a paragraph or heading. A `line` or `paragraph` field (the email's, a push's) writes each break as one space; a `lines` field (an SMS) writes each as `\n`:
 
-- A `text` node gives its text, with each line break character (CR LF once) turned into one space and then step 4 applied.
-- A `hardBreak` gives one space.
-- A `variable` gives its step 1 text, or nothing.
+- A `text` node gives its text, with each line break character (CR LF once) turned into the break, and then step 4 applied.
+- A `hardBreak` gives the break.
+- A `variable` gives its step 1 text, or nothing. A value is one line wherever it prints: a line break inside it is one space.
 - Marks are checked, then ignored.
+- In a message's field (a push's, an SMS's), step 4 and the character rule of step 1 remove only control characters (a tab still becomes a space): invisible characters are kept, in the typed text and in values alike (section 4). So `Family ❤️ 👨‍👩‍👧` stays exactly that, and a value `Zoë 👩‍💻` prints with its joiner. The email's fields remove them, as the body does.
 
-Lines are joined with one space. The whole string is NFC-normalized (text from different nodes composes), and then whitespace (section 5's set) is trimmed from both ends (a mail header can't carry leading whitespace). Runs of spaces inside stay as typed. There is no removal rule for fields.
+Lines are joined with the break. The whole string is NFC-normalized (text from different nodes composes), and then whitespace (section 5's set, line breaks included) is trimmed from both ends (a mail header can't carry leading whitespace, and an SMS doesn't start or end on an empty line). Runs of spaces inside, and spaces at the ends of an SMS's inner lines, stay as typed. There is no removal rule for fields.
 
 ### Tables: the width
 
@@ -564,7 +602,7 @@ Adapters only choose how the RenderDoc looks. They never drop, add, reorder, ren
 
 ## 10. Channels
 
-Shared by every channel: every block of the RenderDoc renders, in order; every list item shows its `marker` before its first line; blank paragraphs render as blank lines; spaces and hard breaks render per section 4; links per section 6; the version's name never appears in the body.
+Shared by every document channel (web, email, PDF): every block of the RenderDoc renders, in order; every list item shows its `marker` before its first line; blank paragraphs render as blank lines; spaces and hard breaks render per section 4; links per section 6; the version's name never appears in the body. The message channels (push, SMS) render no RenderDoc: only their own fields, below.
 
 ### Web (`text/html; charset=utf-8`)
 
@@ -619,6 +657,36 @@ The adapter returns `{ subject, preheader, html, text }`.
 - Before layout, every character that will be drawn is checked: the body in document order (an item's marker before its content), then the footer (the label, then `Page`, `of` and the digits). Each character is checked against the face that sets it (weight and style included: bold runs and header cells bold, italic runs italic, markers upright at their block's weight); it passes if that face, or the fallback family in the same weight and style, has the glyph. In the Node engine the faces are Newsreader 500 for level-2 headings and Liberation Sans (700 for levels 1 and 3, 400 elsewhere), with Liberation Sans as the fallback, and printable ASCII (U+0020–U+007E) is skipped because every face has it (a space, above, never fails). If any character can't be drawn, the render fails (section 11): no tofu boxes, no silent drops.
 - Never crashes on legal input: tables of up to 12 columns at any nesting, spans and `start` within the limits, lists 9 deep (rendering well under a second).
 
+### Push (`application/json`)
+
+A push is one message for both platforms, rendered for the one the request names (`platform`). The response is `{ "title", "subtitle"?, "body", "payloadBytes", "newerVersion" }`:
+
+- `title`, `subtitle` and `body` are the resolved fields (section 8), in full. Nothing is cut to a length: the phone cuts what doesn't fit its screen, never the engine.
+- `subtitle` is iPhone's only. With `platform: "android"` it is never present; with `"ios"` it is present only when it resolved to text.
+- `payloadBytes` is the UTF-8 length of the notification JSON this text makes, written compact (no whitespace, non-ASCII as raw UTF-8, only `"`, `\` and control characters escaped): `{"aps":{"alert":{"title":…,"subtitle":…,"body":…}}}` for iPhone (APNs; the subtitle only when present), `{"message":{"notification":{"title":…,"body":…}}}` for Android (FCM HTTP v1), keys in that order. It is a lower bound on what the consumer sends: its own keys (a deep link, data, badge, sound) add to it.
+- Over 4,096 bytes on the requested platform, the render is refused: 422 `push_payload_too_large` (section 11). A value is never shortened to fit.
+
+### SMS (`application/json`)
+
+The response is `{ "text", "encoding", "parts", "characters", "newerVersion" }`:
+
+- `text` is the message exactly as it must be sent: the resolved message field (section 8, its line breaks as `\n`), then, when the version has an SMS footer, `\n` and the footer as written. An empty message is the footer alone. Nothing is cut and nothing is transliterated: a value prints as sent, even when it switches the message to UCS-2.
+- **The footer is the version's.** Submit freezes the content type's footer (brand and opt-out) into the version (`versions.sms_footer`), with the rest of what was reviewed, and every render of that version prints it. A later change to the content type's footer reaches only versions submitted after it, so it goes through approval like any other change to a message. A draft preview prints the content type's footer as it stands. Review and Compare show each version's own footer, and redline it when it changed between the two.
+- `encoding`, `parts` and `characters` measure `text` (below).
+- Over 10 parts, the render is refused: 422 `sms_too_long` (section 11).
+
+Consumers must send `text` as is and turn off provider rewriting such as Twilio's Smart Encoding, which replaces ’ – … with ASCII: the counts are for the text exactly as rendered.
+
+### SMS encoding
+
+The reference is `src/domain/messages/gsm7.ts`; its README explains the sources ([decision 0035](decisions/0035-sms-characters-and-length.md)).
+
+- **GSM-7 or UCS-2.** `text` is GSM-7 when every character is in the GSM 7-bit default alphabet (3GPP TS 23.038 §6.2.1; 127 characters, 1 septet each) or its extension table (§6.2.1.1: form feed, `^ { } \ [ ~ ] |` and `€`, 2 septets each: an escape and a code). Code 0x09 is `Ç` (capital): `ç` is not GSM-7. One character outside both switches the whole message to UCS-2 (UTF-16).
+- **Units** are septets in GSM-7 and UTF-16 code units in UCS-2 (a character outside the Basic Multilingual Plane, such as most emoji, is 2).
+- **Parts.** The empty text has 0 parts. Up to 160 septets, or 70 units in UCS-2, it is 1 part. Longer, each part holds at most 153 septets or 67 units, and a part ends before a piece that doesn't fit: an extension character stays with its escape, a surrogate pair stays whole, and in UCS-2 a grapheme cluster (a ZWJ emoji sequence, a flag, a letter and its combining marks, an Indic conjunct such as क्ष) stays whole. A CRLF may split between CR and LF. A cluster longer than 67 units splits between code points. So `parts` can be one more than `units ÷ per part` suggests.
+- **`characters`** counts grapheme clusters: a ZWJ emoji sequence, a flag, an Indic conjunct and a CRLF are 1 each. It is informational; units fill the parts.
+- **Grapheme clusters** are Unicode's extended grapheme clusters (UAX #29, "Grapheme Cluster Boundary Rules", rules GB3 to GB999 with GB9a, GB9b and GB9c) over the Unicode Character Database **17.0.0**: its Grapheme_Cluster_Break, Extended_Pictographic and Indic_Conjunct_Break properties. The version is pinned, never the runtime's (section 12): in the Node code, `src/domain/messages/graphemes.ts` and the table `scripts/unicode-graphemes.ts` generates from those three UCD files, checked against Unicode's own `GraphemeBreakTest-17.0.0.txt` (copied beside it). A Java port uses ICU4J 78, whose character `BreakIterator` is Unicode 17.0, or ports the module and its table; either way it runs that conformance file. Moving to a newer Unicode version is a change to this specification: the rules move between versions (GB9c arrived in 15.1 and changes again in 18.0), so `parts` and `characters` can move with it, in every engine at once.
+
 ---
 
 ## 11. Errors
@@ -631,11 +699,14 @@ Every error is JSON `{ "error": { "code", "message", "details"? } }`. The codes 
 | A value doesn't fit its type | `invalid_values` (422) | one sentence per key, separated by one space: "{key} must be text." / "… an amount, like 1000 or 1000.50." / "… a percentage, like 21.99." / "… a date, like 2027-03-04." / "… a number, like 20000." / "… a US state, like NJ." |
 | A value is longer than 1,000 characters | `invalid_values` (422) | "{key} must be at most 1,000 characters." in the same list, in the version's variable order |
 | The body is larger than 1,000,000 bytes | `body_too_large` (413) | "The body must be at most 1,000,000 bytes." Before stage 1, not logged |
-| The stored document fails the document check, or the resolver refuses it | `render_failed` (500) | "The PDF couldn't be rendered. {sentence}" e.g. "The PDF couldn't be rendered. Tables can have at most 12 columns." The sentence is one of section 3's (the limits, or "This document has content Stencil doesn't support." from the schema parse), or, for email only, "The email subject and preheader can hold only one line of text and variables." `details: { "reason": "document" }` |
+| A push without a platform or with one that isn't `ios` or `android`; a platform on another channel; an encoding on push or SMS | `bad_request` (400) | "platform must be ios or android." / "platform is only for channel push." / "encoding is only for channels pdf, web and email." Before stage 1, not logged |
+| A push over 4,096 bytes on its platform, with these values | `push_payload_too_large` (422) | "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." (the platform as "iPhone" or "Android") `details: { "platform", "payloadBytes", "maxBytes": 4096 }` |
+| An SMS over 10 parts, with these values | `sms_too_long` (422) | "The SMS is 11 parts in UCS-2. It can be at most 10 parts." `details: { "parts", "maxParts": 10, "encoding", "characters" }` |
+| The stored document fails the document check, or the resolver refuses it | `render_failed` (500) | "The PDF couldn't be rendered. {sentence}" e.g. "The PDF couldn't be rendered. Tables can have at most 12 columns." The sentence is one of section 3's (the limits, or "This document has content Stencil doesn't support." from the schema parse), or, for a channel field, its channel's field sentence (section 3). `details: { "reason": "document" }` |
 | The PDF font can't draw some characters | `render_failed` (500) | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹)." `details: { "reason": "glyphs", "characters": ["U+1EA1", "U+20B9"] }` |
 | Anything else that fails in stages 7–9, or outside the engine (the database, the log write) | `render_failed` (500) | "The PDF couldn't be rendered. Try again." (as today), no `details` |
 
-"The PDF" is the channel's subject: "The PDF", "The web page", "The email".
+"The PDF" is the channel's subject: "The PDF", "The web page", "The email", "The push", "The SMS".
 
 Both value codes carry `details: { "missing": [ key, … ], "invalid": [ { "key", "expected": type, "maxLength"? }, … ] }`, keys in the version's variable order. `maxLength` (1000) is there only for a value over the length limit. `missing_variables` is returned whenever anything is missing, otherwise `invalid_values`. Each invalid key reads `{key} must be {noun}.`, or `{key} must be at most 1,000 characters.` when it has `maxLength`; the nouns are text "text", currency "an amount, like 1000 or 1000.50", percent "a percentage, like 21.99", date "a date, like 2027-03-04", number "a number, like 20000", us_state "a US state, like NJ". Sentences are joined by one space.
 
@@ -648,6 +719,7 @@ The editor's link field shows the link refusal messages of section 6; the editor
 ## 12. Determinism
 
 - The output is a function of the inputs listed in section 1 and nothing else: no clock (the PDF dates come from `at`), no randomness, no locale, no time zone, no `Intl`, no environment, no hash-order iteration.
+- No runtime's Unicode version either. Where a rule needs Unicode character data, the data is pinned and shipped with the engine: grapheme clusters (an SMS's parts and `characters`) follow UAX #29 over Unicode 17.0.0 (section 10, "SMS encoding"), not `Intl.Segmenter` or `java.text.BreakIterator` of whatever version the runtime has. That is what keeps the composer's preview (in any browser), the server and a second engine on the same parts. NFC (`String.prototype.normalize`, `java.text.Normalizer`) is the one place a runtime's Unicode data still reaches the output; Unicode's normalization stability policy keeps its result the same for every character both runtimes know.
 - The same inputs give the same bytes, every time, in each engine (web HTML, email JSON and text, and PDF bytes for the same `at` to the second), whatever the process rendered before and in any order: nothing a render leaves behind (font and glyph caches, module state) may change a later one. An in-process test can't see this (every render there shares the same state), so the Node engine checks it in fresh processes: `golden/determinism.test.ts` renders every golden case in every channel, plus probe documents that would leave state behind (a soft hyphen, leading no-break spaces, characters that share a glyph, a character the PDF can't draw), in two new processes in opposite orders, and every output must be identical.
 - Across engines: the engine-neutral golden files (section 13) are identical; PDF bytes are not compared (fonts and layout engines differ), but the PDF's content, markers, links, metadata and missing-glyph count are.
 
@@ -674,6 +746,11 @@ src/server/render/golden/
                           (dates ISO 8601 UTC, "2027-03-04T12:00:00.000Z"; language is the catalog's /Lang;
                           absent when the PDF fails)
         error.json        only for a case that must fail before any channel: { "code", "message", "details" }
+        push.ios.json     a push case: iPhone's push, { "title", "subtitle"?, "body", "payloadBytes" }
+        push.android.json   … and Android's, never with a subtitle
+        sms.json          an SMS case: { "text", "encoding", "parts", "characters" }
+        push.ios.error.json, push.android.error.json, sms.error.json
+                          in place of the file above when that render is refused (a message over its limit)
       node/               Node engine only: depends on fonts and the layout engine
         pdf.layout.txt    every text line by page, with its indent and heading level; footer and links
         pdf.json          { "pageCount", "missingGlyphs", "links": [ { "page", "url", "text" } ] }
@@ -690,13 +767,14 @@ src/server/render/golden/
   "at": "2027-03-04T12:00:00.000Z",         // render time: the PDF's dates
   "variables": [ { "key", "label", "type", "required", "sample" }, … ],
   "values": { "purchase_apr": 21.90, … },   // as a request sends them; JSON numbers are read from their source text
-  "body": { "type": "doc", … },
-  "emailSubject": { "type": "doc", … } | null,
-  "emailPreheader": { "type": "doc", … } | null
+  "body": { "type": "doc", … },             // a message case's is never read
+  "channelFields": { "email": { "subject": { "type": "doc", … }, "preheader": { … } } },  // or {} (section 2)
+  "channels": [ "pdf", "web", "email" ],    // the channels the case renders: one family
+  "smsFooter": "Coral: Reply STOP to opt out, HELP for help."   // optional: the version's SMS footer (section 10)
 }
 ```
 
-A case runs the engine (stages 6 to 9) on its input once per channel, in the order pdf, web, email. The first run refused before its adapter (stage 6, 7 or 8) ends the case: `expected/error.json` holds that error and no other file exists (no `node/`). So a refused body reads "The PDF couldn't be rendered. …", and a refused subject or preheader (checked only for email) reads "The email couldn't be rendered. …". A PDF refused at stage 9 (unrenderable characters) leaves `node/pdf.error.json` (the error object) alone in `node/`, and `expected/` has no `pdf.meta.json`; the other channels' files are written as usual.
+A case runs the engine (stages 6 to 9) on its input once per channel it lists, in the order pdf, web, email, push, SMS, and a push once per platform, iPhone then Android. The first run refused before its adapter (stage 6, 7 or 8) ends the case: `expected/error.json` holds that error and no other file exists (no `node/`). So a refused body reads "The PDF couldn't be rendered. …", and a refused subject or preheader (checked only for email) reads "The email couldn't be rendered. …". A PDF refused at stage 9 (unrenderable characters) leaves `node/pdf.error.json` (the error object) alone in `node/`, and `expected/` has no `pdf.meta.json`; the other channels' files are written as usual. A push or SMS refused at stage 9 (over its limit) writes its error as `push.<platform>.error.json` or `sms.error.json` in `expected/`, in place of its output. A message case writes no `renderdoc.json`, `content.txt` or `links.json`.
 
 **Comparison:** JSON files are compared as parsed JSON (key order and whitespace don't matter). `.html` and `.txt` files are compared byte for byte (UTF-8, `\n`). Where this document leaves a byte-level detail to the implementation (CSS, attribute order, markup), the golden file is the reference.
 
@@ -712,7 +790,8 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 
 **The parity test** (`parity.test.ts`, plain assertions, never updated by `-u`) checks, per case:
 
-- `error-*` cases are refused before any channel; `pdf-error-*` cases render everything but the PDF.
+- `error-*` cases are refused before any channel; `pdf-error-*` cases render everything but the PDF; `push-error-*` cases refuse the push on every platform, and `sms-error-*` cases the SMS; every other case renders each channel it lists.
+- A push's title and body are the same on both platforms, Android's has no subtitle, and each `payloadBytes` is its platform's JSON measured again. An SMS's `encoding`, `parts` and `characters` are its `text` measured again, and the text ends with the footer on its own line when the case has one.
 - The RenderDoc invariants of section 9 hold.
 - The web and email HTML match `content.txt` line for line (markers and blank lines included).
 - The email text is the plain text section 10 dictates, line for line. Every line is exact (characters, typed spaces, markers, each hard break's line, every empty line, the ` | ` between cells, link addresses), except the layout the format adds, compared loosely: the indent of an item's further lines, the padding after a cell's line and an underline's length.
@@ -723,9 +802,9 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 - The PDF has zero missing glyphs, and its dates equal `at` to the second.
 - A second run gives identical files and identical PDF bytes; and two fresh processes rendering every case in opposite orders give identical outputs (`determinism.test.ts`, section 12).
 
-**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 44 cases: 36 hand-built (13 of them `error-*`, one `pdf-error-*`) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
+**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 60 cases: 52 hand-built (13 of them `error-*`, one `pdf-error-*`, one `push-error-*`, one `sms-error-*`, and 16 for push and SMS in all) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
 
-**How Java consumes them:** the Java build reads the same `cases/` directory. For each case it renders `input.json` with its own engine and checks: `renderdoc.json`, `email.json`, `links.json`, `error.json` and `pdf.meta.json` (when present) as JSON; `web.html`, `email.html`, `email.txt` and `content.txt` byte for byte; its own PDF's extracted content against the PDF view (`content.ts` `VIEWS.pdf`, compared as `compareContent` does, each table cell read on its own) and its link annotations against `links.json`; zero missing glyphs. It ignores `node/`.
+**How Java consumes them:** the Java build reads the same `cases/` directory. For each case it renders `input.json` with its own engine and checks: `renderdoc.json`, `email.json`, `links.json`, `error.json`, `pdf.meta.json`, `push.*.json` and `sms*.json` (when present) as JSON; `web.html`, `email.html`, `email.txt` and `content.txt` byte for byte; its own PDF's extracted content against the PDF view (`content.ts` `VIEWS.pdf`, compared as `compareContent` does, each table cell read on its own) and its link annotations against `links.json`; zero missing glyphs. It ignores `node/`.
 
 ---
 
@@ -766,3 +845,4 @@ A case runs the engine (stages 6 to 9) on its input once per channel, in the ord
 | A stored document outside the content model | rendered approximately, or a crash | refused at save (autosave, and import with the new `content` refusal), and `render_failed` with `reason: "document"` and the check's sentence at render |
 | A pasted list `start` outside 0–9999 | shown as pasted, refused at save | brought into 0–9999 on paste |
 | PDF dates | the wall clock | the render time `at` |
+| Channels | PDF, Web and Email | also Push and SMS, for message templates (an Alert): a push for `platform` `ios` or `android`, an SMS with its footer, measured and refused past their limits (section 10) |

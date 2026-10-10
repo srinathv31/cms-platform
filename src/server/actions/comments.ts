@@ -25,10 +25,10 @@ import { db, type Db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { blockIdsOf, loadChain, stageApproverIds } from "@/server/queries/review-shared";
+import { anchorIdsOf, loadChain, stageApproverIds } from "@/server/queries/review-shared";
 import { permit, refuse, serverAction } from "./kit";
 
-// Review comments: start a thread on a block (or on the whole version), reply, resolve, reopen. The rules
+// Review comments: start a thread on a block or a channel field (or on the whole version), reply, resolve, reopen. The rules
 // are domain/comments.ts: which versions take comments (a draft, a version in review), who may act on
 // which thread, the text's limits, and who is notified. Every action runs the server action kit (kit.ts):
 //   1. `authorize`: read the facts outside a transaction and ask the rule (`permit`), so a refused caller
@@ -95,7 +95,7 @@ async function namedOnStage(
   return stageApproverIds(currentStageOf(version, await loadChain(reader, contentTypeId)));
 }
 
-/** The version a new thread goes on, with its template and the blocks in its body. */
+/** The version a new thread goes on, with its template and what a thread on it can anchor to (its fields and blocks). */
 async function loadVersion(reader: Reader, templateId: string, versionId: string) {
   const row = await reader
     .select({
@@ -108,6 +108,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
       stages: versions.stages,
       currentStage: versions.currentStage,
       body: versions.body,
+      channels: versions.channels,
       templateId: templates.id,
       // The version's own name: its notification names the version commented on.
       templateName: versions.name,
@@ -132,7 +133,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
   return {
     template: { id: row.templateId, name: row.templateName, teamId: row.teamId },
     version,
-    blockIds: blockIdsOf(row.body),
+    blockIds: anchorIdsOf(row),
   };
 }
 

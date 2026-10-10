@@ -1,8 +1,27 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { BAD_REQUEST_MESSAGES, MAX_BODY_BYTES, badRequest, bodyTooLarge, consumerRequired, renderFailed } from "@/domain/render";
+import { assertNever } from "@/domain/assert-never";
+import { PUSH_PLATFORMS } from "@/domain/messages/push";
+import {
+  BAD_REQUEST_MESSAGES,
+  MAX_BODY_BYTES,
+  badRequest,
+  bodyTooLarge,
+  consumerRequired,
+  renderFailed,
+  renderTarget,
+} from "@/domain/render";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
-import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
+import type {
+  Base64ResponseBody,
+  EmailRender,
+  EmailResponseBody,
+  PushRender,
+  PushResponseBody,
+  RenderError,
+  SmsRender,
+  SmsResponseBody,
+} from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
 import { readBodyCapped } from "@/server/import/read-body";
@@ -25,6 +44,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 const RequestBody = z.object({
   version: z.union([z.int().min(1), z.literal("draft")]),
   channel: z.enum(CHANNELS),
+  platform: z.enum(PUSH_PLATFORMS).optional(),
   values: z.custom<Record<string, unknown>>(isPlainObject),
   encoding: z.literal("base64").optional(),
   preview: z.boolean().optional(),
@@ -40,6 +60,7 @@ type RequestBody = Omit<z.infer<typeof RequestBody>, "round"> & { round?: number
 const FIELD_MESSAGES: Readonly<Record<string, string>> = {
   version: BAD_REQUEST_MESSAGES.version,
   channel: BAD_REQUEST_MESSAGES.channel,
+  platform: BAD_REQUEST_MESSAGES.platform,
   values: "values must be an object.",
   encoding: "encoding must be base64.",
   preview: "preview must be true or false.",
@@ -102,39 +123,48 @@ function successResponse(
   if (opts.preview) headers.set("X-Stencil-Preview", "true");
 
   const { newerVersion } = result;
-
-  if (result.channel === "email") {
-    const email = result.body as EmailRender;
-    const body: EmailResponseBody =
-      opts.encoding === "base64"
-        ? { ...email, html: toBase64(email.html), text: toBase64(email.text), newerVersion, encoding: "base64" }
-        : { ...email, newerVersion };
+  // PDF and web are files: as they are, or wrapped in JSON as base64.
+  const base64 = (channel: Base64ResponseBody["channel"], contentType: Base64ResponseBody["contentType"], data: Uint8Array | string) => {
+    const body: Base64ResponseBody = { channel, contentType, encoding: "base64", data: toBase64(data), newerVersion };
     return Response.json(body, { headers });
-  }
+  };
 
-  const contentType = result.channel === "pdf" ? "application/pdf" : "text/html; charset=utf-8";
-  const data = result.body as Uint8Array | string;
-
-  if (opts.encoding === "base64") {
-    const body: Base64ResponseBody = {
-      channel: result.channel,
-      contentType,
-      encoding: "base64",
-      data: toBase64(data),
-      newerVersion,
-    };
-    return Response.json(body, { headers });
+  switch (result.channel) {
+    case "pdf": {
+      const bytes = result.body as Uint8Array;
+      if (opts.encoding === "base64") return base64("pdf", "application/pdf", bytes);
+      headers.set("Content-Type", "application/pdf");
+      headers.set("Content-Disposition", `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`);
+      // A copy on its own ArrayBuffer: the Response body type wants exactly that.
+      return new Response(new Uint8Array(bytes), { headers });
+    }
+    case "web": {
+      const html = result.body as string;
+      if (opts.encoding === "base64") return base64("web", "text/html; charset=utf-8", html);
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      headers.set("Content-Security-Policy", WEB_CSP);
+      return new Response(html, { headers });
+    }
+    case "email": {
+      const email = result.body as EmailRender;
+      const body: EmailResponseBody =
+        opts.encoding === "base64"
+          ? { ...email, html: toBase64(email.html), text: toBase64(email.text), newerVersion, encoding: "base64" }
+          : { ...email, newerVersion };
+      return Response.json(body, { headers });
+    }
+    // Messages are JSON already: the platform's push, or the SMS as sent.
+    case "push": {
+      const body: PushResponseBody = { ...(result.body as PushRender), newerVersion };
+      return Response.json(body, { headers });
+    }
+    case "sms": {
+      const body: SmsResponseBody = { ...(result.body as SmsRender), newerVersion };
+      return Response.json(body, { headers });
+    }
+    default:
+      return assertNever(result.channel, "channel");
   }
-
-  headers.set("Content-Type", contentType);
-  if (result.channel === "pdf") {
-    headers.set("Content-Disposition", `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`);
-    const bytes = data as Uint8Array;
-    // A copy on its own ArrayBuffer: the Response body type wants exactly that.
-    return new Response(new Uint8Array(bytes), { headers });
-  }
-  headers.set("Content-Security-Policy", WEB_CSP);
-  return new Response(data as string, { headers });
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -150,10 +180,13 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
 
   const parsed = parseBody(new TextDecoder().decode(body.bytes));
   if (!parsed.ok) return errorResponse(parsed.error, correlationId);
-  const { version, round, channel, values, encoding } = parsed.body;
+  const { version, round, channel, platform, values, encoding } = parsed.body;
   const preview = parsed.body.preview === true;
 
   if (version === "draft" && !preview) return errorResponse(badRequest(BAD_REQUEST_MESSAGES.version), correlationId);
+  // A push asks for its platform; nothing else takes one, and push and SMS take no encoding.
+  const target = renderTarget(channel, platform, encoding);
+  if (!target.ok) return errorResponse(target.error, correlationId);
   const consumerId = request.headers.get("x-consumer-id")?.trim() || null;
   if (!preview && !consumerId) return errorResponse(consumerRequired(), correlationId);
 
@@ -163,6 +196,7 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
       version,
       ...(preview && round !== undefined ? { round } : {}),
       channel,
+      platform,
       values,
       encoding,
       preview,

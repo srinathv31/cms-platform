@@ -4,6 +4,7 @@
 // chips filled, from its own sample sets.
 
 import { describe, expect, it } from "vitest";
+import { ALL_CHANNEL_FIELDS, channelFieldValue, channelFieldsOf, type ChannelFields } from "@/domain/channel-fields";
 import { HANDLED_MARKS, HANDLED_NODES, resolveDocument, validateValues } from "@/domain/render";
 import type { RenderBlock, RenderInline } from "@/domain/render";
 import type { JSONContent, SampleSet, Variable } from "@/domain/types";
@@ -11,8 +12,9 @@ import { sampleSetValues } from "@/editor/model/sample-sets";
 import { createContext } from "@/server/seed/context";
 import { seedCardStatementsTemplates } from "@/server/seed/templates/card-statements";
 import { seedCoralTemplates } from "@/server/seed/templates/coral";
+import { seedCoralAlerts } from "@/server/seed/templates/coral-alerts";
 import { seedDepositsTemplates } from "@/server/seed/templates/deposits";
-import { STARTER_KEYS, buildStarter } from "@/server/starters";
+import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starters";
 import { normalizeDocument } from "@/editor/model/normalize";
 import { DOCUMENT_MESSAGES, RenderDocumentError, checkDocument, checkField, editorSchema } from "./schema-check";
 
@@ -254,12 +256,13 @@ describe("checkDocument: the limits, with their sentences", () => {
   });
 });
 
-describe("checkField (email subject, preheader)", () => {
+describe("checkField, a line (email subject, preheader)", () => {
   const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
+  const subject = channelFieldsOf("email")[0]!;
 
   it("accepts one line of text and variables, or an empty line", () => {
-    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }))).not.toThrow();
-    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] })).not.toThrow();
+    expect(() => checkField(field({ type: "text", text: "Hi " }, { type: "variable", attrs: { key: "first_name" } }), subject)).not.toThrow();
+    expect(() => checkField({ type: "doc", content: [{ type: "paragraph" }] }, subject)).not.toThrow();
   });
 
   it.each<[string, JSONContent]>([
@@ -269,21 +272,46 @@ describe("checkField (email subject, preheader)", () => {
     ["a mark", field({ type: "text", text: "a", marks: [{ type: "bold" }] })],
     ["no paragraph", { type: "doc", content: [] }],
   ])("refuses %s", (_, value) => {
-    expect(() => checkField(value)).toThrow("The email subject and preheader can hold only one line of text and variables.");
+    expect(() => checkField(value, subject)).toThrow("The email subject and preheader can hold only one line of text and variables.");
+  });
+});
+
+describe("checkField, a push's fields and an SMS", () => {
+  const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
+  const [title, , body] = channelFieldsOf("push");
+  const [sms] = channelFieldsOf("sms");
+  const broken = field({ type: "text", text: "a" }, { type: "hardBreak" }, { type: "text", text: "b" });
+
+  it("refuses a line break in a push field, in the push's words", () => {
+    for (const push of [title!, body!]) {
+      expect(() => checkField(broken, push)).toThrow("The push title, subtitle and body can hold only text and variables, with no line breaks.");
+    }
+  });
+
+  it("takes line breaks in an SMS, and refuses a mark in the SMS's words", () => {
+    expect(() => checkField(broken, sms!)).not.toThrow();
+    expect(() => checkField(field({ type: "text", text: "a", marks: [{ type: "bold" }] }), sms!)).toThrow(
+      "The SMS message can hold only text, line breaks and variables.",
+    );
   });
 });
 
 // ── Real content ─────────────────────────────────────────────────────────────
 
-describe.each(STARTER_KEYS)("starter %s", (key) => {
+const STARTER_CHOICES: StarterChoice[] = [
+  ...STARTER_KEYS.document.map((starterKey) => ({ family: "document" as const, starterKey })),
+  ...STARTER_KEYS.message.map((starterKey) => ({ family: "message" as const, starterKey })),
+];
+
+describe.each(STARTER_CHOICES)("starter $family/$starterKey", (choice) => {
   it("checks, and resolves with every chip filled from its own sample sets", () => {
-    const starter = buildStarter(key, { scope: "UC-TEST01", now: NOW });
+    const starter = buildStarter(choice, { scope: "UC-TEST01", now: NOW });
     expectRendersFully({
-      name: key,
+      name: `${choice.family}/${choice.starterKey}`,
       body: starter.body,
       variables: starter.variables,
       sampleSets: starter.sampleSets,
-      fields: [starter.emailSubject, starter.emailPreheader],
+      fields: ALL_CHANNEL_FIELDS.map((field) => channelFieldValue(starter.channelFields ?? {}, field)),
     });
   });
 });
@@ -293,6 +321,7 @@ describe("seeded templates", () => {
   seedCoralTemplates(ctx);
   seedDepositsTemplates(ctx);
   seedCardStatementsTemplates(ctx);
+  seedCoralAlerts(ctx);
   const versions = ctx.sink.versions;
 
   it("are all reachable without a database", () => {
@@ -307,7 +336,7 @@ describe("seeded templates", () => {
         body: v.body as JSONContent,
         variables: v.variables as Variable[],
         sampleSets: v.sampleSets as SampleSet[],
-        fields: [v.emailSubject as JSONContent | null, v.emailPreheader as JSONContent | null],
+        fields: ALL_CHANNEL_FIELDS.map((field) => channelFieldValue((v.channelFields ?? {}) as ChannelFields, field)),
       });
     },
   );

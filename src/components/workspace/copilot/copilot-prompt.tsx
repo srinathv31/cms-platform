@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { BlockedButton } from "@/components/primitives/blocked-button";
 import { useCopy } from "@/components/primitives/copy";
 import type { CopilotPrompt } from "@/domain/import-types";
 import { readTemplate } from "@/lib/template-reads";
@@ -17,6 +18,9 @@ const NOT_SAVED = "Your latest changes aren't saved yet.";
 const LOAD_FAILED = "Couldn't get the prompt. Try again.";
 const COPY_FAILED = "Couldn't copy. Select the prompt and copy it.";
 const COPIED_MS = 2000;
+
+/** The quiet row at the end of the rail. */
+const ROW = "h-8 w-full justify-start gap-2 rounded-lg px-2 text-[13px] font-normal text-text-muted hover:text-text";
 
 /** What `disabled:` does for a native disabled button, for the `aria-disabled` one that keeps focus. */
 const UNUSABLE = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
@@ -34,7 +38,20 @@ type PromptState = { status: "loading" } | { status: "ready"; text: string } | {
  * Every open fetches a fresh prompt (the draft may have changed). Focus starts on Copy prompt, which
  * stays focusable (`aria-disabled`) until the prompt is there; closing returns focus to the row.
  */
-export function CopilotPromptButton({ templateId }: { templateId: string }) {
+export function CopilotPromptButton({ templateId, blocked = null }: { templateId: string; blocked?: string | null }) {
+  // An alert has no body for Copilot to write (`copilotUnavailable`): the row stays, greyed, with why.
+  if (blocked) {
+    return (
+      <BlockedButton variant="ghost" reason={blocked} className={ROW}>
+        <Sparkles strokeWidth={1.75} className="size-4" aria-hidden />
+        Copilot prompt
+      </BlockedButton>
+    );
+  }
+  return <CopilotPromptDialog templateId={templateId} />;
+}
+
+function CopilotPromptDialog({ templateId }: { templateId: string }) {
   const session = useWorkspaceSession();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<PromptState>({ status: "loading" });
@@ -93,10 +110,7 @@ export function CopilotPromptButton({ templateId }: { templateId: string }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger
         render={
-          <Button
-            variant="ghost"
-            className="h-8 w-full justify-start gap-2 rounded-lg px-2 text-[13px] font-normal text-text-muted hover:text-text"
-          />
+          <Button variant="ghost" className={ROW} />
         }
       >
         <Sparkles strokeWidth={1.75} className="size-4" aria-hidden />

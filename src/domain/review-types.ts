@@ -7,6 +7,7 @@
 import type {
   ApproverRule,
   Channel,
+  ChannelFamily,
   ContractChange,
   JSONContent,
   PermissionResult,
@@ -15,6 +16,8 @@ import type {
   Variable,
   VersionState,
 } from "./types";
+import type { ChannelField, ChannelFields } from "./channel-fields";
+import type { MessageTypeRules, TeamSenders } from "./platform-config";
 import type { Refused } from "./refusals";
 import type { NumberedRound } from "./rounds";
 
@@ -248,6 +251,29 @@ export interface RedlineDoc {
   counts: { added: number; removed: number; changed: number; moved: number };
 }
 
+/**
+ * One channel field in a redline (`diffChannelFields`): the field, how it changed as a whole, and its
+ * text diffed as a document's blocks are (`doc`, normally one paragraph). A field is one block, so it is
+ * never "moved". Counted once in the screen's change count, by `status`.
+ */
+export interface FieldRedline {
+  field: ChannelField;
+  status: Exclude<RedlineStatus, "moved">;
+  doc: RedlineDoc;
+}
+
+/**
+ * The SMS's locked footer in a redline (`diffChannelFields`): the one each version prints (its own, frozen at
+ * submit; a draft's is the content type's), shown under the SMS's message. `from` is null with no base, or
+ * when the base had no footer. A changed footer counts as one change, unless the SMS itself was turned on or
+ * off (its message counts then, and the footer comes or goes with it).
+ */
+export interface FooterRedline {
+  from: string | null;
+  to: string | null;
+  status: Exclude<RedlineStatus, "moved">;
+}
+
 // ── Consequences (domain/consequences.ts) ─────────────────────────────────────
 
 /** Render-log aggregate per consumer and version (non-preview renders only). */
@@ -317,7 +343,8 @@ export interface ReviewQueue {
 }
 
 export interface ReviewScreenData {
-  template: { id: string; teamId: string; teamSlug: string; teamName: string };
+  /** `family`: its content type's (`contentTypeFamily`), never read from a version's channels. */
+  template: { id: string; teamId: string; teamSlug: string; teamName: string; family: ChannelFamily };
   version: {
     id: string;
     number: number;
@@ -330,8 +357,10 @@ export interface ReviewScreenData {
     variables: Variable[];
     channels: Channel[];
     sampleSets: SampleSet[];
-    emailSubject: JSONContent | null;
-    emailPreheader: JSONContent | null;
+    /** Each channel's own fields (channel-fields.ts). */
+    channelFields: ChannelFields;
+    /** The SMS footer frozen into this version at submit (null: none): what its SMS ends with, whatever the content type's is now. */
+    smsFooter: string | null;
     submittedBy: Person;
     submittedAt: string;
     submitNote: string | null;
@@ -347,9 +376,19 @@ export interface ReviewScreenData {
    * newest version that still renders. Never a round's own number: a round sent back before its number
    * went live compares with the released version it was drafted from. Null for a first version, or when
    * that would be this version. `state` is for the label ("vs v3 (revoked)"). The contract changes come
-   * from submit (`contractBaseline`).
+   * from submit (`contractBaseline`). Its channels, channel fields and SMS footer are what the fields'
+   * redline compares with (`diffChannelFields`).
    */
-  baseline: { id: string; number: number; state: VersionState; body: JSONContent; variables: Variable[] } | null;
+  baseline: {
+    id: string;
+    number: number;
+    state: VersionState;
+    body: JSONContent;
+    variables: Variable[];
+    channels: Channel[];
+    channelFields: ChannelFields;
+    smsFooter: string | null;
+  } | null;
   /**
    * The Active version this one would replace, for the Approve dialog's consequences and its sunset
    * offer. Null when nothing is Active, or the Active version is this one or its number's release. Not
@@ -380,6 +419,13 @@ export interface ReviewScreenData {
   today: string;
   /** The approve dialog's sunset picker. */
   sunsetCalendar: SunsetCalendar;
+  /**
+   * What the phone preview renders a message version with: the SMS footer is the version's own (frozen at
+   * submit, as `version.smsFooter`), the part budget the content type's.
+   */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from on the phone preview. */
+  senders: TeamSenders;
 }
 
 /** One round of a number in the Versions tab's review history, and how it was decided. */

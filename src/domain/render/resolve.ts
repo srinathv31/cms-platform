@@ -23,8 +23,11 @@
 //                   a list item in it too) is refused with the document check's sentence.
 //   the document    trailing empty paragraphs (the editor's trailing line) are dropped; empty
 //                   paragraphs inside the document stay (they are blank lines the author typed).
+//   fields          the email's subject and preheader follow the document's character rules; a push's
+//                   and an SMS's fields keep their invisible characters, in text and values alike
+//                   (`characters: "message"`): a phone draws emoji sequences and joiners with them.
 
-import { LINE_BREAKS, cleanCharacters } from "@/editor/model/characters";
+import { LINE_BREAKS, cleanCharacters, type CharacterRules } from "@/editor/model/characters";
 import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
 import { INVISIBLE_CHARACTERS, normalizeLink } from "@/editor/model/links";
 import {
@@ -113,8 +116,8 @@ const FIELD_ENDS =
   /^[\t\n\u000B\u000C\r\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]+|[\t\n\u000B\u000C\r\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]+$/g;
 
 /** Text that must stay on one line (a variable's value, a subject): a line break reads as a space. */
-function oneLineChars(text: string): string {
-  return cleanCharacters(text.replace(LINE_BREAKS, " "));
+function oneLineChars(text: string, rules: CharacterRules): string {
+  return cleanCharacters(text.replace(LINE_BREAKS, " "), rules);
 }
 
 // ── Scope ────────────────────────────────────────────────────────────────────
@@ -128,10 +131,19 @@ interface Scope {
   bulletDepth: number;
   /** Inside a table cell, at any depth: only paragraphs and lists (rule 24). */
   inCell: boolean;
+  /** Which characters text and values keep: a document's, or a message field's (characters.ts). */
+  characters: CharacterRules;
 }
 
-function scopeOf(ctx: ResolveContext): Scope {
-  return { byKey: new Map(ctx.variables.map((v) => [v.key, v])), values: ctx.values, orderedDepth: 0, bulletDepth: 0, inCell: false };
+function scopeOf(ctx: ResolveContext, characters: CharacterRules = "document"): Scope {
+  return {
+    byKey: new Map(ctx.variables.map((v) => [v.key, v])),
+    values: ctx.values,
+    orderedDepth: 0,
+    bulletDepth: 0,
+    inCell: false,
+    characters,
+  };
 }
 
 // ── Public ───────────────────────────────────────────────────────────────────
@@ -146,16 +158,34 @@ export function resolveDocument(body: JSONContent, ctx: ResolveContext): RenderB
 }
 
 /**
- * The text of a one-line field (email subject, preheader): its text and its variables' display text,
- * in order, with the character rules and NFC. A line break or hard break becomes one space (and
- * several paragraphs are joined by one), whitespace at both ends is trimmed (a mail header can't
- * start with it), and runs of spaces inside stay as typed. There is no removal rule. `null` gives "".
+ * The text of a one-line field (`line` or `paragraph`: the email subject and preheader, a push title,
+ * subtitle or body): its text and its variables' display text, in order, with the character rules and
+ * NFC. A line break or hard break becomes one space (and several paragraphs are joined by one),
+ * whitespace at both ends is trimmed (a mail header can't start with it), and runs of spaces inside
+ * stay as typed. There is no removal rule. `null` gives "". `characters`: a message's field (a push's)
+ * is `"message"`, and keeps the invisible characters in its text and values, which a phone draws with;
+ * the email's (`"document"`, the default) loses them, as the document does (characters.ts).
  */
-export function resolveInlineField(field: JSONContent | null, ctx: ResolveContext): string {
+export function resolveInlineField(field: JSONContent | null, ctx: ResolveContext, characters: CharacterRules = "document"): string {
+  return fieldText(field, ctx, " ", characters);
+}
+
+/**
+ * The text of a field that keeps its line breaks (an SMS message): as `resolveInlineField`, but each
+ * line break or hard break is one "\n" (and several paragraphs are joined by one), so the text has the
+ * lines the author typed. A value is still one line: a line break inside it reads as a space. Line
+ * breaks and other whitespace at both ends are trimmed; spaces at a line's ends inside stay as typed.
+ */
+export function resolveLinesField(field: JSONContent | null, ctx: ResolveContext, characters: CharacterRules = "document"): string {
+  return fieldText(field, ctx, "\n", characters);
+}
+
+/** A field's text, each line break (in text, a hard break, between paragraphs) written as `lineBreak`. */
+function fieldText(field: JSONContent | null, ctx: ResolveContext, lineBreak: " " | "\n", characters: CharacterRules): string {
   if (!field) return "";
-  const scope = scopeOf(ctx);
+  const scope = scopeOf(ctx, characters);
   const lines = field.type === "doc" ? (field.content ?? []) : [field];
-  const text = lines.map((line) => fieldLine(line, scope)).join(" ");
+  const text = lines.map((line) => fieldLine(line, scope, lineBreak)).join(lineBreak);
   return text.normalize("NFC").replace(FIELD_ENDS, "");
 }
 
@@ -445,7 +475,7 @@ function variableText(node: JSONContent, scope: Scope): string | null {
   if (typeof key !== "string") return null;
   const variable = scope.byKey.get(key);
   if (!variable || !Object.prototype.hasOwnProperty.call(scope.values, key)) return null;
-  const text = oneLineChars(formatValue(variable.type, scope.values[key]!));
+  const text = oneLineChars(formatValue(variable.type, scope.values[key]!), scope.characters);
   return text === "" ? null : text;
 }
 
@@ -482,17 +512,19 @@ function sameMarks(a: MarkSet, b: MarkSet): boolean {
 // ── One-line fields ──────────────────────────────────────────────────────────
 
 /** One paragraph of a one-line field as plain text (marks are read for validity, not kept). */
-function fieldLine(node: JSONContent, scope: Scope): string {
+function fieldLine(node: JSONContent, scope: Scope, lineBreak: " " | "\n"): string {
   if (node?.type !== "paragraph" && node?.type !== "heading") throw unsupported();
   let out = "";
   for (const child of node.content ?? []) {
     switch (child?.type) {
-      case "text":
+      case "text": {
         marksOf(child.marks);
-        out += oneLineChars(typeof child.text === "string" ? child.text : "");
+        const text = typeof child.text === "string" ? child.text : "";
+        out += cleanCharacters(text.replace(LINE_BREAKS, lineBreak), scope.characters);
         break;
+      }
       case "hardBreak":
-        out += " ";
+        out += lineBreak;
         break;
       case "variable":
         marksOf(child.marks);

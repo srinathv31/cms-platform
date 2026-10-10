@@ -5,13 +5,25 @@ import { userName } from "./people";
 export const TEAM_IDS = ["coral-offers", "deposits", "card-statements"] as const;
 export type TeamId = (typeof TEAM_IDS)[number];
 
-const TEAMS: { id: TeamId; name: string; description: string; icon: string; createdDaysAgo: number }[] = [
+const TEAMS: {
+  id: TeamId;
+  name: string;
+  description: string;
+  icon: string;
+  createdDaysAgo: number;
+  /** Who the team's push notifications and SMS come from (decision 0034): every seeded team has both. */
+  appName: string;
+  /** A fictional US short code, a word on a phone keypad: 26725 is CORAL, 33767 DEPOS, 22737 CARDS. */
+  smsSender: string;
+}[] = [
   {
     id: "coral-offers",
     name: "Coral Offers",
     description: "Card offer disclosures: balance transfers, cash back and promotional terms.",
     icon: "credit-card",
     createdDaysAgo: 420,
+    appName: "Coral",
+    smsSender: "26725",
   },
   {
     id: "deposits",
@@ -19,6 +31,8 @@ const TEAMS: { id: TeamId; name: string; description: string; icon: string; crea
     description: "Savings and checking disclosures: rates, fees and account terms.",
     icon: "piggy-bank",
     createdDaysAgo: 395,
+    appName: "Deposits Online",
+    smsSender: "33767",
   },
   {
     id: "card-statements",
@@ -26,6 +40,8 @@ const TEAMS: { id: TeamId; name: string; description: string; icon: string; crea
     description: "Statement inserts: rate changes, enrollment notices and annual notices.",
     icon: "receipt-text",
     createdDaysAgo: 380,
+    appName: "Card Center",
+    smsSender: "22737",
   },
 ];
 
@@ -68,6 +84,8 @@ export function seedTeams(ctx: SeedCtx) {
       description: t.description,
       icon: t.icon,
       createdAt: ctx.at(t.createdDaysAgo),
+      appName: t.appName,
+      smsSender: t.smsSender,
     });
     ctx.sink.auditEvents.push({
       id: ctx.id("ae"),

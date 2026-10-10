@@ -1,28 +1,34 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { blockTextOf } from "@/components/comments/block-text";
+import { blockTextOf, fieldTextOf } from "@/components/comments/block-text";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-list";
 import { openCount } from "@/components/comments/thread-state";
 import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
+import { phoneSenders } from "@/components/preview/preview-sender";
+import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type ChannelFields } from "@/domain/channel-fields";
+import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import type { Person, ThreadView } from "@/domain/review-types";
-import type { Channel, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
+import type { Channel, ChannelFamily, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";
+import { createLiveDraft } from "../session/live-draft";
 import { useInert, usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
 import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
 import { EmailDetails } from "./email-details";
+import { MessageComposer } from "./message-composer";
 import { Rail } from "./rail";
 
-/** The fields this page shows, which a revert can put back. */
-const CONTENT_FIELDS = ["body", "variables", "channels", "emailSubject", "emailPreheader", "sampleSets"] as const;
+/** The fields this page shows, which a revert can put back: every channel field among them, by id. */
+const CONTENT_FIELDS = ["body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
 
 /** The app's one scrolling element (AppFrame's canvas), which the document scrolls in. */
 const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
@@ -44,8 +50,14 @@ export interface ContentWorkspaceProps {
   requiredSections: RequiredSection[];
   channels: Channel[];
   allowedChannels: Channel[];
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /** A document (the editor) or a message (the composer): the content type's family, for the template's whole life. */
+  family: ChannelFamily;
+  /** Each channel's own fields, as the version stores them (src/domain/channel-fields.ts). */
+  channelFields: ChannelFields;
+  /** The content type's SMS footer and part budget (a message's composer and preview). */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from on the phone preview. */
+  senders: TeamSenders;
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD. */
   today: string;
@@ -72,6 +84,11 @@ export interface ContentWorkspaceProps {
  * renders with the live variable list. The server component that renders this passes a key made of the version
  * and whether it is editable, so a different version, or the same one turning read-only (submitted),
  * is a fresh editor.
+ *
+ * A message template (an Alert, `family` "message") has no document: the first cell is the message
+ * composer instead (message-composer.tsx), its fields in the same root. The fields as typed and the
+ * sample sets live in a live draft (session/live-draft.ts) the composer writes and the preview reads,
+ * so Push and SMS render in the browser on every keystroke (decision 0036).
  *
  * Review comments (src/components/comments) live here too: the document gets highlights and markers
  * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
@@ -103,8 +120,10 @@ export function ContentWorkspace({
   requiredSections,
   channels: initialChannels,
   allowedChannels,
-  emailSubject,
-  emailPreheader,
+  family,
+  channelFields,
+  messageRules,
+  senders,
   sampleSets,
   today,
   editable,
@@ -140,8 +159,27 @@ export function ContentWorkspace({
 
   // What the editor root and its fields mount with: the page's values as it opened, then whatever a
   // revert (or undoing one) hands over. `gen` remounts them. Later props (a refresh) don't reset a draft being edited.
-  const [opening] = useState(() => ({ body, variables, channels: initialChannels, emailSubject, emailPreheader, sampleSets }));
+  // The channel fields are held flat, by id, as autosave saves them.
+  const [opening] = useState(() => ({
+    body,
+    variables,
+    channels: initialChannels,
+    ...channelFieldValues(channelFields),
+    sampleSets,
+  }));
   const [shown, setShown] = useState(() => ({ gen: 0, ...opening }));
+
+  // The draft as typed, ahead of autosave: what the phone preview and the composer's measurements read.
+  // A new one when a revert remounts the fields with other values.
+  const liveDraft = useMemo(
+    () =>
+      createLiveDraft({
+        fields: Object.fromEntries(CHANNEL_FIELD_IDS.map((id) => [id, shown[id]])) as ChannelFieldValues,
+        sampleSets: shown.sampleSets,
+      }),
+    [shown],
+  );
+  const message = family === "message";
 
   // A revert is pressed from a button, so it must not scroll the page. The old editor leaving shortens
   // the page for a moment, and the browser clamps the canvas's scroll: put it back as the new one lands.
@@ -188,22 +226,26 @@ export function ContentWorkspace({
       opening,
       restore: (fields, values) => {
         if (!CONTENT_FIELDS.some((key) => key in fields)) return;
+        // A channel field's null is a value (cleared), so only a missing one falls back to the opening.
+        const fieldValues = Object.fromEntries(
+          CHANNEL_FIELD_IDS.map((id) => [id, values[id] === undefined ? opening[id] : values[id]]),
+        ) as ChannelFieldValues;
         const next = {
           body: values.body ?? opening.body,
           variables: values.variables ?? opening.variables,
           channels: values.channels ?? opening.channels,
-          emailSubject: values.emailSubject === undefined ? opening.emailSubject : values.emailSubject,
-          emailPreheader: values.emailPreheader === undefined ? opening.emailPreheader : values.emailPreheader,
+          ...fieldValues,
           sampleSets: values.sampleSets ?? opening.sampleSets,
         };
         liveBody.current = next.body;
-        trackDocument(next.body);
+        // A message has no body: its threads are on its fields, which a revert puts back with it.
+        if (!message) trackDocument(next.body);
         setChannels(next.channels);
         keptScroll.current = canvasElement()?.scrollTop ?? null;
         setShown((prev) => ({ gen: prev.gen + 1, ...next }));
       },
     });
-  }, [session, editable, opening, trackDocument]);
+  }, [session, editable, opening, trackDocument, message]);
 
   const open = openCount(review.threads);
   const hasComments = review.threads.length > 0 || review.composer !== null;
@@ -267,7 +309,17 @@ export function ContentWorkspace({
   );
   const blockPosition = useCallback((blockId: string) => editorHandle.current?.getBlockRect(blockId)?.top ?? null, []);
   const labels = useMemo(() => new Map(shown.variables.map((v) => [v.key, v.label])), [shown.variables]);
-  const blockText = useCallback((blockId: string) => blockTextOf(liveBody.current, blockId, labels), [labels]);
+  // A card about a whole block quotes the start of its text; one about a channel field, the field as typed.
+  const blockText = useCallback(
+    (blockId: string) => fieldTextOf(liveDraft.getFields(), blockId, labels) ?? blockTextOf(liveBody.current, blockId, labels),
+    [labels, liveDraft],
+  );
+  // The field a thread is on, for the composer's handle (a message's threads are on its fields).
+  const latestThreads = useRef(review.threadsForEditor);
+  useLayoutEffect(() => {
+    latestThreads.current = review.threadsForEditor;
+  });
+  const threadField = useCallback((id: string) => latestThreads.current.find((t) => t.id === id)?.blockId ?? null, []);
 
   return (
     <EditorScope
@@ -280,28 +332,59 @@ export function ContentWorkspace({
     >
       {editable ? <HistoryBridge onChange={session.setHistory} /> : null}
       <div data-slot="editor" className={cn(WS.doc, "relative")}>
-        <DocumentBody
-          content={shown.body}
-          onChange={editable ? onBodyChange : undefined}
-          editorRef={setEditor}
-          comments={{
-            threads: review.threadsForEditor,
-            activeThreadId: review.editorActiveThreadId,
-            onThreadClick,
-            onCaretThreadChange,
-            onRequestComment: canComment ? requestComment : undefined,
-          }}
-        />
-        <GutterMarkers
-          editor={editorHandle}
-          threads={review.threads}
-          activeThreadId={activeThreadId}
-          onActivate={showThread}
-          onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
-          compact={previewOpen}
-          // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
-          className="hidden @min-[53rem]/ws:block"
-        />
+        {message ? (
+          // A message has no document: its channels' own fields, in the same root.
+          <>
+            <MessageComposer
+              channels={channels}
+              editable={editable}
+              values={shown}
+              draft={liveDraft}
+              today={today}
+              rules={messageRules}
+              appName={phoneSenders(senders, teamName).appName}
+              editorRef={setEditor}
+              threadField={threadField}
+            />
+            {/* A message's threads are on its fields: their markers sit beside them, and a hover starts one on a field. */}
+            <GutterMarkers
+              editor={editorHandle}
+              threads={review.threads}
+              activeThreadId={activeThreadId}
+              onActivate={showThread}
+              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+              compact={previewOpen}
+              className="hidden @min-[53rem]/ws:block"
+              noun="field"
+              blocks='[data-slot="message-composer"] [data-id]'
+            />
+          </>
+        ) : (
+          <>
+            <DocumentBody
+              content={shown.body}
+              onChange={editable ? onBodyChange : undefined}
+              editorRef={setEditor}
+              comments={{
+                threads: review.threadsForEditor,
+                activeThreadId: review.editorActiveThreadId,
+                onThreadClick,
+                onCaretThreadChange,
+                onRequestComment: canComment ? requestComment : undefined,
+              }}
+            />
+            <GutterMarkers
+              editor={editorHandle}
+              threads={review.threads}
+              activeThreadId={activeThreadId}
+              onActivate={showThread}
+              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+              compact={previewOpen}
+              // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
+              className="hidden @min-[53rem]/ws:block"
+            />
+          </>
+        )}
       </div>
       <Rail
         comments={
@@ -339,16 +422,11 @@ export function ContentWorkspace({
           />
         }
         emailDetails={
-          <EmailDetails
-            on={channels.includes("email")}
-            editable={editable}
-            subject={shown.emailSubject}
-            preheader={shown.emailPreheader}
-          />
+          <EmailDetails on={channels.includes("email")} editable={editable} values={shown} />
         }
         original={importOriginal !== null}
         takeArrival={takeArrival}
-        footer={editable ? <CopilotPromptButton templateId={templateId} /> : null}
+        footer={editable ? <CopilotPromptButton templateId={templateId} blocked={copilotUnavailable(family)} /> : null}
         reviewHref={reviewHref}
         preview={
           <PreviewSurface
@@ -358,7 +436,9 @@ export function ContentWorkspace({
             teamName={teamName}
             channels={channels}
             editable={editing}
-            sampleSets={shown.sampleSets}
+            draft={liveDraft}
+            messageRules={messageRules}
+            senders={senders}
             today={today}
             commentsCount={hasComments ? open : null}
             original={importOriginal}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JSONContent, Variable } from "@/domain/types";
-import { blockOptions } from "./block-options";
+import { blockOptions, fieldOptions } from "./block-options";
 
 const variables = [{ key: "first_name", label: "First name", type: "text", required: true }] as unknown as Variable[];
 
@@ -96,5 +96,17 @@ describe("blockOptions", () => {
 
   it("has nothing to offer without blocks", () => {
     expect(blockOptions({ type: "doc" }, [])).toEqual([]);
+  });
+});
+
+describe("fieldOptions", () => {
+  it("lists a message's fields by their full name, for the channels that are on, in registry order", () => {
+    expect(fieldOptions(["sms", "push"]).map((o) => [o.id, o.label])).toEqual([
+      ["push.title", "Push title"],
+      ["push.subtitle", "Push subtitle"],
+      ["push.body", "Push body"],
+      ["sms.text", "SMS message"],
+    ]);
+    expect(fieldOptions(["sms"]).map((o) => o.id)).toEqual(["sms.text"]);
   });
 });

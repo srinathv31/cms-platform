@@ -5,6 +5,7 @@
 //   formatShortDate    "Oct 4" in the demo clock's year, "Jan 3, 2027" otherwise (pass `now`)
 //   formatLongDate     "October 4, 2026" for sentences
 //   formatWeekdayDate  "Sun, Oct 4, 2026": a day on its own, in a chart's tooltip
+//   formatPhoneDate    "Sunday, October 4": the date on a phone's lock screen, in the message previews
 //   formatTime         "3:42 PM UTC"
 //   formatDateTime     "Oct 4, 3:42 PM UTC", or "Oct 4, 2025, 3:42 PM UTC" outside the demo clock's year
 //   formatStamp        "Sun, Oct 4, 2026, 3:42 PM UTC": the full instant, for hover titles and the Demo pill
@@ -30,6 +31,7 @@ const SHORT_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", day: "nume
 const LONG = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 const TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 const WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
+const PHONE_DATE = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 
 type When = Date | string | number;
 
@@ -55,6 +57,11 @@ export function formatLongDate(value: When): string {
 export function formatWeekdayDate(value: When): string {
   const date = toDate(value);
   return `${WEEKDAY.format(date)}, ${SHORT_YEAR.format(date)}`;
+}
+
+/** "Friday, October 9": a phone's lock-screen date, no year (the message previews' clock). */
+export function formatPhoneDate(value: When): string {
+  return PHONE_DATE.format(toDate(value));
 }
 
 /** "3:42 PM UTC". */

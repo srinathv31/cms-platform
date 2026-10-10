@@ -112,8 +112,10 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
   const { vars } = ctx;
   const savingsVariables = () => vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]);
   const savingsEmail = (preheader: string) => ({
-    subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
-    preheader: inlineDoc(preheader),
+    email: {
+      subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
+      preheader: inlineDoc(preheader),
+    },
   });
   // Rounds 1 and 2 of v2 called the email a rate change; round 3 fixed it.
   const rateChangeEmail = () => savingsEmail("Hi {first_name}, here are the details of your rate change.");
@@ -153,7 +155,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           body: savingsBody(2, { withdrawals: false }),
           variables: savingsVariables(),
           channels: ["pdf", "web", "email"],
-          email: rateChangeEmail(),
+          channelFields: rateChangeEmail(),
           contractChanges: [],
           createdBy: "eli",
           createdAt: 78,
@@ -171,7 +173,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           body: savingsBody(2),
           variables: savingsVariables(),
           channels: ["pdf", "web", "email"],
-          email: rateChangeEmail(),
+          channelFields: rateChangeEmail(),
           contractChanges: [],
           createdBy: "eli",
           createdAt: 76.4,
@@ -193,7 +195,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           body: savingsBody(2),
           variables: savingsVariables(),
           channels: ["pdf", "web", "email"],
-          email: savingsEmail("Hi {first_name}, here are the details of your savings rate."),
+          channelFields: savingsEmail("Hi {first_name}, here are the details of your savings rate."),
           contractChanges: [],
           createdBy: "eli",
           createdAt: 75.2,

@@ -259,6 +259,8 @@ const ERROR_TEXT: Record<RenderErrorCode, string> = {
   channel_not_enabled: "The channel isn't enabled on this version.",
   missing_variables: "Missing required variables.",
   invalid_values: "A value had the wrong format.",
+  push_payload_too_large: "The push was over 4,096 bytes.",
+  sms_too_long: "The SMS was over 10 parts.",
   render_failed: "The render itself failed.",
 };
 

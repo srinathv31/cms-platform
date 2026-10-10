@@ -231,7 +231,7 @@ describe("focus while the server works", () => {
   });
 
   it("leaves focus on the Submit button after a refusal, so Tab stays in the dialog", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     const submit = button(/^Submit v3$/);
     submit.focus();
@@ -243,7 +243,7 @@ describe("focus while the server works", () => {
   });
 
   it("leaves focus in the note after a refusal from ⌘Enter", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
     note().focus();
@@ -289,7 +289,7 @@ describe("submitting", () => {
   });
 
   it("shows a refusal at the button and stays open, with the note kept", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     await typeNote("Keep me.");
     await act(async () => button(/^Submit v3$/).click());
@@ -375,7 +375,7 @@ describe("a summary the draft has moved past (handoff review I8)", () => {
   });
 
   it("offers no refresh for any other refusal", async () => {
-    onSubmit.mockResolvedValueOnce({ ok: false, code: "email_subject_missing", reason: "Add an email subject before submitting." });
+    onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
     await render(summary());
     await act(async () => button(/^Submit v3$/).click());
     expect(buttonNamed(/^Refresh summary$/)).toBeNull();

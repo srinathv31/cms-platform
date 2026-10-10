@@ -1,16 +1,17 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import {
-  DEFAULT_CHANNELS,
+  newTemplateChannels,
+  newTemplateContentType,
   type DraftFields,
   type LifecycleResult,
   type NewTemplateChanges,
   type StarterContent,
 } from "@/domain/lifecycle";
 import { conformToSections } from "@/domain/platform-config";
-import type { Channel, RequiredSection } from "@/domain/types";
+import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
-import { contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import { templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId, newTemplateId } from "@/server/ids";
 
@@ -29,8 +30,7 @@ export function draftRow(draft: DraftFields, ids: { id: string; templateId: stri
     name: draft.name,
     basedOnVersionId: draft.basedOnVersionId,
     body: draft.body,
-    emailSubject: draft.emailSubject,
-    emailPreheader: draft.emailPreheader,
+    channelFields: draft.channelFields,
     channels: draft.channels,
     variables: draft.variables,
     sampleSets: draft.sampleSets,
@@ -56,31 +56,33 @@ export async function freshTemplateId(reader: Reader = db): Promise<string> {
   return templateId;
 }
 
-/** The Disclosure content type every new template gets (the prototype has one). */
-export async function disclosureContentType(reader: Reader = db) {
-  const contentType = await reader.query.contentTypes.findFirst({ where: eq(contentTypes.key, "disclosure") });
-  if (!contentType) throw new Error("The Disclosure content type is missing");
-  return contentType;
+/**
+ * The content type a new template of `family` is made on, and keeps for life: the domain chooses it
+ * from the platform's content types (`newTemplateContentType`). A document (New template's Document,
+ * and every import) gets Disclosure as seeded, an alert gets Alert. Refused when no content type is of
+ * that family.
+ */
+export async function newTemplateType(family: ChannelFamily, reader: Reader = db) {
+  return newTemplateContentType(family, await reader.query.contentTypes.findMany());
 }
 
 /**
  * A first draft shaped to the content type as it is now (Platform settings), for every way a template
- * is born. Only the channels the type allows (the first allowed one if none of the wanted ones is).
- * Its required sections: removed ones become ordinary headings, renamed ones take the new title, new
- * ones are appended. An import has already fitted them (`finishImport`), so it passes
- * `sectionsFitted` and its body is left alone. Existing templates are never reshaped.
+ * is born. Its channels: the ones the starter wants that the type allows, else the defaults of the
+ * type's family (documents PDF and Web, messages Push and SMS) that it allows, else the first it allows
+ * (`newTemplateChannels`). Its required sections: removed ones become ordinary headings, renamed ones
+ * take the new title, new ones are appended. An import has already fitted them (`finishImport`), so it
+ * passes `sectionsFitted` and its body is left alone. Existing templates are never reshaped.
  */
 export function conformToContentType(
   starter: StarterContent,
   type: { requiredSections: RequiredSection[]; allowedChannels: Channel[] },
   options: { sectionsFitted?: boolean } = {},
 ): StarterContent {
-  const wanted = starter.channels ?? DEFAULT_CHANNELS;
-  const allowed = wanted.filter((c) => type.allowedChannels.includes(c));
   return {
     ...starter,
     body: options.sectionsFitted ? starter.body : conformToSections(starter.body, type.requiredSections, () => newId("b")),
-    channels: allowed.length > 0 ? allowed : type.allowedChannels.slice(0, 1),
+    channels: newTemplateChannels(starter.channels, type.allowedChannels),
   };
 }
 

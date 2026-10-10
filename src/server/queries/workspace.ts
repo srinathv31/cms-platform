@@ -5,15 +5,28 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
-import { contractBaseline, planDraftStart } from "@/domain/lifecycle";
+import type { ChannelFields } from "@/domain/channel-fields";
+import { contractBaseline, planDraftStart, smsFooterOf } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { asNumbered, nextRound, versionLabel as labelOf, type NumberedRound } from "@/domain/rounds";
-import type { Channel, JSONContent, PermissionResult, RequiredSection, SampleSet, Variable, VersionState } from "@/domain/types";
+import {
+  contentTypeFamily,
+  type Channel,
+  type ChannelFamily,
+  type JSONContent,
+  type PermissionResult,
+  type RequiredSection,
+  type SampleSet,
+  type Variable,
+  type VersionState,
+} from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
+import { anchorIdsOf } from "./review-shared";
 import { loadThreads } from "./threads";
 import type { ThreadView } from "@/domain/review-types";
 import type { ImportOriginalRef } from "@/domain/import-types";
@@ -167,8 +180,22 @@ export interface WorkspaceDocumentData {
   channels: Channel[];
   /** The channels the content type allows: what the Channels selector offers. */
   allowedChannels: Channel[];
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
+  /**
+   * The template's family, fixed by its content type: a document (the Content tab is the editor) or a
+   * message (the Content tab is the message composer). Decision 0034.
+   */
+  family: ChannelFamily;
+  /**
+   * The SMS footer and part budget: what the message preview renders an SMS with (`renderMessage`'s
+   * `rules.smsFooter`) and the parts submit allows with the long sample values. The footer is the shown
+   * version's (`smsFooterOf`): a draft's is its content type's as it stands, a submitted version's the one
+   * frozen into it.
+   */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from in the phone preview: the push app name and the SMS sender. */
+  senders: TeamSenders;
+  /** Each channel's own fields (src/domain/channel-fields.ts), whether or not the channel is on. */
+  channelFields: ChannelFields;
   /** The version's named sample data sets, as saved. The preview's switcher fills in any default that is missing. */
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD: date samples are generated from it. */
@@ -199,9 +226,14 @@ export const getWorkspaceDocument = cache(
         teamId: templates.teamId,
         requiredSections: contentTypes.requiredSections,
         allowedChannels: contentTypes.allowedChannels,
+        smsFooter: contentTypes.smsFooter,
+        smsMaxParts: contentTypes.smsMaxParts,
+        appName: teams.appName,
+        smsSender: teams.smsSender,
       })
       .from(templates)
       .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
+      .innerJoin(teams, eq(teams.id, templates.teamId))
       .where(eq(templates.id, header.id))
       .limit(1)
       .then((r) => r[0]);
@@ -218,8 +250,8 @@ export const getWorkspaceDocument = cache(
         body: versions.body,
         variables: versions.variables,
         channels: versions.channels,
-        emailSubject: versions.emailSubject,
-        emailPreheader: versions.emailPreheader,
+        channelFields: versions.channelFields,
+        smsFooter: versions.smsFooter,
         sampleSets: versions.sampleSets,
       })
       .from(versions)
@@ -229,7 +261,7 @@ export const getWorkspaceDocument = cache(
     if (!shown) notFound();
     const at = await now();
     const today = at.toISOString().slice(0, 10);
-    const threads = await loadThreads(header.id, shown.body);
+    const threads = await loadThreads(header.id, anchorIdsOf(shown));
     const importOriginal = await getImportOriginalRef(header.id);
 
     return {
@@ -244,8 +276,10 @@ export const getWorkspaceDocument = cache(
       baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
-      emailSubject: shown.emailSubject,
-      emailPreheader: shown.emailPreheader,
+      family: contentTypeFamily(tpl.allowedChannels),
+      messageRules: { smsFooter: smsFooterOf(shown, tpl.smsFooter), smsMaxParts: tpl.smsMaxParts },
+      senders: { appName: tpl.appName, smsSender: tpl.smsSender },
+      channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,
       today,
       requiredSections: tpl.requiredSections,

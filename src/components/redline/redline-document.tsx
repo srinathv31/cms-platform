@@ -65,7 +65,8 @@ const BAR: Record<Exclude<RedlineStatus, "unchanged" | "moved">, string> = {
   changed: "bg-text-subtle/60",
 };
 
-function Gutter({ status }: { status: Exclude<RedlineStatus, "unchanged"> }) {
+/** What hangs in the gutter beside a block that changed: a bar in its status's colour, or "Moved". A changed channel field has the bar too (fields-document.tsx). */
+export function Gutter({ status }: { status: Exclude<RedlineStatus, "unchanged"> }) {
   return (
     <>
       {status === "moved" ? (

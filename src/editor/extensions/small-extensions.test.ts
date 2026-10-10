@@ -30,6 +30,17 @@ describe("single-line", () => {
   });
 });
 
+describe("field-lines (a field that keeps its line breaks)", () => {
+  it("Enter and Shift+Enter add a hard break in the one paragraph", () => {
+    const editor = mountEditor(doc(p("Hello")), { extensions: inlineFieldExtensions({ store: createVariableStore([]) }, "lines") });
+    editor.commands.setTextSelection(6);
+    expect(press(editor, "Enter")).toBe(true);
+    expect(press(editor, "Enter", { shift: true })).toBe(true);
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(editor.getJSON().content?.[0]?.content).toEqual([{ type: "text", text: "Hello" }, { type: "hardBreak" }, { type: "hardBreak" }]);
+  });
+});
+
 describe("line-boundary-keys (Home / End)", () => {
   const setup = () => {
     const editor = mountEditor(doc(p("First line of text")));

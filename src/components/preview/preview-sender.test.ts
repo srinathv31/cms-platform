@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { recipientOf, senderOf } from "./preview-sender";
+import { phoneSenders, recipientOf, senderOf } from "./preview-sender";
+
+describe("phoneSenders", () => {
+  it("sends as the team's app, from its short code", () => {
+    expect(phoneSenders({ appName: "Coral", smsSender: "26725" }, "Coral Offers")).toEqual({ appName: "Coral", smsSender: "26725" });
+  });
+
+  it("names the app after the team when it has no app name, so the app is never blank", () => {
+    expect(phoneSenders({ appName: null, smsSender: null }, "Home Loans").appName).toBe("Home Loans");
+    expect(phoneSenders({ appName: "  ", smsSender: null }, " Home Loans ").appName).toBe("Home Loans");
+  });
+
+  it("has no SMS sender without a short code: never the team's name, which a US text can't show there", () => {
+    expect(phoneSenders({ appName: "Coral", smsSender: null }, "Coral Offers").smsSender).toBe("");
+    expect(phoneSenders({ appName: "Coral", smsSender: "   " }, "Coral Offers").smsSender).toBe("");
+  });
+});
 
 describe("senderOf", () => {
   it("sends from the team, at a no-reply address made from its name", () => {

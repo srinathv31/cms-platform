@@ -3,6 +3,7 @@
 // the rev current, is the channel allowed for the content type) live in apply-patch.ts.
 
 import { z } from "zod";
+import { CHANNEL_FIELD_IDS, type ChannelFieldId } from "@/domain/channel-fields";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
@@ -109,8 +110,11 @@ const sampleSets = z
   .max(MAX_SAMPLE_SETS)
   .refine((list) => new Set(list.map((s) => s.id)).size === list.length, { message: "has a repeated id" });
 
+// At least one: the channel chips never turn off the last one, and a version with none would render
+// nothing and skip every channel's rules at submit.
 const channels = z
   .array(z.enum(CHANNELS))
+  .min(1, { message: "must have at least one channel" })
   .max(CHANNELS.length)
   .refine((list) => new Set(list).size === list.length, { message: "has a repeated channel" });
 
@@ -125,6 +129,12 @@ const name = z
     return normalized;
   });
 
+/** One optional key per channel field, by id ("email.subject"): a document sets it, null clears it. */
+const channelFields = Object.fromEntries(CHANNEL_FIELD_IDS.map((id) => [id, doc.nullable().optional()])) as Record<
+  ChannelFieldId,
+  z.ZodOptional<z.ZodNullable<typeof doc>>
+>;
+
 const patchSchema = z.strictObject({
   rev: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   sessionKey: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, { message: "is not a valid session key" }),
@@ -132,8 +142,7 @@ const patchSchema = z.strictObject({
   variables: variables.optional(),
   name: name.optional(),
   channels: channels.optional(),
-  emailSubject: doc.nullable().optional(),
-  emailPreheader: doc.nullable().optional(),
+  ...channelFields,
   sampleSets: sampleSets.optional(),
 });
 

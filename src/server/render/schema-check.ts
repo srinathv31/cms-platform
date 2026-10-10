@@ -1,7 +1,8 @@
 import "server-only";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
-import { DOCUMENT_MESSAGES, documentProblem, fieldProblem, type DocumentProblem } from "@/editor/model/document-check";
+import { channelFieldProblem, type FieldOf } from "@/domain/channel-fields";
+import { DOCUMENT_MESSAGES, documentProblem, type DocumentProblem } from "@/editor/model/document-check";
 import { baseExtensions } from "@/editor/schema";
 
 // The document check (docs/render-spec.md §3): the guard between a document and storage (autosave)
@@ -59,9 +60,13 @@ export function checkDocument(body: JSONContent): void {
   parseWithSchema(body);
 }
 
-/** Throws a RenderDocumentError when `field` isn't a valid one-line field (email subject, preheader). */
-export function checkField(field: JSONContent): void {
-  const problem = fieldProblem(field);
+/**
+ * Throws a RenderDocumentError when `value` isn't a valid channel field of its shape
+ * (src/domain/channel-fields.ts), in its channel's words: one paragraph of text and variables with no
+ * marks, and hard breaks only in a `lines` field (an SMS message).
+ */
+export function checkField(value: JSONContent, field: FieldOf): void {
+  const problem = channelFieldProblem(field, value);
   if (problem) throw new RenderDocumentError(problem);
-  parseWithSchema(field);
+  parseWithSchema(value);
 }

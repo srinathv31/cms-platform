@@ -6,7 +6,9 @@
 //                          required-section guard, the section-merging paste, block moves, the
 //                          field binding (usage, drop, chip popover, paste), Home/End,
 //                          review-thread highlights and list markers.
-// inlineFieldExtensions()  a one-line field (email subject, preheader): text + chips only.
+// inlineFieldExtensions()  a channel field (email subject, push title, SMS message): text + chips only,
+//                          on one line, or keeping its line breaks as hard breaks; with the host's
+//                          text flags when it has any.
 
 import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
@@ -27,9 +29,13 @@ import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
 import { ListMarkers } from "./extensions/list-markers";
 import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
+import { FieldLines } from "./extensions/field-lines";
+import type { CharacterRules } from "./model/characters";
+import type { FieldLines as FieldLinesMode } from "./model/normalize";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
 import { SectionPaste } from "./extensions/section-paste";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
+import { TextFlags, type TextFlagsOptions } from "./extensions/text-flags";
 import { Variable } from "./extensions/variable";
 import { variableSuggestion, type VariablePickerRender, type VariableSuggestion } from "./extensions/variable-picker";
 import { VariableWithChip } from "./extensions/variable-view";
@@ -217,6 +223,8 @@ export interface EditorExtensionOptions {
   requiredNote?: () => string;
   /** Review threads: where they come from and where clicks and the caret's thread go. */
   reviewThreads?: Omit<Partial<ReviewThreadsOptions>, "leafText"> | null;
+  /** A channel field's flags (InlineVariableField's `flags`): the host's flagger and the popover's store. */
+  textFlags?: TextFlagsOptions | null;
 }
 
 function clientVariableOptions({ store, pickerRender }: EditorExtensionOptions): InternalBaseOptions {
@@ -264,7 +272,11 @@ const InlineDocument = Node.create({
   content: "paragraph",
 });
 
-function buildInline(opts: InternalBaseOptions): Extensions {
+/**
+ * `lines`: the field keeps its line breaks (an SMS message), so its schema has the hard break. `characters`:
+ * which characters a paste keeps (model/characters.ts; `"message"` for a push's or an SMS's field).
+ */
+function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode, characters: CharacterRules): Extensions {
   return [
     InlineDocument,
     StarterKit.configure({
@@ -278,7 +290,8 @@ function buildInline(opts: InternalBaseOptions): Extensions {
       code: false,
       codeBlock: false,
       horizontalRule: false,
-      hardBreak: false,
+      // Shift+Enter and Mod+Enter add one; FieldLines makes Enter add one too.
+      hardBreak: lines === "lines" ? { keepMarks: false } : false,
       bold: false,
       italic: false,
       underline: false,
@@ -289,17 +302,27 @@ function buildInline(opts: InternalBaseOptions): Extensions {
       dropcursor: { color: false, width: 2, class: "ucomp-dropcursor" },
     }),
     variableNode(opts),
-    ContentLimits.configure({ field: true }),
+    ContentLimits.configure({ field: lines, characters }),
   ];
 }
 
-/** Client extensions of a one-line field: the same `{{` picker, drop and chips as the document. */
-export function inlineFieldExtensions(options: EditorExtensionOptions): Extensions {
+/**
+ * Client extensions of a channel field: the same `{{` picker, drop and chips as the document. On one
+ * line (`"line"`, the default: an email subject, a push title or body), Enter adds nothing; keeping its
+ * line breaks (`"lines"`, an SMS message), Enter adds a hard break. A message's field (`characters:
+ * "message"`, a push's or an SMS's) keeps the invisible characters in what is pasted into it.
+ */
+export function inlineFieldExtensions(
+  options: EditorExtensionOptions,
+  lines: FieldLinesMode = "line",
+  characters: CharacterRules = "document",
+): Extensions {
   return [
-    ...buildInline(clientVariableOptions(options)),
+    ...buildInline(clientVariableOptions(options), lines, characters),
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
-    SingleLine,
+    lines === "lines" ? FieldLines : SingleLine,
+    ...(options.textFlags ? [TextFlags.configure(options.textFlags)] : []),
   ];
 }
 

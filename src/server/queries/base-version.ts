@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { channelFieldValues, type ChannelFieldValues } from "@/domain/channel-fields";
 import { can } from "@/domain/permissions";
 import type { Channel, JSONContent, SampleSet, Variable, VersionState, Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
@@ -19,10 +20,11 @@ import { templates, versions } from "@/server/db/schema/ucomp";
 // someone started a new one).
 
 /**
- * The draft's fields as they are in the version it was started from: its name too. With its number,
- * round and state, for its label ("Reverted to v1, round 1", `versionLabel`).
+ * The draft's fields as they are in the version it was started from: its name too, and each channel field
+ * by id ("email.subject", null when it has none), the way the workspace holds and saves them. With its
+ * number, round and state, for its label ("Reverted to v1, round 1", `versionLabel`).
  */
-export interface BaseVersionContent {
+export interface BaseVersionContent extends ChannelFieldValues {
   number: number;
   round: number;
   state: VersionState;
@@ -30,8 +32,6 @@ export interface BaseVersionContent {
   body: JSONContent;
   variables: Variable[];
   channels: Channel[];
-  emailSubject: JSONContent | null;
-  emailPreheader: JSONContent | null;
   sampleSets: SampleSet[];
 }
 
@@ -69,8 +69,7 @@ export async function getBaseVersion(
       body: versions.body,
       variables: versions.variables,
       channels: versions.channels,
-      emailSubject: versions.emailSubject,
-      emailPreheader: versions.emailPreheader,
+      channelFields: versions.channelFields,
       sampleSets: versions.sampleSets,
     })
     .from(versions)
@@ -92,9 +91,8 @@ export async function getBaseVersion(
       body: base.body,
       variables: base.variables,
       channels: base.channels,
-      emailSubject: base.emailSubject,
-      emailPreheader: base.emailPreheader,
       sampleSets: base.sampleSets,
+      ...channelFieldValues(base.channelFields),
     },
   };
 }

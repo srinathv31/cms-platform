@@ -145,8 +145,12 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     name: SPRING_NAME,
     based_on_version_id: null,
     body: JSON.stringify(body),
-    email_subject: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [variable("first_name"), text(", your Spring Travel Rewards terms")] }] }),
-    email_preheader: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [text("What to know before you spend.")] }] }),
+    channel_fields: JSON.stringify({
+      email: {
+        subject: { type: "doc", content: [{ type: "paragraph", content: [variable("first_name"), text(", your Spring Travel Rewards terms")] }] },
+        preheader: { type: "doc", content: [{ type: "paragraph", content: [text("What to know before you spend.")] }] },
+      },
+    }),
     channels: JSON.stringify(["pdf", "web", "email"]),
     variables: JSON.stringify(variables),
     sample_sets: JSON.stringify(sampleSets),

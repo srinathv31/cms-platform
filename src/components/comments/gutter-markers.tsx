@@ -61,6 +61,13 @@ export interface GutterMarkersProps {
   compact?: boolean;
   /** For the layer (the workspace hides it where there is no gutter). */
   className?: string;
+  /** What a marker is beside, in its label: a document's "block", or a message's "field" (its threads are on its fields). */
+  noun?: "block" | "field";
+  /**
+   * What the hover marker can start a comment on: the elements, by selector, that carry their block's id in
+   * `data-id`. A document's top-level blocks by default; the message composer's fields.
+   */
+  blocks?: string;
 }
 
 interface Marker {
@@ -183,6 +190,8 @@ export function GutterMarkers({
   collapsedKeys,
   compact = false,
   className,
+  noun = "block",
+  blocks = ".ucomp-doc > [data-id]",
 }: GutterMarkersProps) {
   const layer = useRef<HTMLDivElement>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -235,7 +244,7 @@ export function GutterMarkers({
       const target = event.target instanceof Element ? event.target : null;
       if (event.buttons !== 0) return setHover(null); // a drag is selecting text
       if (!target || layer.current?.contains(target)) return;
-      setHover(target.closest(".ucomp-doc > [data-id]")?.getAttribute("data-id") ?? null);
+      setHover(target.closest(blocks)?.getAttribute("data-id") ?? null);
     };
     const onLeave = () => setHover(null);
     host.addEventListener("pointermove", onMove);
@@ -245,7 +254,7 @@ export function GutterMarkers({
       host.removeEventListener("pointerleave", onLeave);
       setHover(null);
     };
-  }, [canRequest]);
+  }, [canRequest, blocks]);
 
   // One tab stop for the whole group: the marker of the active thread, else the one last focused, else the first.
   const activeBlock = markers.find((m) => activeThreadId !== null && m.threadIds.includes(activeThreadId))?.blockId;
@@ -314,7 +323,7 @@ export function GutterMarkers({
           <button
             type="button"
             tabIndex={-1}
-            aria-label="Comment on this block"
+            aria-label={`Comment on this ${noun}`}
             onClick={() => onRequestBlockComment?.(ghost.blockId)}
             className="absolute grid place-items-center rounded-md text-text-subtle outline-none transition-colors duration-(--dur-fast) hover:bg-hover hover:text-text-muted focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring"
             style={{ top: ghost.y - ghost.top - size / 2, left: offset, width: size, height: size }}
@@ -325,7 +334,7 @@ export function GutterMarkers({
       ) : null}
 
       {markers.length > 0 ? (
-        <div role="toolbar" aria-label="Comments in the document" aria-orientation="vertical" onKeyDown={onKeyDown}>
+        <div role="toolbar" aria-label={noun === "field" ? "Comments on the message" : "Comments in the document"} aria-orientation="vertical" onKeyDown={onKeyDown}>
           {markers.map((marker) => {
             const active = activeThreadId !== null && marker.threadIds.includes(activeThreadId);
             return (
@@ -337,7 +346,7 @@ export function GutterMarkers({
                 }}
                 type="button"
                 data-marker={marker.blockId}
-                aria-label={`${plural(marker.count, "comment")} ${collapsedKeys?.has(marker.blockId) ? "in unchanged blocks" : "on this block"}`}
+                aria-label={`${plural(marker.count, "comment")} ${collapsedKeys?.has(marker.blockId) ? "in unchanged blocks" : `on this ${noun}`}`}
                 aria-pressed={active}
                 tabIndex={marker.blockId === stop ? 0 : -1}
                 onFocus={() => setFocused(marker.blockId)}

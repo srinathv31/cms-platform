@@ -2,7 +2,9 @@
 
 Stencil is a CMS for regulated customer content. Teams write templates with typed variables, send each version
 through an approval chain, and publish it. Consumer systems then render the Active version over `/api/v1` as a web
-page, an email, or a PDF, sending their own values for the variables.
+page, an email, or a PDF, sending their own values for the variables. A template is a document (a Disclosure,
+rendered from its one body) or a message (an Alert, rendered to a push notification or an SMS from its own short
+fields), never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)).
 
 It is one Next.js 16 app (App Router, Cache Components) on one local SQLite file. Three things share the app: the
 CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and a set of
@@ -109,12 +111,13 @@ variations to avoid.
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
    client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
    byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.
-3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and email fields with
-   [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against the document limits and the editor
-   schema, block ids added. Import stores documents through the same function. Then, in one transaction, it checks
-   permission, the `draft` state, and `rev` (tolerating a lost response from the same session), writes with a
-   compare-and-set, adds the saver to the version's `writers` (nobody decides a version they wrote), and keeps one
-   `draft.edited` audit row per editing session. Nothing is refreshed; the client already has the content.
+3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and the channel fields (each by its id,
+   such as `"email.subject"`) with [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against
+   the document limits and the editor schema, block ids added. Import stores documents through the same function.
+   Then, in one transaction, it checks permission, the `draft` state, and `rev` (tolerating a lost response from the
+   same session), writes with a compare-and-set (the channel fields laid over the stored ones), adds the saver to
+   the version's `writers` (nobody decides a version they wrote), and keeps one `draft.edited` audit row per editing
+   session. Nothing is refreshed; the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
@@ -133,7 +136,9 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    needs no database, clock, or request: values valid (422; each at most 1,000 characters, and a JSON number keeps
    its exact source text), then the document check.
 4. Resolve the TipTap JSON to a `RenderDoc` (`src/domain/render`), then a channel adapter renders web HTML, an email,
-   or a PDF.
+   or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
+   browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
+   version's footer (frozen at submit; a draft's is the content type's), refused (422) past 4,096 bytes or 10 parts.
 5. One `render_log` row, success or error. It never stores the values.
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
@@ -150,13 +155,17 @@ at Turso instead. Two schema files:
 
 - [schema/ucomp.ts](../src/server/db/schema/ucomp.ts), the CMS:
   - **Settings:** `settings` (demo clock offset, seed version, business time zone).
-  - **People and teams:** `users`, `teams`, `memberships`, `membership_roles`.
-  - **Platform configuration:** `content_types` (required sections, allowed channels), `approval_stages`.
+  - **People and teams:** `users`, `teams` (with the app name and SMS short code its messages come from),
+    `memberships`, `membership_roles`.
+  - **Platform configuration:** `content_types` (required sections, allowed channels of one family, and for a
+    message type the SMS footer and part budget), `approval_stages`.
   - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
-    variables, channels, state, `number` and `round`, `rev`, `writers`, the approval `stages` recorded at submit,
-    sunset and revoke fields); `approvals` (each decision's stage id). The name is a version field, so a rename
-    goes through review ([decision 0016](decisions/0016-the-name-is-versioned.md)). A row is one round: the
-    number counts releases, and a resubmission after a send-back is the next round of the same number
+    `channel_fields` (each channel's own fields, such as the email subject, by channel and then field key, from
+    the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `number` and
+    `round`, `rev`, `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, sunset
+    and revoke fields); `approvals` (each decision's stage id). The name is a version field, so a rename goes
+    through review ([decision 0016](decisions/0016-the-name-is-versioned.md)). A row is one round: the number
+    counts releases, and a resubmission after a send-back is the next round of the same number
     ([decision 0033](decisions/0033-a-resubmission-is-the-next-round-of-the-same-version.md)).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
@@ -191,7 +200,8 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
   | --- | --- |
   | Teams | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space |
   | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer) |
-  | Content type | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email` |
+  | Content types | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget |
+  | Templates | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
   | Template ids | `UC-` plus 6 Crockford base32 characters, e.g. `UC-4F7K2Q` |
   | Consumer | `coral`, with offers, customers, and links in the `sim_*` tables |
 

@@ -10,15 +10,33 @@
 
 import type {
   ApiBase64Response,
+  ApiChannel,
   ApiContractChange,
   ApiEmailResponse,
   ApiErrorBody,
   ApiErrorCode,
   ApiJsonSchema,
   ApiNotice,
+  ApiPushPlatform,
+  ApiPushResponse,
+  ApiPushTooLargeDetails,
+  ApiSmsEncoding,
+  ApiSmsResponse,
+  ApiSmsTooLongDetails,
   ApiVariableType,
 } from "@/contracts/api-v1";
-import type { Base64ResponseBody, EmailResponseBody, RenderErrorBody, RenderErrorCode } from "./render/types";
+import type { SmsEncoding } from "./messages/gsm7";
+import type { PushPlatform } from "./messages/push";
+import type {
+  Base64ResponseBody,
+  EmailResponseBody,
+  PushResponseBody,
+  PushTooLargeDetails,
+  RenderErrorBody,
+  RenderErrorCode,
+  SmsResponseBody,
+  SmsTooLongDetails,
+} from "./render/types";
 import type { ConsumerNoticeKind } from "./review-types";
 import type { Channel, ContractChange, Variable, VariableType, VersionState } from "./types";
 
@@ -29,10 +47,22 @@ export type * from "@/contracts/api-v1";
 type Assert<T extends true> = T;
 type Fits<A, B> = [A] extends [B] ? true : false;
 export type _DriftChecks = [
+  // A channel the domain renders is one the API names, and the other way round.
+  Assert<Fits<Channel, ApiChannel>>,
+  Assert<Fits<ApiChannel, Channel>>,
   Assert<Fits<RenderErrorCode, ApiErrorCode>>,
   Assert<Fits<RenderErrorBody, ApiErrorBody>>,
   Assert<Fits<EmailResponseBody, ApiEmailResponse>>,
   Assert<Fits<Base64ResponseBody, ApiBase64Response>>,
+  // The push platforms and SMS encodings are the same on both sides, and so are the message bodies.
+  Assert<Fits<PushPlatform, ApiPushPlatform>>,
+  Assert<Fits<ApiPushPlatform, PushPlatform>>,
+  Assert<Fits<SmsEncoding, ApiSmsEncoding>>,
+  Assert<Fits<ApiSmsEncoding, SmsEncoding>>,
+  Assert<Fits<PushResponseBody, ApiPushResponse>>,
+  Assert<Fits<SmsResponseBody, ApiSmsResponse>>,
+  Assert<Fits<PushTooLargeDetails, ApiPushTooLargeDetails>>,
+  Assert<Fits<SmsTooLongDetails, ApiSmsTooLongDetails>>,
   Assert<Fits<VariableType, ApiVariableType>>,
   Assert<Fits<ApiVariableType, VariableType>>,
   Assert<Fits<ConsumerNoticeKind, ApiNotice["kind"]>>,
@@ -56,6 +86,8 @@ export const API_ERROR_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   channel_not_enabled: 422,
   missing_variables: 422,
   invalid_values: 422,
+  push_payload_too_large: 422,
+  sms_too_long: 422,
   render_failed: 500,
   consumer_not_found: 404,
   consumer_mismatch: 403,
@@ -310,8 +342,11 @@ export interface IntegrationPanelData {
   /** One per enabled channel, PDF first when enabled. Values = each variable's sample. */
   samples: { channel: Channel; curl: string; fetch: string }[];
   responses: ResponseFormat[];
-  /** The errors a consumer should handle, for a short table: 410 sunset/revoked, 422 values, 404. */
-  errors: { status: number; code: ApiErrorCode; when: string }[];
+  /**
+   * The errors a consumer should handle, for a short table: 410 sunset/revoked, 422 values, 404, and the
+   * message limits. `channel`: an error only that channel returns (shown when the version has it).
+   */
+  errors: { status: number; code: ApiErrorCode; when: string; channel?: Channel }[];
   /**
    * "What changed since vN": one entry per OLDER released version (Superseded or Revoked), newest
    * first; the picker defaults to the first. Empty for a v1.

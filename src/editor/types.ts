@@ -7,7 +7,7 @@
 //   <EditorRoot variables onVariablesChange baseline requiredSections readOnly>
 //     <DocumentEditor content onChange ref />        the document body
 //     <VariablesPanel />                             the right-hand panel
-//     <InlineVariableField label value onChange />   one-line fields (email subject, preheader)
+//     <InlineVariableField label value onChange />   channel fields (email subject, push title, SMS message)
 //   </EditorRoot>
 //
 // Everything inside one root shares a single variable list, so a chip, a panel row and an inline
@@ -15,6 +15,8 @@
 // root from its own `variables`, `requiredSections`, `readOnly` and `onVariablesChange` props.
 
 import type { ReactNode, Ref } from "react";
+import type { CharacterRules } from "./model/characters";
+import type { FieldLines } from "./model/normalize";
 import type { ContractChange, JSONContent, RequiredSection, Variable } from "./model/types";
 
 /**
@@ -178,9 +180,10 @@ export interface VariablesPanelProps {
 // ── <InlineVariableField> ─────────────────────────────────────
 
 /**
- * A one-line editor that accepts text and variable chips, with the same `{{` picker, drag and
- * click-to-insert as the document. Used for the email subject and preheader. Must render inside
- * an <EditorRoot>. Enter never adds a line.
+ * A field editor that accepts text and variable chips, with the same `{{` picker, drag and
+ * click-to-insert as the document. Used for the channel fields: the email subject and preheader, a
+ * push's title and body, an SMS message. Must render inside an <EditorRoot>. On one line (the default)
+ * Enter never adds a line; with `lines="lines"` Enter adds a hard break.
  */
 export interface InlineVariableFieldProps {
   /** Accessible name, and how the field is named in a chip's "where it's used" list ("Email subject"). */
@@ -190,6 +193,17 @@ export interface InlineVariableFieldProps {
    * for empty. Read once (remount with a new `key` to reset).
    */
   value: JSONContent | null;
+  /**
+   * `"line"` (default): one line; a pasted line break becomes a space. `"lines"`: line breaks are kept
+   * as hard breaks (Enter adds one, a paste keeps its lines). Read once, like `value`.
+   */
+  lines?: FieldLines;
+  /**
+   * Which characters a paste keeps (model/characters.ts). `"document"` (default): the email's fields, which
+   * lose invisible characters as the document does. `"message"`: a push's or an SMS's field, which keeps
+   * them (the joiner in an emoji sequence, the non-joiner in a Persian name). Read once, like `value`.
+   */
+  characters?: CharacterRules;
   onChange?: (value: JSONContent) => void;
   /**
    * Not shown for now (the email subject while Email is off), but still part of the root: its chips
@@ -197,9 +211,42 @@ export interface InlineVariableFieldProps {
    * undo and redo pass it by. Default false.
    */
   hidden?: boolean;
+  /**
+   * Marks problems in the text where they sit (an SMS's characters outside GSM-7, a link on a public
+   * shortener). Called on every edit with the field's text (each chip a space, each line break "\n");
+   * each flag it returns is underlined, and its popover shows the `message` and, with a `replacement`,
+   * a one-click fix. Read on every edit, so it may change between renders. Default: no flags.
+   */
+  flags?: TextFlagger;
+  /**
+   * Fixed text shown inside the field's box after what the author types, never editable: an SMS's
+   * locked footer. Default none.
+   */
+  footer?: ReactNode;
+  /**
+   * `"sm"` (default): 14px text, for a rail (the email subject). `"md"`: 15px text and roomier
+   * padding, for a page's main column (the message composer).
+   */
+  size?: "sm" | "md";
   id?: string;
   className?: string;
 }
+
+/**
+ * One problem in a field's text (`InlineVariableFieldProps.flags`). `from` and `to` are offsets into
+ * the text the flagger was given (UTF-16, `to` exclusive).
+ */
+export interface TextFlag {
+  from: number;
+  to: number;
+  /** What the popover says: "’ isn't in the SMS character set." */
+  message: string;
+  /** What the one-click fix writes in its place; "" removes it. Absent: no fix (the popover only explains). */
+  replacement?: string;
+}
+
+/** A field's text in, its flags out (see `InlineVariableFieldProps.flags`). */
+export type TextFlagger = (text: string) => readonly TextFlag[];
 
 // ── Contract state (useContractState) ─────────────────────────
 

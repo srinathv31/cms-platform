@@ -26,6 +26,7 @@ import type {
   VariableValues,
   VersionState,
 } from "@/domain/types";
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { ConsumerNoticeKind, VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
@@ -57,6 +58,13 @@ export const teams = sqliteTable("teams", {
   description: text("description").notNull(),
   icon: text("icon").notNull(), // lucide icon key
   createdAt: ts("created_at").notNull(),
+  // Who the team's messages come from, as the phone previews show it (decision 0034). Facts, not
+  // derived from the name the way the email preview's sender is (decision 0023): an app has its own
+  // name, and a short code is a number. Null when not set.
+  /** The app name over the team's push notifications: "Coral". */
+  appName: text("app_name"),
+  /** The short code the team's SMS come from: "26725". */
+  smsSender: text("sms_sender"),
 });
 
 export const memberships = sqliteTable(
@@ -96,7 +104,12 @@ export const contentTypes = sqliteTable("content_types", {
   key: text("key").notNull().unique(), // "disclosure"
   name: text("name").notNull(),
   requiredSections: json<RequiredSection[]>("required_sections").notNull(),
+  // One family, documents or messages, never both (decision 0034): `channelRuleRefusal`.
   allowedChannels: json<Channel[]>("allowed_channels").notNull(),
+  /** Printed on its own line after every SMS of this type: brand and opt-out. Null: none. */
+  smsFooter: text("sms_footer"),
+  /** Submit refuses an SMS over this many parts with the long sample values (`DEFAULT_SMS_MAX_PARTS`). */
+  smsMaxParts: integer("sms_max_parts").notNull().default(3),
 });
 
 export const approvalStages = sqliteTable("approval_stages", {
@@ -143,9 +156,15 @@ export const versions = sqliteTable(
     name: text("name").notNull(),
     basedOnVersionId: text("based_on_version_id"),
     body: json<JSONContent>("body").notNull(), // TipTap JSON; variable nodes hold only their key
-    emailSubject: json<JSONContent>("email_subject"),
-    emailPreheader: json<JSONContent>("email_preheader"),
+    // Each channel's own short fields (src/domain/channel-fields.ts), by channel and then field key:
+    // { "email": { "subject": <doc>, "preheader": <doc> } }. A field with no value is absent.
+    channelFields: json<ChannelFields>("channel_fields").notNull().default(sql`'{}'`),
     channels: json<Channel[]>("channels").notNull(),
+    // The content type's SMS footer as it stood when this version was submitted, frozen with it (decision
+    // 0035): render, review, Compare and Coral print this one, so a later footer change reaches only versions
+    // submitted after it, through approval. Null on a draft (it shows the content type's footer as it stands,
+    // `smsFooterOf`) and on a version whose content type had none.
+    smsFooter: text("sms_footer"),
     variables: json<Variable[]>("variables").notNull(),
     sampleSets: json<SampleSet[]>("sample_sets").notNull(),
     contractChanges: json<ContractChange[]>("contract_changes"),

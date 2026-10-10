@@ -82,6 +82,10 @@
       }
     ]
   },
-  "emailSubject": null,
-  "emailPreheader": null
+  "channelFields": {},
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
 }

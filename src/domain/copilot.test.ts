@@ -2,7 +2,7 @@
 // The round trip through the editor's Markdown paste is in components/workspace/copilot.
 
 import { describe, expect, it } from "vitest";
-import { buildCopilotPrompt, documentToMarkdown, promptSections } from "./copilot";
+import { buildCopilotPrompt, copilotUnavailable, documentToMarkdown, promptSections } from "./copilot";
 import type { CopilotPromptInput } from "./import-types";
 import type { JSONContent, RequiredSection, Variable } from "./types";
 
@@ -99,6 +99,13 @@ describe("documentToMarkdown", () => {
   it("an empty body is empty", () => {
     expect(documentToMarkdown(doc())).toBe("");
     expect(documentToMarkdown(doc({ type: "paragraph" }))).toBe("");
+  });
+});
+
+describe("copilotUnavailable", () => {
+  it("offers Copilot for a document, and says why not for an alert", () => {
+    expect(copilotUnavailable("document")).toBeNull();
+    expect(copilotUnavailable("message")).toBe("Copilot drafts documents only.");
   });
 });
 

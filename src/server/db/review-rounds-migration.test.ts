@@ -2,7 +2,8 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client, InValue } from "@libsql/client";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, getTableColumns, getTableName } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDraft } from "@/domain/lifecycle";
@@ -70,15 +71,32 @@ async function insertOld(table: string, row: Record<string, unknown>) {
 }
 
 /**
+ * Rows as the seed builds them, written in the shape the database has now (0007): a column a later
+ * migration adds (a team's app name, a content type's SMS footer) is left out, as it was then.
+ */
+async function insertAsBuilt<T extends SQLiteTable>(table: T, rows: readonly T["$inferInsert"][]) {
+  const name = getTableName(table);
+  const existing = new Set((await libsql.execute(`PRAGMA table_info(${name})`)).rows.map((r) => String(r.name)));
+  const columns = Object.entries(getTableColumns(table));
+  for (const row of rows) {
+    const values: Record<string, unknown> = {};
+    for (const [key, column] of columns) {
+      const value = (row as Record<string, unknown>)[key];
+      if (value === undefined || !existing.has(column.name)) continue;
+      values[column.name] = value === null ? null : column.mapToDriverValue(value);
+    }
+    await insertOld(name, values);
+  }
+}
+
+/**
  * A template and its versions as the old numbering left them: `numbered` in order, each submitted by
  * Maya, then an open draft started from the last of them.
  */
 async function oldTemplate(id: string, numbered: { number: number; state: "active" | "superseded" | "changes_requested" }[]) {
   const created = daysAgo(40);
-  await db
-    .insert(schema.templates)
-    .values({ id, teamId: "coral-offers", contentTypeId: "ct_disclosure", createdBy: "maya", createdAt: created });
-  const starter = buildStarter("card_offer_terms", { scope: id, now: created });
+  await insertAsBuilt(schema.templates, [{ id, teamId: "coral-offers", contentTypeId: "ct_disclosure", createdBy: "maya", createdAt: created }]);
+  const starter = buildStarter({ family: "document", starterKey: "card_offer_terms" }, { scope: id, now: created });
   const { draft } = createDraft({ starter, createdBy: "maya", now: created }).changes;
   const content = {
     name: draft.name,
@@ -138,18 +156,19 @@ beforeAll(async () => {
   before = migrationsThrough0007();
   await migrate(db, { migrationsFolder: before });
 
-  // The people, teams and chain, from the seed (none of these tables changed in 0008).
+  // The people, teams and chain, from the seed (none of these tables changed in 0008; later migrations add
+  // columns to teams and content types, which these rows go in without).
   const ctx = createContext(BASE.getTime());
   seedPeople(ctx);
   seedTeams(ctx);
   seedPlatform(ctx);
   const { sink } = ctx;
-  await db.insert(schema.users).values(sink.users);
-  await db.insert(schema.teams).values(sink.teams);
-  await db.insert(schema.memberships).values(sink.memberships);
-  await db.insert(schema.membershipRoles).values(sink.membershipRoles);
-  await db.insert(schema.contentTypes).values(sink.contentTypes);
-  await db.insert(schema.approvalStages).values(sink.approvalStages);
+  await insertAsBuilt(schema.users, sink.users);
+  await insertAsBuilt(schema.teams, sink.teams);
+  await insertAsBuilt(schema.memberships, sink.memberships);
+  await insertAsBuilt(schema.membershipRoles, sink.membershipRoles);
+  await insertAsBuilt(schema.contentTypes, sink.contentTypes);
+  await insertAsBuilt(schema.approvalStages, sink.approvalStages);
 
   // Sent back the old way: v1 Active, then v2 sent back (it kept its number), and a draft from it.
   await oldTemplate("UC-SENTBK", [
@@ -214,6 +233,15 @@ describe("migration 0008: review rounds", () => {
     // A sent-back round beside the released row is what rounds are for.
     await insertOld("versions", { ...row, id: "v_sent_back_round", number: 2, round: 2, state: "changes_requested" });
     await libsql.execute("DELETE FROM versions WHERE id = 'v_sent_back_round'");
+  });
+
+  it("runs the later migrations over the same rows: no channel fields yet, and a document's versions without an SMS footer", async () => {
+    const { rows } = await libsql.execute("SELECT channel_fields, sms_footer FROM versions WHERE template_id = 'UC-SH1PED' ORDER BY created_at");
+    expect(rows.map((r) => [r.channel_fields, r.sms_footer])).toEqual([
+      ["{}", null],
+      ["{}", null],
+      ["{}", null],
+    ]);
   });
 
   it("continues the number an old send-back left above every released one, and numbers the next release after the last", async () => {

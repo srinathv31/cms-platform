@@ -1,19 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { renderMessagePreview } from "@/components/preview/message-preview";
+import type { PhoneView } from "@/components/preview/phone-controls";
 import { PreviewPane } from "@/components/preview/preview-pane";
-import { recipientOf, senderOf } from "@/components/preview/preview-sender";
+import { phoneClock, phoneSenders, recipientOf, senderOf } from "@/components/preview/preview-sender";
 import { usePreviewRender } from "@/components/preview/use-preview-render";
+import { INITIAL_PHONE, type PreviewDevice } from "@/components/workspace/session/session-store";
+import type { ChannelFields } from "@/domain/channel-fields";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import type { VariableValues } from "@/editor/model/types";
-import type { Channel, Variable } from "@/domain/types";
-import type { PreviewDevice } from "@/components/workspace/session/session-store";
+import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";
 import { RV } from "./review-grid";
 
 /**
  * The rendered output of the version under review: the Phase 3 preview's own pieces (the channel
- * control, Download PDF or Desktop / Mobile, the output on its tinted well), rendering THIS round
- * by number and round through the same route a consumer calls, with `preview: true` (only a preview
- * may name a round).
+ * control, Download PDF, Desktop / Mobile or the phone's controls, the output on its tinted well).
+ * A document channel renders THIS round by number and round through the same route a consumer calls,
+ * with `preview: true` (only a preview may name a round). Push and SMS render in the browser from the
+ * round's stored fields, through the route's own function (decision 0036): what the approver sees is
+ * what a consumer gets.
  *
  * Nothing here is saved or edited, so there is nothing to wait for before a request (`flush` is
  * instant) and no save tick. The sample set is chosen in the tab bar; `onSeen` says which sets the
@@ -32,6 +38,10 @@ export function PreviewView({
   teamName,
   channels,
   variables,
+  channelFields,
+  messageRules,
+  senders,
+  today,
   values,
   setId,
   enabled,
@@ -46,6 +56,14 @@ export function PreviewView({
   /** The version's channels. Never empty. */
   channels: readonly Channel[];
   variables: Variable[];
+  /** The version's own fields (a push's, an SMS's), as stored. */
+  channelFields: ChannelFields;
+  /** The content type's SMS footer (and part budget). */
+  messageRules: MessageTypeRules;
+  /** Who the team's messages come from on the phone. */
+  senders: TeamSenders;
+  /** The demo clock's day, YYYY-MM-DD: the phone's date. */
+  today: string;
   /** The chosen sample set's values. */
   values: VariableValues;
   setId: string;
@@ -58,22 +76,30 @@ export function PreviewView({
 }) {
   const [picked, setPicked] = useState<Channel>(channels[0] ?? "pdf");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
+  const [phone, setPhone] = useState<PhoneView>({ settings: INITIAL_PHONE, screen: "lock" });
   const channel = channels.includes(picked) ? picked : (channels[0] ?? "pdf");
 
   const { slots, rendering, retry } = usePreviewRender({
     templateId,
     version: versionNumber,
     round,
-    channel,
+    channel: isDocumentChannel(channel) ? channel : null,
     values,
     variables,
     enabled,
     saveTick: 0,
     session: NO_SESSION,
   });
-  const slot = slots[channel];
+  const slot = isDocumentChannel(channel) ? slots[channel] : undefined;
 
-  const rendered = Boolean(slot?.output) && !slot?.error;
+  const platform = phone.settings.platform;
+  const message = useMemo(() => {
+    if (!enabled || isDocumentChannel(channel)) return null;
+    const target = channel === "push" ? ({ channel, platform } as const) : ({ channel } as const);
+    return renderMessagePreview(target, { fields: channelFields, variables, values, rules: messageRules });
+  }, [enabled, channel, platform, channelFields, variables, values, messageRules]);
+
+  const rendered = message ? message.ok : Boolean(slot?.output) && !slot?.error;
   useEffect(() => {
     if (enabled && rendered) onSeen(setId);
   }, [enabled, rendered, setId, onSeen]);
@@ -99,6 +125,11 @@ export function PreviewView({
         onRetry={retry}
         sender={senderOf(teamName)}
         recipient={recipientOf(values)}
+        phone={phone}
+        onPhone={(next) => setPhone((now) => ({ ...now, ...next }))}
+        message={message}
+        senders={phoneSenders(senders, teamName)}
+        clock={phoneClock(today)}
       />
     </div>
   );

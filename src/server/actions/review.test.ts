@@ -10,8 +10,10 @@ import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
+import { diffChannelFields } from "@/domain/redline";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
-import type { Variable, Viewer } from "@/domain/types";
+import type { ChannelFields } from "@/domain/channel-fields";
+import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import { createVariableStore } from "@/editor/state/variable-store";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -24,6 +26,7 @@ import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { findRound } from "@/server/queries/find-round";
 import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
+import { getReviewScreen } from "@/server/queries/review";
 import { addComment } from "./comments";
 import { startDraft, submitDraft } from "./templates";
 import {
@@ -967,8 +970,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       body: v2.body,
       variables: v2.variables,
       channels: v2.channels,
-      emailSubject: v2.emailSubject,
-      emailPreheader: v2.emailPreheader,
+      channelFields: v2.channelFields,
       sampleSets: v2.sampleSets,
       contractChanges: null,
     });
@@ -1276,5 +1278,157 @@ describe("the writers backfill in the migration", () => {
     await libsql.execute("UPDATE versions SET writers = '[]'");
     await libsql.execute(backfill!);
     expect(await writersById()).toEqual(recorded);
+  });
+});
+
+// The SQL that filled `sms_footer` for versions submitted before the column existed: every submitted version
+// takes its content type's footer, as the seed and submit freeze it, and a draft keeps none.
+describe("the SMS footer backfill in the migration", () => {
+  it("gives every submitted version its content type's footer, and leaves drafts and documents without one", async () => {
+    const folder = "./src/server/db/migrations";
+    const file = readdirSync(folder).find((name) => name.endsWith("_version_sms_footer.sql"))!;
+    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split("--> statement-breakpoint");
+    const footers = async () =>
+      Object.fromEntries((await db.select({ id: versions.id, smsFooter: versions.smsFooter }).from(versions)).map((v) => [v.id, v.smsFooter]));
+
+    const recorded = await footers();
+    expect(Object.values(recorded).filter(Boolean).length, "some alert versions are submitted").toBeGreaterThan(0);
+    await libsql.execute("UPDATE versions SET sms_footer = NULL");
+    await libsql.execute(backfill!);
+    expect(await footers()).toEqual(recorded);
+  });
+});
+
+// ── Submitting an alert: the message rules (decisions 0034 and 0035) ──────────
+
+describe("submitting an alert", () => {
+  const t = (text: string): JSONContent => ({ type: "text", text });
+  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+  const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
+
+  /** A draft turned into an Alert's: its template on the Alert content type, Push and SMS on. */
+  async function alertDraft(sms: JSONContent) {
+    const { templateId, draftId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    await db.update(schema.templates).set({ contentTypeId: "ct_alert" }).where(eq(schema.templates.id, templateId));
+    await db
+      .update(versions)
+      .set({
+        body: { type: "doc", content: [{ type: "paragraph" }] },
+        channels: ["push", "sms"],
+        channelFields: {
+          push: { title: field(t("Your offer ends soon")), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) },
+          sms: { text: sms },
+        },
+      })
+      .where(eq(versions.id, draftId));
+    return templateId;
+  }
+
+  it("refuses characters the author typed outside GSM-7, and writes nothing", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", it’s ending.")));
+    const before = await draftOf(templateId);
+    const at = as("maya");
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      code: "sms_characters",
+      reason: "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.",
+    });
+    expect(await draftOf(templateId)).toEqual(before);
+    expect(await auditAt(at)).toEqual([]);
+  });
+
+  it("measures the SMS with the content type's footer and part budget, using the long sample values", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(". " + "Your offer ends Friday. ".repeat(4))));
+    // The footer and the long first name take it past one part: fine at the Alert's 3.
+    await db.update(schema.contentTypes).set({ smsMaxParts: 1 }).where(eq(schema.contentTypes.id, "ct_alert"));
+    try {
+      as("maya");
+      expect(await submitNow(templateId)).toEqual({
+        ok: false,
+        code: "sms_too_many_parts",
+        reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer.",
+      });
+    } finally {
+      await db.update(schema.contentTypes).set({ smsMaxParts: 3 }).where(eq(schema.contentTypes.id, "ct_alert"));
+    }
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect((await version(templateId, 1))?.state).toBe("in_review");
+  });
+
+  it("freezes the content type's SMS footer into the version: a later change to it doesn't reach the submitted text", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
+    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+    expect(footer).toBeTruthy();
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect((await version(templateId, 1))?.smsFooter).toBe(footer);
+    await db.update(schema.contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(schema.contentTypes.id, "ct_alert"));
+    try {
+      expect((await version(templateId, 1))?.smsFooter).toBe(footer);
+    } finally {
+      await db.update(schema.contentTypes).set({ smsFooter: footer }).where(eq(schema.contentTypes.id, "ct_alert"));
+    }
+  });
+
+  it("resubmits a sent-back alert as the next round, each round freezing its own footer, redlined against the live version", async () => {
+    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
+    const alertFooter = async (smsFooter: string) =>
+      db.update(schema.contentTypes).set({ smsFooter }).where(eq(schema.contentTypes.id, "ct_alert"));
+    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+    const editDraft = async (fields: Partial<ChannelFields>) => {
+      const draft = (await draftOf(templateId))!;
+      await db.update(versions).set({ channelFields: { ...draft.channelFields, ...fields }, rev: draft.rev + 1 }).where(eq(versions.id, draft.id));
+    };
+    const title = (text: string) => ({ push: { title: field(t(text)), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) } });
+    try {
+      as("maya");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+      as("jordan");
+      expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+      const v1 = (await version(templateId, 1))!;
+
+      // v2, round 1: a new title, submitted under a new footer; Jordan sends it back.
+      as("maya");
+      expect(await startDraft({ templateId })).toMatchObject({ ok: true });
+      await editDraft(title("Your offer ends Friday"));
+      await alertFooter("Coral: Text STOP to end.");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+      as("jordan");
+      expect(await requestChanges({ templateId, versionNumber: 2, round: 1, reason: "Say which card." })).toEqual({ ok: true });
+
+      // v2, round 2: the draft the send-back opened carries round 1's fields; Maya rewrites the title.
+      as("maya");
+      expect((await draftOf(templateId))!.channelFields).toEqual((await version(templateId, 2, 1))!.channelFields);
+      await editDraft(title("Your Coral card offer ends Friday"));
+      await alertFooter("Coral: Reply STOP to stop.");
+      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 2 });
+      const [round1, round2] = [(await version(templateId, 2, 1))!, (await version(templateId, 2, 2))!];
+      expect([v1.smsFooter, round1.smsFooter, round2.smsFooter]).toEqual([footer, "Coral: Text STOP to end.", "Coral: Reply STOP to stop."]);
+      expect(round2.basedOnVersionId).toBe(round1.id);
+
+      // Both rounds are redlined against v1, the live version, fields and footer alike: never against each other.
+      as("jordan");
+      for (const round of [null, 1] as const) {
+        const screen = await getReviewScreen("coral-offers", templateId, 2, round);
+        expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "active", channelFields: v1.channelFields, smsFooter: footer });
+        const redline = diffChannelFields(screen.baseline, screen.version);
+        expect(redline.fields.filter((f) => f.status !== "unchanged").map((f) => [f.field.id, f.status])).toEqual([["push.title", "changed"]]);
+        expect(redline.footer).toEqual({ from: footer, to: screen.version.smsFooter, status: "changed" });
+      }
+      expect((await getReviewScreen("coral-offers", templateId, 2, 1)).replacedBy).toMatchObject({ number: 2, round: 2, label: "v2, round 2" });
+    } finally {
+      await alertFooter(footer!);
+    }
+  });
+
+  it("refuses a public link shortener in the SMS", async () => {
+    const templateId = await alertDraft(field(t("Pay at bit.ly/coral")));
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      code: "public_shortener",
+      reason: "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain.",
+    });
   });
 });

@@ -8,6 +8,10 @@
 //   resolveThread  open → resolved
 //   reopenThread   resolved → open
 //
+// What a thread anchors to. A block of the body, by its id, or a channel field, by its id ("push.title"):
+// a message (an Alert) has no body, so its fields are where its threads go (`commentAnchors`). A thread
+// on the whole version (a change request's reason) anchors to `DOCUMENT_THREAD`.
+//
 // Where a thread can be answered. Threads belong to the template and anchor to block ids, so one thread
 // shows on several versions. It is answered on a version that takes comments and shows it: the open
 // draft, whose margin shows every thread of the template, or the version in review, whose screen shows
@@ -25,8 +29,9 @@ import {
   type NotificationEffect,
   type NotificationLink,
 } from "./review-types";
+import { fieldsOfChannels } from "./channel-fields";
 import { asNumbered, compareRounds, reviewLink, versionLabel, type RoundRef } from "./rounds";
-import type { PermissionResult, VersionState, Viewer } from "./types";
+import type { Channel, PermissionResult, VersionState, Viewer } from "./types";
 
 // ── Limits and sentences ──────────────────────────────────────
 
@@ -133,6 +138,16 @@ export function threadBeganBy(origin: RoundRef | null, through: RoundRef, next: 
   return compareRounds(origin ?? next, through) <= 0;
 }
 
+/**
+ * Where a thread on a version can anchor, in reading order: the fields of each channel that is on (a
+ * message's whole content; a document's email subject and preheader, which show above its body), then
+ * each block of the body (`blockIds`, top-level and nested). A thread on a field is about its whole text,
+ * as one on a block is about the block's.
+ */
+export function commentAnchors(blockIds: readonly string[], channels: readonly Channel[]): string[] {
+  return [...fieldsOfChannels(channels).map((field) => field.id), ...blockIds];
+}
+
 // ── Who may comment ───────────────────────────────────────────
 
 /**
@@ -185,16 +200,16 @@ export function commentText(body: string): Outcome<{ body: string }> {
 export type AddCommentResult = Outcome<{ thread: NewThread; comment: NewComment; effects: LifecycleEffect[] }>;
 
 /**
- * Starts a thread on one block of a version (or on the whole version: `DOCUMENT_THREAD`), with its first
- * comment. On a frozen version the block must be in its body; a draft's newest blocks may not be saved
- * yet, so a draft takes any block id (a thread whose block never lands reads as orphaned). The version's
- * author is notified, unless they wrote it.
+ * Starts a thread on one block of a version or one of its fields (or on the whole version:
+ * `DOCUMENT_THREAD`), with its first comment. On a frozen version the anchor must be on it; a draft's
+ * newest blocks may not be saved yet, so a draft takes any block id (a thread whose block never lands
+ * reads as orphaned). The version's author is notified, unless they wrote it.
  */
 export function addComment(input: {
   viewer: Viewer;
   template: Pick<CommentTemplate, "id" | "name" | "teamId">;
   version: CommentVersion;
-  /** Every block id in the version's body (top-level and nested). */
+  /** Every anchor on the version (`commentAnchors`): its channels' fields, and every block id in its body. */
   blockIds: readonly string[];
   blockId: string;
   quote?: string | null;

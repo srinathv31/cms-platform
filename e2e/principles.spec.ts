@@ -290,6 +290,10 @@ const RATE_CHANGE = "UC-PAS9A0"; // Rate Change Notice: v1 active
 const DEPOSIT = "UC-A4S1YT"; // Deposits, Everyday Checking: v1 active
 const HIGH_YIELD = "UC-ZKZSRZ"; // Deposits, High-Yield Savings: v1 superseded, v2 approved on round 3 after two send-backs
 const STATEMENT = "UC-8Y49K2"; // Card Statements, Statement Insert — Rate Change: v1 active
+// Coral Offers' alerts (push and SMS, decision 0034).
+const PAYMENT_DUE = "UC-EFXFMS"; // Payment Due Reminder: v1 active
+const CARD_ABROAD = "UC-397J2A"; // Card Used Abroad: v1 in review (Priya's)
+const HEADS_UP = "UC-FYN38M"; // Rate Change Heads-up: a draft
 
 const SEEDED: Record<string, string> = {
   [COLLECT]: "Cash Back Welcome Bonus — Terms",
@@ -300,6 +304,9 @@ const SEEDED: Record<string, string> = {
   [DEPOSIT]: "Everyday Checking — Fee Schedule",
   [HIGH_YIELD]: "High-Yield Savings — Rate Disclosure",
   [STATEMENT]: "Statement Insert — Rate Change",
+  [PAYMENT_DUE]: "Payment Due Reminder",
+  [CARD_ABROAD]: "Card Used Abroad",
+  [HEADS_UP]: "Rate Change Heads-up",
 };
 
 test("the template ids this spec names are the seed's", async () => {
@@ -308,7 +315,8 @@ test("the template ids this spec names are the seed's", async () => {
     const found: Record<string, string> = {};
     for (const id of Object.keys(SEEDED)) {
       const { rows } = await db.execute({
-        sql: "SELECT name FROM versions WHERE template_id = ? AND number IS NOT NULL ORDER BY number DESC, round DESC LIMIT 1",
+        // The newest numbered row, or the draft of a template that has nothing else.
+        sql: "SELECT name FROM versions WHERE template_id = ? ORDER BY number IS NULL, number DESC, round DESC LIMIT 1",
         args: [id],
       });
       if (rows[0]) found[id] = String(rows[0].name);
@@ -349,6 +357,10 @@ const WORKSPACE: Route[] = [
   { url: `/deposits/templates/${HIGH_YIELD}/versions`, personas: ["priya"] },
   { url: `/card-statements/templates/${STATEMENT}`, personas: ["riley"] },
   { url: `/card-statements/templates/${STATEMENT}/usage`, personas: ["riley"] },
+  // An alert's every tab; a draft alert in its composer; one in review, as its author.
+  ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${PAYMENT_DUE}${tab}`, personas: ["maya"] })),
+  { url: `/coral-offers/templates/${HEADS_UP}`, personas: ["maya", "jordan"] },
+  { url: `/coral-offers/templates/${CARD_ABROAD}`, personas: ["priya"] },
 ];
 
 const REVIEW: Route[] = [
@@ -361,6 +373,9 @@ const REVIEW: Route[] = [
   // Its round 1, sent back: a read-only record.
   { url: `/coral-offers/review/${COLLECT}/3?round=1`, personas: ["jordan", "taylor"] },
   { url: `/coral-offers/review/${COLLECT}/2`, personas: ["jordan"] },
+  // An alert in review (its fields on the Document view), as the approver and its author, and an Active one.
+  { url: `/coral-offers/review/${CARD_ABROAD}/1`, personas: ["jordan", "priya"] },
+  { url: `/coral-offers/review/${PAYMENT_DUE}/1`, personas: ["jordan"] },
 ];
 
 const USAGE: Route[] = [
@@ -447,6 +462,8 @@ test.describe("Simulator (foreign system)", () => {
     "/sim/offers/offer_spring_travel",
     "/sim/offers/offer_cash_back",
     "/sim/offers/offer_cash_back/link",
+    "/sim/offers/alert_payment_due",
+    "/sim/offers/alert_card_abroad/link",
   ];
   for (const url of SIM) {
     test(`${url}`, async ({ page }) => {
@@ -465,6 +482,7 @@ test.describe("Views inside a page", () => {
     { url: "/all/review", persona: "riley" },
     { url: `/coral-offers/templates/${FEE_WAIVER}`, persona: "maya" }, // the rail's views (Variables, Comments, ...)
     { url: `/coral-offers/review/${COLLECT}/3`, persona: "jordan" },
+    { url: `/coral-offers/review/${CARD_ABROAD}/1`, persona: "jordan" }, // an alert: its fields, then the phone
     { url: "/coral-offers/usage", persona: "jordan" }, // Overview, Consumers
   ];
   for (const { url, persona } of TAB_PAGES) {

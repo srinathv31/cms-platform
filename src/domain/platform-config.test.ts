@@ -29,7 +29,7 @@ import {
   zoneChangeConsequences,
 } from "./platform-config";
 import type { ApprovalStage } from "./review-types";
-import type { ApproverRule, JSONContent, RequiredSection } from "./types";
+import type { ApproverRule, Channel, JSONContent, RequiredSection } from "./types";
 
 const NOW = new Date("2026-10-05T12:00:00.000Z");
 const riley = { id: "riley", name: "Riley Brooks" };
@@ -179,7 +179,7 @@ const SECTIONS: RequiredSection[] = [
   { key: "rates_and_fees", title: "Rates and fees" },
   { key: "legal_notices", title: "Legal notices" },
 ];
-const disclosure = { id: "ct_disclosure", name: "Disclosure", requiredSections: SECTIONS };
+const disclosure = { id: "ct_disclosure", name: "Disclosure", requiredSections: SECTIONS, allowedChannels: ["pdf", "web", "email"] as Channel[] };
 
 describe("sectionKey", () => {
   it.each([
@@ -334,15 +334,59 @@ describe("conformToSections", () => {
 // ── Channel rules ────────────────────────────────────────────────────────────
 
 describe("channelRuleRefusal (whether a switch may flip)", () => {
-  it("refuses turning off the last channel on, and nothing else", () => {
-    expect(channelRuleRefusal(["email"], "email", false)).toBe(PLATFORM_REFUSALS.oneChannel);
-    expect(channelRuleRefusal(["web", "email"], "email", false)).toBeNull();
-    expect(channelRuleRefusal(["email"], "pdf", true)).toBeNull();
-    expect(channelRuleRefusal(["email"], "fax" as never, true)).toBe(PLATFORM_REFUSALS.oneChannel);
+  const type = (...allowedChannels: Channel[]) => ({ name: "Disclosure", allowedChannels });
+
+  it("refuses turning off the last channel on", () => {
+    expect(channelRuleRefusal(type("email"), "email", false)).toBe(PLATFORM_REFUSALS.oneChannel);
+    expect(channelRuleRefusal(type("web", "email"), "email", false)).toBeNull();
+    expect(channelRuleRefusal(type("email"), "pdf", true)).toBeNull();
+    expect(channelRuleRefusal(type("email"), "fax" as never, true)).toBe(PLATFORM_REFUSALS.oneChannel);
     const ct = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["email" as const] };
-    expect(setChannelRule({ contentType: ct, channel: "email", allowed: false, activeUsing: 0, actor: riley, now: NOW })).toEqual({
+    expect(setChannelRule({ contentType: ct, channel: "email", allowed: false, activeUsing: 0, contentTypes: [], actor: riley, now: NOW })).toEqual({
       ok: false,
-      ...channelRuleRefusal(["email"], "email", false),
+      ...channelRuleRefusal(type("email"), "email", false),
+    });
+  });
+
+  describe("families never mix (decision 0034)", () => {
+    const disclosure = { name: "Disclosure", allowedChannels: ["pdf", "web"] as Channel[] };
+    const notice = { name: "Notice", allowedChannels: ["pdf"] as Channel[] };
+    const alert = { name: "Alert", allowedChannels: ["push", "sms"] as Channel[] };
+    const all = [disclosure, notice, alert];
+
+    it("refuses a message channel on a document type, naming the types it goes on", () => {
+      for (const channel of ["push", "sms"] as const) {
+        const refusal = channelRuleRefusal(disclosure, channel, true, all);
+        expect(refusal).toEqual({ code: "channel_family", reason: "Disclosures are documents. Push and SMS go on Alert templates." });
+      }
+    });
+
+    it("refuses a document channel on a message type, naming the types it goes on", () => {
+      expect(channelRuleRefusal(alert, "email", true, all)).toEqual({
+        code: "channel_family",
+        reason: "Alerts are messages. PDF, Web and Email go on Disclosure or Notice templates.",
+      });
+    });
+
+    it("names the family when no content type of it exists", () => {
+      expect(channelRuleRefusal(disclosure, "sms", true, [disclosure])?.reason).toBe(
+        "Disclosures are documents. Push and SMS go on message templates.",
+      );
+    });
+
+    it("lets a type turn on its own family's channels, and turn any channel off", () => {
+      expect(channelRuleRefusal(disclosure, "email", true, all)).toBeNull();
+      expect(channelRuleRefusal(alert, "sms", false, all)).toBeNull();
+      expect(channelRuleRefusal({ name: "Alert", allowedChannels: ["push"] }, "sms", true, all)).toBeNull();
+    });
+
+    it("setChannelRule refuses it too, and writes nothing", () => {
+      const ct = { id: "ct_alert", name: "Alert", allowedChannels: ["push", "sms"] as Channel[] };
+      expect(setChannelRule({ contentType: ct, channel: "pdf", allowed: true, activeUsing: 0, contentTypes: all, actor: riley, now: NOW })).toEqual({
+        ok: false,
+        code: "channel_family",
+        reason: "Alerts are messages. PDF, Web and Email go on Disclosure or Notice templates.",
+      });
     });
   });
 });
@@ -350,7 +394,16 @@ describe("channelRuleRefusal (whether a switch may flip)", () => {
 describe("setChannelRule", () => {
   const ct = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["pdf", "web", "email"] as const };
   const run = (over: Partial<Parameters<typeof setChannelRule>[0]> = {}) =>
-    setChannelRule({ contentType: { ...ct, allowedChannels: [...ct.allowedChannels] }, channel: "email", allowed: false, activeUsing: 2, actor: riley, now: NOW, ...over });
+    setChannelRule({
+      contentType: { ...ct, allowedChannels: [...ct.allowedChannels] },
+      channel: "email",
+      allowed: false,
+      activeUsing: 2,
+      contentTypes: [],
+      actor: riley,
+      now: NOW,
+      ...over,
+    });
 
   it("turning a channel off names the Active versions it stops", () => {
     expect(run()).toEqual({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ConvertedFile, ImportReport } from "./import-types";
+import { IMPORT_DOCUMENTS_ONLY, importUnavailable, type ConvertedFile, type ImportReport } from "./import-types";
 import {
   applyPlaceholders,
   classifyPlaceholder,
@@ -660,5 +660,14 @@ describe("refusalForUnreadableKind", () => {
     expect(refusalForUnreadableKind("fake.docx")).toBe("notWord");
     expect(refusalForUnreadableKind("picture.png")).toBe("type");
     expect(refusalForUnreadableKind("binary.txt")).toBe("type");
+  });
+});
+
+// Import makes documents: a file's text becomes a body, and an alert has none (decision 0034).
+describe("importUnavailable", () => {
+  it("offers Import for a document, and says why not for an alert", () => {
+    expect(importUnavailable("document")).toBeNull();
+    expect(importUnavailable("message")).toBe(IMPORT_DOCUMENTS_ONLY);
+    expect(IMPORT_DOCUMENTS_ONLY).toBe("Only documents can be imported.");
   });
 });

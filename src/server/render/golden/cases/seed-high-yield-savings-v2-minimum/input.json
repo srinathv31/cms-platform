@@ -410,52 +410,61 @@
       }
     ]
   },
-  "emailSubject": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
+  "channelFields": {
+    "email": {
+      "subject": {
+        "type": "doc",
         "content": [
           {
-            "type": "text",
-            "text": "Your High-Yield Savings rate: "
-          },
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Your High-Yield Savings rate: "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "apy"
+                }
+              },
+              {
+                "type": "text",
+                "text": " APY"
+              }
+            ]
+          }
+        ]
+      },
+      "preheader": {
+        "type": "doc",
+        "content": [
           {
-            "type": "variable",
-            "attrs": {
-              "key": "apy"
-            }
-          },
-          {
-            "type": "text",
-            "text": " APY"
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", here are the details of your savings rate."
+              }
+            ]
           }
         ]
       }
-    ]
+    }
   },
-  "emailPreheader": {
-    "type": "doc",
-    "content": [
-      {
-        "type": "paragraph",
-        "content": [
-          {
-            "type": "text",
-            "text": "Hi "
-          },
-          {
-            "type": "variable",
-            "attrs": {
-              "key": "first_name"
-            }
-          },
-          {
-            "type": "text",
-            "text": ", here are the details of your savings rate."
-          }
-        ]
-      }
-    ]
-  }
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
 }

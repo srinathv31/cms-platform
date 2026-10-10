@@ -65,7 +65,13 @@ export function RailBody({
         {closeSlot}
       </div>
       <div className="mt-3 px-2">
-        <ChannelSelector channels={channels} allowed={ALL_CHANNELS} editable onChange={onChannels} />
+        <ChannelSelector
+          channels={channels}
+          allowed={ALL_CHANNELS}
+          editable
+          // The mock allows only the document channels, so only they come back.
+          onChange={(next) => onChannels(ALL_CHANNELS.filter((c) => next.includes(c)))}
+        />
       </div>
       {channels.includes("email") ? (
         <div className="mt-8 px-2">

@@ -3,6 +3,7 @@ import { act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { channelFieldValues } from "@/domain/channel-fields";
 import type { ActionResult } from "@/domain/review-types";
 import type { BaseVersionContent } from "@/server/queries/base-version";
 import type { SaveFields } from "./autosave/autosave-scheduler";
@@ -119,7 +120,7 @@ describe("SaveStatus, in the browser", () => {
 // anything else is edited, so it can never put the old content over a newer edit.
 describe("Revert to v1", () => {
   const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
-  const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], emailSubject: null, emailPreheader: null, sampleSets: [] };
+  const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], ...channelFieldValues({}), sampleSets: [] };
   const V1: BaseVersionContent = {
     number: 1,
     round: 1,
@@ -128,8 +129,7 @@ describe("Revert to v1", () => {
     body: doc("Version 1"),
     variables: [],
     channels: ["pdf"],
-    emailSubject: null,
-    emailPreheader: null,
+    ...channelFieldValues({}),
     sampleSets: [],
   };
 

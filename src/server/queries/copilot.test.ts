@@ -1,9 +1,11 @@
 import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
+import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
+import { versions } from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getCopilotPrompt } from "./copilot";
@@ -57,5 +59,22 @@ describe("getCopilotPrompt", () => {
     expect(await getCopilotPrompt(maya, { templateId: ids["cash-back"]! })).toEqual({ ok: false, status: 409, code: "no_draft_to_write", reason: "There is no draft to write." });
     expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, code: "template_unavailable", reason: "This template isn't available." });
     expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
+  });
+
+  it("refuses an alert's draft: Copilot writes a document's body, and an alert has none", async () => {
+    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toEqual({
+      ok: false,
+      status: 409,
+      code: "copilot_documents_only",
+      reason: "Copilot drafts documents only.",
+    });
+  });
+
+  it("knows an alert by its content type, even when its draft's channels were emptied", async () => {
+    await db.update(versions).set({ channels: [] }).where(and(eq(versions.templateId, ids["rate-change-heads-up"]!), eq(versions.state, "draft")));
+    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toMatchObject({
+      ok: false,
+      code: "copilot_documents_only",
+    });
   });
 });

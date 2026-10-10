@@ -601,6 +601,33 @@
   background: var(--brand-1);
 }
 
+/* A flag (InlineVariableField's `flags`, extensions/text-flags.ts): text the host marks as a problem,
+   underlined in the warning colour where it sits, on a soft wash that reaches a little past it (a
+   shadow, so a single ’ still shows). Backgrounds, shadows and decoration only: nothing moves when it
+   comes or goes. A flag on text that draws nothing (a zero-width space) gets a sliver of width. */
+.ucomp-field-input .ucomp-flag {
+  border-radius: 2px;
+  background-color: var(--warning-soft);
+  box-shadow: 0 0 0 2px var(--warning-soft);
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--warning);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+  cursor: pointer;
+}
+
+.ucomp-field-input .ucomp-flag[data-invisible] {
+  display: inline-block;
+  min-width: 0.375em;
+  height: 1.2em;
+  vertical-align: -0.2em;
+  border-radius: 2px;
+  background-color: var(--warning-border);
+  text-decoration: none;
+}
+
 .ucomp-field-input img.ProseMirror-separator {
   display: inline !important;
   border: none !important;

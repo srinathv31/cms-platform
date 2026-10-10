@@ -6,7 +6,8 @@ import type { VarKey } from "../variables";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
-// Coral Offers: five templates that put every lifecycle state on screen (build plan, "Seed data").
+// Coral Offers: five disclosures that put every lifecycle state on screen (build plan, "Seed data"). Its
+// alerts are in coral-alerts.ts.
 // Times are days before the reset.
 
 const CUSTOMER_KEYS: VarKey[] = ["first_name", "last_name", "purchase_apr", "home_state"];
@@ -528,9 +529,11 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           body: rateChangeBody(),
           variables: vars.list([...CUSTOMER_KEYS, "effective_date"]),
           channels: ["pdf", "web", "email"],
-          email: {
-            subject: inlineDoc("Your purchase APR is changing on {effective_date}"),
-            preheader: inlineDoc("Hi {first_name}, here is what is changing on your Coral account."),
+          channelFields: {
+            email: {
+              subject: inlineDoc("Your purchase APR is changing on {effective_date}"),
+              preheader: inlineDoc("Hi {first_name}, here is what is changing on your Coral account."),
+            },
           },
           createdBy: "maya",
           createdAt: 130,

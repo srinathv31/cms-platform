@@ -43,9 +43,15 @@ export function rich(source: string): JSONContent[] {
 
 const paragraph = (source: string): JSONContent => ({ type: "paragraph", content: rich(source) });
 
-/** A one-paragraph document for the email subject and preheader. */
+/** A one-paragraph document: a one-line channel field (the email subject and preheader, a push title or body). */
 export function inlineDoc(source: string): JSONContent {
   return { type: "doc", content: [paragraph(source)] };
+}
+
+/** A `lines` channel field (an SMS message): one paragraph, each line after the first behind a hard break. */
+export function linesDoc(...lines: string[]): JSONContent {
+  const content = lines.flatMap((line, i) => [...(i > 0 ? [{ type: "hardBreak" }] : []), ...rich(line)]);
+  return { type: "doc", content: [{ type: "paragraph", content }] };
 }
 
 // ── Blocks ────────────────────────────────────────────────────
@@ -143,6 +149,14 @@ export function buildDoc(scope: string, blocks: Block[]): JSONContent {
     return { ...node, attrs: { id, ...node.attrs } };
   });
   return { type: "doc", content };
+}
+
+/**
+ * An alert's body: one empty paragraph. A message renders only its own channel fields and never a body
+ * (decision 0034), but every version has one.
+ */
+export function emptyBody(scope: string): JSONContent {
+  return buildDoc(scope, [{ key: "empty", node: { type: "paragraph" } }]);
 }
 
 /** A disclosure body: the three required sections in order, each followed by its blocks. */

@@ -17,6 +17,7 @@ import { findRound } from "./find-round";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "./review";
+import { anchorIdsOf } from "./review-shared";
 import { getThreads, loadThreads } from "./threads";
 import { getVersions } from "./versions";
 import { getWorkspaceDocument } from "./workspace";
@@ -40,7 +41,7 @@ vi.mock("@/server/db/client", async () => {
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
-const { commentThreads, versions } = schema;
+const { commentThreads, contentTypes, versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
@@ -70,9 +71,10 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 // ── Queue ─────────────────────────────────────────────────────
 
 describe("getReviewQueue", () => {
-  it("Jordan waits on Cash Back v3 round 2, and sees its round 1 and Annual Fee Waiver among the recent decisions", async () => {
+  it("Jordan waits on Cash Back v3 round 2 and the Card Used Abroad alert, and sees Cash Back's round 1 and Annual Fee Waiver among the recent decisions", async () => {
     as("jordan");
     const queue = await getReviewQueue("coral-offers");
+    // Newest submitted first: Cash Back v3 went in after the alert.
     expect(queue.waiting).toEqual([
       {
         templateId: ids["cash-back"],
@@ -87,6 +89,20 @@ describe("getReviewQueue", () => {
         submittedAt: expect.stringMatching(ISO),
         stage: { position: 0, name: "Team approver", count: 1 },
         breaking: true,
+      },
+      {
+        templateId: ids["card-used-abroad"],
+        templateName: "Card Used Abroad",
+        teamSlug: "coral-offers",
+        teamName: "Coral Offers",
+        versionId: expect.any(String),
+        versionNumber: 1,
+        round: 1,
+        state: "in_review",
+        author: { id: "priya", name: "Priya Raman", initials: "PR", hue: expect.any(Number) },
+        submittedAt: expect.stringMatching(ISO),
+        stage: { position: 0, name: "Team approver", count: 1 },
+        breaking: false,
       },
     ]);
     expect(queue.submitted).toEqual([]);
@@ -110,7 +126,7 @@ describe("getReviewQueue", () => {
         decision: { kind: "changes_requested", by: expect.objectContaining({ id: "jordan" }), at: expect.stringMatching(ISO) },
       }),
     ]);
-    expect(await getReviewBadgeCount("coral-offers")).toBe(1);
+    expect(await getReviewBadgeCount("coral-offers")).toBe(2);
   });
 
   it("Maya submitted it: nothing waits on her", async () => {
@@ -151,6 +167,7 @@ describe("getReviewScreen", () => {
       teamId: "coral-offers",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
+      family: "document",
     });
     expect(screen.version).toMatchObject({
       number: 3,
@@ -223,7 +240,8 @@ describe("getReviewScreen", () => {
       });
       const queue = await getReviewQueue("coral-offers");
       expect(queue.waiting).toEqual([]);
-      expect(queue.submitted).toEqual([]);
+      // What Priya submitted herself is hers to watch, not to decide: the Card Used Abroad alert.
+      expect(queue.submitted.map((r) => [r.templateId, r.versionNumber])).toEqual([[ids["card-used-abroad"], 1]]);
       expect(await getReviewBadgeCount("coral-offers")).toBe(0);
 
       as("jordan");
@@ -354,7 +372,16 @@ describe("getReviewScreen", () => {
         async () => {},
         async () => {
           const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
-          expect(screen.baseline).toEqual({ id: v2.id, number: 2, state: "revoked", body: v2.body, variables: v2.variables });
+          expect(screen.baseline).toEqual({
+            id: v2.id,
+            number: 2,
+            state: "revoked",
+            body: v2.body,
+            variables: v2.variables,
+            channels: v2.channels,
+            channelFields: v2.channelFields,
+            smsFooter: null,
+          });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
         },
       );
@@ -695,8 +722,8 @@ describe("threads on a submitted version", () => {
       expect(mine(await screen(2))).toEqual(["th_f3a_v1"]);
       expect(mine(await screen(3))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
       // Without a version, everything on the template (the editor's margin).
-      const body = (await db.query.versions.findFirst({ where: eq(versions.id, await versionId(templateId, 3)) }))!.body;
-      expect(mine(await loadThreads(templateId, body))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
+      const v3 = (await db.query.versions.findFirst({ where: eq(versions.id, await versionId(templateId, 3)) }))!;
+      expect(mine(await loadThreads(templateId, anchorIdsOf(v3)))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
       // By id: the same rule.
       expect(mine(await getThreads("coral-offers", templateId, await versionId(templateId, 2)))).toEqual(["th_f3a_v1"]);
     } finally {
@@ -781,5 +808,61 @@ describe("the workspace's comment permission", () => {
     const document = await getWorkspaceDocument("coral-offers", ids["rate-change-notice"]!);
     expect(document.versionNumber).toBe(1);
     expect(document.can.comment).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+  });
+});
+
+describe("an alert's family", () => {
+  it("comes from its content type, even when its version's channels were emptied", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const where = and(eq(versions.templateId, templateId), eq(versions.number, 1));
+    const { channels } = (await db.query.versions.findFirst({ where }))!;
+    await db.update(versions).set({ channels: [] }).where(where);
+    try {
+      as("jordan");
+      expect((await getReviewScreen("coral-offers", templateId, 1, null)).template.family).toBe("message");
+    } finally {
+      await db.update(versions).set({ channels }).where(where);
+    }
+  });
+});
+
+describe("an alert's SMS footer", () => {
+  it("is the one frozen into the version at submit, for the preview and the fields, whatever the content type's is now", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const frozen = "Coral: Reply STOP to opt out, HELP for help.";
+    await db.update(contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(contentTypes.id, "ct_alert"));
+    try {
+      as("jordan");
+      const screen = await getReviewScreen("coral-offers", templateId, 1, null);
+      expect(screen.version.smsFooter).toBe(frozen);
+      expect(screen.messageRules.smsFooter).toBe(frozen);
+    } finally {
+      await db.update(contentTypes).set({ smsFooter: frozen }).where(eq(contentTypes.id, "ct_alert"));
+    }
+  });
+});
+
+describe("an alert's threads, on its fields", () => {
+  it("lists a thread on a field in the fields' order, not as orphaned, on the review screen and in the workspace", async () => {
+    const templateId = ids["card-used-abroad"]!;
+    const v1 = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) }))!;
+    const rows = [
+      { id: "th_alert_sms", blockId: "sms.text" },
+      { id: "th_alert_title", blockId: "push.title" },
+    ].map((r, i) => ({ ...r, templateId, originVersionId: v1.id, createdAt: new Date(BASE.getTime() - i * 1000) }));
+    await db.insert(commentThreads).values(rows);
+    try {
+      as("jordan");
+      const threads = (await getReviewScreen("coral-offers", templateId, 1, null)).threads.filter((t) => t.id.startsWith("th_alert"));
+      expect(threads.map((t) => [t.id, t.orphaned])).toEqual([
+        ["th_alert_title", false],
+        ["th_alert_sms", false],
+      ]);
+      as("priya");
+      const margin = (await getWorkspaceDocument("coral-offers", templateId)).threads.filter((t) => t.id.startsWith("th_alert"));
+      expect(margin.map((t) => t.orphaned)).toEqual([false, false]);
+    } finally {
+      await db.delete(commentThreads).where(inArray(commentThreads.id, rows.map((r) => r.id)));
+    }
   });
 });

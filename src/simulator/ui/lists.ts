@@ -3,6 +3,7 @@ import { asc, desc } from "drizzle-orm";
 import { connection } from "next/server";
 import { simCustomers, simDeliveries, simOffers } from "@/server/db/schema/sim";
 import { simDb } from "@/simulator/db";
+import { customerRow } from "@/simulator/queries";
 import type { SimCustomerRow } from "@/simulator/types";
 
 // Read models for Coral's Customers and Deliveries lists. Coral's own tables only; nothing here calls UCOMP.
@@ -10,14 +11,7 @@ import type { SimCustomerRow } from "@/simulator/types";
 export async function getSimCustomers(): Promise<SimCustomerRow[]> {
   await connection();
   const rows = await simDb.select().from(simCustomers).orderBy(asc(simCustomers.id));
-  return rows.map((c) => ({
-    id: c.id,
-    name: `${c.firstName} ${c.lastName}`,
-    email: c.email,
-    homeState: c.homeState,
-    purchaseApr: c.purchaseApr,
-    annualFee: c.annualFee,
-  }));
+  return rows.map(customerRow);
 }
 
 export interface SimBatchSummary {

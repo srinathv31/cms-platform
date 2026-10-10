@@ -1,0 +1,61 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A value switches to UCS-2",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "last_name",
+      "label": "Last name",
+      "type": "text",
+      "required": true,
+      "sample": "Chen"
+    }
+  ],
+  "values": {
+    "last_name": "Gómez"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Coral Offers: Ms. "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "last_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", your new card has shipped."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ],
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."
+}

@@ -258,7 +258,7 @@ function buildRows(
   return rows.sort(compareUsageRows);
 }
 
-const emptyChannels = (): Record<Channel, number> => ({ pdf: 0, web: 0, email: 0 });
+const emptyChannels = (): Record<Channel, number> => ({ pdf: 0, web: 0, email: 0, push: 0, sms: 0 });
 
 function trendWeeks(w: UsageWindows): string[] {
   return Array.from({ length: TREND_WEEKS }, (_, i) => addDays(w.trendFrom, i * 7));

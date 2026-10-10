@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   BusinessZoneSection,
   ChannelRuleRow,
+  ContentTypeView,
   InactivityRow,
   InactivitySection,
   MemberRow,
@@ -41,6 +42,7 @@ vi.mock("@/server/actions/platform", () => ({
 }));
 
 const { ChannelRulesSectionView } = await import("./platform/channel-rules");
+const { ContentTypesSectionView } = await import("./platform/content-types");
 const { InactivityView } = await import("./team/inactivity-view");
 const { MembersTable } = await import("./team/members-table");
 const { RecertificationView } = await import("./team/recertification-view");
@@ -132,22 +134,82 @@ describe("Channel rules", () => {
   const row = (toggle: ChannelRuleRow["can"]["toggle"]): ChannelRuleRow => ({
     contentTypeId: "ct_disclosure",
     name: "Disclosure",
-    allowed: { pdf: true, web: true, email: true },
-    activeUsing: { pdf: 1, web: 1, email: 0 },
+    allowed: { pdf: true, web: true, email: true, push: false, sms: false },
+    activeUsing: { pdf: 1, web: 1, email: 0, push: 0, sms: 0 },
     can: { toggle },
   });
+  const family = { ok: false, code: "channel_family", reason: "Disclosures are documents. Push and SMS go on Alert templates." } as const;
 
-  it("disables exactly the switches the read model refuses", async () => {
+  it("blocks exactly the switches the read model refuses: greyed in place, still focusable, with the reason", async () => {
     // Three channels on, so the rule alone would refuse none: the refusal here is the server's word.
     await show(
       <ChannelRulesSectionView
-        section={{ channels: ["pdf", "web", "email"], rows: [row({ pdf: OK, web: { ok: false, code: "last_channel", reason: "Decided by the server." }, email: OK })] }}
+        section={{
+          channels: ["pdf", "web", "email", "push", "sms"],
+          rows: [row({ pdf: OK, web: { ok: false, code: "last_channel", reason: "Decided by the server." }, email: OK, push: family, sms: family })],
+        }}
       />,
     );
-    const sw = (label: string) => container.querySelector(`[role="switch"][aria-label="${label}"]`)!;
-    expect(sw("Disclosure on Web").hasAttribute("data-disabled")).toBe(true);
-    expect(sw("Disclosure on PDF").hasAttribute("data-disabled")).toBe(false);
-    expect(sw("Disclosure on Email").hasAttribute("data-disabled")).toBe(false);
+    const sw = (label: string) => container.querySelector<HTMLElement>(`[role="switch"][aria-label="${label}"]`)!;
+    const reason = (el: HTMLElement) => document.getElementById(el.getAttribute("aria-describedby") ?? "")?.textContent ?? null;
+    for (const label of ["Disclosure on Web", "Disclosure on Push", "Disclosure on SMS"]) {
+      const blocked = sw(label);
+      expect(blocked.getAttribute("aria-disabled"), label).toBe("true");
+      expect(blocked.hasAttribute("data-disabled"), `${label}: not disabled, so Tab reaches it and its reason`).toBe(false);
+      expect(blocked.tabIndex, label).toBe(0);
+    }
+    expect(reason(sw("Disclosure on Web"))).toBe("Decided by the server.");
+    // The other family's channels show greyed, not hidden, and say why.
+    expect(reason(sw("Disclosure on Push"))).toBe(family.reason);
+    for (const label of ["Disclosure on PDF", "Disclosure on Email"]) {
+      expect(sw(label).hasAttribute("aria-disabled"), label).toBe(false);
+      expect(sw(label).hasAttribute("aria-describedby"), label).toBe(false);
+    }
+
+    // Pressing a blocked switch does nothing: it doesn't flip, and asks for no turn-off.
+    const { setChannelRule } = await import("@/server/actions/platform");
+    await click(sw("Disclosure on Web"));
+    expect(sw("Disclosure on Web").getAttribute("aria-checked")).toBe("true");
+    expect(strip()).toBeNull();
+    await click(sw("Disclosure on Push"));
+    expect(sw("Disclosure on Push").getAttribute("aria-checked")).toBe("false");
+    expect(setChannelRule).not.toHaveBeenCalled();
+
+    // An unblocked one still asks before turning off.
+    await click(sw("Disclosure on PDF"));
+    expect(strip()).not.toBeNull();
+  });
+});
+
+describe("Content types", () => {
+  const type = (id: string, name: string, editSections: ContentTypeView["can"]["editSections"]): ContentTypeView => ({
+    id,
+    key: id,
+    name,
+    family: "document",
+    requiredSections: [{ key: "terms", title: "Terms" }],
+    allowedChannels: ["pdf", "web"],
+    smsFooter: null,
+    smsMaxParts: 3,
+    templates: 1,
+    can: { editSections },
+  });
+
+  it("keeps the Edit sections the read model refuses in place, greyed and still focusable, with its reason", async () => {
+    const refused = { ok: false, code: "sections_on_messages", reason: "Decided by the server." } as const;
+    await show(<ContentTypesSectionView types={[type("ct_a", "Notice", OK), type("ct_b", "Alert", refused)]} />);
+    const blocked = buttonNamed("Edit Alert sections")!;
+    expect(blocked.hasAttribute("disabled"), "not the native disabled: Tab would skip it and its reason").toBe(false);
+    expect(blocked.getAttribute("aria-disabled")).toBe("true");
+    expect(blocked.hasAttribute("data-disabled")).toBe(true);
+    expect(document.getElementById(blocked.getAttribute("aria-describedby")!)?.textContent).toBe("Decided by the server.");
+    await click(blocked);
+    expect(container.querySelector('[data-slot="sections-editor"]')).toBeNull();
+
+    const open = buttonNamed("Edit Notice sections")!;
+    expect(open.hasAttribute("aria-disabled")).toBe(false);
+    await click(open);
+    expect(container.querySelector('[data-slot="sections-editor"]')).not.toBeNull();
   });
 });
 

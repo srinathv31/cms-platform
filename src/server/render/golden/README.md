@@ -1,9 +1,10 @@
 # `src/server/render/golden`: golden files for the render engine
 
-The golden files freeze what the render engine prints. Each case is one document, with its variables
-and values, and the exact output of every channel for it: the RenderDoc, the web page, the email
-(HTML, plain text, subject and preheader) and the PDF. Any change that moves one byte of output shows
-up here as a file diff that someone has to read and accept.
+The golden files freeze what the render engine prints. Each case is one template, with its variables
+and values, and the exact output of every channel it lists: for a document, the RenderDoc, the web page,
+the email (HTML, plain text, subject and preheader) and the PDF; for a message, the push for iPhone and for
+Android and the SMS. Any change that moves one byte of output shows up here as a file diff that someone
+has to read and accept.
 
 They exist for two reasons:
 
@@ -62,7 +63,7 @@ cases/<slug>/
 
 | File | What it holds |
 | --- | --- |
-| `input.json` | The frozen input (`RenderFixture`): template id and name, version number (null for a draft), `at` (the render time, used as the PDF's dates), the variables, the values as a request sends them (JSON numbers are read from their source text, so `21.90` stays `21.90`), the body, the email subject and preheader. |
+| `input.json` | The frozen input (`RenderFixture`): template id and name, version number (null for a draft), `at` (the render time, used as the PDF's dates), the variables, the values as a request sends them (JSON numbers are read from their source text, so `21.90` stays `21.90`), the body (a message case's is an empty document, never read), the channel fields as a version stores them (`channelFields`: `{}`, `{ "email": { "subject", "preheader" } }`, `{ "push": { … }, "sms": { "text" } }`), the channels the case renders (`channels`, one family), and for a message the content type's SMS footer (`smsFooter`, absent for none). |
 | `expected/renderdoc.json` | The resolved document (spec section 9). |
 | `expected/web.html` | The web page. |
 | `expected/email.html` | The email HTML. |
@@ -72,6 +73,8 @@ cases/<slug>/
 | `expected/links.json` | `[ { "text", "url" } ]` in document order. |
 | `expected/pdf.meta.json` | The PDF's title, subject, creator, producer, language and dates. Absent when the PDF fails. |
 | `expected/error.json` | Only for a case refused before any channel: `{ "code", "message", "details" }`, and then the only file besides `input.json` (no `node/`). |
+| `expected/push.ios.json`, `expected/push.android.json` | A push case: the push the route returns for that platform, `{ "title", "subtitle"?, "body", "payloadBytes" }` (Android's never has a subtitle). `push.<platform>.error.json` instead when that render is refused (over 4,096 bytes). |
+| `expected/sms.json` | An SMS case: `{ "text", "encoding", "parts", "characters" }`, the footer on the text's last line. `sms.error.json` instead when it is refused (over 10 parts). |
 | `node/pdf.layout.txt` | A picture of the PDF's layout: the metadata (dates left out), then every text line by page, with its indent (in steps of `indentStep`), `#` marks for heading sizes, `∅` for a blank paragraph's gap, the footer and the links. Wraps and page breaks show here. |
 | `node/pdf.json` | Page count, missing glyphs (always 0) and link annotations with their page. |
 | `node/pdf.error.json` | Only when the PDF must fail: the error, alone in `node/`. |
@@ -79,10 +82,11 @@ cases/<slug>/
 JSON files are compared as parsed JSON (key order and whitespace don't matter); `.html` and `.txt`
 files byte for byte.
 
-A case renders the channels in the order PDF, web, email. A refusal before the adapter (values, the
-document check, the resolver) ends the case, so a refused body reads "The PDF couldn't be rendered.
-…", and a refused subject or preheader (only email checks them) reads "The email couldn't be
-rendered. …".
+A case renders only the channels it lists (`channels`), in the order PDF, web, email, push (iPhone, then
+Android), SMS. A refusal before the adapter (values, the document check, the resolver) ends the case, so a
+refused body reads "The PDF couldn't be rendered. …", and a refused subject or preheader (only email checks
+them) reads "The email couldn't be rendered. …". A message case writes no `renderdoc.json`, `content.txt` or
+`links.json`: a message has no document.
 
 ## Case names
 
@@ -92,8 +96,10 @@ The prefix is an assertion: `parity.test.ts` checks it.
 | --- | --- |
 | `error-` | Must be refused before any channel renders: `expected/error.json` only. |
 | `pdf-error-` | Every channel renders except the PDF, which fails with `render_failed` (characters its font can't draw): `node/pdf.error.json`, no `pdf.meta.json`. |
+| `push-error-` | The push is refused on both platforms (`push_payload_too_large`): `push.ios.error.json` and `push.android.error.json`. |
+| `sms-error-` | The SMS is refused (`sms_too_long`): `sms.error.json`. |
 | `seed-` | A realistic disclosure frozen from the seed by `golden:import`: `seed-<template key>-v<version>-<sample set>`, or `-draft-` for the open draft. Its `input.json` is never rewritten. |
-| anything else | A hand-built case from `focused-cases.ts` that renders in every channel. The first word groups it: `lists-`, `spaces-`, `characters-`, `table-`, … |
+| anything else | A hand-built case from `focused-cases.ts` that renders in every channel it lists. The first word groups it: `lists-`, `spaces-`, `characters-`, `table-`, `push-`, `sms-`, `alert-`, … |
 
 Slugs are lowercase letters, digits and dashes.
 
@@ -104,7 +110,7 @@ All four run in `npm test`.
 | Test | What it checks | Can an update approve it? |
 | --- | --- | --- |
 | `golden.test.ts` | Per case: a hand-built case's `input.json` equals what `focused-cases.ts` writes; `expected/` and `node/` hold exactly the files the engine produces, with the same contents. A missing, extra or different file fails and names the file. | Yes: `npm run golden:update` rewrites them. It isn't a vitest snapshot, so `vitest -u` does nothing here. |
-| `parity.test.ts` | Per case: the `error-` / `pdf-error-` promise; the RenderDoc invariants; the web HTML, email HTML, email text and PDF all show the RenderDoc's content (markers, blank lines, links; typed spaces and every hard break in the HTML); no list markup a browser or mail client would number; zero missing glyphs; the PDF's dates equal `at`; a second run gives identical files and PDF bytes. | No. Plain assertions on the engine's output; nothing on disk changes the outcome. |
+| `parity.test.ts` | Per case: the `error-` / `pdf-error-` / `push-error-` / `sms-error-` promise; a message's platforms agree (Android's push is iPhone's without the subtitle) and its `payloadBytes`, encoding, parts and characters are its text measured again, the footer on its own last line; the RenderDoc invariants; the web HTML, email HTML, email text and PDF all show the RenderDoc's content (markers, blank lines, links; typed spaces and every hard break in the HTML); no list markup a browser or mail client would number; zero missing glyphs; the PDF's dates equal `at`; a second run gives identical files and PDF bytes. | No. Plain assertions on the engine's output; nothing on disk changes the outcome. |
 | `parity-detects.test.ts` | The parity check checks itself: it plants one defect at a time (a changed marker, a dropped paragraph, collapsed spaces, a changed link address, two cells swapped, a missing glyph, …) in one channel's output of `lists-mixed`, `links`, `blank-lines`, `spaces-and-breaks` and `tables`, and requires `parityProblems` to report it. | No. Renaming or removing those five cases breaks it. |
 | `determinism.test.ts` | Every case in every channel, plus probe documents that would leave state behind (a soft hyphen, leading no-break spaces, characters that share a glyph, a character the PDF can't draw), rendered in two fresh Node processes in opposite orders: every output must be identical. | No. |
 
@@ -126,7 +132,7 @@ It checks nothing else. Run `npm test` afterwards to see whether parity still ho
 
 **`npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]`** freezes
 one seeded version as a new case: `cases/<slug>/input.json` holds a copy of the version's document,
-variables, email fields and one sample set's values, with `at` set to `GOLDEN_AT`. It reads a
+variables, channel fields and one sample set's values, every channel of its family (and a message's SMS footer), with `at` set to `GOLDEN_AT`. It reads a
 throwaway database built by the real seed, never `data/ucomp.db`, so it gives the same file on every
 machine. It refuses to overwrite an existing case. Then write the case's output:
 
@@ -188,7 +194,12 @@ A hand-built case pins one rule or group of rules:
 1. In `focused-cases.ts`, build the document with the builders from `src/server/render/testing/tiptap.ts`
    (`doc`, `p`, `t`, `para`, `h`, `br`, `ul`, `ol`, `li`, `item`, `table`, `row`, `cell`, `callout`,
    `link`, `v` for a variable chip, `variable(...)` for its definition), and wrap it in
-   `make(slug, templateName, { body, variables, values, emailSubject, emailPreheader })`.
+   `make(slug, templateName, { body, variables, values, channelFields })`, where `channelFields` is
+   `{ email: { subject: line(…), preheader: line(…) } }` for a case about the email's own fields. A
+   case renders PDF, web and email unless it says otherwise (`channels`). A push or SMS case uses
+   `message(slug, templateName, { channels: ["push"] | ["sms"] | ["push", "sms"], channelFields, smsFooter? })`,
+   with no body: `channelFields` is `{ push: { title, subtitle?, body }, sms: { text } }`, each a `line(…)`
+   (an SMS's line breaks are `br`).
 2. Values go in as a request sends them: strings for text, `num("21.90")` for a JSON number written
    exactly as typed.
 3. Add the case to `FOCUSED_CASES`.

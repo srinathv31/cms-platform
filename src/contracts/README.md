@@ -27,10 +27,31 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 | `GET /api/v1/templates?q=&limit=&after=` | `ApiTemplateSearch`, `ApiTemplateSummary`, `ApiPage` | [templates/route.ts](../app/api/v1/templates/route.ts) |
 | `GET /api/v1/templates/{id}?version=&since=` | `ApiTemplateDetail`, `ApiVersionSummary`, `ApiContract`, `ApiVariable`, `ApiJsonSchema`, `ApiContractDiff`, `ApiContractChange` | [templates/[templateId]/route.ts](<../app/api/v1/templates/[templateId]/route.ts>) |
 | `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind`, `ApiPage` | [notices/route.ts](<../app/api/v1/consumers/[consumerId]/notices/route.ts>) |
-| `POST /api/v1/templates/{id}/render` | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response` (a raw PDF or HTML answer has no type) | [render/route.ts](<../app/api/v1/templates/[templateId]/render/route.ts>) |
+| `POST /api/v1/templates/{id}/render` | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response`, `ApiPushResponse`, `ApiSmsResponse` (a raw PDF or HTML answer has no type); errors `ApiPushTooLargeDetails`, `ApiSmsTooLongDetails` | [render/route.ts](<../app/api/v1/templates/[templateId]/render/route.ts>) |
 
 Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
 previews.
+
+## Channels: documents and messages
+
+`ApiChannel` is `pdf`, `web`, `email` (a document template's: its body) or `push`, `sms` (a message template's, such
+as an Alert: its own short fields). A template is one or the other, so a version's `channels` never mix
+([decision 0034](../../docs/decisions/0034-message-channels-families-and-the-fields-registry.md)).
+
+- **Push** needs `platform: "ios" | "android"` (`ApiPushPlatform`); no other channel takes one (400 `bad_request`).
+  The answer is the push for that platform, `ApiPushResponse`: the title, the subtitle (iPhone only: never for
+  Android, and only when it has text) and the body, all in full, and `payloadBytes`, the UTF-8 size of the
+  notification JSON this text makes (APNs' for iOS, FCM's for Android). The consumer's own keys add to it: they have
+  4,096 − `payloadBytes` left, 2,048 for an FCM topic message. Over 4,096 is 422 `push_payload_too_large`.
+- **SMS** answers `ApiSmsResponse`: the text to send as is, the version's footer (frozen at submit) on its last line, its
+  `encoding` (`ApiSmsEncoding`, `GSM-7` or `UCS-2`), `parts` and `characters`. A value is never transliterated: one
+  outside GSM-7 switches the message to UCS-2, and `encoding` says so. Over 10 parts is 422 `sms_too_long`. Turn off
+  provider rewriting such as Twilio's Smart Encoding: the counts are for this text
+  ([decision 0035](../../docs/decisions/0035-sms-characters-and-length.md)).
+- `encoding: "base64"` is for PDF, web and email only; push and SMS are JSON already (400 `bad_request`).
+
+`src/domain/golive-types.ts` holds `ApiChannel` and `Channel` equal, and `ApiPushPlatform`, `ApiSmsEncoding`, the
+push and SMS bodies and their error details equal to the domain's, at compile time (`_DriftChecks`).
 
 ## Notices
 
@@ -107,11 +128,13 @@ repeats their statuses and is read only by `src/domain/render/errors.test.ts`; t
 - [src/simulator/types.ts](../simulator/types.ts): Coral's read models, built on the `Api*` types it imports directly.
 
 `_DriftChecks` in `golive-types.ts` is a tuple of `Assert<Fits<A, B>>` types (`Fits`: A is assignable to B), so `tsc`
-fails when the domain's types stop fitting the wire shapes: `RenderErrorCode` into `ApiErrorCode`, `RenderErrorBody`
-into `ApiErrorBody`, `EmailResponseBody` into `ApiEmailResponse`, `Base64ResponseBody` into `ApiBase64Response`,
-`VariableType` and `ApiVariableType` both ways, `ConsumerNoticeKind` into `ApiNotice["kind"]`, and the contract
-change kinds (`ContractChange["kind"]` and `ApiContractChange["kind"]`) both ways. `ApiChannel`,
-`ApiVersionState` and `ApiRenderRequest` have no explicit check. Only `npm run typecheck` and `next build` run them.
+fails when the domain's types stop fitting the wire shapes: `Channel` and `ApiChannel` both ways, `RenderErrorCode`
+into `ApiErrorCode`, `RenderErrorBody` into `ApiErrorBody`, `EmailResponseBody` into `ApiEmailResponse`,
+`Base64ResponseBody` into `ApiBase64Response`, `VariableType` and `ApiVariableType` both ways, `ConsumerNoticeKind`
+into `ApiNotice["kind"]`, and the contract change kinds (`ContractChange["kind"]` and `ApiContractChange["kind"]`)
+both ways. `ApiVersionState` and `ApiRenderRequest` have no explicit check. Only `npm run typecheck` and
+`next build` run them. A channel added to the domain therefore has to be added to `ApiChannel`, and from there
+Coral's client (`src/simulator/ucomp-api.ts`) fails to compile until it handles it.
 
 To change the contract: edit `api-v1.ts`, then the Stencil side that builds the shape (`consumer-api.ts`,
 `src/domain/golive/`, or `src/domain/render/types.ts` for the render route), run `npm run typecheck`, then update

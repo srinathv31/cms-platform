@@ -48,6 +48,8 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
   the editor only `@/editor/model/*`.
 - `src/editor` imports no `next/*` and no app code; from `src/components`, only `@/components/ui/*`.
 - `src/contracts` imports nothing.
+- `src/components/device` (the phone kit, shared with Coral) imports nothing from `@/domain`, `@/server`,
+  `@/editor` or `@/app`, and from `src/components` only `ui/`, `primitives/` and `motion/`.
 - `src/simulator` and `src/app/(simulator)` import nothing from `@/server`, `@/domain`, or `@/editor`, except
   `@/server/db/schema/sim`. Nothing outside them (but the seed and reset) imports simulator code or tables.
 - There is no `@/editor` barrel. Import each export from the module that defines it.

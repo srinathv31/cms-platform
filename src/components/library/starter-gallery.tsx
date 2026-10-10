@@ -1,20 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { m } from "motion/react";
+import { fadeRise } from "@/components/motion/presets";
+import { Segmented, type SegmentedOption } from "@/components/primitives/segmented";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Spinner } from "@/components/ui/spinner";
+import { importUnavailable } from "@/domain/import-types";
+import { CHANNEL_FAMILIES, TEMPLATE_KIND_LABELS, type ChannelFamily } from "@/domain/types";
 import { createTemplate } from "@/server/actions/create-template";
-import { STARTERS, type StarterKey } from "@/server/starters/catalog";
+import { STARTERS, type StarterChoice } from "@/server/starters/catalog";
 import { cn } from "@/lib/utils";
 import { ImportRow } from "./import-row";
 import { StarterPreview } from "./starter-preview";
 
+/** Document · Alert: which kind of template, and so its content type for life (decision 0034). */
+const KINDS: readonly SegmentedOption<ChannelFamily>[] = CHANNEL_FAMILIES.map((family) => ({
+  value: family,
+  label: TEMPLATE_KIND_LABELS[family],
+}));
+
+const sameChoice = (a: StarterChoice | null, b: StarterChoice) => a?.family === b.family && a.starterKey === b.starterKey;
+
 /**
- * The starting points: Blank first, then the examples. Picking one creates the template and opens it,
- * so choosing a card is the second click from the Library. Under the cards, the dashed "Import a file"
- * row makes a template from a .docx, .pdf or .txt instead. Used in the New template dialog and,
- * inline, as the empty state of a team's Library. One thing happens at a time: while a card is
- * creating or a file is importing, the rest are locked. A refusal shows its sentence under the cards.
+ * The starting points. Over them, Document · Alert chooses the kind of template: a document renders one
+ * body to PDF, Web and Email, an alert its own push and text message, and a template stays the kind it
+ * was made as. Each kind has its own starters, Blank first; Document is chosen when the gallery opens, so
+ * a document is still two clicks from the Library. Picking a card creates the template and opens it.
+ * Under the cards, the dashed "Import a file" row makes a document from a .docx, .pdf or .txt instead;
+ * with Alert chosen it stays in place, disabled, with its reason. Used in the New template dialog and,
+ * inline, as the empty state of a team's Library. One thing happens at a time: while a card is creating
+ * or a file is importing, the rest (the kind too) are locked. A refusal shows its sentence under the cards.
  *
  * `onImported` is called when the new template has opened, from a card as from a file.
  *
@@ -41,11 +57,13 @@ export function StarterGallery({
   /** A template was made (from a card or a file) and has opened: the dialog closes along with that navigation. */
   onImported?: () => void;
 }) {
-  const { pending, error, run } = useActionRun("Couldn't create the template. Try again.");
-  const [picked, setPicked] = useState<StarterKey | null>(null);
+  const { pending, error, setError, run } = useActionRun("Couldn't create the template. Try again.");
+  const [family, setFamily] = useState<ChannelFamily>("document");
+  const [picked, setPicked] = useState<StarterChoice | null>(null);
   const [importing, setImporting] = useState(false);
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
   const busy = pending || importing;
+  const starters = STARTERS[family];
 
   useEffect(() => {
     onBusyChange?.(busy);
@@ -64,14 +82,21 @@ export function StarterGallery({
 
   const onImportBusy = useCallback((next: boolean) => setImporting(next), []);
 
-  function pick(starterKey: StarterKey) {
+  function choose(next: ChannelFamily) {
+    if (busy) return;
+    setFamily(next);
+    // A refusal was about the other kind's cards.
+    setError(null);
+  }
+
+  function pick(choice: StarterChoice) {
     if (busy) return;
     // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
-    if (run(() => createTemplate({ teamSlug, starterKey }), { onRefused: () => setPicked(null) })) setPicked(starterKey);
+    if (run(() => createTemplate({ teamSlug, ...choice }), { onRefused: () => setPicked(null) })) setPicked(choice);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const last = STARTERS.length - 1;
+    const last = starters.length - 1;
     const next = {
       ArrowRight: Math.min(index + 1, last),
       ArrowLeft: Math.max(index - 1, 0),
@@ -87,13 +112,19 @@ export function StarterGallery({
 
   return (
     <div>
-      <div
+      <Segmented label="Kind of template" value={family} options={KINDS} onChange={choose} disabled={busy} className="mb-5" />
+      {/* Keyed by the kind: the cards fade in when it changes, and a card's ref and focus belong to its kind. */}
+      <m.div
+        key={family}
+        {...fadeRise}
         role="group"
         aria-label="Starting points"
         className={cn("grid gap-4", columns === 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}
       >
-        {STARTERS.map((starter, index) => {
-          const isPicked = picked === starter.key;
+        {starters.map((starter, index) => {
+          const choice = { family, starterKey: starter.key } as StarterChoice;
+          const isPicked = sameChoice(picked, choice);
+          const id = `starter-${family}-${starter.key}-description`;
           return (
             <button
               key={starter.key}
@@ -105,10 +136,10 @@ export function StarterGallery({
                   else (firstCardRef as { current: HTMLButtonElement | null }).current = el;
                 }
               }}
-              aria-describedby={`starter-${starter.key}-description`}
+              aria-describedby={id}
               aria-disabled={busy && !isPicked ? true : undefined}
               aria-busy={isPicked && pending ? true : undefined}
-              onClick={() => pick(starter.key)}
+              onClick={() => pick(choice)}
               onKeyDown={(event) => onKeyDown(event, index)}
               className={cn(
                 "group/card flex flex-col gap-3 rounded-2xl border border-hairline bg-surface p-2.5 text-left outline-none transition-colors",
@@ -120,7 +151,7 @@ export function StarterGallery({
             >
               <span className="relative block">
                 <StarterPreview
-                  starter={starter.key}
+                  starter={choice}
                   className={cn(columns === 2 ? "h-36" : "h-44", "transition-opacity", isPicked && pending && "opacity-60")}
                 />
                 {isPicked && pending ? (
@@ -131,21 +162,19 @@ export function StarterGallery({
               </span>
               <span className="block px-1.5 pb-1">
                 <span className="block text-[15px] leading-5 font-medium text-text">{starter.name}</span>
-                <span
-                  id={`starter-${starter.key}-description`}
-                  className="mt-0.5 block text-[13px] leading-[18px] text-text-muted"
-                >
+                <span id={id} className="mt-0.5 block text-[13px] leading-[18px] text-text-muted">
                   {starter.description}
                 </span>
               </span>
             </button>
           );
         })}
-      </div>
+      </m.div>
       <div className="mt-4">
         <ImportRow
           teamSlug={teamSlug}
           locked={pending}
+          unavailable={importUnavailable(family)}
           onBusyChange={onImportBusy}
           onImported={onImported}
           rowRef={importRowRef}

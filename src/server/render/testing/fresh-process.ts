@@ -10,15 +10,16 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
-import type { EmailRender, RenderDoc, RenderError } from "@/domain/render/types";
+import { assertNever } from "@/domain/assert-never";
+import type { RenderDoc, RenderError, RenderTarget } from "@/domain/render/types";
 import type { Channel } from "@/domain/types";
 import { renderPdf } from "@/server/render/channels/pdf";
-import { runEngine } from "@/server/render/engine";
-import type { RenderFixture } from "./fixture";
+import { runEngine, type RenderBody } from "@/server/render/engine";
+import { engineInput, type RenderFixture } from "./fixture";
 
 export type FreshJob =
   /** The engine (stages 6 to 9), as the render route runs it. */
-  | { name: string; input: RenderFixture; channel: Channel }
+  | { name: string; input: RenderFixture; target: RenderTarget }
   /** The PDF adapter alone, on a RenderDoc as given (no resolver in front of it). */
   | { name: string; pdfDoc: RenderDoc; at: string };
 
@@ -91,19 +92,29 @@ export async function runJobs(jobs: readonly FreshJob[]): Promise<FreshResult[]>
       results.push({ name: job.name, ok: true, body: Buffer.from(bytes).toString("base64"), error: null });
       continue;
     }
-    const result = await runEngine(job.input, job.channel, new Date(job.input.at));
+    const result = await runEngine(engineInput(job.input), job.target, new Date(job.input.at));
     results.push(
       result.ok
-        ? { name: job.name, ok: true, body: bodyText(job.channel, result.body), error: null }
+        ? { name: job.name, ok: true, body: bodyText(job.target.channel, result.body), error: null }
         : { name: job.name, ok: false, body: null, error: result.error },
     );
   }
   return results;
 }
 
-function bodyText(channel: Channel, body: Uint8Array | string | EmailRender): string {
-  if (channel === "pdf") return Buffer.from(body as Uint8Array).toString("base64");
-  return typeof body === "string" ? body : JSON.stringify(body);
+function bodyText(channel: Channel, body: RenderBody): string {
+  switch (channel) {
+    case "pdf":
+      return Buffer.from(body as Uint8Array).toString("base64");
+    case "web":
+      return body as string;
+    case "email":
+    case "push":
+    case "sms":
+      return JSON.stringify(body);
+    default:
+      return assertNever(channel, "channel");
+  }
 }
 
 /** A PDF result's bytes. */

@@ -1,12 +1,12 @@
 "use client";
 
-import { Check, FileText, Globe, Mail, type LucideIcon } from "lucide-react";
+import { Check, FileText, Globe, Mail, MessageSquareText, Smartphone, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import { CHANNELS, type Channel } from "@/domain/types";
 
-const ICON: Readonly<Record<Channel, LucideIcon>> = { pdf: FileText, web: Globe, email: Mail };
+const ICON: Readonly<Record<Channel, LucideIcon>> = { pdf: FileText, web: Globe, email: Mail, push: Smartphone, sms: MessageSquareText };
 
 const CHIP =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium [&_svg]:size-3.5";

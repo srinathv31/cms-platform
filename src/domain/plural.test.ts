@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plural, pluralName, pluralWord } from "./plural";
+import { plural, pluralName, pluralWord, withArticle } from "./plural";
 
 describe("plural", () => {
   it("puts the count before the noun, singular only for one", () => {
@@ -34,5 +34,17 @@ describe("pluralName", () => {
     expect(pluralName("Policy")).toBe("Policies");
     expect(pluralName("Survey")).toBe("Surveys");
     expect(pluralName("Notices")).toBe("Notices");
+  });
+});
+
+describe("withArticle", () => {
+  it("puts an before a vowel and a before a consonant", () => {
+    expect(withArticle("email subject")).toBe("an email subject");
+    expect(withArticle("push title")).toBe("a push title");
+  });
+
+  it("reads a word in capitals letter by letter", () => {
+    expect(withArticle("SMS message")).toBe("an SMS message");
+    expect(withArticle("PDF")).toBe("a PDF");
   });
 });

@@ -198,7 +198,8 @@ test.describe("GET /api/v1/templates/{id}", () => {
     await expectError(await get(request, `/api/v1/templates/${hidden}`), 404, "template_not_found", `Template ${hidden} doesn't exist.`);
     await expectError(await get(request, `${base}?version=99`), 404, "version_not_found", `Template ${active.templateId} has no version 99.`);
 
-    const inReview = pick(all, "numbered version in review", (v) => v.state === "in_review" && v.number !== null);
+    // On a released template: one with nothing released is a 404 above, whatever its versions are.
+    const inReview = pick(all, "numbered version in review on a released template", (v) => v.state === "in_review" && v.number !== null && !unreleased(all).includes(v.templateId));
     const error = await expectError(
       await get(request, `/api/v1/templates/${inReview.templateId}?version=${inReview.number}`),
       409,

@@ -8,15 +8,17 @@ import { describeChanges } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
 import { REFUSALS, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
-import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
+import type { ChannelFamily, ContractChange, PermissionResult, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import {
+  anchorIdsOf,
   chainFor,
   decideCheck,
   getChains,
@@ -25,6 +27,8 @@ import {
   loadChain,
   loadConsumerUsage,
   loadDecisions,
+  loadFamily,
+  loadMessageRules,
   opensRound,
   personOf,
   requireReviewVersion,
@@ -226,16 +230,16 @@ function decideOnScreen(check: PermissionResult, state: string): PermissionResul
   return state === "in_review" ? check : refuse(REFUSALS.notInReview);
 }
 
-/** The baseline's document, for the redline: only the chosen version's body is read. */
+/** The baseline's content, for the redline: only the chosen version's body and channel fields are read. */
 async function loadBaseline(
   base: { id: string; number: number | null; state: VersionState } | null,
 ): Promise<ReviewScreenData["baseline"]> {
   if (!base || base.number === null) return null;
   const row = await db.query.versions.findFirst({
-    columns: { body: true, variables: true },
+    columns: { body: true, variables: true, channels: true, channelFields: true, smsFooter: true },
     where: eq(versions.id, base.id),
   });
-  return row ? { id: base.id, number: base.number, state: base.state, body: row.body, variables: row.variables } : null;
+  return row ? { id: base.id, number: base.number, state: base.state, ...row } : null;
 }
 
 /**
@@ -252,7 +256,7 @@ export const getReviewScreen = cache(
 
     const nowDate = await demoNow();
     const zone = await getBusinessZone();
-    const [others, chain, people, decisionRows, threads, consumerUsage] = await Promise.all([
+    const [others, chain, people, decisionRows, threads, consumerUsage, messages] = await Promise.all([
       db
         .select({
           id: versions.id,
@@ -273,8 +277,9 @@ export const getReviewScreen = cache(
         .where(eq(approvals.versionId, version.id))
         .orderBy(asc(approvals.decidedAt), asc(approvals.id)),
       // A submitted round is a record: the threads that began after it are not part of it.
-      loadThreads(template.id, version.body, { through: shown }),
+      loadThreads(template.id, anchorIdsOf(version), { through: shown }),
       loadConsumerUsage(db, template.id, nowDate),
+      loadMessageSetup(template),
     ]);
 
     const submittedBy = version.submittedBy ?? version.createdBy;
@@ -308,6 +313,7 @@ export const getReviewScreen = cache(
         teamId: template.teamId,
         teamSlug: template.teamSlug,
         teamName: template.teamName,
+        family: messages.family,
       },
       version: {
         id: version.id,
@@ -319,8 +325,8 @@ export const getReviewScreen = cache(
         variables: version.variables,
         channels: version.channels,
         sampleSets: version.sampleSets,
-        emailSubject: version.emailSubject,
-        emailPreheader: version.emailPreheader,
+        channelFields: version.channelFields,
+        smsFooter: version.smsFooter,
         submittedBy: personOf(people, submittedBy),
         submittedAt: iso(version.submittedAt ?? version.createdAt),
         submitNote: version.submitNote,
@@ -355,6 +361,27 @@ export const getReviewScreen = cache(
       consumerUsage,
       today: utcDay(nowDate),
       sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
+      // A reviewed version is submitted: its SMS ends with the footer frozen into it, not the content type's now.
+      messageRules: { ...messages.rules, smsFooter: version.smsFooter },
+      senders: messages.senders,
     };
   },
 );
+
+/**
+ * The template's family (its content type's), and what the phone preview renders a message version with:
+ * its content type's SMS footer and part budget, and who the team's messages come from (the push's app,
+ * the SMS's short code).
+ */
+async function loadMessageSetup(template: { teamId: string; contentTypeId: string }): Promise<{
+  family: ChannelFamily;
+  rules: MessageTypeRules;
+  senders: TeamSenders;
+}> {
+  const [family, rules, team] = await Promise.all([
+    loadFamily(db, template.contentTypeId),
+    loadMessageRules(db, template.contentTypeId),
+    db.query.teams.findFirst({ where: eq(teams.id, template.teamId), columns: { appName: true, smsSender: true } }),
+  ]);
+  return { family, rules, senders: { appName: team?.appName ?? null, smsSender: team?.smsSender ?? null } };
+}

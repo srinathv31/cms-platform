@@ -1,16 +1,13 @@
 // The audit rule for autosave: one `draft.edited` row per editing session, not one per save.
 // Pure TypeScript: the merge takes the existing row (or null) and returns what the row should hold.
 
-/** Every field an autosave can change, in the order they are listed in the audit details. */
-export const DRAFT_FIELDS = [
-  "body",
-  "variables",
-  "name",
-  "channels",
-  "emailSubject",
-  "emailPreheader",
-  "sampleSets",
-] as const;
+import { CHANNEL_FIELD_IDS } from "@/domain/channel-fields";
+
+/**
+ * Every field an autosave can change, in the order they are listed in the audit details. Each channel
+ * field is listed by its id ("email.subject"), from the registry.
+ */
+export const DRAFT_FIELDS = ["body", "variables", "name", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
 export type DraftField = (typeof DRAFT_FIELDS)[number];
 
 export const DRAFT_EDITED = "draft.edited";
@@ -31,7 +28,7 @@ export interface DraftEditedDetails {
   [key: string]: unknown;
 }
 
-/** The fields a patch actually carries. `null` counts (it clears the email subject or preheader). */
+/** The fields a patch actually carries. `null` counts (it clears a channel field). */
 export function changedFields(patch: Partial<Record<DraftField, unknown>>): DraftField[] {
   return DRAFT_FIELDS.filter((field) => patch[field] !== undefined);
 }

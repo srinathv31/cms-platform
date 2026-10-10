@@ -1,20 +1,15 @@
 import { DEFAULT_BUSINESS_ZONE, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { isReleased } from "@/domain/rounds";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
-import {
-  REQUIRED_SECTIONS,
-  blockId,
-  blockText,
-  topLevelIds,
-  variableKeys,
-} from "../content";
-import { CONTENT_TYPE_ID, TEAM_STAGE } from "../platform";
+import { blockId, blockText, topLevelIds, variableKeys } from "../content";
+import { SEED_CONTENT_TYPES } from "../platform";
 import { int } from "../rng";
 import { userName } from "../people";
 import type { SeedTemplate, SeedVersion } from "./types";
 
-const STAGE_NAME = TEAM_STAGE.name;
+type SeedType = (typeof SEED_CONTENT_TYPES)[keyof typeof SEED_CONTENT_TYPES];
 
 /**
  * A seeded sunset `inDays` days from the seed's base, as the picker sets one: that day in the business
@@ -26,7 +21,7 @@ function seededSunset(ctx: SeedCtx, inDays: number) {
 }
 
 /** Fails the reset early if a seeded body breaks the contract (cheaper than finding it in the UI). */
-function check(spec: SeedTemplate, v: SeedVersion) {
+function check(spec: SeedTemplate, v: SeedVersion, type: SeedType) {
   const where = `${spec.key}/${v.ref}`;
 
   const ids = topLevelIds(v.body);
@@ -36,8 +31,7 @@ function check(spec: SeedTemplate, v: SeedVersion) {
 
   const declared = new Set(v.variables.map((x) => x.key));
   const used = variableKeys(v.body);
-  variableKeys(v.email?.subject, used);
-  variableKeys(v.email?.preheader, used);
+  for (const field of ALL_CHANNEL_FIELDS) variableKeys(channelFieldValue(v.channelFields ?? {}, field), used);
   for (const key of used) {
     if (!declared.has(key)) throw new Error(`Seed: ${where} uses undeclared variable "${key}"`);
   }
@@ -45,9 +39,12 @@ function check(spec: SeedTemplate, v: SeedVersion) {
   const required = (v.body.content ?? [])
     .filter((b) => b.type === "heading" && b.attrs?.requiredKey)
     .map((b) => b.attrs?.requiredKey);
-  if (required.join() !== REQUIRED_SECTIONS.map((s) => s.key).join()) {
+  if (required.join() !== type.requiredSections.join()) {
     throw new Error(`Seed: ${where} required sections are missing or out of order`);
   }
+  // A content type is one family, and a version renders only channels its content type allows.
+  const foreign = v.channels.find((channel) => !(type.channels as readonly string[]).includes(channel));
+  if (foreign) throw new Error(`Seed: ${where} renders ${foreign}, which its content type doesn't allow`);
 
   if ((v.state === "draft") !== (v.number === null)) {
     throw new Error(`Seed: ${where} number and state disagree`);
@@ -58,8 +55,9 @@ function check(spec: SeedTemplate, v: SeedVersion) {
   if (v.state === "draft" && v.updatedAt === undefined) {
     throw new Error(`Seed: ${where} is a draft and needs updatedAt`);
   }
-  if (v.email && !v.channels.includes("email")) {
-    throw new Error(`Seed: ${where} has email copy but no email channel`);
+  const stray = ALL_CHANNEL_FIELDS.find((field) => !v.channels.includes(field.channel) && channelFieldValue(v.channelFields ?? {}, field));
+  if (stray) {
+    throw new Error(`Seed: ${where} has a ${stray.name} but no ${stray.channel} channel`);
   }
 }
 
@@ -124,6 +122,8 @@ function lastTouched(v: SeedVersion): number {
 export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   const { sink } = ctx;
   const templateId = ctx.templateId();
+  const type: SeedType = SEED_CONTENT_TYPES[spec.contentType ?? "disclosure"];
+  const stage = type.stage;
 
   const ref: TemplateRef = {
     id: templateId,
@@ -189,7 +189,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   sink.templates.push({
     id: templateId,
     teamId: spec.teamId,
-    contentTypeId: CONTENT_TYPE_ID,
+    contentTypeId: type.id,
     createdBy: spec.createdBy,
     createdAt: ctx.at(spec.createdAt),
     starterKey: spec.starterKey ?? null,
@@ -202,7 +202,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   });
 
   for (const v of spec.versions) {
-    check(spec, v);
+    check(spec, v, type);
     const info = versionOf(v.ref);
     const isDraft = v.state === "draft";
 
@@ -216,14 +216,15 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       name: spec.name,
       basedOnVersionId: v.basedOn ? versionOf(v.basedOn).id : null,
       body: v.body,
-      emailSubject: v.email?.subject ?? null,
-      emailPreheader: v.email?.preheader ?? null,
+      channelFields: v.channelFields ?? {},
       channels: v.channels,
+      // Submit freezes the content type's SMS footer into the version; a draft shows the content type's as it stands.
+      smsFooter: isDraft ? null : type.smsFooter,
       variables: v.variables,
       sampleSets: ctx.vars.sampleSets(v.variables),
       contractChanges: v.contractChanges ?? null,
-      // Every submitted version went through the one-stage chain the seed configures.
-      stages: isDraft ? null : [{ id: TEAM_STAGE.id, name: TEAM_STAGE.name }],
+      // Every submitted version went through the one-stage chain the seed configures for its content type.
+      stages: isDraft ? null : [{ id: stage.id, name: stage.name }],
       currentStage: 0,
       rev: v.rev ?? (isDraft ? int(ctx.rng, 12, 40) : int(ctx.rng, 40, 190)),
       createdBy: v.createdBy,
@@ -288,9 +289,9 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       sink.approvals.push({
         id: ctx.id("ap"),
         versionId: info.id,
-        stageId: TEAM_STAGE.id,
+        stageId: stage.id,
         stagePosition: 0,
-        stageName: STAGE_NAME,
+        stageName: stage.name,
         actorId: a.actor,
         decision: a.decision,
         reason: a.reason ?? null,
@@ -305,7 +306,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         details: {
           number: v.number,
           round: info.round,
-          stage: STAGE_NAME,
+          stage: stage.name,
           ...(a.reason ? { reason: a.reason } : {}),
         },
       });

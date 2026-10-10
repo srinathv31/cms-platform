@@ -3,10 +3,12 @@
 import { Activity, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { Route } from "next";
 import { useReducedMotion } from "motion/react";
-import { COMPOSER_THREAD_ID, ThreadList, blockTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
+import { COMPOSER_THREAD_ID, ThreadList, blockTextOf, fieldTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
 import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
-import { diffDocuments, nameChange } from "@/domain/redline";
+import { channelFieldValues } from "@/domain/channel-fields";
+import { commentAnchors } from "@/domain/comments";
+import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
 import { reviewPath } from "@/domain/rounds";
 import type { Channel, VersionState } from "@/domain/types";
@@ -74,6 +76,10 @@ export function ReviewWorkspace({
 
   // ── Views ───────────────────────────────────────────────────────
 
+  // A document's view is its body (and its email details); a message's (an Alert's) is its fields, which are its
+  // whole content. Either way the screen opens on what was written, with the redline and the comments. The
+  // family is the content type's, never read from the version's channels.
+  const family = template.family;
   const [view, setView] = useState<ReviewView>("document");
   // The output is built the first time it is looked at, then kept (its last render stays up).
   const [previewVisited, setPreviewVisited] = useState(false);
@@ -84,7 +90,12 @@ export function ReviewWorkspace({
     () => (baseline ? diffDocuments(baseline.body, version.body) : null),
     [baseline, version.body],
   );
-  const changeCount = redline ? redline.counts.added + redline.counts.removed + redline.counts.changed + redline.counts.moved : 0;
+  // Each channel's own fields, as they stand and against the baseline: an email's subject, an alert's push and SMS
+  // (with the SMS footer each version was submitted with, so a footer change is redlined too).
+  const fieldsNow = useMemo(() => diffChannelFields(null, version), [version]);
+  const fieldsRedline = useMemo(() => (baseline ? diffChannelFields(baseline, version) : null), [baseline, version]);
+  const counts = redline && fieldsRedline ? addCounts(redline.counts, fieldsRedline.counts) : null;
+  const changeCount = counts ? counts.added + counts.removed + counts.changed + counts.moved : 0;
   // The name is versioned: a rename against what customers get today is reviewed like the rest.
   const rename = nameChange(data.liveName, version.name);
 
@@ -109,19 +120,21 @@ export function ReviewWorkspace({
   const canComment = can.comment.ok;
   const openThreads = threads.filter((t) => t.status === "open").length;
 
-  // Where a block sits in the document, so a new thread slots into document order at once.
+  // Where a thread's anchor sits (the fields, then the body's blocks: `commentAnchors`), so a new thread slots
+  // into reading order at once.
   const blockPosition = useMemo(() => {
-    const order = new Map<string, number>();
-    (version.body.content ?? []).forEach((block, i) => {
-      const id = block.attrs?.id;
-      if (typeof id === "string") order.set(id, i);
-    });
+    const blocks = (version.body.content ?? []).flatMap((block) => (typeof block.attrs?.id === "string" ? [block.attrs.id] : []));
+    const order = new Map(commentAnchors(blocks, version.channels).map((id, i) => [id, i] as const));
     return (blockId: string) => order.get(blockId) ?? null;
-  }, [version.body]);
+  }, [version.body, version.channels]);
 
-  // The start of a block's text, for the card about a whole block (it has no quote to show).
+  // The start of a block's text, or a field's name and text, for the card about a whole block or field (it has no quote to show).
   const labels = useMemo(() => new Map(version.variables.map((v) => [v.key, v.label])), [version.variables]);
-  const blockText = useCallback((blockId: string) => blockTextOf(version.body, blockId, labels), [version.body, labels]);
+  const fieldValues = useMemo(() => channelFieldValues(version.channelFields), [version.channelFields]);
+  const blockText = useCallback(
+    (blockId: string) => fieldTextOf(fieldValues, blockId, labels) ?? blockTextOf(version.body, blockId, labels),
+    [version.body, fieldValues, labels],
+  );
 
   // A click on the quote the comment box is about (its temporary highlight) isn't a thread.
   const onThreadClick = useCallback((id: string) => id !== COMPOSER_THREAD_ID && setActive(id), [setActive]);
@@ -301,7 +314,7 @@ export function ReviewWorkspace({
         changesOnly={changesOnly}
         onChangesOnly={setChangesOnly}
         count={changeCount}
-        summary={redline ? redlineSummary(redline.counts) : ""}
+        summary={counts ? redlineSummary(counts) : ""}
       />
     ) : null;
 
@@ -330,11 +343,14 @@ export function ReviewWorkspace({
       <Activity mode={view === "document" ? "visible" : "hidden"}>
         <DocumentView
           versionId={version.id}
+          family={family}
+          fields={(showChanges && fieldsRedline ? fieldsRedline : fieldsNow).fields}
+          footer={(showChanges && fieldsRedline ? fieldsRedline : fieldsNow).footer}
           body={version.body}
           variables={version.variables}
           baselineVariables={baseline?.variables ?? null}
           redline={showChanges ? redline : null}
-          changesOnly={changesOnly}
+          changesOnly={showChanges && changesOnly}
           editorRef={editorRef}
           anchors={threadsForEditor}
           activeThreadId={editorActiveThreadId}
@@ -355,6 +371,10 @@ export function ReviewWorkspace({
             teamName={template.teamName}
             channels={channels}
             variables={version.variables}
+            channelFields={version.channelFields}
+            messageRules={data.messageRules}
+            senders={data.senders}
+            today={today}
             values={values}
             setId={selectedSet.id}
             enabled={view === "preview"}
@@ -399,7 +419,14 @@ export function ReviewWorkspace({
               <div className="flex items-center gap-3">
                 {openThreads > 0 ? <span className="text-[12px] text-text-subtle">{openThreads} open</span> : null}
                 {canComment && view === "document" ? (
-                  <BlockCommentMenu body={version.body} variables={version.variables} onPick={pickBlock} triggerRef={menuButton} />
+                  <BlockCommentMenu
+                    family={family}
+                    body={version.body}
+                    channels={version.channels}
+                    variables={version.variables}
+                    onPick={pickBlock}
+                    triggerRef={menuButton}
+                  />
                 ) : null}
               </div>
             }

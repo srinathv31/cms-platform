@@ -12,6 +12,7 @@ import {
   correlation,
   demoNow,
   expectError,
+  isDocument,
   logFor,
   longDate,
   openDb,
@@ -60,7 +61,8 @@ test.afterAll(() => {
 
 // ── Finding things ───────────────────────────────────────────────────────────
 
-const versions = () => allVersions(db);
+/** The documents' versions: the rules below are checked on PDF, Web and Email. Alerts are at the end. */
+const versions = async () => (await allVersions(db)).filter(isDocument);
 
 const rendersTo = (channel: Channel) => (v: SeedVersion) => v.state === "active" && v.channels.includes(channel);
 const rendersToAll = (v: SeedVersion) => v.state === "active" && ALL_CHANNELS.every((c) => v.channels.includes(c));
@@ -431,9 +433,9 @@ test.describe("channels", () => {
 
   test("an unknown channel name is a 400 bad_request", async ({ request }) => {
     const v = await activeEverywhere();
-    for (const channel of ["sms", "PDF", "", 7, null]) {
+    for (const channel of ["fax", "PDF", "", 7, null]) {
       const { res } = await render(request, { templateId: v.templateId, body: { version: v.number, channel, values: validValues(v.variables) } });
-      await expectError(res, 400, "bad_request", "channel must be one of pdf, web, email.");
+      await expectError(res, 400, "bad_request", "channel must be one of pdf, web, email, push, sms.");
     }
   });
 });
@@ -836,7 +838,7 @@ test.describe("render_log", () => {
       ["unknown template", { templateId: "UC-ZZZZZZ", body: { version: 1, channel: "web", values } }],
       ["unknown version", { templateId: v.templateId, body: { version: 9999, channel: "web", values } }],
       ["no open draft", { templateId: noDraft.templateId, body: { version: "draft", channel: "web", values: validValues(noDraft.variables), preview: true } }],
-      ["malformed body", { templateId: v.templateId, body: { version: v.number, channel: "sms", values } }],
+      ["malformed body", { templateId: v.templateId, body: { version: v.number, channel: "fax", values } }],
       ["draft without preview", { templateId: draft.templateId, body: { version: "draft", channel: "web", values } }],
       ["no consumer", { templateId: v.templateId, consumer: null, body: bodyFor(v, "web") }],
     ];
@@ -962,5 +964,39 @@ test.describe("render_log", () => {
       const { rows } = await db.execute({ sql: `SELECT count(*) AS n FROM render_log WHERE instr(${asText}, ?) > 0`, args: [sentinel] });
       expect(Number(rows[0].n), `rows in render_log containing ${sentinel}`).toBe(0);
     }
+  });
+});
+
+// ── 8. Alerts: Push and SMS ──────────────────────────────────────────────────
+
+test.describe("alerts", () => {
+  test("the seeded Active alert renders a push for each platform, and an SMS with its footer, all as JSON", async ({ request }) => {
+    const v = pick(await allVersions(db), "Active alert with push and SMS on", (x) => x.state === "active" && x.channels.includes("push") && x.channels.includes("sms"));
+    const values = validValues(v.variables, { first_name: "Maya", card_last4: "4821" });
+    const json = async (body: object) => {
+      const { res, correlationId } = await render(request, { templateId: v.templateId, body: { version: v.number, values, ...body } });
+      expect(res.status()).toBe(200);
+      expect(res.headers()["content-type"]).toMatch(/^application\/json/);
+      expect(res.headers()["x-stencil-version"]).toBe(String(v.number));
+      expect((await logFor(db, correlationId!))[0]).toMatchObject({ outcome: "ok", channel: "channel" in body ? body.channel : null, consumer_id: "coral" });
+      return (await res.json()) as Record<string, unknown>;
+    };
+
+    // One message for both phones; the subtitle is the iPhone's alone, and no title carries a value.
+    const ios = await json({ channel: "push", platform: "ios" });
+    const android = await json({ channel: "push", platform: "android" });
+    expect(ios).toMatchObject({ title: "Your payment is due soon", subtitle: "Coral card ending in 4821" });
+    expect(ios.body).toBe("Hi Maya, your minimum payment of $1,234.56 is due March 4, 2027. Pay in the app to avoid a late fee.");
+    expect(android).toMatchObject({ title: ios.title, body: ios.body });
+    expect(android).not.toHaveProperty("subtitle");
+    for (const push of [ios, android]) expect(push.payloadBytes).toEqual(expect.any(Number));
+
+    const sms = await json({ channel: "sms" });
+    expect(sms).toMatchObject({
+      text: "Coral: Your minimum payment of $1,234.56 is due March 4, 2027.\nPay at coral.example/pay\nCoral: Reply STOP to opt out, HELP for help.",
+      encoding: "GSM-7",
+      parts: 1,
+    });
+    expect(sms.characters).toBe((sms.text as string).length);
   });
 });

@@ -179,6 +179,17 @@ describe("addComment", () => {
     ]);
   });
 
+  it("takes a thread on a field of an alert in review (its threads are on its fields), not on a field of a channel it doesn't have", async () => {
+    const v1 = await versionOf("card-used-abroad", 1);
+    as("jordan");
+    const result = await addComment({ templateId: ids["card-used-abroad"]!, versionId: v1.id, blockId: "push.title", body: "Too vague?" });
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(await threadRow(result.threadId)).toMatchObject({ blockId: "push.title", quote: null });
+    expect(
+      await addComment({ templateId: ids["card-used-abroad"]!, versionId: v1.id, blockId: "email.subject", body: "x" }),
+    ).toMatchObject({ ok: false, code: "block_gone" });
+  });
+
   it("refuses an unknown block on a frozen version, an empty comment, and a version of another template", async () => {
     const v3 = await versionOf("cash-back", 3);
     as("jordan");

@@ -104,3 +104,28 @@
 .ucomp-redline del [data-variable] svg {
   color: var(--danger-text);
 }
+
+/* ── Channel fields (fields-document.tsx) ─────────────────────────
+   A message's fields keep the composer's rhythm: 24px from a section's heading to its first field and
+   between fields, 48px before the next channel's section. A document's details (its email subject and
+   preheader, above the body) sit closer, under a caps label. */
+
+.ucomp-fields .ucomp-doc > .rl-item + .rl-item {
+  margin-top: 1.5rem;
+}
+
+.ucomp-fields .ucomp-doc > .rl-item + .rl-item[data-kind="section"] {
+  margin-top: 3rem;
+}
+
+.ucomp-fields[data-fields-document="details"] .ucomp-doc > .rl-item + .rl-item {
+  margin-top: 1rem;
+}
+
+.ucomp-fields[data-fields-document="details"] .ucomp-doc > .rl-item[data-kind="label"] + .rl-item {
+  margin-top: 0.75rem;
+}
+
+.ucomp-fields[data-fields-document="details"] .ucomp-doc > .rl-item + .rl-item[data-kind="label"] {
+  margin-top: 2rem;
+}

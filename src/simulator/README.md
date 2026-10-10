@@ -3,7 +3,8 @@
 Coral is a pretend card-offers system that belongs to another company. It shows the consumer side of the demo:
 link an offer to a Stencil template, pin a version, map Coral's own customer and offer fields to the template's
 variables, send renders, see the API's errors as they come back, read Stencil's notices, and relink when a new
-version arrives. It lives in this repo, but it behaves like an outside system: it reaches Stencil only over HTTP on
+version arrives. Besides its offers (documents: PDF, web, email) it has alerts, servicing messages it sends to a
+customer's phone as a push and a text, and the customer view shows that customer's phone. It lives in this repo, but it behaves like an outside system: it reaches Stencil only over HTTP on
 the public `/api/v1`, keeps its data in its own `sim_*` tables, and has its own look. Its pages are under `/sim`
 (routes in `src/app/(simulator)`), opened from the Demo pill's "Open simulator" button
 ([demo-pill.tsx](../components/demo/demo-pill.tsx)).
@@ -32,9 +33,12 @@ Conventions (not linted):
   body: `unreachable` (status 0), `bad_response`, and `no_active_version` in the link flow.
 - Colors come only from the `--sim-*` custom properties in [theme.css](theme.css), which apply under the
   `[data-sim]` element the layout renders. It is the only stylesheet besides `src/styles/tokens.css` that holds raw
-  colors; Stencil's tokens don't reach inside Coral, and Coral's components never write a color of their own.
+  colors; Stencil's tokens don't reach inside Coral, and Coral's components never write a color of their own. The
+  one exception is the customer's phone: the phone kit draws it in its own `--device-*` tokens, because it is the
+  customer's device, not Coral's screen.
 - Coral's UI is built from [ui/bits.tsx](ui/bits.tsx) and native elements, not Stencil's shadcn primitives (the one
-  exception is `Skeleton`), so it reads as a different product. The frame strip in the layout is Stencil's.
+  exception is `Skeleton`), so it reads as a different product; the customer's phone is the shared phone kit
+  (`@/components/device`), framed by Coral's drawer. The frame strip in the layout is Stencil's.
 - Display helpers are Coral's own ([ui/format.tsx](ui/format.tsx)) because `@/domain/dates` is off limits. Dates
   are formatted in UTC so the server and the browser agree.
 - Nothing here logs customer values.
@@ -48,11 +52,13 @@ Conventions (not linted):
 | [actions.ts](actions.ts) | Server actions: `searchTemplates`, `linkTemplate`, `saveMapping`, `sendToCustomers`, `markNoticesRead`, `getDeliveryView`. Each returns `SimResult`; the four that write call `refresh()`. |
 | [fields.ts](fields.ts), [mapping.ts](mapping.ts) | Pure: Coral's 14 field paths (`SIM_FIELDS`) and the variable types each fits; `suggestMapping`, `missingRequired`, `valuesFor`, `blockedSentence`. |
 | [types.ts](types.ts) | Coral's read models and `SimResult`, built on the `Api*` wire types. |
+| [assert-never.ts](assert-never.ts) | Coral's own exhaustive check. Every branch on a channel is a `switch` over `ApiChannel` (the client) or `SimChannel` (a stored delivery, `schema/sim.ts`) that ends in `assertNever`, so a channel added to either is a compile error at each place that must handle it. |
 | [db.ts](db.ts) | `simDb`, a Drizzle client that knows only the sim schema, and `withBusyRetry` for writes. |
 | [theme.css](theme.css) | Coral's palette, fonts and radii. |
 | [ui/offer-view.tsx](ui/offer-view.tsx) | Client. One offer: Template, Values and Send tabs (`?tab=`), optimistic mapping rows, send, customer drawer. |
 | [ui/link-flow.tsx](ui/link-flow.tsx) | Client. Link and relink: search, choose, version and channels, map, confirm. |
-| [ui/send-tab.tsx](ui/send-tab.tsx), [ui/customer-drawer.tsx](ui/customer-drawer.tsx) | The customer picker and results grid; the phone, inbox and PDF views of one delivery. |
+| [kinds.ts](kinds.ts) | Pure: what Coral sends each kind on (`KIND_CHANNELS`: an offer PDF, web and email; an alert push and SMS) and `sendable`. |
+| [ui/send-tab.tsx](ui/send-tab.tsx), [ui/customer-drawer.tsx](ui/customer-drawer.tsx) | The customer picker (with each customer's phone, for an alert) and results grid; one delivery on the customer's phone (web page, push, text thread, on the phone kit `@/components/device`), in an inbox, or as the PDF. |
 | [ui/notices-panel.tsx](ui/notices-panel.tsx), [ui/offers-table.tsx](ui/offers-table.tsx), [ui/mapping-table.tsx](ui/mapping-table.tsx) | Notice inbox with mark-read; the offers list; the variable-to-field table (with [ui/mapping-select.tsx](ui/mapping-select.tsx)). |
 | [ui/bits.tsx](ui/bits.tsx), [ui/format.tsx](ui/format.tsx), [ui/page-frame.tsx](ui/page-frame.tsx), `ui/nav*.tsx` | Shared pieces: pills, buttons, panels, strips, table classes; labels and dates; page scroll and skeleton; sidebar. |
 | [ui/lists.ts](ui/lists.ts) | Server-only reads for the Customers and Deliveries pages (sim tables only). |
@@ -64,10 +70,10 @@ Conventions (not linted):
 
 | Table | Holds |
 | --- | --- |
-| `sim_offers` | Coral's offers and their terms (`spend`, `bonus`, `months`, optional `annualFee` and `endsOn`). |
-| `sim_customers` | Coral's customers: name, email, home state, purchase APR, annual fee. |
-| `sim_links` | One row per offer (unique `offer_id`): template id, a cached template name, `pinned_version`, chosen channels, and the mapping (variable key → Coral field path). Relinking updates the row. |
-| `sim_deliveries` | One row per customer × channel of a send, grouped by `batch_id`: what Coral received in `output` (PDF as base64, the web HTML, or the email JSON) or the API's error, plus `newer_version` and `correlation_id`. |
+| `sim_offers` | What Coral links: `kind` `offer` (its terms: `spend`, `bonus`, `months`, optional `annualFee` and `endsOn`) or `alert` (no terms; `headline` says when it's sent). The UI says "offer" for both in code (`offerId`, `/sim/offers/…`). |
+| `sim_customers` | Coral's customers: name, email, home state, purchase APR, annual fee; their phone (`phone`, E.164, a fictional 555-01xx number; `platform`, `ios` or `android`); and their card (`card_last4`, the `statement`'s minimum due and due date, the `last_purchase`'s amount, merchant and country), the alerts' values. |
+| `sim_links` | One row per offer or alert (unique `offer_id`): template id, a cached template name, `pinned_version`, chosen channels, and the mapping (variable key → Coral field path). Relinking updates the row. |
+| `sim_deliveries` | One row per customer × channel of a send, grouped by `batch_id`: what Coral received in `output` (PDF as base64, the web HTML, or the JSON of an email, a push or an SMS, as the API sent it without `newerVersion`) or the API's error, plus `newer_version`, `correlation_id` and, for a push, the `platform` Coral asked for. An SMS's `encoding`, `parts` and `characters` are in its output. |
 | `sim_notice_reads` | Which of Stencil's notices Coral has marked read. |
 
 Fetched from `/api/v1` on each page load and never stored: version states, sunset and revoke dates, whether the pin
@@ -80,8 +86,10 @@ the clock moves. `linked_at` and `read_at` use real time.
 
 In the demo both sides share one SQLite file: `simDb` opens `DATABASE_URL` (default `data/ucomp.db`) through
 `createAppClient` in `src/lib/serialized-writes.ts`, so its writes take turns with Stencil's. The seed
-([seed/sim.ts](../server/seed/sim.ts)) writes four offers (Spring Travel unlinked, so the demo links it live), ten
-customers, three links, and read marks on every Coral notice but the newest.
+([seed/sim.ts](../server/seed/sim.ts)) writes four offers (Spring Travel unlinked, so the demo links it live), two
+alerts (Payment due, linked to Payment Due Reminder v1 on Push and SMS; Card used abroad, unlinked, for the demo to
+link once its template is approved), ten customers (iPhone and Android in turn; a few merchants outside GSM-7, so
+their text goes as UCS-2), four links, and read marks on every Coral notice but the newest.
 
 ## How it works
 
@@ -104,16 +112,36 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   Active version with `suggestMapping` (keeps current mappings that still fit, auto-maps keys it is sure of, leaves
   `annual_fee` to the person). `linkTemplate` re-reads the template, refuses a version that isn't Active or a channel
   it doesn't render, drops unknown keys and fields, and upserts `sim_links`. Unmapped required keys may be saved;
-  Send then names them.
+  Send then names them. An offer links on PDF, web and email and an alert on Push and SMS (`KIND_CHANNELS` in
+  [kinds.ts](kinds.ts)): the search lists only templates on the kind's channels, the flow offers only those, and
+  `linkTemplate` refuses the others ("Coral sends alerts as Push and SMS."). An alert's keys (`card_last4`,
+  `amount_due`, `due_date`, `transaction_amount`, `merchant`, `country`) auto-map to the customer's card fields.
 - **Map values** (`OfferView`, `saveMapping`). Each select saves at once under `useOptimistic`. `saveMapping` checks
   the keys against the pinned version's contract over the API.
 - **Send** (`sendToCustomers`). Checks the mapping against the pinned contract first (`missingRequired`, then
   `blockedSentence`). Then one `POST /api/v1/templates/{id}/render` per customer × linked channel at the pinned
   version, at most 3 in flight, each with a fresh `coral_…` correlation id. `valuesFor` leaves out fields Coral has no
-  value for, so Stencil answers `missing_variables` rather than Coral inventing a value. Every render becomes a
-  `sim_deliveries` row, failed or not. The action fails only on bad input or when Stencil couldn't be reached at all.
-- **Customer view** (`CustomerDrawer`, `getDeliveryView`). Sandboxed iframes load `/sim/deliveries/{id}/file`,
-  which serves the stored output with `no-store`, `nosniff`, and for HTML a CSP that allows no scripts.
+  value for, so Stencil answers `missing_variables` rather than Coral inventing a value. A push is asked for on the
+  customer's `platform` (`ios` or `android`; Android's never has a subtitle) and keeps it on the delivery. Every
+  render becomes a `sim_deliveries` row, failed or not: a push over 4,096 bytes (`push_payload_too_large`) or a text
+  over 10 parts (`sms_too_long`) fails with the API's error like any other. The results grid shows the push's
+  platform and the text's encoding and parts under each Delivered. The action fails only on bad input or when
+  Stencil couldn't be reached at all.
+- **Customer view** (`CustomerDrawer`, `getDeliveryView`). The web page, the push and the texts show on the
+  customer's phone, drawn by the phone kit ([src/components/device](../components/device/README.md)) on their
+  platform at its standard width, in its real proportions and scaled to fit the drawer's height whole (about 0.7
+  of its real size on a 1440 × 900 window; while it loads, the same phone empty, `PhoneSkeleton`), with the
+  phone's clock at the delivery's time and, above it, the platform and number and what Stencil measured (a push's
+  bytes; a text's encoding, parts and characters). A push shows on the
+  lock screen from Coral's app; clicking it expands it. A text shows in the customer's thread with Coral's short
+  code (`CORAL_SHORT_CODE`), every text Coral delivered to them from any offer or alert, oldest first, up to the
+  one viewed. The web page is a sandboxed iframe in `ScreenPreview`. When a send reaches the customer whose drawer
+  is open, the drawer stays on them, keeps the old delivery on the phone while the new one loads, and a push drops
+  in as a banner (a heads-up on Android) once; any other view ends that (`Arrival` in `OfferView`). Closing an
+  opened push, or coming back to it from another view, shows the lock screen: the drop never replays (`PushPhone`
+  holds the screen, keyed by the delivery). Inbox and PDF
+  are Coral's own frames. Sandboxed iframes load `/sim/deliveries/{id}/file`, which serves the stored output with
+  `no-store`, `nosniff`, and for HTML a CSP that allows no scripts (a push or SMS as its JSON).
 - **Upgrade, sunset, revoke** (`loadLinkState`, `linkStatus`). For each link Coral reads the template at the pinned
   version, and when a newer version is Active, reads `?since={pinned}` for the diff. The offer page shows
   "vN available" with the `newRequired` keys, or "A send now fails" when the pin is revoked or past its sunset.
@@ -147,8 +175,7 @@ implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCO
 
 ## Don't copy
 
-- [ui/lists.ts](ui/lists.ts) is a read model that lives in `ui/`, and its `getSimCustomers` repeats `customerRow`
-  from `queries.ts`. Put new reads in `queries.ts`.
+- [ui/lists.ts](ui/lists.ts) is a read model that lives in `ui/`. Put new reads in `queries.ts`.
 - `NoticeBadge` (rendered by the layout, so on every `/sim` page) and `/sim/notices` call `getSimHome()`, which also
   loads every offer's link state and last send over the API. A new count or list should read only what it shows.
 - Copied helpers: `joinWithAnd` in `mapping.ts` and `andList` in `ui/format.tsx` are the same function;
@@ -175,7 +202,9 @@ implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCO
 - End to end (Playwright): `e2e/scenario-04.spec.ts` (link, send to five customers, customer views, no customer
   values in Stencil's tables), `e2e/scenario-05.spec.ts` ("v3 available", send fails after the sunset, relink),
   `e2e/scenario-06.spec.ts` (revoke, then Coral's send fails with the API's message), `e2e/sunset-passed.spec.ts` (the
-  sweep's `sunset_passed` notice in Coral's inbox), `e2e/demo-script.spec.ts`, and
+  sweep's `sunset_passed` notice in Coral's inbox), `e2e/coral-alerts.spec.ts` (Jordan approves Card Used Abroad;
+  Coral links it, sends to an iPhone and an Android customer, and each phone shows the push, with or without the
+  subtitle, and the text with its footer; a second send drops a heads-up in), `e2e/demo-script.spec.ts`, and
   the "Simulator (foreign system)" block in `e2e/principles.spec.ts` (axe and layout shift on each `/sim` page).
   The drivers and the snapshot and restore of `sim_*` rows are in `e2e/helpers/golive.ts`.
   `e2e/api/consumer.spec.ts` calls the GET routes the way Coral does.
