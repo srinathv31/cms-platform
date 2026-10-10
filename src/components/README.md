@@ -245,7 +245,8 @@ output on a tinted well whose top never moves. Where the output comes from depen
 
 Either way, values the route would refuse show as `OutputError`, in the author's words. A message the route would
 refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
-sentence above it. In the workspace the phone's settings and Push's screen live in the session's preview state
+sentence above it. That sentence carries the live size, so it is no live region: a polite one says a fixed sentence
+(`refusalNotice`: "The SMS is over 10 parts.") once, when the message turns refused. In the workspace the phone's settings and Push's screen live in the session's preview state
 (`phone`, `pushScreen`), like Web's `device`; the review keeps its own. The phone's sender is the team's app name
 (else its name) and short code (else none: the thread shows a muted "No sender", never a made-up number or the
 team's name), its date the demo clock's day (`preview-sender.ts`).
