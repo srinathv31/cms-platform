@@ -3,7 +3,7 @@ import type { ChannelFields } from "../channel-fields";
 import { smsLength } from "../messages/gsm7";
 import { pushPayloadBytes } from "../messages/push";
 import type { JSONContent, Variable } from "../types";
-import { renderMessage, resolveChannelField, resolveMessage, withFooter, type MessageInput } from "./message";
+import { longSampleValues, renderMessage, resolveChannelField, resolveMessage, withFooter, type MessageInput } from "./message";
 import { validateValues } from "./validate";
 
 const t = (text: string): JSONContent => ({ type: "text", text });
@@ -145,5 +145,26 @@ describe("resolveChannelField", () => {
 
   it("gives nothing for a field with no value", () => {
     expect(resolveChannelField(null, "lines", ctx)).toBe("");
+  });
+});
+
+describe("longSampleValues", () => {
+  const TODAY = "2026-10-09";
+
+  it("takes the version's own long set, its gaps filled from the defaults, canonical", () => {
+    const long = { id: "long", name: "Long", values: { first_name: "Alexandria-Marguerite", amount_due: "$1,250.00" } };
+    const values = longSampleValues({ variables: VARIABLES, sampleSets: [long] }, TODAY);
+    expect(values?.first_name).toBe("Alexandria-Marguerite");
+    expect(values?.amount_due).toBe("1250.00");
+    expect(values?.due_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("generates the long set when the version has none", () => {
+    expect(longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY)?.first_name).toBe("Alexandria-Marguerite");
+  });
+
+  it("is null when the long values don't validate: there is nothing to measure", () => {
+    const broken = { id: "long", name: "Long", values: { due_date: "not a date" } };
+    expect(longSampleValues({ variables: VARIABLES, sampleSets: [broken] }, TODAY)).toBeNull();
   });
 });

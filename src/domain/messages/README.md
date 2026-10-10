@@ -15,6 +15,11 @@ They use two built-ins, `Intl.Segmenter` (grapheme clusters) and `String.prototy
 | [gsm7.ts](gsm7.ts) | Is this SMS GSM-7 or UCS-2? How many units, characters and parts? Where are the parts cut? Which characters are outside GSM-7, and what can replace them? | `smsEncoding`, `smsLength`, `smsParts`, `nonGsmCharacters`, `gsm7Septets`, the two tables, the limits |
 | [push.ts](push.ts) | What JSON does a push send on iOS and on Android, and how many UTF-8 bytes is it? | `pushPayload`, `pushPayloadBytes`, `utf8ByteLength`, `PUSH_MAX_BYTES`, `PUSH_PLATFORMS` |
 | [links.ts](links.ts) | Does this text contain a link on a public URL shortener, and where? | `findPublicShorteners`, `PUBLIC_SHORTENER_DOMAINS` |
+| [flags.ts](flags.ts) | What does the composer underline in a field the author typed, and what does it say? | `messageFieldFlags`, `MessageFlag` |
+| [truncation.ts](truncation.ts) | Where does a phone's lock screen cut a push, as the warning under the field? | `truncationWarnings`, `roundToWord`, `quotedTail` |
+
+`flags.ts` and `truncation.ts` are the composer's side of these measurements, with the sentences an author reads.
+They need no browser either: the composer hands them text, or the phone kit's measurements.
 
 ## Constants
 
@@ -107,6 +112,27 @@ UTF-16 offset and length, through its path and without trailing punctuation. It 
 inside another link's query is found too. A host that only resembles one doesn't match: `bit.lyrics.com`,
 `notbit.ly`, `goo.gle`. The list is curated, not exhaustive: the best-known general-purpose shorteners, plus the
 services that wrap every link their users post (t.co, lnkd.in).
+
+## In the composer: flags and cut warnings
+
+**Flags.** `messageFieldFlags(field, typedText)` finds, in one field, what submit would refuse whatever the values:
+a character outside GSM-7 in an SMS field, and a link on a public shortener in a field that refuses them (a push
+body, an SMS). Each comes with the sentence the composer's popover shows ("’ isn't in the SMS character set.",
+"bit.ly is a public link shortener carriers filter. Use a link on your own domain.") and, for a character with a
+GSM-7 equivalent, the `replacement` its one-click fix writes ("" removes it). The text is `typedText`, so a chip is
+one space and a value is never flagged: a customer's "Gómez" goes out as sent.
+
+**Cuts.** The phone, not Stencil, cuts a push, so the warning reads the phone: the phone kit measures where each
+platform's lock screen clamps each field (at the standard width and default text size), and
+`truncationWarnings(fits, text)` turns that into the sentence under the field. It warns only when something is
+wrong: the title cut on either platform, or the subtitle or body cut on the iPhone lock screen. Android's collapsed
+body is always one line, which is how Android shows it, so that is no warning. The visible text is rounded back to
+the last whole word (`roundToWord`) and quoted by its last two words (`quotedTail`): "iPhone lock screen cuts after
+“…payment of”." When both platforms cut a title at the same word, one sentence names both.
+
+The composer doesn't warn about Android showing the title with previews hidden: whether that matters depends on
+whether a value is sensitive, which nothing records yet (sensitive variables are a later phase). The preview's
+Previews: Hidden shows it.
 
 ## Sources
 

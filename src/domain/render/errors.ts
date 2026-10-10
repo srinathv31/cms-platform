@@ -336,6 +336,14 @@ export function codePointLabel(character: string): string {
   return `U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
+/**
+ * A character as a sentence names it: itself ("’"), or its code point ("U+00A0") when it doesn't show
+ * on its own (a space, an invisible character).
+ */
+export function characterLabel(char: string): string {
+  return /^[\p{L}\p{M}\p{N}\p{P}\p{S}]/u.test(char) ? char : codePointLabel(char);
+}
+
 /** The glyphs message names at most this many characters; it counts the rest. */
 const NAMED_CHARACTERS = 10;
 

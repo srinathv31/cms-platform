@@ -26,12 +26,14 @@ import {
   type ChannelFields,
   type FieldShape,
 } from "../channel-fields";
+import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import { SMS_MAX_PARTS, smsLength } from "../messages/gsm7";
 import { PUSH_MAX_BYTES, pushPayloadBytes, type PushPlatform } from "../messages/push";
-import type { JSONContent, Variable } from "../types";
+import type { JSONContent, SampleSet, Variable } from "../types";
 import { pushPayloadTooLarge, smsTooLong } from "./errors";
 import { resolveInlineField, resolveLinesField } from "./resolve";
 import type { CanonicalValues, MessageTarget, PushRender, RenderError, ResolveContext, SmsRender } from "./types";
+import { validateValues } from "./validate";
 
 /** The content type's rules a message renders with. */
 export interface MessageRules {
@@ -130,6 +132,23 @@ export function renderMessage(target: MessageTarget, input: MessageInput): Messa
 export function withFooter(message: string, footer: string | null): string {
   if (!footer) return message;
   return message ? `${message}\n${footer}` : footer;
+}
+
+/**
+ * The "long" sample values that submit measures a message with (`submit` in lifecycle.ts) and the
+ * composer's "Long values" line shows: the version's "long" set, or the generated one when it has none,
+ * its gaps filled from the defaults (`sampleSetValues`), canonical. Null when they don't validate: then
+ * there is nothing to measure, and the preview says why. `today` is YYYY-MM-DD (the demo clock's day).
+ */
+export function longSampleValues(
+  version: { variables: readonly Variable[]; sampleSets: readonly SampleSet[] },
+  today: string,
+): CanonicalValues | null {
+  const set =
+    version.sampleSets.find((s) => s.id === "long") ??
+    defaultSampleSets(version.variables, today).find((s) => s.id === "long")!;
+  const validated = validateValues(version.variables, sampleSetValues(set, version.variables, today));
+  return validated.ok ? validated.values : null;
 }
 
 /** The fields, each resolved to its text, by key. */

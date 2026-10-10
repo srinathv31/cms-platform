@@ -29,7 +29,6 @@
 // (`version.name`): that is what its notifications call it.
 
 import { diffVariables, isBreaking } from "@/editor/model/contract";
-import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
 import { usageFromJSON } from "@/editor/model/usage";
 import {
   approvedThisRound,
@@ -60,10 +59,8 @@ import { REASONS, makerCheckerRefusal } from "./permissions";
 import type { MessageTypeRules } from "./platform-config";
 import { plural } from "./plural";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
-import { codePointLabel, joinWithAnd, PLATFORM_LABELS } from "./render/errors";
-import { resolveMessage } from "./render/message";
-import type { CanonicalValues } from "./render/types";
-import { validateValues } from "./render/validate";
+import { characterLabel, joinWithAnd, PLATFORM_LABELS } from "./render/errors";
+import { longSampleValues, resolveMessage } from "./render/message";
 import { formatLongDate, utcDay } from "./dates";
 import {
   DOCUMENT_THREAD,
@@ -568,7 +565,7 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     }
   }
 
-  const long = longValues(draft, now);
+  const long = longSampleValues(draft, utcDay(now));
   const input = long && { fields: draft.channelFields, variables: draft.variables, values: long, rules };
   if (on("sms") && input) {
     const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
@@ -588,21 +585,6 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     }
   }
   return null;
-}
-
-/** The draft's "long" sample values, canonical; null when they don't validate. */
-function longValues(draft: SubmitDraft, now: Date): CanonicalValues | null {
-  const today = utcDay(now);
-  const set =
-    draft.sampleSets.find((s) => s.id === "long") ??
-    defaultSampleSets(draft.variables, today).find((s) => s.id === "long")!;
-  const validated = validateValues(draft.variables, sampleSetValues(set, draft.variables, today));
-  return validated.ok ? validated.values : null;
-}
-
-/** "’", or "U+00A0" for a character that doesn't show on its own (a space, an invisible one). */
-function characterLabel(char: string): string {
-  return /^[\p{L}\p{M}\p{N}\p{P}\p{S}]/u.test(char) ? char : codePointLabel(char);
 }
 
 /** The keys of the chips in a document, in order of first use. */
