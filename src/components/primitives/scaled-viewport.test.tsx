@@ -86,10 +86,10 @@ describe("ScaledBox", () => {
   const reserve = () => container.querySelector<HTMLElement>('[data-slot="scaled-reserve"]')!;
   const content = () => reserve().firstElementChild as HTMLElement;
 
-  it("lays its content out at its own size and reserves the scaled size, with the room under it", () => {
+  it("lays its content out at its own size and reserves the scaled size", () => {
     act(() =>
       root.render(
-        <ScaledBox width={400} height={800} room={16}>
+        <ScaledBox width={400} height={800} room={40}>
           x
         </ScaledBox>,
       ),
@@ -98,22 +98,24 @@ describe("ScaledBox", () => {
     expect(content().style.height).toBe("800px");
     expect(content().style.transform).toBe("scale(0.5)");
     expect(reserve().style.width).toBe("200px");
-    expect(reserve().style.height).toBe("416px");
+    // It fits: no room under it.
+    expect(reserve().style.height).toBe("400px");
     expect(reserve().getAttribute("data-scale")).toBe("0.500");
   });
 
-  it("takes its scale from the caller when given one, and follows the box", () => {
+  it("takes its scale from the caller, follows the box, and keeps the room under content that runs past it", () => {
     act(() =>
       root.render(
-        <ScaledBox width={400} height={800} scale={(b) => containScale(b, { width: 400, height: 1000 }, 0.3)}>
+        <ScaledBox width={400} height={800} room={40} scale={(b) => containScale(b, { width: 400, height: 1000 }, 0.3)}>
           x
         </ScaledBox>,
       ),
     );
     expect(content().style.transform).toBe("scale(0.4)");
+    expect(reserve().style.height).toBe("320px");
     box = { width: 600, height: 200 };
     act(() => observed?.());
     expect(content().style.transform).toBe("scale(0.3)");
-    expect(reserve().style.height).toBe("240px");
+    expect(reserve().style.height).toBe("280px");
   });
 });

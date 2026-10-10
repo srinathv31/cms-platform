@@ -89,9 +89,10 @@ export function ScaledViewport({
 /**
  * Lays its children out at `width` × `height` CSS pixels and scales them to fit the box: by
  * `containScale` unless `scale` says otherwise. The scaled size is reserved in the layout, centred across
- * the box and at its top, so nothing overlaps it and no gap is left under it. `room` adds that many px of
- * empty space under the content, inside what is reserved: when the content runs past the box's bottom, it
- * is the space a scroller keeps below it at the end.
+ * the box and at its top, so nothing overlaps it and no gap is left under it. When the scaled content runs
+ * past the box's bottom (a scale held at its minimum), `room` px of empty space are reserved under it too:
+ * the space a scroller round it keeps below it at the end, which the scroller's own padding wouldn't give
+ * (padding doesn't follow an overflowing descendant).
  */
 export function ScaledBox({
   width,
@@ -112,13 +113,15 @@ export function ScaledBox({
   const ref = useRef<HTMLDivElement>(null);
   const box = useBoxSize(ref);
   const scale = box ? (scaleFor ? scaleFor(box) : containScale(box, { width, height })) : 1;
+  // Half a px of slack: a content that fits to the rounding is not running past the box.
+  const overflows = box !== null && height * scale > box.height + 0.5;
   return (
     <div ref={ref} data-slot="scaled-box" className={cn("min-w-0", className)}>
       <div
         data-slot="scaled-reserve"
         data-scale={box ? scale.toFixed(3) : undefined}
         className="relative mx-auto"
-        style={box ? { width: width * scale, height: height * scale + room } : { ...UNMEASURED, width: 0, height: 0 }}
+        style={box ? { width: width * scale, height: height * scale + (overflows ? room : 0) } : { ...UNMEASURED, width: 0, height: 0 }}
       >
         <div className="absolute top-0 left-0 origin-top-left" style={{ width, height, transform: `scale(${scale})` }}>
           {children}

@@ -49,12 +49,12 @@ const settings: DeviceSettings = {
     onScreenChange={setScreen}                       // optional: makes the notification a toggle button
     onMeasure={(m) => setFit(m)}                     // optional: truncation per field, see below
     clock={{ time: "9:41", date: "Friday, October 9" }}  // optional, this is the default
-    fit={{ minScale: 0.55, room: 16 }}               // optional: the smallest scale, and px kept under the phone
+    fit={{ minScale: 0.55, room: 40 }}               // optional: the smallest scale, and px under a phone that overflows
   />
 </div>
 
 // While the content loads: the same phone, empty, in the same place.
-<PhoneSkeleton settings={settings} fit={{ room: 16 }} />
+<PhoneSkeleton settings={settings} fit={{ room: 40 }} />
 
 <SmsPreview settings={settings} content={{ sender: "26725", text, time: "9:41 AM", day: "Today" }} />
 
@@ -149,8 +149,9 @@ phone has their proportions: 431 × 903 (0.477) and 455 × 958 (0.475). The came
   compact width reads smaller, as it is. The standard and large widths fit the container.
 - Height fits down to `MIN_SCALE`, 0.55, where the 15pt notification text is about 8px, the least that reads
   comfortably. A shorter container keeps that scale and the phone runs past its bottom, for a scroller round
-  it to scroll; width always fits. `fit.minScale` changes it, and `fit.room` keeps that many px under the phone
-  inside its box, the space a scroller leaves at the end (a scroller's own padding doesn't follow an overflow).
+  it to scroll; width always fits. `fit.minScale` changes it, and `fit.room` keeps that many px under a phone
+  that overflows, inside its box: the space a scroller leaves at the end (a scroller's own padding doesn't
+  follow an overflow).
 
 What that gives, measured in the running app:
 
@@ -158,9 +159,10 @@ What that gives, measured in the running app:
 | --- | --- | --- |
 | Preview well, 1440 × 900 | 0.717, 309 × 647 | 0.675, 307 × 647 |
 | Preview well, 1280 × 800 | 0.606, 261 × 547 | 0.571, 260 × 547 |
-| Preview well, 1000 × 700 overlay | 0.55, the well scrolls 50px | 0.55, the well scrolls 80px |
+| Preview well, 1000 × 700 overlay | 0.55, the well scrolls 74px | 0.55, the well scrolls 104px |
 | Review's Preview, 1440 × 900 | 0.589 | 0.555 |
-| Coral's drawer, 1440 × 900 | about 0.70 | about 0.66 |
+| Coral's drawer, 1440 × 900 | 0.722 | 0.681 |
+| Coral's drawer, 1280 × 800 | 0.611 | 0.576 |
 
 **The screen's content** is laid out for the real screen's height, where each OS puts it: iOS's date and clock
 near the top and its notifications rising from the bottom, the stack just above the flashlight and camera;

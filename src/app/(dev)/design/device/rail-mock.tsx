@@ -172,5 +172,5 @@ export function Well({ width, height, children, className }: { width: number; he
   );
 }
 
-/** The phone in the well: the mat's 16px stay under it when the well scrolls. */
-export const WELL_FIT: PhoneFit = { room: 16 };
+/** The phone in the well: 40px stay under it when the well scrolls, as in the preview (preview/well.ts). */
+export const WELL_FIT: PhoneFit = { room: 40 };

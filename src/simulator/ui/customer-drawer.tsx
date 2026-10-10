@@ -49,9 +49,10 @@ const phoneSettings = (platform: SimPlatform): DeviceSettings => ({
 
 /**
  * The phone fits the drawer's height whole (about 0.7 of its real size on a 900px window, 0.6 on an
- * 800px one, by the kit's own scale); in a shorter window the drawer scrolls, 16px under the phone at the end.
+ * 800px one, by the kit's own scale); in a shorter window the drawer scrolls, and at the end the phone stops
+ * 56px above the bottom, as the drawer's padding does, clear of the Demo pill.
  */
-const FIT: PhoneFit = { room: 16 };
+const FIT: PhoneFit = { room: 56 };
 
 /** Small segmented control (Coral's one picker style). */
 function Seg({ label, value, options, onChange }: { label: string; value: ApiChannel; options: { value: ApiChannel; label: string }[]; onChange: (v: ApiChannel) => void }) {

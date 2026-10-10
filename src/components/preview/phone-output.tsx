@@ -31,7 +31,7 @@ export interface PhoneSenders {
 /** What an SMS's thread shows as its time: the phone's clock. */
 const SMS_TIME = "9:41 AM";
 
-/** The phone on its mat: when the well scrolls, the mat's 16px stay under it (well.ts). */
+/** The phone on its mat: when the well scrolls, 40px stay under it at the end (well.ts). */
 const FIT: PhoneFit = { room: PHONE_ROOM };
 
 export function PushOutput({

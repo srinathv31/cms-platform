@@ -41,7 +41,7 @@ export interface PhoneFit {
    * always fits.
    */
   minScale?: number;
-  /** Empty px kept under the phone, inside its box: the space a scroller leaves below it at the end. Default 0. */
+  /** Empty px kept under the phone while it runs past its container: the space a scroller leaves below it at the end. Default 0. */
   room?: number;
 }
 
