@@ -83,16 +83,20 @@ function WebPhone({ view, delivery }: { view: Extract<View, { kind: "phone" }>; 
 }
 
 /**
- * The push on the customer's lock screen. One that arrived while the drawer was open drops in as a banner
- * (a heads-up on Android) instead, once. Clicking the notification opens it, as on a phone.
+ * The push on the customer's lock screen. One that arrived while the drawer was open (`arrived`) drops in
+ * as a banner (a heads-up on Android) instead, once. Clicking the notification opens it, as on a phone,
+ * and closing it lands on the lock screen, where a notification that came in waits: the banner has
+ * dropped, and never drops again. The screen lives here, and the drawer keys this by the delivery, so
+ * switching to another view and back starts again on the lock screen (switching ends the arrival).
  */
-function PushPhone({ view, delivery, screen, onScreen }: { view: Extract<View, { kind: "push" }>; delivery: SimDeliveryView; screen: PushScreen; onScreen: (s: PushScreen) => void }) {
+function PushPhone({ view, delivery, arrived }: { view: Extract<View, { kind: "push" }>; delivery: SimDeliveryView; arrived: boolean }) {
   const { push, appName } = view;
+  const [screen, setScreen] = useState<PushScreen>(arrived ? "banner" : "lock");
   return (
     <PushPreview
       settings={phoneSettings(view.platform)}
       screen={screen}
-      onScreenChange={onScreen}
+      onScreenChange={(next) => setScreen(next === "banner" ? "lock" : next)}
       clock={phoneClock(delivery.at)}
       content={{ appName, appMark: { monogram: Array.from(appName)[0] ?? "" }, title: push.title, subtitle: push.subtitle, body: push.body, time: "now" }}
     />
@@ -214,11 +218,6 @@ export function CustomerDrawer({
   }
   const ready = state?.status === "ready" ? state.view : null;
 
-  // The push screen the person chose, for the delivery on screen; else the lock screen, or the banner for
-  // one that arrived while the drawer was open.
-  const [chosen, setChosen] = useState<{ id: string; screen: PushScreen } | null>(null);
-  const screen: PushScreen = ready && chosen?.id === ready.id ? chosen.screen : ready && arrival?.deliveryId === ready.id ? "banner" : "lock";
-
   const options = CHANNEL_ORDER.filter((c) => results.some((r) => r.channel === c)).map((c) => ({ value: c, label: VIEW_LABEL[c] }));
   const filename = ready ? `${ready.templateName} · v${ready.versionNumber}`.replace(/\s+/g, " ") : "Offer terms";
   const phone = onPhone(result?.channel ?? channel);
@@ -241,7 +240,7 @@ export function CustomerDrawer({
         body = <WebPhone view={view} delivery={delivery} />;
         break;
       case "push":
-        body = <PushPhone view={view} delivery={delivery} screen={screen} onScreen={(s) => setChosen({ id: delivery.id, screen: s })} />;
+        body = <PushPhone key={delivery.id} view={view} delivery={delivery} arrived={arrival?.deliveryId === delivery.id} />;
         break;
       case "sms":
         body = view.thread.length > 0 ? <SmsPhone view={view} delivery={delivery} /> : <Strip tone="bad">Nothing was delivered.</Strip>;
