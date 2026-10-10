@@ -17,7 +17,7 @@ export const TEAM_STAGE = { id: "stage_disclosure_0", name: "Team approver" } as
  */
 export const ALERT_CONTENT_TYPE_ID = "ct_alert";
 export const ALERT_CHANNELS: Channel[] = ["push", "sms"];
-export const ALERT_SMS_FOOTER = "Coral Offers: Reply STOP to opt out, HELP for help.";
+export const ALERT_SMS_FOOTER = "Coral: Reply STOP to opt out, HELP for help.";
 /** The Alert chain's one stage. */
 export const ALERT_STAGE = { id: "stage_alert_0", name: "Team approver" } as const;
 

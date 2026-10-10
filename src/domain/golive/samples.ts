@@ -110,8 +110,8 @@ const PUSH_EXAMPLE: ApiPushResponse = (() => {
 /** An SMS as the route returns it, footer included, measured by the same functions the route uses. */
 const SMS_EXAMPLE: ApiSmsResponse = (() => {
   const text = withFooter(
-    "Coral Offers: your payment of $35.00 is due March 4. Pay at coral.example/pay",
-    "Coral Offers: Reply STOP to opt out, HELP for help.",
+    "Coral: Your minimum payment of $35.00 is due March 4. Pay at coral.example/pay",
+    "Coral: Reply STOP to opt out, HELP for help.",
   );
   const { encoding, parts, characters } = smsLength(text);
   return { text, encoding, parts, characters, newerVersion: null };

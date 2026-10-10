@@ -688,7 +688,10 @@ function pagination(): FocusedCase {
 // units (an emoji costs 2), 160 or 70 in one part and 153 or 67 in each part once split
 // (docs/render-spec.md §10, src/domain/messages/gsm7.ts).
 
-/** The Alert content type's footer, as the seed sets it. */
+/**
+ * The cases' SMS footer: a brand and the opt-out, the shape of the Alert content type's. The cases keep
+ * their own, so a change to the seed's never moves a golden file, and the boundary cases keep their counts.
+ */
 const FOOTER = "Coral Offers: Reply STOP to opt out, HELP for help.";
 const NO_BODY = doc(p());
 const amount = variable("amount_due", "Amount due", "currency", true, "35");

@@ -42,11 +42,11 @@ test.use({ trace: "off", screenshot: "only-on-failure" });
 const ALERT_NAME = "Card Used Abroad";
 const CORAL_ALERT = "Card used abroad";
 const CORAL_ALERT_ID = "alert_card_abroad";
-const FOOTER = "Coral Offers: Reply STOP to opt out, HELP for help.";
+const FOOTER = "Coral: Reply STOP to opt out, HELP for help.";
 
 /** What Coral holds for the two customers (src/server/seed/sim.ts): their phones and their last purchase abroad. */
 const OLIVIA = { ...CUSTOMERS.olivia, phone: "iPhone · (201) 555-0142", last4: "3417", purchase: "$48.20 at Café Lisboa in Portugal" };
-const MARCUS = { name: "Marcus Delgado", phone: "Android · (415) 555-0118", last4: "9052", purchase: "$23.75 at Barcelona Tapas Bar in Spain" };
+const MARCUS = { name: "Marcus Delgado", phone: "Android · (415) 555-0118", last4: "9052", purchase: "$23.75 at Barcelona Tapas Bar & Grill in Spain" };
 
 let db: Client;
 let snapshot: Snapshot;

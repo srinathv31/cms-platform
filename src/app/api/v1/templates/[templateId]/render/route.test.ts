@@ -479,7 +479,7 @@ describe("POST …/render: push and SMS", () => {
         sms: { text: field(t("Coral Offers: "), chip("amount_due"), t(" is due."), { type: "hardBreak" }, t("coral.example/pay")) },
       },
       // Frozen at submit, as the Alert content type's footer stood then.
-      smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.",
+      smsFooter: "Coral: Reply STOP to opt out, HELP for help.",
       sunsetAt: null,
       revoke: null,
     });
@@ -514,10 +514,10 @@ describe("POST …/render: push and SMS", () => {
     const res = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      text: "Coral Offers: $35.00 is due.\ncoral.example/pay\nCoral Offers: Reply STOP to opt out, HELP for help.",
+      text: "Coral Offers: $35.00 is due.\ncoral.example/pay\nCoral: Reply STOP to opt out, HELP for help.",
       encoding: "GSM-7",
       parts: 1,
-      characters: 98,
+      characters: 91,
       newerVersion: null,
     });
   });
@@ -529,12 +529,12 @@ describe("POST …/render: push and SMS", () => {
     await db.insert(versions).values({ ...(await db.select().from(versions).where(eq(versions.id, "v_alert_1")))[0]!, id: "v_alert_draft", number: null, state: "draft", smsFooter: null });
     try {
       const active = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
-      expect(((await active.json()) as { text: string }).text).toMatch(/\nCoral Offers: Reply STOP to opt out, HELP for help\.$/);
+      expect(((await active.json()) as { text: string }).text).toMatch(/\nCoral: Reply STOP to opt out, HELP for help\.$/);
       const draft = await post(ALERT_ID, { version: "draft", preview: true, channel: "sms", values: VALUES }, {});
       expect(((await draft.json()) as { text: string }).text).toMatch(new RegExp(`\\n${NEW.replace(/[.]/g, "\\.")}$`));
     } finally {
       await db.delete(versions).where(eq(versions.id, "v_alert_draft"));
-      await db.update(contentTypes).set({ smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+      await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
     }
   });
 
@@ -550,10 +550,10 @@ describe("POST …/render: push and SMS", () => {
       .where(eq(versions.id, "v_alert_1"));
     const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "Gómez" } });
     expect(await res.json()).toEqual({
-      text: "Hi Gómez\nCoral Offers: Reply STOP to opt out, HELP for help.",
+      text: "Hi Gómez\nCoral: Reply STOP to opt out, HELP for help.",
       encoding: "UCS-2",
       parts: 1,
-      characters: 60,
+      characters: 53,
       newerVersion: null,
     });
   });

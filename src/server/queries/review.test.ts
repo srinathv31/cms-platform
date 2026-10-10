@@ -646,7 +646,7 @@ describe("an alert's family", () => {
 describe("an alert's SMS footer", () => {
   it("is the one frozen into the version at submit, for the preview and the fields, whatever the content type's is now", async () => {
     const templateId = ids["card-used-abroad"]!;
-    const frozen = "Coral Offers: Reply STOP to opt out, HELP for help.";
+    const frozen = "Coral: Reply STOP to opt out, HELP for help.";
     await db.update(contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(contentTypes.id, "ct_alert"));
     try {
       as("jordan");

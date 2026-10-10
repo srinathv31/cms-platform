@@ -211,7 +211,7 @@ describe("people, teams and access", () => {
       name: "Alert",
       requiredSections: [],
       allowedChannels: ["push", "sms"],
-      smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.",
+      smsFooter: "Coral: Reply STOP to opt out, HELP for help.",
       smsMaxParts: 3,
     });
     const stages = await db.select().from(ucomp.approvalStages);
@@ -282,7 +282,7 @@ describe("lifecycle states", () => {
       expect(template).toMatchObject({ teamId: "coral-offers", contentTypeId: "ct_alert" });
       for (const v of versionsOf(key)) expect(v.channels).toEqual(["push", "sms"]);
       // Each submitted version froze the Alert's footer, as submit does; a draft shows the content type's.
-      for (const v of versionsOf(key)) expect(v.smsFooter).toBe(v.state === "draft" ? null : "Coral Offers: Reply STOP to opt out, HELP for help.");
+      for (const v of versionsOf(key)) expect(v.smsFooter).toBe(v.state === "draft" ? null : "Coral: Reply STOP to opt out, HELP for help.");
     }
     for (const v of versionsOn("ct_disclosure")) expect(v.smsFooter).toBeNull();
     expect(versionsOf("payment-due-reminder")[0]).toMatchObject({ name: "Payment Due Reminder", stages: [{ id: "stage_alert_0" }] });

@@ -35,6 +35,6 @@ export const SMS: SmsContent = {
   sender: "26725",
   text:
     "Hi Maya, your minimum payment of $35.00 is due Wed, Oct 14. Pay at coral.example/pay\n" +
-    "Coral Offers: Reply STOP to opt out, HELP for help.",
+    "Coral: Reply STOP to opt out, HELP for help.",
   time: "9:41 AM",
 };

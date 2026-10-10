@@ -32,7 +32,7 @@ const CUSTOMERS: {
   purchase: { amount: string; merchant: string; country: string };
 }[] = [
   { first: "Olivia", last: "Bennett", state: "NJ", apr: "21.99", fee: "95", phone: "+12015550142", platform: "ios", last4: "3417", due: { amount: "35.00", inDays: 12 }, purchase: { amount: "48.20", merchant: "Café Lisboa", country: "Portugal" } },
-  { first: "Marcus", last: "Delgado", state: "CA", apr: "24.49", fee: "0", phone: "+14155550118", platform: "android", last4: "9052", due: { amount: "58.12", inDays: 9 }, purchase: { amount: "23.75", merchant: "Barcelona Tapas Bar", country: "Spain" } },
+  { first: "Marcus", last: "Delgado", state: "CA", apr: "24.49", fee: "0", phone: "+14155550118", platform: "android", last4: "9052", due: { amount: "58.12", inDays: 9 }, purchase: { amount: "23.75", merchant: "Barcelona Tapas Bar & Grill", country: "Spain" } },
   { first: "Anjali", last: "Kapoor", state: "TX", apr: "19.24", fee: "95", phone: "+15125550163", platform: "ios", last4: "6128", due: { amount: "25.00", inDays: 15 }, purchase: { amount: "1240.00", merchant: "Hotel Kraków Old Town", country: "Poland" } },
   { first: "Jonas", last: "Eriksen", state: "WA", apr: "22.74", fee: "0", phone: "+12065550127", platform: "android", last4: "0459", due: { amount: "112.40", inDays: 6 }, purchase: { amount: "312.60", merchant: "Nordic Outfitters", country: "Norway" } },
   { first: "Fatima", last: "Al-Sayed", state: "NY", apr: "26.99", fee: "95", phone: "+12125550190", platform: "ios", last4: "7783", due: { amount: "74.89", inDays: 18 }, purchase: { amount: "86.10", merchant: "Dubai Mall Electronics", country: "United Arab Emirates" } },

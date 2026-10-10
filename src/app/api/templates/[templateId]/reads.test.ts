@@ -124,12 +124,12 @@ describe("GET /api/templates/[templateId]/compare", () => {
       expect(body).toMatchObject({
         ok: true,
         family: "message",
-        from: { smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." },
+        from: { smsFooter: "Coral: Reply STOP to opt out, HELP for help." },
         to: { smsFooter: NOW },
       });
     } finally {
       await db.delete(versions).where(eq(versions.id, "v_payment_draft"));
-      await db.update(contentTypes).set({ smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+      await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
     }
   });
 

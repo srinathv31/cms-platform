@@ -769,7 +769,7 @@ src/server/render/golden/
   "body": { "type": "doc", … },             // a message case's is never read
   "channelFields": { "email": { "subject": { "type": "doc", … }, "preheader": { … } } },  // or {} (section 2)
   "channels": [ "pdf", "web", "email" ],    // the channels the case renders: one family
-  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."   // optional: the version's SMS footer (section 10)
+  "smsFooter": "Coral: Reply STOP to opt out, HELP for help."   // optional: the version's SMS footer (section 10)
 }
 ```
 

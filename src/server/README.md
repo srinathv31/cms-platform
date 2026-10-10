@@ -153,7 +153,7 @@ SQLite and libSQL specifics:
 
 The platform ([seed/platform.ts](seed/platform.ts)) has two content types, each with a one-stage chain: Disclosure
 (documents: PDF, Web and Email, three required sections) and Alert (messages: Push and SMS, no sections, the SMS
-footer "Coral Offers: Reply STOP to opt out, HELP for help." and a 3-part budget). Every seeded team has an app name
+footer "Coral: Reply STOP to opt out, HELP for help." and a 3-part budget). Every seeded team has an app name
 and a fictional short code its messages come from, so no preview shows the fallback: Coral Offers sends as "Coral"
 from 26725, Deposits as "Deposits Online" from 33767, and Card Statements as "Card Center" from 22737
 ([seed/teams.ts](seed/teams.ts)). The submit action reads the content type's footer and budget with

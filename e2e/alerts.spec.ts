@@ -158,7 +158,7 @@ test.describe("alerts", () => {
       await expect(page.getByRole("heading", { name: "Push notification" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Text message" })).toBeVisible();
       for (const name of ["Push title", "Push subtitle", "Push body", "SMS message"]) await expect(field(page, name)).toBeVisible();
-      await expect(page.locator('[data-slot="sms-footer"]').filter({ visible: true })).toHaveText("Coral Offers: Reply STOP to opt out, HELP for help.");
+      await expect(page.locator('[data-slot="sms-footer"]').filter({ visible: true })).toHaveText("Coral: Reply STOP to opt out, HELP for help.");
       // Copilot writes a document's body: on an alert the row stays, greyed, with why.
       const copilot = page.getByRole("button", { name: "Copilot prompt" });
       await expect(copilot).toHaveAttribute("aria-disabled", "true");

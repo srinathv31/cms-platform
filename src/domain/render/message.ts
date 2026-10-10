@@ -39,7 +39,7 @@ import { validateValues } from "./validate";
 /** The content type's rules a message renders with. */
 export interface MessageRules {
   /**
-   * The SMS footer (brand and opt-out, "Coral Offers: Reply STOP to opt out, HELP for help."), printed
+   * The SMS footer (brand and opt-out, "Coral: Reply STOP to opt out, HELP for help."), printed
    * after the message on its own line, exactly as written. Null or "": none.
    */
   smsFooter: string | null;

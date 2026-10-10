@@ -81,7 +81,7 @@ describe("platform read models", () => {
       family: "message",
       allowedChannels: ["push", "sms"],
       requiredSections: [],
-      smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.",
+      smsFooter: "Coral: Reply STOP to opt out, HELP for help.",
       smsMaxParts: 3,
       can: { editSections: { ok: false, ...PLATFORM_REFUSALS.noSections("Alert") } },
     });

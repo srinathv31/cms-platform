@@ -981,7 +981,7 @@ test.describe("alerts", () => {
 
     const sms = await json({ channel: "sms" });
     expect(sms).toMatchObject({
-      text: "Coral: Your minimum payment of $1,234.56 is due March 4, 2027.\nPay at coral.example/pay\nCoral Offers: Reply STOP to opt out, HELP for help.",
+      text: "Coral: Your minimum payment of $1,234.56 is due March 4, 2027.\nPay at coral.example/pay\nCoral: Reply STOP to opt out, HELP for help.",
       encoding: "GSM-7",
       parts: 1,
     });
