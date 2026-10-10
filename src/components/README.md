@@ -42,6 +42,7 @@ Feature folders:
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
 | `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
+| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`; the preview rail and Coral's phone next |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
 | `library/` | Library view and browser, New template dialog, starter gallery, file upload. | `/[team]/library`, and under the settings dialog |
@@ -117,6 +118,8 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 `border-hairline`, `text-text-muted`, `text-label`, `bg-selected`, `bg-brand`, `text-danger-text`, `bg-chip`,
 `bg-status-review` (one set per lifecycle state; to show a state, use `StatusBadge`), and the shadcn names
 (`bg-primary`, `border-border`). Light theme only: `globals.css` defines no dark theme, so don't add `dark:` classes.
+The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.css) have a light set and a
+`[data-appearance="dark"]` set for a phone in dark mode, read as `bg-(--device-…)` inside `device/` only.
 
 - **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
   use `series-1…5`, five hues in a fixed order, one per channel (a version chart uses the first four, then taupe),
@@ -128,7 +131,8 @@ Raw colors live only in [src/styles/tokens.css](../styles/tokens.css): a primiti
 - **Radius:** `rounded-md` 6px chips, `rounded-lg` 8px controls, `rounded-xl` 14px cards, `rounded-2xl` 18px
   large cards, `rounded-3xl` 22px modals, `rounded-4xl` 24px the canvas panel (`xs` 4px, `sm` 5px).
 - **Fonts** ([src/styles/fonts.ts](../styles/fonts.ts)): `font-sans` Figtree (the default), `font-display` (or
-  `font-heading`) Newsreader, `font-mono` Geist Mono for variable keys.
+  `font-heading`) Newsreader, `font-mono` Geist Mono for variable keys. The phone kit loads its own device faces
+  (Inter and Google Sans Flex, scoped to the kit) in [device/fonts.ts](device/fonts.ts).
 - **Utility classes:** `.display-xl` (page titles), `.display-lg` (dialog titles), `.caps-label` (tracked caps
   labels), `.numeral` (big tabular numbers). Also `shadow-pop`, `shadow-modal` (modals only; elsewhere
   borders, not shadows), `ease-soft`, and `animate-stream-in`.
