@@ -273,9 +273,10 @@ What it measures, shown only when it matters and never animated:
 The composer hands the session a document-editor handle whose `focus` puts the caret in the first field on screen, so
 the name field's Enter lands there. A message has no blocks, so its review threads are on its fields (a field's id is
 the thread's block, `commentAnchors`): the handle finds a field by `data-field` (the redline's DOM handle with its own
-`anchor`), so the markers sit beside the fields and choosing a card scrolls to its field. A thread on a field is
-started on the review screen (the hover marker beside a field, or the rail's "Comment on a field" menu); the
-composer has no selection to comment on.
+`anchor`), so the markers sit beside the fields and choosing a card scrolls to its field. A thread is on a whole field
+(there is no selection to quote): the hover marker beside a field starts one, in the composer (each field carries
+`data-id`, which `GutterMarkers` finds through its `blocks` selector) and on the review screen, where the rail's
+"Comment on a field" menu is the keyboard path.
 
 The composer's field label and the SMS's locked footer (`content/field-chrome.tsx`) are shared with the review's and
 Compare's read-only fields (`redline/fields-document.tsx`), so a field looks the same written, reviewed and compared.
@@ -340,7 +341,9 @@ Compare's read-only fields (`redline/fields-document.tsx`), so a field looks the
 - Keep logic in pure `.ts` modules so it tests without a DOM: `review/decision-model.ts`, `palette/commands.ts`,
   `comments/thread-state.ts`, `workspace/session/session-store.ts`, `workspace/autosave/autosave-scheduler.ts`.
 - End-to-end: `e2e/scenario-02.spec.ts` through `e2e/scenario-10.spec.ts` follow the demo scenarios (create,
-  review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`,
+  review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/alerts.spec.ts` follows an alert from the
+  composer and its live phone through submit, a field-redlined review, a comment on a field and Compare;
+  `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`,
   and `e2e/principles.spec.ts` cover the shell, Back and Forward, and the settings modal. The auto fixture in
   [e2e/helpers/scenario.ts](../../e2e/helpers/scenario.ts) fails a test on any console error.
 - Specs select by accessible name and by `data-slot` and `data-status` attributes: grep `e2e/` before you rename

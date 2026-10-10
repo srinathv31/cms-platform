@@ -63,6 +63,11 @@ export interface GutterMarkersProps {
   className?: string;
   /** What a marker is beside, in its label: a document's "block", or a message's "field" (its threads are on its fields). */
   noun?: "block" | "field";
+  /**
+   * What the hover marker can start a comment on: the elements, by selector, that carry their block's id in
+   * `data-id`. A document's top-level blocks by default; the message composer's fields.
+   */
+  blocks?: string;
 }
 
 interface Marker {
@@ -186,6 +191,7 @@ export function GutterMarkers({
   compact = false,
   className,
   noun = "block",
+  blocks = ".ucomp-doc > [data-id]",
 }: GutterMarkersProps) {
   const layer = useRef<HTMLDivElement>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -238,7 +244,7 @@ export function GutterMarkers({
       const target = event.target instanceof Element ? event.target : null;
       if (event.buttons !== 0) return setHover(null); // a drag is selecting text
       if (!target || layer.current?.contains(target)) return;
-      setHover(target.closest(".ucomp-doc > [data-id]")?.getAttribute("data-id") ?? null);
+      setHover(target.closest(blocks)?.getAttribute("data-id") ?? null);
     };
     const onLeave = () => setHover(null);
     host.addEventListener("pointermove", onMove);
@@ -248,7 +254,7 @@ export function GutterMarkers({
       host.removeEventListener("pointerleave", onLeave);
       setHover(null);
     };
-  }, [canRequest]);
+  }, [canRequest, blocks]);
 
   // One tab stop for the whole group: the marker of the active thread, else the one last focused, else the first.
   const activeBlock = markers.find((m) => activeThreadId !== null && m.threadIds.includes(activeThreadId))?.blockId;

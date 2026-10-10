@@ -252,7 +252,8 @@ function ComposerField({
   }, [field]);
 
   return (
-    <div data-field={field.id} className="flex flex-col">
+    // `data-id`: a review thread can be on the field, as on a document's block (the gutter's hover marker finds it).
+    <div data-field={field.id} data-id={field.id} className="flex flex-col">
       {/* The field names itself to assistive tech ("Push subtitle"); this is its visible label. */}
       <FieldLabel label={field.label} tag={fieldPlatformTag(field)} />
       <InlineVariableField

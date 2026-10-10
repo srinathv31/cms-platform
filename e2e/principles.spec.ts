@@ -288,6 +288,10 @@ const HOLIDAY = "UC-R4PZ0A"; // v1 revoked, v2 active
 const RATE_CHANGE = "UC-KQ0DEZ"; // v1 active
 const DEPOSIT = "UC-3EDEJN"; // Deposits (Everyday Checking), v1 active
 const STATEMENT = "UC-E9NPGR"; // Card Statements (Statement Insert — Rate Change), v1 active
+// Coral Offers' alerts (push and SMS, decision 0033).
+const PAYMENT_DUE = "UC-9EABFD"; // Payment Due Reminder, v1 active
+const CARD_ABROAD = "UC-5ZGGKX"; // Card Used Abroad, v1 in review (Priya's)
+const HEADS_UP = "UC-XFMSZE"; // Rate Change Heads-up, a draft
 
 interface Route {
   url: string;
@@ -317,6 +321,10 @@ const WORKSPACE: Route[] = [
   { url: `/deposits/templates/${DEPOSIT}/versions`, personas: ["priya"] },
   { url: `/card-statements/templates/${STATEMENT}`, personas: ["riley"] },
   { url: `/card-statements/templates/${STATEMENT}/usage`, personas: ["riley"] },
+  // An alert's every tab; a draft alert in its composer; one in review, as its author.
+  ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${PAYMENT_DUE}${tab}`, personas: ["maya"] })),
+  { url: `/coral-offers/templates/${HEADS_UP}`, personas: ["maya", "jordan"] },
+  { url: `/coral-offers/templates/${CARD_ABROAD}`, personas: ["priya"] },
 ];
 
 const REVIEW: Route[] = [
@@ -325,6 +333,9 @@ const REVIEW: Route[] = [
   // The review screen for the version in review (v3): the approver, the author who submitted it, Legal, an observer.
   { url: `/coral-offers/review/${COLLECT}/3`, personas: ["jordan", "maya", "dana", "taylor"] },
   { url: `/coral-offers/review/${COLLECT}/2`, personas: ["jordan"] },
+  // An alert in review (its fields on the Document view), as the approver and its author, and an Active one.
+  { url: `/coral-offers/review/${CARD_ABROAD}/1`, personas: ["jordan", "priya"] },
+  { url: `/coral-offers/review/${PAYMENT_DUE}/1`, personas: ["jordan"] },
 ];
 
 const USAGE: Route[] = [
@@ -429,6 +440,7 @@ test.describe("Views inside a page", () => {
     { url: "/all/review", persona: "riley" },
     { url: `/coral-offers/templates/${FEE_WAIVER}`, persona: "maya" }, // the rail's views (Variables, Comments, ...)
     { url: `/coral-offers/review/${COLLECT}/3`, persona: "jordan" },
+    { url: `/coral-offers/review/${CARD_ABROAD}/1`, persona: "jordan" }, // an alert: its fields, then the phone
     { url: "/coral-offers/usage", persona: "jordan" }, // Overview, Consumers
   ];
   for (const { url, persona } of TAB_PAGES) {

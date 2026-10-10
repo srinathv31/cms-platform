@@ -343,15 +343,17 @@ export function ContentWorkspace({
               editorRef={setEditor}
               threadField={threadField}
             />
-            {/* A message's threads are on its fields: their markers sit beside them (a new one starts in the review). */}
+            {/* A message's threads are on its fields: their markers sit beside them, and a hover starts one on a field. */}
             <GutterMarkers
               editor={editorHandle}
               threads={review.threads}
               activeThreadId={activeThreadId}
               onActivate={showThread}
+              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
               compact={previewOpen}
               className="hidden @min-[53rem]/ws:block"
               noun="field"
+              blocks='[data-slot="message-composer"] [data-id]'
             />
           </>
         ) : (
