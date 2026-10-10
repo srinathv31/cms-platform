@@ -21,7 +21,7 @@ import { WELL_INSET } from "./well";
 /** Who the team's messages come from: the app a push is from, and the number an SMS is from. */
 export interface PhoneSenders {
   appName: string;
-  /** A US short code or a number; "" when the team has none. */
+  /** A US short code or a number; "" when the team has none (the phone then shows "No sender"). */
   smsSender: string;
 }
 

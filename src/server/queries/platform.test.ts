@@ -91,6 +91,6 @@ describe("platform read models", () => {
   it("Teams: who each team's messages come from", async () => {
     const { teams } = await getTeamsSection();
     expect(teams.find((t) => t.slug === "coral-offers")).toMatchObject({ appName: "Coral", smsSender: "26725" });
-    expect(teams.find((t) => t.slug === "deposits")).toMatchObject({ appName: null, smsSender: null });
+    expect(teams.find((t) => t.slug === "deposits")).toMatchObject({ appName: "Deposits Online", smsSender: "33767" });
   });
 });

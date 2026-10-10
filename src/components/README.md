@@ -247,7 +247,8 @@ Either way, values the route would refuse show as `OutputError`, in the author's
 refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
 sentence above it. In the workspace the phone's settings and Push's screen live in the session's preview state
 (`phone`, `pushScreen`), like Web's `device`; the review keeps its own. The phone's sender is the team's app name
-(else its name) and short code, its date the demo clock's day (`preview-sender.ts`).
+(else its name) and short code (else none: the thread shows a muted "No sender", never a made-up number or the
+team's name), its date the demo clock's day (`preview-sender.ts`).
 
 ## The message composer
 

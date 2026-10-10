@@ -11,10 +11,10 @@ const TEAMS: {
   description: string;
   icon: string;
   createdDaysAgo: number;
-  /** Who the team's push notifications and SMS come from (decision 0033). */
-  appName?: string;
-  /** A fictional US short code. */
-  smsSender?: string;
+  /** Who the team's push notifications and SMS come from (decision 0033): every seeded team has both. */
+  appName: string;
+  /** A fictional US short code, a word on a phone keypad: 26725 is CORAL, 33767 DEPOS, 22737 CARDS. */
+  smsSender: string;
 }[] = [
   {
     id: "coral-offers",
@@ -31,6 +31,8 @@ const TEAMS: {
     description: "Savings and checking disclosures: rates, fees and account terms.",
     icon: "piggy-bank",
     createdDaysAgo: 395,
+    appName: "Deposits Online",
+    smsSender: "33767",
   },
   {
     id: "card-statements",
@@ -38,6 +40,8 @@ const TEAMS: {
     description: "Statement inserts: rate changes, enrollment notices and annual notices.",
     icon: "receipt-text",
     createdDaysAgo: 380,
+    appName: "Card Center",
+    smsSender: "22737",
   },
 ];
 
@@ -80,8 +84,8 @@ export function seedTeams(ctx: SeedCtx) {
       description: t.description,
       icon: t.icon,
       createdAt: ctx.at(t.createdDaysAgo),
-      appName: t.appName ?? null,
-      smsSender: t.smsSender ?? null,
+      appName: t.appName,
+      smsSender: t.smsSender,
     });
     ctx.sink.auditEvents.push({
       id: ctx.id("ae"),

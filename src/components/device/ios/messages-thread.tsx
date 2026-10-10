@@ -5,6 +5,7 @@ import { m } from "motion/react";
 import { ChevronLeft, ChevronRight, Mic, Plus } from "lucide-react";
 import { fadeRise } from "@/components/motion/presets";
 import { pt } from "../geometry";
+import { NO_SENDER, smsSender } from "../labels";
 import { linkRuns } from "../links";
 import { Silhouette } from "../silhouette";
 import { cutoutWidth } from "../phone-frame";
@@ -14,10 +15,11 @@ import type { DeviceClock, DeviceSettings, SmsContent } from "../types";
 import { fixedText, textStyle } from "./type";
 
 // The Messages thread a text arrives in: the sender's short code in the header (a US text can't show a
-// brand there), "Text Message • SMS" and the time above a grey incoming bubble, and a composer that is
-// only drawn. Earlier texts from the sender sit above it, each under its own time when that changes, and
-// the thread opens on the newest. Links show as plain underlined text: iOS turns them off for unknown
-// senders. The text is never cut; a long one scrolls inside the phone.
+// brand there; a muted "No sender" when it has none), "Text Message • SMS" and the time above a grey
+// incoming bubble, and a composer that is only drawn. Earlier texts from the sender sit above it, each
+// under its own time when that changes, and the thread opens on the newest. Links show as plain
+// underlined text: iOS turns them off for unknown senders. The text is never cut; a long one scrolls
+// inside the phone.
 
 /** The header's controls: light glass on the app's own background. */
 const CHROME: CSSProperties = {
@@ -51,6 +53,7 @@ export function MessagesThread({
   const body = textStyle("body", settings.textSize);
   const meta = textStyle("caption", settings.textSize);
   const messages = threadMessages(content);
+  const sender = smsSender(content.sender);
   const scroller = useRef<HTMLDivElement>(null);
   const newest = useRef<HTMLDivElement>(null);
   useOpenOnNewest(scroller, newest, messages.length);
@@ -82,7 +85,15 @@ export function MessagesThread({
             gap: pt(1),
           }}
         >
-          <span className="tabular-nums">{content.sender}</span>
+          {sender === null ? (
+            <span data-slot="sms-sender" data-placeholder="" className="text-(--device-label-2)">
+              {NO_SENDER}
+            </span>
+          ) : (
+            <span data-slot="sms-sender" className="tabular-nums">
+              {sender}
+            </span>
+          )}
           <ChevronRight aria-hidden strokeWidth={2.4} className="text-(--device-label-3)" style={{ width: pt(13), height: pt(13) }} />
         </span>
       </header>

@@ -4,7 +4,9 @@ import { useRef } from "react";
 import { m } from "motion/react";
 import { ArrowLeft, EllipsisVertical, ImagePlus, Mic, Phone, Plus, Smile, Video } from "lucide-react";
 import { fadeRise } from "@/components/motion/presets";
+import { cn } from "@/lib/utils";
 import { pt } from "../geometry";
+import { NO_SENDER, smsSender } from "../labels";
 import { linkRuns } from "../links";
 import { Silhouette } from "../silhouette";
 import { HomeIndicator, STATUS_BAR_HEIGHT, StatusBar } from "../status-bar";
@@ -13,10 +15,11 @@ import type { DeviceClock, DeviceSettings, SmsContent } from "../types";
 import { androidText } from "./type";
 
 // A text in the current Google Messages style, drawn generically (no app icon, no logo): the sender as a
-// number in the top bar on a solid tinted background, the thread in a container with rounded top corners,
-// "Text message" and the time above a grey incoming bubble with tighter corners than iOS, and a composer
-// that is only drawn. Earlier texts sit above, each under its own time when that changes, and the thread
-// opens on the newest. Links show as plain underlined text. The text is never cut; a long one scrolls.
+// number in the top bar on a solid tinted background (a muted "No sender" when it has none), the thread
+// in a container with rounded top corners, "Text message" and the time above a grey incoming bubble with
+// tighter corners than iOS, and a composer that is only drawn. Earlier texts sit above, each under its
+// own time when that changes, and the thread opens on the newest. Links show as plain underlined text.
+// The text is never cut; a long one scrolls.
 
 export function AndroidMessagesThread({
   content,
@@ -31,6 +34,7 @@ export function AndroidMessagesThread({
   const label = androidText("label", settings.textSize);
   const icon = { width: pt(24), height: pt(24) };
   const messages = threadMessages(content);
+  const sender = smsSender(content.sender);
   const scroller = useRef<HTMLDivElement>(null);
   const newest = useRef<HTMLDivElement>(null);
   useOpenOnNewest(scroller, newest, messages.length);
@@ -48,8 +52,13 @@ export function AndroidMessagesThread({
         >
           <Silhouette />
         </span>
-        <span className="min-w-0 flex-1 truncate tabular-nums" style={{ fontSize: pt(20), lineHeight: pt(28), marginLeft: pt(12) }}>
-          {content.sender}
+        <span
+          data-slot="sms-sender"
+          data-placeholder={sender === null ? "" : undefined}
+          className={cn("min-w-0 flex-1 truncate tabular-nums", sender === null && "text-(--device-m3-on-surface-variant)")}
+          style={{ fontSize: pt(20), lineHeight: pt(28), marginLeft: pt(12) }}
+        >
+          {sender ?? NO_SENDER}
         </span>
         <span aria-hidden className="flex shrink-0 items-center text-(--device-m3-on-surface-variant)" style={{ gap: pt(20), paddingRight: pt(12) }}>
           <Phone strokeWidth={2} style={icon} />
