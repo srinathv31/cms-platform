@@ -433,7 +433,7 @@ test.describe("channels", () => {
     const v = await activeEverywhere();
     for (const channel of ["fax", "PDF", "", 7, null]) {
       const { res } = await render(request, { templateId: v.templateId, body: { version: v.number, channel, values: validValues(v.variables) } });
-      await expectError(res, 400, "bad_request", "channel must be one of pdf, web, email.");
+      await expectError(res, 400, "bad_request", "channel must be one of pdf, web, email, push, sms.");
     }
   });
 });

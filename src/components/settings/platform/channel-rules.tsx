@@ -16,14 +16,15 @@ import { Blocked, FullRow, useFocusAfterCommit } from "./ui";
 // under the row, and only the strip's confirm commits it. A switch that can't flip (the last channel on)
 // comes decided from the read model, `row.can.toggle`, and shows disabled with its reason.
 
-const COLS = "minmax(0,1fr) repeat(3, 5.5rem)";
+/** The content type's name, then one column per channel (five: documents and messages side by side). */
+const colsFor = (channels: readonly Channel[]) => `minmax(0,1fr) repeat(${channels.length}, 4.5rem)`;
 
 export function ChannelRulesSectionView({ section }: { section: ChannelRulesSection }) {
   // One turn-off strip at a time across the table.
   const [asking, setAsking] = useState<{ contentTypeId: string; channel: Channel } | null>(null);
   return (
     <div data-slot="platform-section" data-section="channel-rules" role="table" aria-label="Channel rules">
-      <div role="row" className="grid items-end gap-x-4 border-b border-hairline pb-2" style={{ gridTemplateColumns: COLS }}>
+      <div role="row" className="grid items-end gap-x-4 border-b border-hairline pb-2" style={{ gridTemplateColumns: colsFor(section.channels) }}>
         <span role="columnheader" className="caps-label">Content type</span>
         {section.channels.map((c) => (
           <span role="columnheader" key={c} className="caps-label text-center">
@@ -67,7 +68,7 @@ function TypeRow({
 
   return (
     <div role="rowgroup" className="border-b border-hairline">
-      <div role="row" className="grid min-h-16 items-center gap-x-4 py-2.5" style={{ gridTemplateColumns: COLS }}>
+      <div role="row" className="grid min-h-16 items-center gap-x-4 py-2.5" style={{ gridTemplateColumns: colsFor(channels) }}>
         <div role="cell" className="min-w-0">
           <div className="truncate text-[15px] font-medium text-text">{row.name}</div>
           {error ? (
