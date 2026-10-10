@@ -3,7 +3,7 @@ import type { Channel, JSONContent, Variable } from "@/domain/types";
 import { emptyBody, inlineDoc, linesDoc } from "../seed/content";
 import type { VarKey, VariableKit } from "../seed/variables";
 
-// The Alert starters: a push and an SMS, with no body (decision 0033). Each passes submit's message
+// The Alert starters: a push and an SMS, with no body (decision 0034). Each passes submit's message
 // rules as it comes (starters.test.ts): its SMS text is GSM-7 and within the Alert's 3 parts with the
 // long sample values and the footer, it links to no public shortener, and its push fits in 4,096 bytes.
 // No push title carries anything private: Android shows the title on a locked phone even when previews

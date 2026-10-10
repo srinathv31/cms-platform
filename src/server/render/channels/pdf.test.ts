@@ -194,6 +194,8 @@ describe("renderPdf", () => {
     check(typical, "UC-4F7K2Q · v2");
     check(long, "UC-9M3T8A · Draft");
     expect(footerLabel({ templateId: "UC-4F7K2Q", versionNumber: null })).toBe("UC-4F7K2Q · Draft");
+    // A CMS preview of a round whose label names it (RenderDoc.round).
+    expect(footerLabel({ templateId: "UC-4F7K2Q", versionNumber: 3, round: 2 })).toBe("UC-4F7K2Q · v3 · Round 2");
   });
 
   it("embeds its own fonts, so Latin Extended text survives", () => {

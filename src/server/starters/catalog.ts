@@ -2,7 +2,7 @@
 // Pure data (its one import is a type), so the gallery (a client component) and the server action can
 // both read it.
 //
-// A template is a document or an alert for life (decision 0033), so each kind has its own starters,
+// A template is a document or an alert for life (decision 0034), so each kind has its own starters,
 // keyed by its channel family: a document's start from a body with the required sections, an alert's
 // from a push and an SMS. Both open with Blank. The content of each starter lives beside this file and
 // is built on the server (index.ts).

@@ -1,4 +1,4 @@
-# 0033. Message channels: Push and SMS, in a family of their own, from a registry of fields
+# 0034. Message channels: Push and SMS, in a family of their own, from a registry of fields
 
 Status: Accepted
 Date: 2026-10-09

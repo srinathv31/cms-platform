@@ -26,9 +26,11 @@ const DRAFT: WorkspaceHeaderData = {
   status: "draft",
   sunsetDay: null,
   versionLabel: "Based on v2",
-  basedOnNumber: 2,
+  basedOn: { label: "v2", active: true },
   activeNumber: 2,
   versionNumber: 3,
+  round: 1,
+  inReview: null,
   canEdit: true,
   editable: true,
   draft: { versionId: "v_draft3", rev: 7 },
@@ -61,7 +63,7 @@ describe("WorkspaceHeader names", () => {
   });
 
   it("has no SHARE ring when nothing is Active", async () => {
-    const tree = await render({ ...DRAFT, activeName: null, activeNumber: null, versionLabel: null, basedOnNumber: null });
+    const tree = await render({ ...DRAFT, activeName: null, activeNumber: null, versionLabel: null, basedOn: null });
     expect(find(tree, WorkspaceShare)).toEqual([]);
   });
 });
@@ -89,7 +91,7 @@ describe("WorkspaceHeader status row", () => {
   });
 
   it("has no separator without a version label to separate", async () => {
-    const tree = await render({ ...DRAFT, versionLabel: null, basedOnNumber: null });
+    const tree = await render({ ...DRAFT, versionLabel: null, basedOn: null });
     const item = parentOf(tree, SaveStatus)!;
     expect([item.props.children].flat(3).filter((child) => isValidElement(child) && child.type !== SaveStatus)).toEqual([]);
   });

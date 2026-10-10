@@ -181,6 +181,11 @@ export interface RenderDoc {
   templateName: string;
   /** null when rendering an unsubmitted draft (preview only). */
   versionNumber: number | null;
+  /**
+   * The round, on a CMS preview of an unreleased round whose label names it ("v3 · Round 2", rounds.ts):
+   * the PDF's footer and subject show it. Absent otherwise, and never on a consumer's render.
+   */
+  round?: number;
   blocks: RenderBlock[];
 }
 
@@ -289,6 +294,11 @@ export interface RenderRequestBody {
    */
   encoding?: "base64";
   preview?: boolean;
+  /**
+   * CMS preview only; ignored without `preview`. Which round of `version` to render (`?round=` on the
+   * review screen). Without it a number is its head: the released row, else its latest round.
+   */
+  round?: number;
 }
 
 /**
@@ -314,7 +324,8 @@ export const MAX_VALUE_LENGTH = 1_000;
  *   X-Stencil-Preview        "true", only on previews
  *
  * Bodies:
- *   pdf    application/pdf (bytes); Content-Disposition: inline; filename="UC-4F7K2Q-v2.pdf" ("…-draft.pdf")
+ *   pdf    application/pdf (bytes); Content-Disposition: inline; filename="UC-4F7K2Q-v2.pdf" ("…-draft.pdf";
+ *          "…-v3-round-2.pdf" for a CMS preview of a round its label names)
  *   web    text/html; charset=utf-8 (a complete, responsive HTML document)
  *   email  application/json: EmailResponseBody
  *   push   application/json: PushResponseBody (the platform's push; never a subtitle on android)

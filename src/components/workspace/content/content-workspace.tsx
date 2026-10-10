@@ -40,6 +40,8 @@ export interface ContentWorkspaceProps {
   versionId: string;
   /** The shown version's number; null for an open draft (the preview renders "draft"). */
   versionNumber: number | null;
+  /** The shown version's round; null for an open draft. The preview renders exactly it. */
+  round: number | null;
   /** Where autosave starts. */
   rev: number;
   body: JSONContent;
@@ -86,7 +88,7 @@ export interface ContentWorkspaceProps {
  * A message template (an Alert, `family` "message") has no document: the first cell is the message
  * composer instead (message-composer.tsx), its fields in the same root. The fields as typed and the
  * sample sets live in a live draft (session/live-draft.ts) the composer writes and the preview reads,
- * so Push and SMS render in the browser on every keystroke (decision 0035).
+ * so Push and SMS render in the browser on every keystroke (decision 0036).
  *
  * Review comments (src/components/comments) live here too: the document gets highlights and markers
  * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
@@ -110,6 +112,7 @@ export function ContentWorkspace({
   teamName,
   versionId,
   versionNumber,
+  round,
   rev,
   body,
   variables,
@@ -429,6 +432,7 @@ export function ContentWorkspace({
           <PreviewSurface
             templateId={templateId}
             versionNumber={versionNumber}
+            round={round}
             teamName={teamName}
             channels={channels}
             editable={editing}

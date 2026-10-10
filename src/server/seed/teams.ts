@@ -11,7 +11,7 @@ const TEAMS: {
   description: string;
   icon: string;
   createdDaysAgo: number;
-  /** Who the team's push notifications and SMS come from (decision 0033): every seeded team has both. */
+  /** Who the team's push notifications and SMS come from (decision 0034): every seeded team has both. */
   appName: string;
   /** A fictional US short code, a word on a phone keypad: 26725 is CORAL, 33767 DEPOS, 22737 CARDS. */
   smsSender: string;

@@ -24,6 +24,7 @@ import { SYSTEM_ACTOR, describeActivity } from "./activity";
 import { addDays, formatRecordedDate, formatShortDate, isCalendarDay, utcDay } from "./dates";
 import { plural } from "./plural";
 import type { Person } from "./review-types";
+import type { NumberedRound } from "./rounds";
 import { TEAM_ROLES, type TeamRole } from "./types";
 
 // ── The action catalog ──────────────────────────────────────────────────────
@@ -130,7 +131,8 @@ export function isAuditCategory(value: unknown): value is AuditCategory {
 export interface AuditEventInput {
   action: string;
   details: Record<string, unknown> | null;
-  versionNumber: number | null;
+  /** The version row the event is about, as it is now; null for the open draft or none (`ActivityEvent.version`). */
+  version: NumberedRound | null;
 }
 
 /**
@@ -476,7 +478,7 @@ export function toCsv(rows: readonly AuditRow[]): string {
         r.actor?.name ?? SYSTEM_ACTOR,
         r.team?.name ?? "All teams",
         r.template ? `${r.template.name} (${r.template.id})` : "",
-        r.versionNumber === null ? "" : `v${r.versionNumber}`,
+        r.versionLabel ?? "",
         r.actionLabel,
         r.summary,
       ]

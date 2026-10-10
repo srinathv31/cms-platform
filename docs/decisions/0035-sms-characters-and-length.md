@@ -1,4 +1,4 @@
-# 0034. An SMS is written in GSM-7, measured in parts, and never cut or rewritten
+# 0035. An SMS is written in GSM-7, measured in parts, and never cut or rewritten
 
 Status: Accepted
 Date: 2026-10-09
@@ -45,7 +45,7 @@ exactly what the author typed and every value as sent.
   footer, and the new one reaches a template only through its next submitted version. A draft shows the content
   type's footer as it stands (`smsFooterOf`). Compare and the review redline show a footer that changed between two
   versions, and count it. Versions submitted before the column existed took their content type's footer as it stood
-  then (migration 0011), which is what they had been rendering.
+  then (migration 0012), which is what they had been rendering.
 - **No public link shorteners** in an SMS or a push body: carriers filter them (CTIA §5.3.2). A branded short domain
   is fine.
 - **Consumers turn off Smart Encoding** and any other provider rewriting: the counts are for the text as rendered,
@@ -74,7 +74,7 @@ exactly what the author typed and every value as sent.
   changes again in 18.0), so an older browser's preview, the server and a Java engine could each cut a different
   SMS. Two ways out were weighed. Saying "Unicode 15.1 or later" in the specification would have named a range, not a
   version, and left the browser preview free to disagree with the API, which decision
-  [0035](0035-message-previews-resolve-in-the-browser.md) forbids. Implementing UAX #29 here, over one version's
+  [0036](0036-message-previews-resolve-in-the-browser.md) forbids. Implementing UAX #29 here, over one version's
   data, keeps all three in agreement in any runtime: `src/domain/messages/graphemes.ts`, with a 6 KB property table
   generated from the Unicode Character Database 17.0.0 (`scripts/unicode-graphemes.ts`) and Unicode's own
   conformance file as its test. 17.0 is the version Node 24's ICU has, so nothing moved when it landed. A Java engine

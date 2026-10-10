@@ -7,6 +7,7 @@ import { db } from "@/server/db/client";
 import { teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { ALL_SPACE } from "@/domain/permissions";
+import { compareRounds, type RoundRow } from "@/domain/rounds";
 import type { VersionState } from "@/domain/types";
 import { formatAgo } from "@/domain/dates";
 
@@ -27,18 +28,14 @@ export interface LibraryRow {
 }
 
 /**
- * Latest = the open draft if there is one, otherwise the highest version number. The CMS shows a
- * template by this version's name (`currentName` in template-name.ts is the same pick in SQL).
+ * Latest = the open draft if there is one, otherwise the highest version number, and of its rounds the
+ * latest (`compareRounds`). The CMS shows a template by this version's name (`currentName` in
+ * template-name.ts is the same pick in SQL).
  */
-export function pickLatest<T extends { number: number | null; state: VersionState }>(
-  list: T[],
-): T | undefined {
+export function pickLatest<T extends RoundRow>(list: T[]): T | undefined {
   const draft = list.find((v) => v.state === "draft");
   if (draft) return draft;
-  return list.reduce<T | undefined>(
-    (best, v) => (best === undefined || (v.number ?? 0) > (best.number ?? 0) ? v : best),
-    undefined,
-  );
+  return list.reduce<T | undefined>((best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best), undefined);
 }
 
 /** Templates in a space ("all" = every team), newest edit first. Caller has already passed requireSpace. */
@@ -67,6 +64,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
     .select({
       templateId: versions.templateId,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       name: versions.name,
       sunsetAt: versions.sunsetAt,

@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { WS } from "@/components/workspace/workspace-grid";
 import { now } from "@/server/clock";
 import { getVersions } from "@/server/queries/versions";
-import { CompareVersions, type CompareOption } from "./compare-dialog";
+import { CompareVersions } from "./compare-dialog";
 import type { VersionContext } from "./version-actions";
 import { TOOLBAR } from "./versions-skeleton";
 import { VersionEntry } from "./version-entry";
@@ -29,23 +29,18 @@ export async function VersionsContent({
     sunsetCalendar: data.sunsetCalendar,
     nowIso: nowDate.toISOString(),
   };
-  const options: CompareOption[] = data.items.map((v) => ({
-    id: v.id,
-    label: v.number === null ? "Draft" : `v${v.number}`,
-    state: v.state,
-  }));
 
   return (
     <section data-slot="versions" aria-label="Versions" className={cn(WS.doc, "flex flex-col")}>
       <div data-slot="versions-toolbar" className={TOOLBAR}>
-        <CompareVersions templateId={data.template.id} options={options} />
+        <CompareVersions templateId={data.template.id} options={data.compareOptions} />
       </div>
       {data.items.length === 0 ? (
         <p className="text-[14px] text-text-muted">No versions yet.</p>
       ) : (
         <ol className="flex flex-col">
           {data.items.map((item, i) => (
-            <VersionEntry key={item.id} item={item} ctx={ctx} now={nowDate} last={i === data.items.length - 1} />
+            <VersionEntry key={item.id} item={item} ctx={ctx} space={team} now={nowDate} last={i === data.items.length - 1} />
           ))}
         </ol>
       )}

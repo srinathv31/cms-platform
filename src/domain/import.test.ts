@@ -663,7 +663,7 @@ describe("refusalForUnreadableKind", () => {
   });
 });
 
-// Import makes documents: a file's text becomes a body, and an alert has none (decision 0033).
+// Import makes documents: a file's text becomes a body, and an alert has none (decision 0034).
 describe("importUnavailable", () => {
   it("offers Import for a document, and says why not for an alert", () => {
     expect(importUnavailable("document")).toBeNull();

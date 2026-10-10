@@ -16,6 +16,7 @@ import {
   isAfterToday,
   planDraftStart,
   requestChanges,
+  renameBaseline,
   reviewBaseline,
   revokePending,
   setSunset,
@@ -37,6 +38,7 @@ import { REASONS } from "./permissions";
 import type { MessageTypeRules } from "./platform-config";
 import type { Refusal } from "./refusals";
 import type { ApprovalStage, Recipients, VersionStage } from "./review-types";
+import type { RoundRow } from "./rounds";
 import {
   VERSION_STATES,
   type ContractChange,
@@ -104,7 +106,7 @@ const BLANK: StarterContent = {
   ],
 };
 
-// A template is a document or an alert for life: its content type is one family (decision 0033).
+// A template is a document or an alert for life: its content type is one family (decision 0034).
 describe("newTemplateContentType", () => {
   const disclosure = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["pdf", "web", "email"] as const };
   const notice = { id: "ct_notice", name: "Notice", allowedChannels: ["pdf"] as const };
@@ -149,6 +151,7 @@ describe("createDraft", () => {
     expect(changes.draft).toMatchObject({
       state: "draft",
       number: null,
+      round: null,
       basedOnVersionId: null,
       name: "Card offer terms",
       contractChanges: null,
@@ -234,7 +237,12 @@ describe("createDraft", () => {
 });
 
 describe("planDraftStart", () => {
-  const v = (id: string, state: VersionState, number: number | null) => ({ id, state, number });
+  const v = (id: string, state: VersionState, number: number | null, round: number | null = number === null ? null : 1) => ({
+    id,
+    state,
+    number,
+    round,
+  });
 
   it("goes to the open draft when there is one, even beside an Active version", () => {
     expect(
@@ -286,12 +294,31 @@ describe("planDraftStart", () => {
   it("refuses a template with no versions", () => {
     expect(planDraftStart([])).toEqual({ kind: "blocked", ...REFUSALS.notEditable });
   });
+
+  it("orders one number's rounds by round: the latest round decides", () => {
+    // v2 round 1 was sent back, round 2 is in review: a draft now would fork it.
+    expect(planDraftStart([v("v1", "active", 1), v("v2r1", "changes_requested", 2, 1), v("v2r2", "in_review", 2, 2)])).toEqual({
+      kind: "blocked",
+      ...REFUSALS.newerInReview,
+    });
+    // v2 went live on round 2: it is the one to copy.
+    expect(planDraftStart([v("v1", "superseded", 1), v("v2r1", "changes_requested", 2, 1), v("v2r2", "active", 2, 2)])).toEqual({
+      kind: "create",
+      from: "v2r2",
+    });
+  });
+
+  it("starts from the Active version when the latest round was sent back and its draft is gone", () => {
+    // A sent-back round is a record, not something to edit: its submit is still v2 round 2 (`nextRound`).
+    expect(planDraftStart([v("v1", "active", 1), v("v2r1", "changes_requested", 2, 1)])).toEqual({ kind: "create", from: "v1" });
+  });
 });
 
 describe("editLatest", () => {
   const active: VersionSnapshot = {
     id: "v_active",
     number: 3,
+    round: 1,
     state: "active",
     name: "Spring Travel Rewards — Terms",
     body: BODY,
@@ -306,6 +333,7 @@ describe("editLatest", () => {
     expect(changes.draft).toEqual({
       state: "draft",
       number: null,
+      round: null,
       basedOnVersionId: "v_active",
       name: "Spring Travel Rewards — Terms",
       body: BODY,
@@ -353,6 +381,7 @@ describe("editLatest", () => {
     expect(changes.draft).toMatchObject({
       state: "draft",
       number: null,
+      round: null,
       basedOnVersionId: "v_revoked",
       body: BODY,
       channelFields: active.channelFields,
@@ -414,6 +443,30 @@ describe("contractBaseline", () => {
   });
 });
 
+describe("renameBaseline", () => {
+  const v = (id: string, state: VersionState, number: number | null, basedOnVersionId: string | null = null) => ({
+    id,
+    state,
+    number,
+    sunsetAt: null,
+    basedOnVersionId,
+  });
+
+  it("is what customers get today, and nothing on the version they get", () => {
+    const list = [v("v1", "superseded", 1), v("v2", "active", 2, "v1"), v("v3", "in_review", 3, "v2")];
+    expect(renameBaseline(list, "v3", NOW)?.id).toBe("v2");
+    expect(renameBaseline(list, "v1", NOW)?.id).toBe("v2");
+    expect(renameBaseline(list, "v2", NOW)).toBeNull();
+    expect(renameBaseline([v("v1", "in_review", 1)], "v1", NOW)).toBeNull();
+  });
+
+  it("for a round sent back before its number went live, is what the round was drafted from", () => {
+    const list = [v("v1", "superseded", 1), v("v2r1", "changes_requested", 2, "v1"), v("v2r2", "active", 2, "v2r1")];
+    expect(renameBaseline(list, "v2r1", NOW)?.id).toBe("v1");
+    expect(renameBaseline([v("v1r1", "changes_requested", 1), v("v1r2", "active", 1, "v1r1")], "v1r1", NOW)).toBeNull();
+  });
+});
+
 describe("reviewBaseline", () => {
   const DAY = 86_400_000;
   const v = (id: string, state: VersionState, number: number | null, basedOnVersionId: string | null = null, sunsetAt: Date | null = null) => ({
@@ -441,13 +494,14 @@ describe("reviewBaseline", () => {
   });
 
   it("walks back through change-request rounds to the revoked version they all correct", () => {
+    // v3's rounds 1 and 2 were sent back; round 3 is in review.
     const list = [
       v("v2", "revoked", 2),
-      v("v3", "changes_requested", 3, "v2"),
-      v("v4", "changes_requested", 4, "v3"),
-      v("v5", "in_review", 5, "v4"),
+      v("v3r1", "changes_requested", 3, "v2"),
+      v("v3r2", "changes_requested", 3, "v3r1"),
+      v("v3r3", "in_review", 3, "v3r2"),
     ];
-    expect(reviewBaseline(list, "v5", NOW)?.id).toBe("v2");
+    expect(reviewBaseline(list, "v3r3", NOW)?.id).toBe("v2");
   });
 
   it("falls back to the newest version that still renders when the based-on version is missing", () => {
@@ -457,9 +511,27 @@ describe("reviewBaseline", () => {
     expect(reviewBaseline([superseded, v("v3", "in_review", 3, "v3")], "v3", NOW)?.id, "never the version itself").toBe("v1");
   });
 
+  it("compares a round sent back before its number went live with what it was drafted from, never its own release", () => {
+    // High-Yield Savings: v1 Superseded; v2 sent back twice, then approved on round 3.
+    const list = [
+      v("v1", "superseded", 1),
+      v("v2r1", "changes_requested", 2, "v1"),
+      v("v2r2", "changes_requested", 2, "v2r1"),
+      v("v2r3", "active", 2, "v2r2"),
+    ];
+    expect(reviewBaseline(list, "v2r1", NOW)?.id).toBe("v1");
+    expect(reviewBaseline(list, "v2r2", NOW)?.id).toBe("v1");
+    expect(reviewBaseline(list, "v2r3", NOW)).toBeNull();
+    // A first version approved on round 2: its round 1 has nothing before it.
+    expect(reviewBaseline([v("v1r1", "changes_requested", 1), v("v1r2", "active", 1, "v1r1")], "v1r1", NOW)).toBeNull();
+    // Once a later version is Active, an old round compares with it, as every older record does.
+    const later = [...list.slice(0, 3), v("v2r3", "superseded", 2, "v2r2"), v("v3", "active", 3, "v2r3")];
+    expect(reviewBaseline(later, "v2r1", NOW)?.id).toBe("v3");
+  });
+
   it("is null for a first version, a change-request round of one, or when nothing renders", () => {
     expect(reviewBaseline([v("v1", "in_review", 1)], "v1", NOW)).toBeNull();
-    expect(reviewBaseline([v("v1", "changes_requested", 1), v("v2", "in_review", 2, "v1")], "v2", NOW), "nothing was ever released").toBeNull();
+    expect(reviewBaseline([v("v1r1", "changes_requested", 1), v("v1r2", "in_review", 1, "v1r1")], "v1r2", NOW), "nothing was ever released").toBeNull();
     expect(reviewBaseline([v("v1", "superseded", 1, null, passed), v("v2", "revoked", 2), v("v3", "in_review", 3)], "v3", NOW)).toBeNull();
     // The version is itself the newest that still renders: nothing to compare it with.
     expect(reviewBaseline([v("v1", "superseded", 1, null, later), v("v2", "revoked", 2)], "v1", NOW)).toBeNull();
@@ -488,7 +560,7 @@ describe("submit", () => {
   const run = (
     over: Partial<SubmitDraft> = {},
     extra: {
-      highestNumber?: number;
+      versions?: RoundRow[];
       baseline?: Variable[] | null;
       note?: string | null;
       chain?: ApprovalStage[];
@@ -499,7 +571,7 @@ describe("submit", () => {
     submit({
       draft: { ...draft, ...over },
       seenRev: extra.seenRev ?? draft.rev,
-      highestNumber: extra.highestNumber ?? 0,
+      versions: extra.versions ?? [],
       baseline: extra.baseline ?? null,
       now: NOW,
       submittedBy: SUBMITTER,
@@ -511,19 +583,28 @@ describe("submit", () => {
       messageRules: extra.messageRules ?? NO_MESSAGE_RULES,
     });
 
-  const reviewRequested = (number: number, extra: { body?: string; to?: Recipients } = {}) => ({
+  const reviewRequested = (number: number, extra: { body?: string; to?: Recipients; round?: number } = {}) => ({
     kind: "notification",
     notification: "review_requested",
     to: extra.to ?? { kind: "team_role", role: "approver", exceptUserIds: ["maya"] },
-    title: `Maya Chen submitted Spring Travel Rewards — Terms v${number} for review.`,
+    title: `Maya Chen submitted Spring Travel Rewards — Terms v${number}${(extra.round ?? 1) > 1 ? `, round ${extra.round}` : ""} for review.`,
     ...(extra.body ? { body: extra.body } : {}),
-    link: { to: "review", templateId: TEMPLATE.id, versionNumber: number },
+    link: {
+      to: "review",
+      templateId: TEMPLATE.id,
+      versionNumber: number,
+      ...((extra.round ?? 1) > 1 ? { round: extra.round } : {}),
+    },
   });
-  const submitted = (number: number, extra: { note?: string | null; contractChanges?: number; breaking?: boolean } = {}) => ({
+  const submitted = (
+    number: number,
+    extra: { note?: string | null; contractChanges?: number; breaking?: boolean; round?: number } = {},
+  ) => ({
     kind: "audit",
     action: "version.submitted",
     details: {
       number,
+      round: extra.round ?? 1,
       note: extra.note ?? null,
       contractChanges: extra.contractChanges ?? 0,
       breaking: extra.breaking ?? false,
@@ -537,6 +618,7 @@ describe("submit", () => {
       changes: {
         state: "in_review",
         number: 1,
+        round: 1,
         submittedBy: "maya",
         submittedAt: NOW,
         writers: ["maya"],
@@ -550,10 +632,21 @@ describe("submit", () => {
     });
   });
 
-  it("numbers the version one above the template's highest", () => {
-    const result = run({}, { highestNumber: 4 });
-    expect(result.ok && result.changes.number).toBe(5);
+  it("numbers the version one above the template's highest released number, as its first round", () => {
+    const released = [1, 2, 3, 4].map((number) => ({ number, round: 1, state: number === 4 ? "active" : "superseded" }) as const);
+    const result = run({}, { versions: [...released, { number: null, round: null, state: "draft" }] });
+    expect(result.ok && [result.changes.number, result.changes.round]).toEqual([5, 1]);
     expect(result.ok && result.effects).toEqual([submitted(5), reviewRequested(5)]);
+  });
+
+  it("resubmits a number sent back as its next round, and says so: the label and the link name the round", () => {
+    const sentBack = [
+      { number: 1, round: 1, state: "changes_requested" },
+      { number: null, round: null, state: "draft" },
+    ] as const;
+    const result = run({}, { versions: [...sentBack] });
+    expect(result.ok && [result.changes.number, result.changes.round]).toEqual([1, 2]);
+    expect(result.ok && result.effects).toEqual([submitted(1, { round: 2 }), reviewRequested(1, { round: 2 })]);
   });
 
   it("keeps the note to reviewers, trimmed, and passes it on to them", () => {
@@ -754,7 +847,7 @@ describe("submit", () => {
     expect(run({ channels: ["pdf"], channelFields: {} }).ok).toBe(true);
   });
 
-  // ── A message (an Alert): Push and SMS (decisions 0033 and 0034) ──
+  // ── A message (an Alert): Push and SMS (decisions 0034 and 0035) ──
   describe("a message", () => {
     const ALERT: MessageTypeRules = { smsFooter: "Coral Offers: Reply STOP to opt out, HELP for help.", smsMaxParts: 3 };
     const lines = (...inline: JSONContent[]): JSONContent => oneLine(...inline);
@@ -956,6 +1049,7 @@ function reviewVersion(over: Partial<ReviewVersion> = {}): ReviewVersion {
     id: "v_1",
     templateId: TEMPLATE.id,
     number: 1,
+    round: 1,
     state: "in_review",
     name: TEMPLATE.name,
     body: BODY,
@@ -979,6 +1073,7 @@ function inState(state: VersionState, over: Partial<ReviewVersion> = {}): Review
   return reviewVersion({
     state,
     number: state === "draft" ? null : 1,
+    round: state === "draft" ? null : 1,
     submittedBy: state === "draft" ? null : "maya",
     revoke: state === "revoked" ? CONFIRMED : null,
     ...over,
@@ -1105,6 +1200,7 @@ describe("requestChanges", () => {
       newDraft: {
         state: "draft",
         number: null,
+        round: null,
         basedOnVersionId: "v_1",
         name: TEMPLATE.name,
         body: BODY,
@@ -1125,13 +1221,14 @@ describe("requestChanges", () => {
         {
           kind: "audit",
           action: "version.changes_requested",
-          details: { number: 1, stage: "Team approver", reason: REASON },
+          details: { number: 1, round: 1, stage: "Team approver", reason: REASON },
         },
         {
           kind: "notification",
           notification: "changes_requested",
           to: { kind: "user", userId: "maya" },
-          title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1.",
+          // Sent back, the round shows: "v1, round 1".
+          title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
           body: REASON,
           link: { to: "template", templateId: TEMPLATE.id },
         },
@@ -1205,8 +1302,18 @@ describe("requestChanges", () => {
     expect(result.ok && result.effects[0]).toEqual({
       kind: "audit",
       action: "version.changes_requested",
-      details: { number: 1, stage: "Legal reviewer", reason: REASON },
+      details: { number: 1, round: 1, stage: "Legal reviewer", reason: REASON },
     });
+  });
+
+  it("names the round it sends back, in the audit row and the author's notification", () => {
+    const result = run({ version: reviewVersion({ id: "v_1r2", round: 2 }) });
+    expect(result.ok && result.effects).toMatchObject([
+      { action: "version.changes_requested", details: { number: 1, round: 2 } },
+      { title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 2." },
+    ]);
+    // The new draft is the next round's: no number and no round until it is submitted.
+    expect(result.ok && [result.newDraft.number, result.newDraft.round]).toEqual([null, null]);
   });
 
   it("records the stage of the version's own that sent it back, by id, after the chain was reordered and renamed", () => {
@@ -1255,7 +1362,7 @@ describe("approve", () => {
   const activated = (supersedes: number | null, stage = "Team approver") => ({
     kind: "audit",
     action: "version.activated",
-    details: { number: 2, supersedes, stage },
+    details: { number: 2, round: 1, supersedes, stage },
   });
   const superseded = { kind: "audit", action: "version.superseded", versionId: "v_1", details: { number: 1, supersededBy: 2 } };
   const live = {
@@ -1330,6 +1437,16 @@ describe("approve", () => {
           contractLines: ["v2 adds required `annual_fee` (Currency)."],
         },
       },
+    ]);
+  });
+
+  it("goes live on a later round as the version consumers know: v2, with the round on the audit row only", () => {
+    const result = run({ version: { ...v2, id: "v_2r3", round: 3 } });
+    expect(result.ok && result.effects).toEqual([
+      { ...activated(1), details: { number: 2, round: 3, supersedes: 1, stage: "Team approver" } },
+      superseded,
+      live,
+      { ...newVersion, versionId: "v_2r3" },
     ]);
   });
 
@@ -1416,7 +1533,7 @@ describe("approve", () => {
           {
             kind: "audit",
             action: "version.stage_approved",
-            details: { number: 2, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
+            details: { number: 2, round: 1, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
           },
           {
             kind: "notification",
@@ -1435,6 +1552,21 @@ describe("approve", () => {
           },
         ],
       });
+    });
+
+    it("names a second round in the stage's titles and links, so the link opens that round", () => {
+      const round2 = { ...v2, id: "v_2r2", round: 2 };
+      const result = run({ chain: CHAIN_2, version: round2 });
+      const review = { to: "review", templateId: TEMPLATE.id, versionNumber: 2, round: 2 };
+      expect(result.ok && result.effects).toEqual([
+        {
+          kind: "audit",
+          action: "version.stage_approved",
+          details: { number: 2, round: 2, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
+        },
+        expect.objectContaining({ title: "Spring Travel Rewards — Terms v2, round 2 is waiting on Legal reviewer.", link: review }),
+        expect.objectContaining({ title: "Jordan Ellis approved Spring Travel Rewards — Terms v2, round 2 for Team approver.", link: review }),
+      ]);
     });
 
     it("doesn't supersede or sunset anything before the last stage", () => {
@@ -2027,7 +2159,7 @@ describe("sweepSunsets", () => {
 // ── The demo scenarios, end to end through the rules ─────────
 
 describe("scenario 3: the review loop", () => {
-  it("submit v1, changes requested, resubmit as v2, approve: v2 is Active", () => {
+  it("submit v1, changes requested, resubmit as v1 round 2, approve: v1 is Active", () => {
     const draft: SubmitDraft = {
       state: "draft",
       variables: VARIABLES,
@@ -2048,7 +2180,7 @@ describe("scenario 3: the review loop", () => {
       messageRules: NO_MESSAGE_RULES,
     };
 
-    const first = submit({ ...base, draft, seenRev: 3, highestNumber: 0, baseline: null });
+    const first = submit({ ...base, draft, seenRev: 3, versions: [{ number: null, round: null, state: "draft" }], baseline: null });
     if (!first.ok) throw new Error(first.reason);
     const v1 = reviewVersion({ ...first.changes, id: "v_1" });
 
@@ -2058,12 +2190,19 @@ describe("scenario 3: the review loop", () => {
     if (!returned.ok) throw new Error(returned.reason);
     expect(returned.newDraft.basedOnVersionId).toBe("v_1");
 
-    const second = submit({ ...base, draft: { ...returned.newDraft }, seenRev: returned.newDraft.rev, highestNumber: 1, baseline: null });
+    // Sending it back doesn't use up a number: the resubmission is round 2 of v1.
+    const rows = [{ number: 1, round: 1, state: "changes_requested" as const }, { ...returned.newDraft }];
+    const second = submit({ ...base, draft: { ...returned.newDraft }, seenRev: returned.newDraft.rev, versions: rows, baseline: null });
     if (!second.ok) throw new Error(second.reason);
-    expect(second.changes.number).toBe(2);
+    expect([second.changes.number, second.changes.round]).toEqual([1, 2]);
 
-    const approved = approve(approveArgs(reviewVersion({ ...second.changes, id: "v_2" })));
+    const approved = approve(approveArgs(reviewVersion({ ...second.changes, id: "v_1r2" })));
     expect(approved).toMatchObject({ ok: true, wentLive: true, changes: { state: "active" } });
+    // Released, it is the v1 consumers know; the audit row keeps the round it was approved on.
+    expect(approved.ok && approved.effects).toContainEqual(
+      expect.objectContaining({ kind: "notification", title: "Spring Travel Rewards — Terms v1 is now Active." }),
+    );
+    expect(approved.ok && approved.effects[0]).toMatchObject({ action: "version.activated", details: { number: 1, round: 2 } });
   });
 
   function approveArgs(version: ReviewVersion): Parameters<typeof approve>[0] {
@@ -2085,11 +2224,17 @@ describe("scenario 3: the review loop", () => {
 // Maker-checker reaches everyone who wrote the version, not only whoever pressed Submit. Priya holds
 // Author and Approver on Coral Offers (an access request can add the role).
 describe("maker-checker: nobody decides a version they wrote", () => {
-  const submitAs = (draft: SubmitDraft, submittedBy: string, highestNumber: number) => {
+  /** The template's rows before the submit: none, v1 sent back (round 2 next), or v1 Active (v2 next). */
+  const BEFORE = {
+    first: [],
+    sentBack: [{ number: 1, round: 1, state: "changes_requested" }],
+    released: [{ number: 1, round: 1, state: "active" }],
+  } as const satisfies Record<string, readonly RoundRow[]>;
+  const submitAs = (draft: SubmitDraft, submittedBy: string, versions: readonly RoundRow[]) => {
     const result = submit({
       draft,
       seenRev: draft.rev,
-      highestNumber,
+      versions,
       baseline: null,
       now: NOW,
       submittedBy,
@@ -2100,7 +2245,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       messageRules: NO_MESSAGE_RULES,
     });
     if (!result.ok) throw new Error(result.reason);
-    return reviewVersion({ ...draft, ...result.changes, id: `v_${result.changes.number}` });
+    return reviewVersion({ ...draft, ...result.changes, id: `v_${result.changes.number}_${result.changes.round}` });
   };
   const decide = (version: ReviewVersion, actorId: string) => ({
     approve: approve({
@@ -2141,7 +2286,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
   it("Priya edits Maya's draft and Maya submits it: Priya can neither approve nor send it back; Jordan can", () => {
     const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
     const edited = { ...draft, writers: withWriter(draft.writers, "priya") };
-    const v1 = submitAs(edited, "maya", 0);
+    const v1 = submitAs(edited, "maya", BEFORE.first);
     expect(v1.writers).toEqual(["maya", "priya"]);
 
     expect(decide(v1, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
@@ -2152,50 +2297,50 @@ describe("maker-checker: nobody decides a version they wrote", () => {
   it("Priya started the draft and someone else submitted it: she can't decide it", () => {
     const active = { ...reviewVersion({ state: "active" }), writers: ["eli"] };
     const { draft } = editLatest({ from: active, createdBy: "priya", now: NOW }).changes;
-    const v2 = submitAs({ ...draft, writers: withWriter(draft.writers, "maya") }, "maya", 1);
+    const v2 = submitAs({ ...draft, writers: withWriter(draft.writers, "maya") }, "maya", BEFORE.released);
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
   });
 
   it("writers carry across a change request; the approver who sent it back can approve the next round", () => {
     const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
-    const v1 = submitAs({ ...draft, writers: withWriter(draft.writers, "priya") }, "maya", 0);
+    const v1 = submitAs({ ...draft, writers: withWriter(draft.writers, "priya") }, "maya", BEFORE.first);
 
     const returned = decide(v1, "jordan").requestChanges;
     if (!returned.ok) throw new Error(returned.reason);
     expect(returned.newDraft.writers, "Jordan isn't a writer for asking").toEqual(["maya", "priya"]);
 
     // Maya fixes it alone and resubmits: Priya wrote round one, so round two isn't hers to decide either.
-    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", 1);
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", BEFORE.sentBack);
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
     expect(decide(v2, "jordan").approve).toMatchObject({ ok: true, wentLive: true });
   });
 
   it("whoever submitted round one stays barred from round two, even without editing", () => {
     const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
-    const v1 = submitAs(draft, "priya", 0);
+    const v1 = submitAs(draft, "priya", BEFORE.first);
     expect(v1.writers).toEqual(["maya", "priya"]);
 
     const returned = decide(v1, "jordan").requestChanges;
     if (!returned.ok) throw new Error(returned.reason);
-    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", 1);
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "maya") }, "maya", BEFORE.sentBack);
     expect(v2.submittedBy).toBe("maya");
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
   });
 
   it("the approver who sent it back becomes a writer only by editing the next round", () => {
     const { draft } = createDraft({ starter, createdBy: "maya", now: NOW }).changes;
-    const v1 = submitAs(draft, "maya", 0);
+    const v1 = submitAs(draft, "maya", BEFORE.first);
     const returned = decide(v1, "priya").requestChanges;
     if (!returned.ok) throw new Error(returned.reason);
 
-    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "priya") }, "maya", 1);
+    const v2 = submitAs({ ...returned.newDraft, writers: withWriter(returned.newDraft.writers, "priya") }, "maya", BEFORE.sentBack);
     expect(decide(v2, "priya")).toEqual({ approve: wrote, requestChanges: wrote });
   });
 
   it("a draft from the Active version starts afresh: writing v1 doesn't keep anyone from deciding v2", () => {
     const active = { ...reviewVersion({ state: "active" }), writers: ["maya", "priya"] };
     const { draft } = editLatest({ from: active, createdBy: "maya", now: NOW }).changes;
-    const v2 = submitAs(draft, "maya", 1);
+    const v2 = submitAs(draft, "maya", BEFORE.released);
     expect(v2.writers).toEqual(["maya"]);
     expect(decide(v2, "priya").approve.ok).toBe(true);
   });

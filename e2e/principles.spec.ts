@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openDb } from "./api/helpers";
 
 // Phase 7 principle checks, on every route, as the persona(s) that can see it:
 //
@@ -279,19 +280,52 @@ test.beforeEach(async ({ page }) => {
 
 // Personas: maya (author), jordan (approver), alex (team admin, Coral Offers), dana (viewer, Legal
 // reviewer), priya (author Coral, viewer Deposits), riley (Platform Admin), taylor (Auditor), morgan (no access).
-// The seed's template ids (src/server/seed; `npm run db:reset` prints the same ones every time). A seed change
-// that moves them must move these too: an unknown id opens the not-found page, which passes the screen checks.
-const COLLECT = "UC-DKGV9R"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 in review
-const BALANCE = "UC-RNWQK3"; // Balance Transfer Intro: v1 superseded, v2 active
-const FEE_WAIVER = "UC-Y60S1H"; // v1 changes requested
-const HOLIDAY = "UC-R4PZ0A"; // v1 revoked, v2 active
-const RATE_CHANGE = "UC-KQ0DEZ"; // v1 active
-const DEPOSIT = "UC-3EDEJN"; // Deposits (Everyday Checking), v1 active
-const STATEMENT = "UC-E9NPGR"; // Card Statements (Statement Insert — Rate Change), v1 active
-// Coral Offers' alerts (push and SMS, decision 0033).
-const PAYMENT_DUE = "UC-9EABFD"; // Payment Due Reminder, v1 active
-const CARD_ABROAD = "UC-5ZGGKX"; // Card Used Abroad, v1 in review (Priya's)
-const HEADS_UP = "UC-XFMSZE"; // Rate Change Heads-up, a draft
+// The seed's template ids: the seed draws them in a fixed order, and its own test pins them (seed.test.ts, "keeps
+// the template ids e2e specs … name"). The first test below checks each is still the template named here.
+const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 round 1 sent back, v3 round 2 in review
+const BALANCE = "UC-D6KSGY"; // Balance Transfer Intro: v1 superseded, v2 active
+const FEE_WAIVER = "UC-NYP7F0"; // Annual Fee Waiver: v1 round 1 changes requested, and a draft
+const HOLIDAY = "UC-WGGRJH"; // Holiday Points Promo: v1 revoked, v2 active
+const RATE_CHANGE = "UC-PAS9A0"; // Rate Change Notice: v1 active
+const DEPOSIT = "UC-A4S1YT"; // Deposits, Everyday Checking: v1 active
+const HIGH_YIELD = "UC-ZKZSRZ"; // Deposits, High-Yield Savings: v1 superseded, v2 approved on round 3 after two send-backs
+const STATEMENT = "UC-8Y49K2"; // Card Statements, Statement Insert — Rate Change: v1 active
+// Coral Offers' alerts (push and SMS, decision 0034).
+const PAYMENT_DUE = "UC-EFXFMS"; // Payment Due Reminder: v1 active
+const CARD_ABROAD = "UC-397J2A"; // Card Used Abroad: v1 in review (Priya's)
+const HEADS_UP = "UC-FYN38M"; // Rate Change Heads-up: a draft
+
+const SEEDED: Record<string, string> = {
+  [COLLECT]: "Cash Back Welcome Bonus — Terms",
+  [BALANCE]: "Balance Transfer Intro — Terms",
+  [FEE_WAIVER]: "Annual Fee Waiver — Terms",
+  [HOLIDAY]: "Holiday Points Promo — Terms",
+  [RATE_CHANGE]: "Rate Change Notice",
+  [DEPOSIT]: "Everyday Checking — Fee Schedule",
+  [HIGH_YIELD]: "High-Yield Savings — Rate Disclosure",
+  [STATEMENT]: "Statement Insert — Rate Change",
+  [PAYMENT_DUE]: "Payment Due Reminder",
+  [CARD_ABROAD]: "Card Used Abroad",
+  [HEADS_UP]: "Rate Change Heads-up",
+};
+
+test("the template ids this spec names are the seed's", async () => {
+  const db = openDb();
+  try {
+    const found: Record<string, string> = {};
+    for (const id of Object.keys(SEEDED)) {
+      const { rows } = await db.execute({
+        // The newest numbered row, or the draft of a template that has nothing else.
+        sql: "SELECT name FROM versions WHERE template_id = ? ORDER BY number IS NULL, number DESC, round DESC LIMIT 1",
+        args: [id],
+      });
+      if (rows[0]) found[id] = String(rows[0].name);
+    }
+    expect(found, "each id is the seeded template of that name (npm run db:reset, or update the ids)").toEqual(SEEDED);
+  } finally {
+    db.close();
+  }
+});
 
 interface Route {
   url: string;
@@ -319,6 +353,8 @@ const WORKSPACE: Route[] = [
   { url: `/coral-offers/templates/${RATE_CHANGE}`, personas: ["dana"] },
   { url: `/deposits/templates/${DEPOSIT}`, personas: ["priya", "riley"] },
   { url: `/deposits/templates/${DEPOSIT}/versions`, personas: ["priya"] },
+  // A version approved after two send-backs: "Approved on round 3" and its folded review history.
+  { url: `/deposits/templates/${HIGH_YIELD}/versions`, personas: ["priya"] },
   { url: `/card-statements/templates/${STATEMENT}`, personas: ["riley"] },
   { url: `/card-statements/templates/${STATEMENT}/usage`, personas: ["riley"] },
   // An alert's every tab; a draft alert in its composer; one in review, as its author.
@@ -329,9 +365,13 @@ const WORKSPACE: Route[] = [
 
 const REVIEW: Route[] = [
   { url: "/coral-offers/review", personas: ["jordan", "alex", "maya"] },
+  // Recently decided: the round Jordan sent back ("v3 · Round 1").
+  { url: "/coral-offers/review?tab=decided", personas: ["jordan"] },
   { url: "/all/review", personas: ["riley", "taylor"] },
-  // The review screen for the version in review (v3): the approver, the author who submitted it, Legal, an observer.
+  // The review screen for the version in review (v3, round 2): the approver, the author who submitted it, Legal, an observer.
   { url: `/coral-offers/review/${COLLECT}/3`, personas: ["jordan", "maya", "dana", "taylor"] },
+  // Its round 1, sent back: a read-only record.
+  { url: `/coral-offers/review/${COLLECT}/3?round=1`, personas: ["jordan", "taylor"] },
   { url: `/coral-offers/review/${COLLECT}/2`, personas: ["jordan"] },
   // An alert in review (its fields on the Document view), as the approver and its author, and an Active one.
   { url: `/coral-offers/review/${CARD_ABROAD}/1`, personas: ["jordan", "priya"] },
@@ -535,6 +575,19 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await click(decision.getByRole("button", { name: "Request changes", exact: true }));
     await expect(page.getByRole("dialog", { name: /Request changes/ })).toBeVisible();
     await checkOpened(page, "Request changes dialog as jordan");
+  });
+
+  test("Review history, unfolded (Versions, Priya)", async ({ page }) => {
+    await open(page, `/deposits/templates/${HIGH_YIELD}/versions`, "priya");
+    const entry = page.locator('[data-slot="version-entry"][data-version="2"]').filter({ visible: true });
+    await expect(entry.locator('[data-slot="approved-on-round"]')).toHaveText("Approved on round 3");
+    const fold = entry.getByRole("button", { name: "v2 review history (3 rounds)", exact: true });
+    await expect(fold).toHaveText("Review history (3 rounds)");
+    await expect(fold).toHaveAttribute("aria-expanded", "false");
+    await click(fold);
+    await expect(fold).toHaveAttribute("aria-expanded", "true");
+    await expect(entry.locator('[data-slot="review-history"] li[data-round]')).toHaveCount(3);
+    await checkOpened(page, "Review history unfolded as priya");
   });
 
   test("Revoke dialog (Versions, Jordan)", async ({ page }) => {

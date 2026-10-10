@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c0c01307-185a-4eea-984c-0689a124c476",
+  "id": "07d8edc3-7824-44a2-8f42-eb9e8e3ba1d1",
   "prevId": "0af94bff-41d0-4fd1-9418-f47874b6272e",
   "tables": {
     "access_requests": {
@@ -1723,6 +1723,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "round": {
+          "name": "round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "state": {
           "name": "state",
           "type": "text",
@@ -1751,13 +1758,19 @@
           "notNull": true,
           "autoincrement": false
         },
-        "channel_fields": {
-          "name": "channel_fields",
+        "email_subject": {
+          "name": "email_subject",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email_preheader": {
+          "name": "email_preheader",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "channels": {
           "name": "channels",
@@ -1911,13 +1924,23 @@
           ],
           "isUnique": false
         },
-        "versions_template_number": {
-          "name": "versions_template_number",
+        "versions_template_number_round": {
+          "name": "versions_template_number_round",
+          "columns": [
+            "template_id",
+            "number",
+            "round"
+          ],
+          "isUnique": true
+        },
+        "versions_one_released": {
+          "name": "versions_one_released",
           "columns": [
             "template_id",
             "number"
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "state IN ('active', 'superseded', 'revoked')"
         },
         "versions_one_draft": {
           "name": "versions_one_draft",

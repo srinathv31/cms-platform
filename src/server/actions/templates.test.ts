@@ -123,7 +123,7 @@ describe("createTemplate shapes the starter to the content type", () => {
   });
 });
 
-// The author chooses Document or Alert, and the kind decides the content type for life (decision 0033).
+// The author chooses Document or Alert, and the kind decides the content type for life (decision 0034).
 describe("createTemplate makes an alert when Alert is chosen", () => {
   it("on the Alert content type, with Push and SMS on and the starter's fields", async () => {
     const { template, draft } = await createFrom({ family: "message", starterKey: "payment_reminder" });

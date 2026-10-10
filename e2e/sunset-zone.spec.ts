@@ -56,6 +56,7 @@ test.beforeAll(async () => {
     ...v2,
     id: `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
     number: 1,
+    round: 1,
     state: "superseded",
     created_at: activatedAt - 20 * DAY,
     updated_at: activatedAt,

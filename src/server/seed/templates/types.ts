@@ -26,11 +26,21 @@ export interface SeedComment {
 export interface SeedThread {
   /** Ref of the version the thread started on. */
   origin: string;
-  /** Block key (see content.ts); resolved to the stable block id. */
+  /**
+   * Block key (see content.ts); resolved to the stable block id. `DOCUMENT_THREAD` is a thread about the
+   * whole version (a change request's reason): no anchor, no quote, and when resolved, it was answered
+   * by submitting the next round (an auto `thread.resolved` audit row, as `submitVersion` writes).
+   */
   block: string;
   quote?: string;
   comments: SeedComment[];
   resolved?: { by: string; at: number };
+  /**
+   * Draw the thread's ids (the thread, its comments, its audit rows) from a sequence keyed by the
+   * template, origin and block (`ctx.keyedId`) instead of the shared one. Set on a thread added after
+   * the seed's ids were in use, so adding it moves no other template's or version's id.
+   */
+  keyedIds?: boolean;
 }
 
 export interface SeedVersion {
@@ -38,6 +48,8 @@ export interface SeedVersion {
   ref: string;
   /** Null for a draft. */
   number: number | null;
+  /** Which submission of `number` (rounds 1..n per number); defaults to 1 when numbered. Absent for a draft. */
+  round?: number;
   state: VersionState;
   basedOn?: string;
   /** Ref of the version this one replaced when it went Active. */

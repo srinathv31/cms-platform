@@ -83,7 +83,7 @@ export const REQUEST_REFUSALS = {
   noDraftToSubmit: refusal("no_draft_to_submit", "There is no draft to submit."),
   noDraftToRevert: refusal("no_draft_to_revert", "There is no draft to revert."),
   noDraftToWrite: refusal("no_draft_to_write", "There is no draft to write."),
-  /** The Copilot prompt asks for a document's body: an alert has none (decision 0033). */
+  /** The Copilot prompt asks for a document's body: an alert has none (decision 0034). */
   copilotDocumentsOnly: refusal("copilot_documents_only", "Copilot drafts documents only."),
   noBaseVersion: refusal("no_base_version", "This draft wasn't started from an earlier version."),
   noActiveVersion: refusal("no_active_version", "This template has no Active version yet."),

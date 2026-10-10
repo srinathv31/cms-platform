@@ -9,6 +9,7 @@ import { duration, ease } from "@/components/motion/presets";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatAgo } from "@/domain/dates";
+import { approvedOnRound, versionLabel } from "@/domain/rounds";
 import { WorkspaceShare } from "@/components/workspace/workspace-share";
 import type { Person } from "@/domain/review-types";
 import type { VersionState } from "@/domain/types";
@@ -23,6 +24,9 @@ import { RV } from "./review-grid";
 //   ‹ REVIEW
 //   name ......................................  ┐
 //   [In review] v3 by Maya Chen · 2 hours ago      │ SHARE ring (Active only), 76px, spans the rows
+//
+// The version reads as its label (rounds.ts): "v3 · Round 2 by Maya Chen" once v3 was sent back, and a
+// released version approved after send-backs adds "· Approved on round 3".
 //
 // One grid for the real header and its skeleton, so they measure the same.
 
@@ -42,6 +46,7 @@ export function ReviewHeader({
   templateId,
   templateName,
   versionNumber,
+  round,
   state,
   sunsetDay,
   author,
@@ -54,6 +59,8 @@ export function ReviewHeader({
   templateId: string;
   templateName: string;
   versionNumber: number;
+  /** The round on screen. */
+  round: number;
   /** The state to show: it can lag the server's while the go-live moment plays. */
   state: VersionState;
   /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (its badge says "Sunset Mar 1"). */
@@ -65,6 +72,8 @@ export function ReviewHeader({
   ring: boolean;
   slotRef: RefObject<HTMLDivElement | null>;
 }) {
+  const shown = { number: versionNumber, round, state };
+  const approvedOn = approvedOnRound(shown);
   return (
     <header className={cn(RV.header, HEADER)}>
       <div className="col-start-1 row-start-1 flex min-w-0 flex-col items-start gap-1">
@@ -86,8 +95,9 @@ export function ReviewHeader({
         >
           <StatusBadge state={state} sunsetDay={sunsetDay} now={nowIso} />
         </m.span>
-        <span className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
-          v{versionNumber} by {author.name} · {formatAgo(submittedAt, nowIso)}
+        <span data-slot="byline" className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
+          {versionLabel(shown)} by {author.name} · {formatAgo(submittedAt, nowIso)}
+          {approvedOn ? ` · ${approvedOn}` : null}
         </span>
       </div>
       <div

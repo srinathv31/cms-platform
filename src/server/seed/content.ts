@@ -153,7 +153,7 @@ export function buildDoc(scope: string, blocks: Block[]): JSONContent {
 
 /**
  * An alert's body: one empty paragraph. A message renders only its own channel fields and never a body
- * (decision 0033), but every version has one.
+ * (decision 0034), but every version has one.
  */
 export function emptyBody(scope: string): JSONContent {
   return buildDoc(scope, [{ key: "empty", node: { type: "paragraph" } }]);

@@ -21,7 +21,7 @@ function screens(at: string, now: Date) {
   const usage: ConsumerUsage[] = [{ consumerId: "coral", consumerName: "Coral", versionNumber: 1, lastRenderAt: at, renders30d: 0 }];
   const sunset = consequences({ kind: "sunset", number: 1, sunsetAt: "2027-03-01", activeNumber: 2 }, usage, now)[0]!;
   const revoke = consequences({ kind: "revoke", number: 1, activeNumber: 2 }, usage, now)[0]!;
-  const activity: ActivityItem = { id: "a", at, actor: null, action: "draft.edited", versionNumber: null, summary: "a" };
+  const activity: ActivityItem = { id: "a", at, actor: null, action: "draft.edited", versionLabel: null, summary: "a" };
   const queue: ReviewQueueRow = {
     templateId: "UC-4F7K2Q",
     templateName: "Cash Back",
@@ -29,6 +29,7 @@ function screens(at: string, now: Date) {
     teamName: "Coral Offers",
     versionId: "ver_1",
     versionNumber: 3,
+    round: 1,
     state: "in_review",
     author: { id: "maya", name: "Maya Chen", initials: "MC", hue: 40 },
     submittedAt: at,

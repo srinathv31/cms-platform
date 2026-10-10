@@ -116,7 +116,12 @@ export async function writeEffects(
         const link = effect.link;
         const outsideReview: NotificationLink | null =
           link.to === "template" && link.reviewVersion !== undefined
-            ? { to: "review", templateId: link.templateId, versionNumber: link.reviewVersion }
+            ? {
+                to: "review",
+                templateId: link.templateId,
+                versionNumber: link.reviewVersion.number,
+                round: link.reviewVersion.round,
+              }
             : null;
         const spaces = link.to === "review" || outsideReview ? await recipientSpaces(tx, userIds, teamSlug) : null;
         const hrefFor = (userId: string): string => {
@@ -224,11 +229,17 @@ export async function resolveRecipients(tx: Tx, to: Recipients, teamId: string):
   return [...new Set(rows.map((r) => r.userId))].filter((id) => !except.has(id)).sort();
 }
 
-/** `/{team}/review/{templateId}/{n}`, `/{team}/templates/{id}` or `/{team}/templates/{id}/versions`. */
+/**
+ * `/{team}/review/{templateId}/{n}` (plus `?round=N` when the link names its round), `/{team}/templates/{id}`
+ * or `/{team}/templates/{id}/versions`.
+ */
 export function notificationHref(teamSlug: string, link: NotificationLink): string {
   switch (link.to) {
-    case "review":
-      return `/${teamSlug}/review/${link.templateId}/${link.versionNumber}`;
+    case "review": {
+      // A link names its round only when the round's label shows it (`reviewLink`); bare, it is the number's head.
+      const path = `/${teamSlug}/review/${link.templateId}/${link.versionNumber}`;
+      return link.round === undefined ? path : `${path}?round=${link.round}`;
+    }
     case "template":
       return `/${teamSlug}/templates/${link.templateId}`;
     case "versions":

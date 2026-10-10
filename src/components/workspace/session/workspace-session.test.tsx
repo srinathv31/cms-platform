@@ -39,7 +39,7 @@ const header = (draft: DraftBinding | null = { versionId: "v_draft", rev: 4 }) =
     <GrabSession />
     <BindDraft draft={draft} />
     <NameField name="Rate notice" editable={draft !== null} />
-    <SaveStatus templateId="UC-ABC123" basedOn={null} activeNumber={null} />
+    <SaveStatus templateId="UC-ABC123" basedOn={null} />
     <SaveStopped />
   </WorkspaceSessionProvider>
 );

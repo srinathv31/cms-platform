@@ -4,7 +4,7 @@ import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveField, nameField, openLibrary, tap, test, typeSlowly, untilUncovered } from "./helpers/scenario";
 
-// Alerts end to end (decision 0033): an alert is made, written with its phone live beside it, held at
+// Alerts end to end (decision 0034): an alert is made, written with its phone live beside it, held at
 // submit until its SMS is in GSM-7, approved, changed, reviewed with its fields redlined, commented on at a
 // field, approved again, and compared.
 //
@@ -174,7 +174,7 @@ test.describe("alerts", () => {
       await expect(cutWarnings(page)).toHaveCount(0);
 
       await typeAtEnd(page, field(page, "Push body"), BODY_ADDED);
-      // Before any save: the phone renders what is typed, in the browser (decision 0035).
+      // Before any save: the phone renders what is typed, in the browser (decision 0036).
       await expect(onPhone(page, "body")).toContainText(BODY_ADDED.trim());
       await expect(cutWarnings(page)).toHaveCount(1);
       await expect(cutWarnings(page)).toHaveText(/^iPhone lock screen cuts after “…[^”]+”\.$/);

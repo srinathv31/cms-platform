@@ -12,11 +12,14 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
 import { ALL_CHANNEL_FIELDS, channelFieldValue, normalizeAndCheckChannelField, type ChannelFields } from "@/domain/channel-fields";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
+import { headOf, isReleased } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
 import { TEMPLATE_ID_PATTERN, newId, newTemplateId, seededId, seededTemplateId } from "@/server/ids";
 import { trySubmit } from "@/server/testing/submit-check";
+import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
 import { mulberry32 } from "./rng";
 
@@ -110,8 +113,9 @@ const versionsOn = (contentTypeId: string) => {
   const ids = new Set(templates.filter((t) => t.contentTypeId === contentTypeId).map((t) => t.id));
   return versions.filter((v) => ids.has(v.templateId));
 };
+/** A number's head (its released row, else its latest round), or the draft (null). */
 const version = (key: string, n: number | null) => {
-  const found = versionsOf(key).find((v) => v.number === n);
+  const found = n === null ? versionsOf(key).find((v) => v.number === null) : headOf(versionsOf(key), n);
   if (!found) throw new Error(`no ${key} v${n}`);
   return found;
 };
@@ -141,6 +145,38 @@ describe("ids", () => {
     expect(templates.length).toBe(14);
     for (const t of templates) expect(t.id).toMatch(TEMPLATE_ID_PATTERN);
     expect(new Set(templates.map((t) => t.id)).size).toBe(templates.length);
+  });
+
+  it("keeps the template ids e2e specs, golden files and screenshots name", () => {
+    // One more draw from the shared sequence before a template moves its id and every id after it. A row
+    // added to the seed draws from its own sequence instead (`ctx.keyedId`, `keyedIds` on a thread).
+    expect(result.templates).toEqual({
+      "balance-transfer": "UC-D6KSGY",
+      "cash-back": "UC-J530DX",
+      "annual-fee-waiver": "UC-NYP7F0",
+      "holiday-points": "UC-WGGRJH",
+      "rate-change-notice": "UC-PAS9A0",
+      "high-yield-savings": "UC-ZKZSRZ",
+      "checking-fees": "UC-A4S1YT",
+      "overdraft-protection": "UC-DNF479",
+      "statement-rate-change": "UC-8Y49K2",
+      "statement-paperless": "UC-7W726J",
+      "statement-privacy": "UC-SZZS5Y",
+      // The alerts are built last, after every document.
+      "payment-due-reminder": "UC-EFXFMS",
+      "card-used-abroad": "UC-397J2A",
+      "rate-change-heads-up": "UC-FYN38M",
+    });
+  });
+
+  it("draws a keyed id from a sequence of its own: the shared sequence goes on as if it hadn't", () => {
+    const plain = createContext(0);
+    const keyed = createContext(0);
+    const first = keyed.keyedId("high-yield-savings:v2r1:doc", "th");
+    expect(first).toBe(createContext(0).keyedId("high-yield-savings:v2r1:doc", "th"));
+    expect(keyed.keyedId("high-yield-savings:v2r1:doc", "cm")).toMatch(/^cm_/);
+    expect(keyed.keyedId("high-yield-savings:v2r2:doc", "th")).not.toBe(first);
+    expect([keyed.id("v"), keyed.templateId()]).toEqual([plain.id("v"), plain.templateId()]);
   });
 });
 
@@ -251,21 +287,25 @@ describe("lifecycle states", () => {
     }
   });
 
-  it("numbers versions only after submit, once each", () => {
+  it("numbers versions only after submit: released numbers 1..n, and each number's rounds 1..k", () => {
     for (const t of templates) {
-      const numbers = versions
-        .filter((v) => v.templateId === t.id && v.state !== "draft")
-        .map((v) => v.number)
-        .sort();
-      numbers.forEach((n, i) => expect(n).toBe(i + 1));
+      const own = versions.filter((v) => v.templateId === t.id && v.state !== "draft");
+      const released = own.filter((v) => isReleased(v.state)).map((v) => v.number!).sort((a, b) => a - b);
+      released.forEach((n, i) => expect(n, `${t.id} released numbers`).toBe(i + 1));
+      for (const number of new Set(own.map((v) => v.number!))) {
+        const rounds = own.filter((v) => v.number === number).map((v) => v.round!).sort((a, b) => a - b);
+        rounds.forEach((r, i) => expect(r, `${t.id} v${number} rounds`).toBe(i + 1));
+      }
     }
-    for (const v of versions.filter((x) => x.state === "draft")) expect(v.number).toBeNull();
+    for (const v of versions.filter((x) => x.state === "draft")) expect([v.number, v.round]).toEqual([null, null]);
   });
 
   it("matches the five Coral templates in the build plan", () => {
     const states = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}:${v.state}`).sort();
+    const rounds = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}/${v.round ?? "-"}:${v.state}`).sort();
     expect(states("balance-transfer")).toEqual(["1:superseded", "2:active"]);
-    expect(states("cash-back")).toEqual(["1:superseded", "2:active", "3:in_review"]);
+    // v3 was sent back on round 1 and is in review on round 2.
+    expect(rounds("cash-back")).toEqual(["1/1:superseded", "2/1:active", "3/1:changes_requested", "3/2:in_review"]);
     expect(states("annual-fee-waiver")).toEqual(["1:changes_requested", "draft:draft"]);
     expect(states("holiday-points")).toEqual(["1:revoked", "2:active"]);
     expect(states("rate-change-notice")).toEqual(["1:active"]);
@@ -291,6 +331,18 @@ describe("lifecycle states", () => {
     // Only alerts are on the Alert content type, and every other template is a document.
     expect(new Set(versionsOn("ct_alert").map((v) => v.templateId)).size).toBe(3);
     for (const v of versionsOn("ct_disclosure")) expect(v.channels.every((c) => ["pdf", "web", "email"].includes(c))).toBe(true);
+  });
+
+  it("gives High-Yield Savings v2 approved on round 3, after Naomi sent rounds 1 and 2 back", async () => {
+    const rounds = versionsOf("high-yield-savings").map((v) => `${v.number}/${v.round}:${v.state}`).sort();
+    expect(rounds).toEqual(["1/1:superseded", "2/1:changes_requested", "2/2:changes_requested", "2/3:active"]);
+    const sentBack = (await db.select().from(ucomp.approvals)).filter(
+      (a) => versionsOf("high-yield-savings").some((v) => v.id === a.versionId) && a.decision === "changes_requested",
+    );
+    expect(sentBack.map((a) => a.actorId)).toEqual(["naomi", "naomi"]);
+    // Each round resubmits the one sent back.
+    const [r1, r2, r3] = [1, 2, 3].map((round) => versionsOf("high-yield-savings").find((v) => v.number === 2 && v.round === round)!);
+    expect([r2!.basedOnVersionId, r3!.basedOnVersionId]).toEqual([r1!.id, r2!.id]);
   });
 
   it("gives Deposits and Card Statements templates in Active and Draft", () => {
@@ -479,7 +531,7 @@ describe("bodies", () => {
 describe("alerts", () => {
   // Every seeded alert could be submitted as it stands, with the Alert content type's footer and part
   // budget: GSM-7 as typed, within 3 parts with the long sample values, no public shortener, and a push
-  // inside 4,096 bytes on both platforms (decisions 0033 and 0034). The draft too, so the demo can submit it.
+  // inside 4,096 bytes on both platforms (decisions 0034 and 0035). The draft too, so the demo can submit it.
   it("pass every submit rule, with the Alert content type's footer and part budget", async () => {
     const [alert] = await db.select().from(ucomp.contentTypes).where(eq(ucomp.contentTypes.id, "ct_alert"));
     const rules = { smsFooter: alert!.smsFooter, smsMaxParts: alert!.smsMaxParts };
@@ -517,12 +569,60 @@ describe("comments", () => {
     expect(threads.length).toBeGreaterThanOrEqual(3);
     for (const t of threads) {
       const origin = versions.find((v) => v.id === t.originVersionId)!;
+      // A thread about the whole version (a change request's reason) has no block.
+      if (t.blockId === DOCUMENT_THREAD) continue;
       const blocks = (v: typeof origin) => (v.body.content ?? []).map((b) => b.attrs?.id);
       expect(blocks(origin)).toContain(t.blockId);
       for (const draft of versions.filter((v) => v.basedOnVersionId === origin.id && v.state === "draft")) {
         expect(blocks(draft)).toContain(t.blockId);
       }
     }
+  });
+
+  it("gives every send-back a whole-version thread holding its reason, answered by the next round's submit", async () => {
+    const threads = await db.select().from(ucomp.commentThreads);
+    const comments = await db.select().from(ucomp.comments);
+    const events = await db.select().from(ucomp.auditEvents);
+    const sentBack = (await db.select().from(ucomp.approvals)).filter((a) => a.decision === "changes_requested");
+    expect(sentBack.length).toBeGreaterThanOrEqual(4);
+    for (const a of sentBack) {
+      const round = versions.find((v) => v.id === a.versionId)!;
+      const thread = threads.find((t) => t.originVersionId === round.id && t.blockId === DOCUMENT_THREAD);
+      expect(thread, `${round.templateId} v${round.number} round ${round.round}`).toBeDefined();
+      const first = comments.filter((c) => c.threadId === thread!.id).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())[0];
+      expect(first).toMatchObject({ authorId: a.actorId, kind: "change_request", body: a.reason, createdAt: a.decidedAt });
+
+      // As submit resolves it: by the next round's submitter, then, naming the round that answered it.
+      const next = versions.find((v) => v.basedOnVersionId === round.id && v.number !== null);
+      if (!next) {
+        expect(thread!.status).toBe("open");
+        continue;
+      }
+      expect(thread).toMatchObject({ status: "resolved", resolvedBy: next.submittedBy, resolvedAt: next.submittedAt });
+      const resolved = events.filter((e) => e.action === "thread.resolved" && (e.details as { threadId?: string }).threadId === thread!.id);
+      expect(resolved.map((e) => [e.actorId, e.versionId, e.at.getTime(), e.details])).toEqual([
+        [
+          next.submittedBy,
+          round.id,
+          next.submittedAt!.getTime(),
+          { threadId: thread!.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
+        ],
+      ]);
+    }
+  });
+
+  it("gives High-Yield Savings v2 rounds 1 and 2 Naomi's reasons, each resolved by Eli submitting the next round", async () => {
+    const ids = versionsOf("high-yield-savings").filter((v) => v.number === 2).sort((a, b) => a.round! - b.round!).map((v) => v.id);
+    const threads = (await db.select().from(ucomp.commentThreads)).filter((t) => t.templateId === tpl("high-yield-savings"));
+    expect(threads.map((t) => [ids.indexOf(t.originVersionId) + 1, t.blockId, t.status, t.resolvedBy]).sort()).toEqual([
+      [1, DOCUMENT_THREAD, "resolved", "eli"],
+      [2, DOCUMENT_THREAD, "resolved", "eli"],
+    ]);
+    const answered = (await db.select().from(ucomp.auditEvents))
+      .filter((e) => e.templateId === tpl("high-yield-savings") && e.action === "thread.resolved")
+      .map((e) => (e.details as { resolvedWithRound: number }).resolvedWithRound)
+      .sort();
+    expect(answered).toEqual([2, 3]);
   });
 
   it("gives Annual Fee Waiver one resolved and one open thread, with Jordan's change request", async () => {
@@ -638,7 +738,7 @@ describe("render history", () => {
 });
 
 describe("notifications, access and audit", () => {
-  it("gives Jordan two pending reviews: Cash Back v3, and the Card Used Abroad alert", async () => {
+  it("gives Jordan two pending reviews: Cash Back v3 round 2, and the Card Used Abroad alert", async () => {
     const pending = [version("cash-back", 3), version("card-used-abroad", 1)];
     const approvals = await db.select().from(ucomp.approvals);
     for (const v of pending) {
@@ -651,7 +751,8 @@ describe("notifications, access and audit", () => {
     expect(notes).toHaveLength(2);
     for (const n of notes) expect(n).toMatchObject({ kind: "review_requested", readAt: null, teamId: "coral-offers" });
     expect(notes.map((n) => n.href).sort()).toEqual(
-      [`/coral-offers/review/${tpl("card-used-abroad")}/1`, `/coral-offers/review/${tpl("cash-back")}/3`].sort(),
+      // Cash Back v3 was sent back once, so its link names the round (reviewPath); the alert's first round doesn't.
+      [`/coral-offers/review/${tpl("card-used-abroad")}/1`, `/coral-offers/review/${tpl("cash-back")}/3?round=2`].sort(),
     );
 
     const waiting = versions.filter((v) => v.state === "in_review" && v.submittedBy !== "jordan");
@@ -808,6 +909,7 @@ describe("determinism", () => {
             id: v.id,
             state: v.state,
             number: v.number,
+            round: v.round,
             body: v.body,
             // Date samples are relative to the base, so compare the contract without them.
             variables: v.variables.map(({ key, label, type, required }) => ({ key, label, type, required })),

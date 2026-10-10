@@ -348,7 +348,7 @@ describe("channelRuleRefusal (whether a switch may flip)", () => {
     });
   });
 
-  describe("families never mix (decision 0033)", () => {
+  describe("families never mix (decision 0034)", () => {
     const disclosure = { name: "Disclosure", allowedChannels: ["pdf", "web"] as Channel[] };
     const notice = { name: "Notice", allowedChannels: ["pdf"] as Channel[] };
     const alert = { name: "Alert", allowedChannels: ["push", "sms"] as Channel[] };

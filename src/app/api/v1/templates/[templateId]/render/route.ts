@@ -48,8 +48,13 @@ const RequestBody = z.object({
   values: z.custom<Record<string, unknown>>(isPlainObject),
   encoding: z.literal("base64").optional(),
   preview: z.boolean().optional(),
+  // The CMS preview's round (`?round=` on the review screen). Not in the consumer contract: without
+  // `preview` it is dropped unread, whatever it holds, so a consumer never meets it.
+  round: z.unknown().optional(),
 });
-type RequestBody = z.infer<typeof RequestBody>;
+/** A preview's round: a whole number from 1. */
+const PreviewRound = z.int().min(1);
+type RequestBody = Omit<z.infer<typeof RequestBody>, "round"> & { round?: number };
 
 /** The bad_request sentence for the first field that doesn't fit. */
 const FIELD_MESSAGES: Readonly<Record<string, string>> = {
@@ -59,6 +64,7 @@ const FIELD_MESSAGES: Readonly<Record<string, string>> = {
   values: "values must be an object.",
   encoding: "encoding must be base64.",
   preview: "preview must be true or false.",
+  round: "round must be a whole number from 1.",
 };
 
 type Parsed = { ok: true; body: RequestBody } | { ok: false; error: RenderError };
@@ -85,7 +91,11 @@ function parseBody(text: string): Parsed {
     const field = String(parsed.error.issues[0]?.path[0] ?? "");
     return { ok: false, error: badRequest(FIELD_MESSAGES[field] ?? BAD_REQUEST_MESSAGES.body) };
   }
-  return { ok: true, body: parsed.data };
+  const { round, ...rest } = parsed.data;
+  if (rest.preview !== true || round === undefined) return { ok: true, body: rest };
+  const previewRound = PreviewRound.safeParse(round);
+  if (!previewRound.success) return { ok: false, error: badRequest(FIELD_MESSAGES.round!) };
+  return { ok: true, body: { ...rest, round: previewRound.data } };
 }
 
 // ── Headers ──────────────────────────────────────────────────────────────────
@@ -170,7 +180,7 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
 
   const parsed = parseBody(new TextDecoder().decode(body.bytes));
   if (!parsed.ok) return errorResponse(parsed.error, correlationId);
-  const { version, channel, platform, values, encoding } = parsed.body;
+  const { version, round, channel, platform, values, encoding } = parsed.body;
   const preview = parsed.body.preview === true;
 
   if (version === "draft" && !preview) return errorResponse(badRequest(BAD_REQUEST_MESSAGES.version), correlationId);
@@ -184,6 +194,7 @@ export const POST = withDemoDate(async function post(request: NextRequest, { par
     const result = await renderTemplate({
       templateId,
       version,
+      ...(preview && round !== undefined ? { round } : {}),
       channel,
       platform,
       values,

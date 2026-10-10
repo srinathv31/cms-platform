@@ -58,7 +58,7 @@ export const teams = sqliteTable("teams", {
   description: text("description").notNull(),
   icon: text("icon").notNull(), // lucide icon key
   createdAt: ts("created_at").notNull(),
-  // Who the team's messages come from, as the phone previews show it (decision 0033). Facts, not
+  // Who the team's messages come from, as the phone previews show it (decision 0034). Facts, not
   // derived from the name the way the email preview's sender is (decision 0023): an app has its own
   // name, and a short code is a number. Null when not set.
   /** The app name over the team's push notifications: "Coral". */
@@ -104,7 +104,7 @@ export const contentTypes = sqliteTable("content_types", {
   key: text("key").notNull().unique(), // "disclosure"
   name: text("name").notNull(),
   requiredSections: json<RequiredSection[]>("required_sections").notNull(),
-  // One family, documents or messages, never both (decision 0033): `channelRuleRefusal`.
+  // One family, documents or messages, never both (decision 0034): `channelRuleRefusal`.
   allowedChannels: json<Channel[]>("allowed_channels").notNull(),
   /** Printed on its own line after every SMS of this type: brand and opt-out. Null: none. */
   smsFooter: text("sms_footer"),
@@ -147,6 +147,9 @@ export const versions = sqliteTable(
       .notNull()
       .references(() => templates.id),
     number: integer("number"), // null while draft; assigned at submit, then frozen
+    // Null while draft; assigned at submit with number, then frozen; a resubmission after a send-back is
+    // the next round of the same number.
+    round: integer("round"),
     state: text("state").$type<VersionState>().notNull(),
     // The template's name as this version has it: an author renames the open draft, and customers see
     // the name of the version they render (the Active one's, where the API speaks of the template).
@@ -158,7 +161,7 @@ export const versions = sqliteTable(
     channelFields: json<ChannelFields>("channel_fields").notNull().default(sql`'{}'`),
     channels: json<Channel[]>("channels").notNull(),
     // The content type's SMS footer as it stood when this version was submitted, frozen with it (decision
-    // 0034): render, review, Compare and Coral print this one, so a later footer change reaches only versions
+    // 0035): render, review, Compare and Coral print this one, so a later footer change reaches only versions
     // submitted after it, through approval. Null on a draft (it shows the content type's footer as it stands,
     // `smsFooterOf`) and on a version whose content type had none.
     smsFooter: text("sms_footer"),
@@ -191,7 +194,12 @@ export const versions = sqliteTable(
   },
   (t) => [
     index("versions_template").on(t.templateId),
-    uniqueIndex("versions_template_number").on(t.templateId, t.number),
+    // One row per round of a number. Drafts (no number, no round) don't collide: NULLs stay distinct.
+    uniqueIndex("versions_template_number_round").on(t.templateId, t.number, t.round),
+    // At most one released row per number: a number's rounds before it were sent back.
+    uniqueIndex("versions_one_released")
+      .on(t.templateId, t.number)
+      .where(sql`state IN ('active', 'superseded', 'revoked')`),
     // At most one open draft and one Active version per template.
     uniqueIndex("versions_one_draft")
       .on(t.templateId)

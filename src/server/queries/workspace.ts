@@ -10,6 +10,7 @@ import { contractBaseline, planDraftStart, smsFooterOf } from "@/domain/lifecycl
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import { asNumbered, nextRound, versionLabel as labelOf, type NumberedRound } from "@/domain/rounds";
 import {
   contentTypeFamily,
   type Channel,
@@ -44,16 +45,24 @@ export interface WorkspaceHeaderData {
   sunsetDay: string | null;
   /**
    * What sits beside the status badge. The badge already says the state, so the label never
-   * repeats it: "v2" on a version with a number, "Based on v2" on a draft of an earlier version,
-   * and null on a brand-new draft that has no earlier version.
+   * repeats it: "v2" (or "v3 · Round 2", rounds.ts) on a version with a number, "Based on v2" (or
+   * "Based on v1 · Round 1") on a draft of an earlier version, and null on a brand-new draft that has
+   * no earlier version.
    */
   versionLabel: string | null;
-  /** The number of the version an open draft was started from; null when it isn't based on one. */
-  basedOnNumber: number | null;
+  /**
+   * The version an open draft was started from: its label in a sentence ("Revert to v3", "Revert to
+   * v1, round 1"), and whether it is the Active version. Null when it isn't based on one.
+   */
+  basedOn: { label: string; active: boolean } | null;
   /** Number of the Active version, if any (the SHARE ring shows only then). */
   activeNumber: number | null;
-  /** The number the shown version has, or will get at submit when it's a draft. */
+  /** The number the shown version has, or will get at submit when it's a draft (`nextRound`). */
   versionNumber: number;
+  /** The round the shown version is, or will be at submit when it's a draft. */
+  round: number;
+  /** The round in review, if there is one: the workspace links to its review screen (`reviewPath`). */
+  inReview: NumberedRound | null;
   /** The viewer may edit this team's drafts (false = "View only"). */
   canEdit: boolean;
   /** The shown version is an open draft and the viewer can edit it (the name is a field, autosave runs). */
@@ -98,6 +107,7 @@ export const getWorkspaceHeader = cache(
       .select({
         id: versions.id,
         number: versions.number,
+        round: versions.round,
         state: versions.state,
         name: versions.name,
         sunsetAt: versions.sunsetAt,
@@ -109,14 +119,19 @@ export const getWorkspaceHeader = cache(
 
     const latest = pickLatest(list);
     const active = list.find((v) => v.state === "active");
-    const highest = list.reduce((max, v) => Math.max(max, v.number ?? 0), 0);
+    const review = list.find((v) => v.state === "in_review" && v.number !== null);
     const zone = await getBusinessZone();
 
     const isDraft = !latest || latest.state === "draft";
-    const versionNumber = isDraft ? highest + 1 : (latest.number ?? highest);
-    const basedOn = isDraft && latest?.basedOnVersionId ? list.find((v) => v.id === latest.basedOnVersionId) : undefined;
-    const basedOnNumber = basedOn?.number ?? null;
-    const versionLabel = isDraft ? (basedOnNumber !== null ? `Based on v${basedOnNumber}` : null) : `v${versionNumber}`;
+    // A draft is numbered as its submit will number it: the next version, or the next round of the one sent back.
+    const shown = isDraft ? nextRound(list) : asNumbered(latest);
+    const base = isDraft && latest?.basedOnVersionId ? list.find((v) => v.id === latest.basedOnVersionId) : undefined;
+    const baseRound = base && base.number !== null ? asNumbered(base) : null;
+    const versionLabel = isDraft
+      ? baseRound
+        ? `Based on ${labelOf(baseRound)}`
+        : null
+      : labelOf(asNumbered(latest));
     const canEdit = can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok;
     const editable = canEdit && latest?.state === "draft";
 
@@ -129,9 +144,11 @@ export const getWorkspaceHeader = cache(
       status: latest?.state ?? "draft",
       sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
       versionLabel,
-      basedOnNumber,
+      basedOn: baseRound ? { label: labelOf(baseRound, { style: "sentence" }), active: baseRound.state === "active" } : null,
       activeNumber: active?.number ?? null,
-      versionNumber,
+      versionNumber: shown.number,
+      round: shown.round,
+      inReview: review ? asNumbered(review) : null,
       canEdit,
       editable,
       draft: editable && latest ? { versionId: latest.id, rev: latest.rev } : null,
@@ -149,6 +166,8 @@ export interface WorkspaceDocumentData {
   versionId: string;
   /** The shown version's number, or null for an open draft (the preview asks the route for "draft"). */
   versionNumber: number | null;
+  /** The shown version's round, or null for an open draft (a preview of an earlier round asks for it). */
+  round: number | null;
   /** Autosave ordering: the rev the client starts from. */
   rev: number;
   body: JSONContent;
@@ -163,7 +182,7 @@ export interface WorkspaceDocumentData {
   allowedChannels: Channel[];
   /**
    * The template's family, fixed by its content type: a document (the Content tab is the editor) or a
-   * message (the Content tab is the message composer). Decision 0033.
+   * message (the Content tab is the message composer). Decision 0034.
    */
   family: ChannelFamily;
   /**
@@ -224,6 +243,7 @@ export const getWorkspaceDocument = cache(
       .select({
         id: versions.id,
         number: versions.number,
+        round: versions.round,
         state: versions.state,
         sunsetAt: versions.sunsetAt,
         rev: versions.rev,
@@ -249,6 +269,7 @@ export const getWorkspaceDocument = cache(
       teamName: header.teamName,
       versionId: shown.id,
       versionNumber: shown.state === "draft" ? null : shown.number,
+      round: shown.state === "draft" ? null : shown.round,
       rev: shown.rev,
       body: shown.body,
       variables: shown.variables,

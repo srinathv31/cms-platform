@@ -7,18 +7,11 @@ import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { VersionState } from "@/domain/types";
+import type { CompareOption } from "@/domain/review-types";
 
-// "Compare versions": a large dialog with the redline between any two versions of the template. The
-// button is all the page loads up front; the panel (and the document renderer under it) is a separate
-// chunk that arrives when the dialog opens.
-
-export interface CompareOption {
-  id: string;
-  /** "v2", or "Draft" for the open draft. */
-  label: string;
-  state: VersionState;
-}
+// "Compare versions": a large dialog with the redline between any two versions of the template, every
+// round included ("v3 · Round 1"). The button is all the page loads up front; the panel (and the
+// document renderer under it) is a separate chunk that arrives when the dialog opens.
 
 const ComparePanel = lazy(() => import("./compare-panel"));
 

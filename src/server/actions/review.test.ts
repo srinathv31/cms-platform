@@ -21,6 +21,7 @@ import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
 import { seedDatabase } from "@/server/seed";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
+import { findRound } from "@/server/queries/find-round";
 import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
@@ -102,8 +103,8 @@ beforeEach(() => {
   vi.mocked(refresh).mockClear();
 });
 
-const version = (templateId: string, number: number) =>
-  db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, number)) });
+/** A version by number: the round given, or the number's head (its released row, else its latest round). */
+const version = (templateId: string, number: number, round?: number) => findRound(db, templateId, number, round);
 const draftOf = (templateId: string) =>
   db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) });
 const auditAt = (at: Date) => db.select().from(auditEvents).where(eq(auditEvents.at, at));
@@ -135,7 +136,7 @@ describe("the review loop (scenario 3)", () => {
   it("Maya submits v1 with a note; the team's approvers are asked to review", async () => {
     const at = as("maya");
     const result = await submitNow(templateId, "  Ready for a look.  ");
-    expect(result).toEqual({ ok: true, number: 1 });
+    expect(result).toEqual({ ok: true, number: 1, round: 1 });
     expect(refresh).toHaveBeenCalledTimes(1);
 
     expect(await version(templateId, 1)).toMatchObject({
@@ -166,11 +167,11 @@ describe("the review loop (scenario 3)", () => {
 
   it("Maya can't approve or request changes on her own version", async () => {
     as("maya");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REASONS.ownVersion,
     });
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "x" })).toEqual({
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "x" })).toEqual({
       ok: false,
       ...REASONS.ownVersion,
     });
@@ -178,7 +179,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("a change request needs a reason", async () => {
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "   " })).toEqual({
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "   " })).toEqual({
       ok: false,
       ...REFUSALS.giveReason,
     });
@@ -188,7 +189,7 @@ describe("the review loop (scenario 3)", () => {
   it("Jordan requests changes: the decision, a new draft with the same block ids, and the reason as a thread", async () => {
     const at = as("jordan");
     const reason = "The intro APR period doesn't match the product sheet.";
-    expect(await requestChanges({ templateId, versionNumber: 1, reason })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason })).toEqual({ ok: true });
     expect(refresh).toHaveBeenCalledTimes(1);
 
     const v1 = (await version(templateId, 1))!;
@@ -206,7 +207,7 @@ describe("the review loop (scenario 3)", () => {
     ]);
 
     const draft = (await draftOf(templateId))!;
-    expect(draft).toMatchObject({ number: null, basedOnVersionId: v1.id, createdBy: "maya", rev: 0 });
+    expect(draft).toMatchObject({ number: null, round: null, basedOnVersionId: v1.id, createdBy: "maya", rev: 0 });
     expect(blockIds(draft.body)).toEqual(blockIds(v1.body));
 
     const [thread] = await db.select().from(commentThreads).where(eq(commentThreads.originVersionId, v1.id));
@@ -220,6 +221,7 @@ describe("the review loop (scenario 3)", () => {
       expect.objectContaining({
         userId: "maya",
         kind: "changes_requested",
+        title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
         href: `/coral-offers/templates/${templateId}`,
       }),
     ]);
@@ -227,7 +229,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("a second change request (a double click) is refused and writes nothing", async () => {
     const at = as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Again" })).toEqual({
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Again" })).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
@@ -236,26 +238,60 @@ describe("the review loop (scenario 3)", () => {
     expect(await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).toHaveLength(1);
   });
 
-  it("Maya resubmits as v2 (through the Phase 3 name, submitDraft)", async () => {
-    as("maya");
-    expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 2 });
-    expect((await version(templateId, 2))?.state).toBe("in_review");
+  it("Maya resubmits as v1, round 2 (through the Phase 3 name, submitDraft): a send-back uses up no number", async () => {
+    const at = as("maya");
+    expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
+    expect((await version(templateId, 1, 2))?.state).toBe("in_review");
+    expect((await version(templateId, 1, 1))?.state, "round 1 stays the record it was").toBe("changes_requested");
+    expect(await version(templateId, 2)).toBeUndefined();
+    // The approvers' link names the round: the bare URL is the number's head, which round 2 now is anyway.
+    const sent = await notificationsAt(at);
+    expect(sent.map((n) => n.userId)).toEqual(["alex", "jordan"]);
+    expect(sent[0]).toMatchObject({
+      kind: "review_requested",
+      title: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
+      href: `/coral-offers/review/${templateId}/1?round=2`,
+    });
   });
 
-  it("Jordan approves v2: it goes live and Maya hears about it", async () => {
+  it("approving round 1 after round 2 exists is refused: it isn't in review", async () => {
     const at = as("jordan");
-    const result = await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: ["typical", "long", "typical"] });
-    expect(result).toEqual({ ok: true, wentLive: true, number: 2 });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+      ok: false,
+      ...REFUSALS.notInReview,
+    });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Again" })).toEqual({
+      ok: false,
+      ...REFUSALS.notInReview,
+    });
+    expect(await auditAt(at)).toEqual([]);
+    expect((await version(templateId, 1, 2))?.state).toBe("in_review");
+  });
+
+  it("a round that doesn't exist is refused like a forbidden one", async () => {
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 3, sampleSetsSeen: [] })).toEqual({
+      ok: false,
+      ...REASONS.generic,
+    });
+  });
+
+  it("Jordan approves v1, round 2: it goes live as v1 and Maya hears about it", async () => {
+    const at = as("jordan");
+    const result = await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: ["typical", "long", "typical"] });
+    expect(result).toEqual({ ok: true, wentLive: true, number: 1, round: 2 });
     expect(refresh).toHaveBeenCalledTimes(1);
 
-    const v2 = (await version(templateId, 2))!;
-    expect(v2).toMatchObject({ state: "active", activatedAt: at, currentStage: 0 });
-    expect(await db.select().from(approvals).where(eq(approvals.versionId, v2.id))).toEqual([
+    const v1 = (await version(templateId, 1))!;
+    expect(v1).toMatchObject({ round: 2, state: "active", activatedAt: at, currentStage: 0 });
+    expect(await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).toEqual([
       expect.objectContaining({ decision: "approved", actorId: "jordan", sampleSetsSeen: ["typical", "long"] }),
     ]);
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.activated"]);
+    expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
+      ["version.activated", { number: 1, round: 2, supersedes: null, stage: "Team approver" }],
+    ]);
     expect(await notificationsAt(at)).toEqual([
-      expect.objectContaining({ userId: "maya", kind: "version_live", title: "Spring Travel Rewards — Terms v2 is now Active." }),
+      expect.objectContaining({ userId: "maya", kind: "version_live", title: "Spring Travel Rewards — Terms v1 is now Active." }),
     ]);
     // Nobody renders a brand-new template yet: no consumer notices.
     expect(await noticesAt(at)).toEqual([]);
@@ -263,10 +299,17 @@ describe("the review loop (scenario 3)", () => {
 
   it("a second approve is refused", async () => {
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
+  });
+
+  it("the database holds one released row per number: a second fails the index", async () => {
+    const v1 = (await version(templateId, 1))!;
+    await expect(db.insert(versions).values({ ...v1, id: `v_dup_${templateId}`, round: 3, state: "superseded" })).rejects.toThrow();
+    // And one row per round.
+    await expect(db.insert(versions).values({ ...v1, id: `v_dup2_${templateId}`, state: "changes_requested" })).rejects.toThrow();
   });
 });
 
@@ -305,7 +348,7 @@ describe("resubmitting answers the change request", () => {
     });
     if (!block.ok) throw new Error(block.reason);
     blockThreadId = block.threadId;
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "The intro APR doesn't match." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "The intro APR doesn't match." })).toEqual({ ok: true });
     const request = (await threadsOf(templateId)).find((t) => t.blockId === DOCUMENT_THREAD)!;
     firstRequestId = request.id;
     expect(request).toMatchObject({ status: "open", resolvedBy: null, resolvedAt: null });
@@ -313,7 +356,7 @@ describe("resubmitting answers the change request", () => {
 
   it("Maya resubmits: the change request resolves as hers, at the submit time", async () => {
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
     resolvedAt = at;
 
     expect(await threadRow(firstRequestId)).toMatchObject({
@@ -325,7 +368,7 @@ describe("resubmitting answers the change request", () => {
     });
   });
 
-  it("writes a thread.resolved audit row about the version that asked, saying which version answered", async () => {
+  it("writes a thread.resolved audit row about the round that asked, saying which round answered", async () => {
     expect(await resolvedAudit(resolvedAt)).toEqual([
       expect.objectContaining({
         actorId: "maya",
@@ -333,7 +376,7 @@ describe("resubmitting answers the change request", () => {
         templateId,
         versionId: v1Id,
         action: "thread.resolved",
-        details: { threadId: firstRequestId, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 2 },
+        details: { threadId: firstRequestId, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 1, resolvedWithRound: 2 },
       }),
     ]);
     // The submit's own audit row is still there beside it.
@@ -351,12 +394,12 @@ describe("resubmitting answers the change request", () => {
 
   it("a second cycle resolves only the new change request", async () => {
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 2, reason: "One more fix, please." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "One more fix, please." })).toEqual({ ok: true });
     const second = (await threadsOf(templateId)).find((t) => t.blockId === DOCUMENT_THREAD && t.status === "open")!;
     expect(second.id).not.toBe(firstRequestId);
 
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 3 });
 
     expect(await threadRow(second.id)).toMatchObject({ status: "resolved", resolvedBy: "maya", resolvedAt: at });
     // The first request keeps the moment it was answered; the block comment is still open.
@@ -364,7 +407,7 @@ describe("resubmitting answers the change request", () => {
     expect(await threadRow(blockThreadId)).toMatchObject({ status: "open" });
 
     expect((await resolvedAudit(at)).map((r) => [r.versionId, r.details])).toEqual([
-      [second.originVersionId, { threadId: second.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 3 }],
+      [second.originVersionId, { threadId: second.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 1, resolvedWithRound: 3 }],
     ]);
     expect(await resolvedAudit(resolvedAt)).toHaveLength(1);
   });
@@ -372,7 +415,7 @@ describe("resubmitting answers the change request", () => {
   it("a submit with no open change request writes no thread.resolved row", async () => {
     const { templateId: fresh } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     const at = as("maya");
-    expect(await submitNow(fresh)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(fresh)).toEqual({ ok: true, number: 1, round: 1 });
     expect(await resolvedAudit(at)).toEqual([]);
   });
 });
@@ -385,10 +428,12 @@ describe("approveVersion over an Active version", () => {
     const at = as("jordan");
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
 
-    const result = await approveVersion({ templateId, versionNumber: 3, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] });
-    expect(result).toEqual({ ok: true, wentLive: true, number: 3 });
+    // The seed's v3 is in review on round 2, after round 1 was sent back.
+    const result = await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] });
+    expect(result).toEqual({ ok: true, wentLive: true, number: 3, round: 2 });
 
-    expect(await version(templateId, 3)).toMatchObject({ state: "active", activatedAt: at });
+    expect(await version(templateId, 3)).toMatchObject({ round: 2, state: "active", activatedAt: at });
+    expect(await version(templateId, 3, 1)).toMatchObject({ state: "changes_requested" });
     expect(await version(templateId, 2)).toMatchObject({
       state: "superseded",
       supersededAt: at,
@@ -419,13 +464,13 @@ describe("approveVersion over an Active version", () => {
     await submitNow(templateId);
     const at = as("jordan");
     const today = at.toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 1, sunsetPrevious: "2026-02-30", sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: "2026-02-30", sampleSetsSeen: [] })).toEqual({
       ok: false,
       code: "invalid_date",
       reason: "Pick a valid date.",
     });
     // No Active version to sunset here, but the date is still checked.
-    expect(await approveVersion({ templateId, versionNumber: 1, sunsetPrevious: today, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: today, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REFUSALS.sunsetAfterToday,
     });
@@ -452,13 +497,14 @@ describe("a two-stage chain", () => {
   it("moves through the stages in order; only the named approver acts on Legal", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
 
     const first = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: ["typical"] })).toEqual({
       ok: true,
       wentLive: false,
       number: 1,
+      round: 1,
     });
     expect(await version(templateId, 1)).toMatchObject({ state: "in_review", currentStage: 1, activatedAt: null });
     expect((await auditAt(first)).map((r) => r.action)).toEqual(["version.stage_approved"]);
@@ -468,17 +514,18 @@ describe("a two-stage chain", () => {
     ]);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
       ok: false,
       code: "waiting_on_stage",
       reason: "Waiting on Legal.",
     });
 
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
+      round: 1,
     });
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("active");
@@ -538,7 +585,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     expect((await draftOf(templateId))?.writers).toEqual(["maya", "priya"]);
 
     const submittedAt = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
     // Priya holds Approver, but she isn't asked to review what she wrote.
     expect((await notificationsAt(submittedAt)).map((n) => [n.userId, n.kind])).toEqual([
@@ -547,18 +594,19 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     ]);
 
     const at = as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Mine to fix." })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Mine to fix." })).toEqual(wrote);
     expect(await version(templateId, 1)).toMatchObject({ state: "in_review" });
     expect(await decisionsOn(templateId, 1)).toEqual([]);
     expect(await auditAt(at)).toEqual([]);
 
     // Jordan wrote none of it.
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
+      round: 1,
     });
   });
 
@@ -566,56 +614,57 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     await edit("priya", templateId, "Priya's sentence.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
     expect(await draftOf(templateId)).toMatchObject({ createdBy: "maya", writers: ["maya", "priya"] });
 
     // Maya fixes it alone and resubmits: Priya wrote round one, so round two isn't hers to decide either.
     await edit("maya", templateId, "The APR is 21.99%.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
-    expect((await version(templateId, 2))?.writers).toEqual(["maya", "priya"]);
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
+    expect((await version(templateId, 1, 2))?.writers).toEqual(["maya", "priya"]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 2, reason: "x" })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
   });
 
   it("whoever submitted round one stays barred from round two, even without editing it", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     as("priya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
     await edit("maya", templateId, "The APR is 21.99%.");
     const resubmitted = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
-    expect(await version(templateId, 2)).toMatchObject({ submittedBy: "maya", writers: ["maya", "priya"] });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
+    expect(await version(templateId, 1, 2)).toMatchObject({ submittedBy: "maya", writers: ["maya", "priya"] });
     expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual(["alex", "jordan"]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 2, reason: "x" })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
   });
 
   it("a change request that finds a draft already open merges the version's writers into it", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     await edit("priya", templateId, "Priya's sentence.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     // Nothing in the app opens a draft while a version is in review; put one there to check the guard.
     const v1 = (await version(templateId, 1))!;
     await db.insert(versions).values({
       ...v1,
       id: `v_open_${templateId}`,
       number: null,
+      round: null,
       state: "draft",
       basedOnVersionId: v1.id,
       submittedBy: null,
@@ -625,7 +674,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     });
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
     const drafts = await db
       .select({ id: versions.id, writers: versions.writers })
       .from(versions)
@@ -636,16 +685,16 @@ describe("maker-checker: nobody decides a version they wrote", () => {
   it("an approver who only sent it back becomes a writer once they edit the next round", async () => {
     const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     as("priya");
-    expect(await requestChanges({ templateId, versionNumber: 1, reason: "Too vague." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Too vague." })).toEqual({ ok: true });
     expect((await draftOf(templateId))?.writers).toEqual(["maya"]);
 
     await edit("priya", templateId, "Priya's fix.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
   });
 });
 
@@ -866,16 +915,16 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   beforeAll(async () => {
     ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
 
     as("maya");
     await startDraft({ templateId });
     await saveVariables("maya", (variables) => [...variables, PROMO]);
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
 
     const v2 = (await version(templateId, 2))!;
     await db.insert(renderLog).values({
@@ -927,7 +976,14 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect((await version(templateId, 2))?.state, "the revoked version stays revoked").toBe("revoked");
 
     const header = await getWorkspaceHeader("coral-offers", templateId);
-    expect(header).toMatchObject({ status: "draft", versionLabel: "Based on v2", basedOnNumber: 2, canStartDraft: false });
+    expect(header).toMatchObject({
+      status: "draft",
+      versionLabel: "Based on v2",
+      basedOn: { label: "v2", active: false },
+      versionNumber: 3,
+      round: 1,
+      canStartDraft: false,
+    });
   });
 
   it("compares the draft with v1, the newest version that still renders, in the workspace and the submit dialog", async () => {
@@ -940,12 +996,12 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(document.baseline?.map((v) => v.key)).not.toContain(PROMO.key);
 
     const summary = await getSubmitSummary(people.maya!, { templateId });
-    expect(summary).toMatchObject({ ok: true, summary: { number: 3, baseline: { number: 1, variables: v1.variables } } });
+    expect(summary).toMatchObject({ ok: true, summary: { number: 3, round: 1, baseline: { number: 1, variables: v1.variables } } });
   });
 
   it("submit freezes the contract changes against v1, not the revoked v2", async () => {
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
     const v3 = (await version(templateId, 3))!;
     expect(v3.contractChanges).toEqual([
       { kind: "added", key: PROMO.key, breaking: false, type: "text", required: false },
@@ -959,17 +1015,18 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     const at = as("jordan");
     // There's no previous Active version for a sunset to land on: the date is ignored.
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 3, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] })).toEqual({
       ok: true,
       wentLive: true,
       number: 3,
+      round: 1,
     });
 
     expect(await version(templateId, 3)).toMatchObject({ state: "active", activatedAt: at });
     expect(await version(templateId, 2)).toEqual(v2Before);
     expect(await version(templateId, 1)).toEqual(v1Before);
     expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
-      ["version.activated", { number: 3, supersedes: null, stage: "Team approver" }],
+      ["version.activated", { number: 3, round: 1, supersedes: null, stage: "Team approver" }],
     ]);
 
     const notices = await noticesAt(at);
@@ -1002,8 +1059,8 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     await startDraft({ templateId });
     expect((await draftOf(templateId))?.basedOnVersionId).toBe((await version(templateId, 3))!.id);
     expect((await getWorkspaceDocument("coral-offers", templateId)).baseline).toBeNull();
-    expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({ ok: true, summary: { number: 4, baseline: null } });
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 4 });
+    expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({ ok: true, summary: { number: 4, round: 1, baseline: null } });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 4, round: 1 });
     expect((await version(templateId, 4))?.contractChanges).toBeNull();
   });
 });
@@ -1032,9 +1089,9 @@ describe("a variable renamed in a draft", () => {
   beforeAll(async () => {
     ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
     const v1 = (await version(templateId, 1))!;
     expect(v1.variables.map((v) => v.key)).toContain("first_name");
     await db.insert(renderLog).values({
@@ -1068,7 +1125,7 @@ describe("a variable renamed in a draft", () => {
 
   it("submit stores one key_renamed with the old and the new key, not a removal and an addition", async () => {
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
     expect((await version(templateId, 2))!.contractChanges).toEqual([
       { kind: "key_renamed", key: "name_on_card", breaking: true, from: "first_name", to: "name_on_card" },
     ]);
@@ -1080,7 +1137,7 @@ describe("a variable renamed in a draft", () => {
 
   it("approved, the consumer notice carries the rename for Coral to map", async () => {
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
     const [notice] = (await noticesAt(at)).filter((n) => n.kind === "new_version");
     expect(notice).toMatchObject({ consumerId: "coral", templateId });
     expect(notice!.payload).toMatchObject({
@@ -1108,7 +1165,7 @@ describe("a variable renamed in a draft", () => {
     await editVariables("maya", (store) =>
       store.getState().create({ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }),
     );
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
     expect((await version(templateId, 3))!.contractChanges).toEqual([
       { kind: "added", key: "first_name", breaking: true, type: "text", required: true },
     ]);
@@ -1158,7 +1215,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
     expect(read.summary.variables.map((v) => v.key)).toContain(GIFT.key);
 
     as("maya");
-    expect(await submitVersion({ templateId, rev: read.summary.rev })).toEqual({ ok: true, number: 1 });
+    expect(await submitVersion({ templateId, rev: read.summary.rev })).toEqual({ ok: true, number: 1, round: 1 });
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("in_review");
     expect(v1.variables.map((v) => v.key)).toContain(GIFT.key);
@@ -1181,7 +1238,7 @@ describe("permission checks come first", () => {
     const at = as("sam");
     expect(await submitNow(templateId)).toEqual({ ok: false, ...REASONS.generic });
     expect(await submitVersion({ templateId: "UC-ZZZZZZ", rev: 0 })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await requestChanges({ templateId: ids["cash-back"]!, versionNumber: 2, reason: "x" })).toEqual({
+    expect(await requestChanges({ templateId: ids["cash-back"]!, versionNumber: 2, round: 1, reason: "x" })).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -1239,7 +1296,7 @@ describe("the SMS footer backfill in the migration", () => {
   });
 });
 
-// ── Submitting an alert: the message rules (decisions 0033 and 0034) ──────────
+// ── Submitting an alert: the message rules (decisions 0034 and 0035) ──────────
 
 describe("submitting an alert", () => {
   const t = (text: string): JSONContent => ({ type: "text", text });
@@ -1292,7 +1349,7 @@ describe("submitting an alert", () => {
       await db.update(schema.contentTypes).set({ smsMaxParts: 3 }).where(eq(schema.contentTypes.id, "ct_alert"));
     }
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     expect((await version(templateId, 1))?.state).toBe("in_review");
   });
 
@@ -1301,7 +1358,7 @@ describe("submitting an alert", () => {
     const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
     expect(footer).toBeTruthy();
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1 });
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     expect((await version(templateId, 1))?.smsFooter).toBe(footer);
     await db.update(schema.contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(schema.contentTypes.id, "ct_alert"));
     try {

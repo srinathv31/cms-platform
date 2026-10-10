@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { describeActivity, type ActivityEvent } from "./activity";
+import { describeActivity, eventVersionLabel, type ActivityEvent } from "./activity";
 import type { Person } from "./review-types";
+import type { VersionState } from "./types";
 
 const MAYA: Person = { id: "maya", name: "Maya Chen", initials: "MC", hue: 30 };
 const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 200 };
@@ -8,10 +9,18 @@ const ALEX: Person = { id: "alex", name: "Alex Kim", initials: "AK", hue: 140 };
 
 const REVOKE_REASON = "Wrong APR in legal notices";
 
-const event = (action: string, versionNumber: number | null, details: Record<string, unknown> = {}): ActivityEvent => ({
+const NAOMI: Person = { id: "naomi", name: "Naomi Reyes", initials: "NR", hue: 300 };
+
+/** An event about version `versionNumber`'s row as it is now: round 1 and released unless `row` says otherwise. */
+const event = (
+  action: string,
+  versionNumber: number | null,
+  details: Record<string, unknown> = {},
+  row: { round?: number; state?: VersionState } = {},
+): ActivityEvent => ({
   action,
   details,
-  versionNumber,
+  version: versionNumber === null ? null : { number: versionNumber, round: row.round ?? 1, state: row.state ?? "superseded" },
 });
 
 describe("describeActivity: one sentence per audit action", () => {
@@ -127,7 +136,18 @@ describe("describeActivity: one sentence per audit action", () => {
     ["comment.added on a draft", event("comment.added", null, { threadId: "t1" }), MAYA, "Maya Chen commented on the draft."],
     ["thread.resolved", event("thread.resolved", 1, { threadId: "t1" }), MAYA, "Maya Chen resolved a comment on v1."],
     [
-      "thread.resolved, answered by resubmitting",
+      "thread.resolved, answered by resubmitting: the next round of the same number",
+      event(
+        "thread.resolved",
+        1,
+        { threadId: "t1", blockId: "doc", auto: true, resolvedWith: 1, resolvedWithRound: 2 },
+        { state: "changes_requested" },
+      ),
+      MAYA,
+      "Maya Chen answered the change request on v1, round 1 by resubmitting.",
+    ],
+    [
+      "thread.resolved, answered by resubmitting before rounds: the next number",
       event("thread.resolved", 1, { threadId: "t1", blockId: "doc", auto: true, resolvedWith: 2 }),
       MAYA,
       "Maya Chen answered the change request on v1 with v2.",
@@ -178,7 +198,9 @@ describe("describeActivity: details", () => {
   });
 
   it("reads null details as none", () => {
-    expect(describeActivity({ action: "version.revoke_cancelled", details: null, versionNumber: 1 }, ALEX)).toBe(
+    expect(
+      describeActivity({ action: "version.revoke_cancelled", details: null, version: { number: 1, round: 1, state: "superseded" } }, ALEX),
+    ).toBe(
       "Alex Kim canceled the revoke of v1.",
     );
   });
@@ -199,5 +221,77 @@ describe("describeActivity: details", () => {
     expect(describeActivity(event("version.sunset_set", 1, { sunsetAt: "soon" }), JORDAN)).toBe(
       "Jordan Ellis set a sunset date for v1.",
     );
+  });
+});
+
+// A review event names the round as the review history does; the rest name the released version.
+describe("describeActivity: rounds", () => {
+  it.each<[string, ActivityEvent, Person | null, string]>([
+    [
+      "submitted, a round later sent back",
+      event("version.submitted", 3, { number: 3, round: 1, note: null }, { round: 1, state: "changes_requested" }),
+      MAYA,
+      "Maya Chen submitted v3, round 1 for review.",
+    ],
+    [
+      "submitted, the second round in review",
+      event("version.submitted", 3, { number: 3, round: 2, note: null }, { round: 2, state: "in_review" }),
+      MAYA,
+      "Maya Chen submitted v3, round 2 for review.",
+    ],
+    [
+      "submitted, the first round in review: no round yet",
+      event("version.submitted", 3, { number: 3, round: 1, note: null }, { round: 1, state: "in_review" }),
+      MAYA,
+      "Maya Chen submitted v3 for review.",
+    ],
+    [
+      "submitted, the round later approved (history)",
+      event("version.submitted", 2, { number: 2, round: 3, note: null }, { round: 3, state: "active" }),
+      MAYA,
+      "Maya Chen submitted v2, round 3 for review.",
+    ],
+    [
+      "changes requested on round 1",
+      event("version.changes_requested", 3, { number: 3, round: 1, reason: "Say when the fee starts." }, { state: "changes_requested" }),
+      JORDAN,
+      "Jordan Ellis requested changes on v3, round 1: Say when the fee starts.",
+    ],
+    [
+      "activated on round 3",
+      event("version.activated", 2, { number: 2, round: 3, supersedes: 1 }, { round: 3, state: "active" }),
+      NAOMI,
+      "Naomi Reyes approved v2 on round 3, making it Active.",
+    ],
+    [
+      "activated on round 1",
+      event("version.activated", 2, { number: 2, round: 1, supersedes: 1 }, { round: 1, state: "active" }),
+      NAOMI,
+      "Naomi Reyes approved v2, making it Active.",
+    ],
+    [
+      "a sunset is about the released version: no round",
+      event("version.sunset_set", 2, { number: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" }, { round: 3 }),
+      JORDAN,
+      "Jordan Ellis set v2 to sunset on March 1, 2027.",
+    ],
+    [
+      "a row the event doesn't join: the round from its details",
+      event("version.submitted", null, { number: 4, round: 2, note: null }),
+      MAYA,
+      "Maya Chen submitted v4, round 2 for review.",
+    ],
+  ])("%s", (_, e, actor, sentence) => {
+    expect(describeActivity(e, actor)).toBe(sentence);
+  });
+
+  it("labels the event's version for its row, with the round only for review events", () => {
+    const sentBack = { number: 3, round: 1, state: "changes_requested" } as const;
+    const approved = { number: 2, round: 3, state: "active" } as const;
+    expect(eventVersionLabel("version.submitted", sentBack)).toBe("v3 · Round 1");
+    expect(eventVersionLabel("version.activated", approved)).toBe("v2 · Round 3");
+    expect(eventVersionLabel("version.activated", approved, "sentence")).toBe("v2, round 3");
+    expect(eventVersionLabel("version.revoke_started", approved)).toBe("v2");
+    expect(eventVersionLabel("comment.added", null)).toBeNull();
   });
 });

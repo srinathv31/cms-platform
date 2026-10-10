@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a3dcec5a-7067-4299-8963-61d2b265ccef",
-  "prevId": "3d101be1-6b09-4c84-bbf7-5826e169a707",
+  "id": "3d101be1-6b09-4c84-bbf7-5826e169a707",
+  "prevId": "c0c01307-185a-4eea-984c-0689a124c476",
   "tables": {
     "access_requests": {
       "name": "access_requests",
@@ -1752,6 +1752,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "round": {
+          "name": "round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "state": {
           "name": "state",
           "type": "text",
@@ -1940,13 +1947,23 @@
           ],
           "isUnique": false
         },
-        "versions_template_number": {
-          "name": "versions_template_number",
+        "versions_template_number_round": {
+          "name": "versions_template_number_round",
+          "columns": [
+            "template_id",
+            "number",
+            "round"
+          ],
+          "isUnique": true
+        },
+        "versions_one_released": {
+          "name": "versions_one_released",
           "columns": [
             "template_id",
             "number"
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "state IN ('active', 'superseded', 'revoked')"
         },
         "versions_one_draft": {
           "name": "versions_one_draft",
@@ -2074,41 +2091,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "phone": {
-          "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "card_last4": {
-          "name": "card_last4",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "statement": {
-          "name": "statement",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "last_purchase": {
-          "name": "last_purchase",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},
@@ -2167,13 +2149,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "status": {
@@ -2363,14 +2338,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'offer'"
-        },
         "name": {
           "name": "name",
           "type": "text",
@@ -2389,7 +2356,7 @@
           "name": "terms",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },

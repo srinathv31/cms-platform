@@ -32,7 +32,7 @@ const CreateTemplateInput = z.discriminatedUnion("family", [
 /**
  * Creates a template and its first draft from a starter of the kind the author chose, Document or
  * Alert, then opens it in the workspace. The kind decides the content type (`newTemplateContentType`),
- * which the template keeps for life (decision 0033): a document renders PDF, Web and Email, an alert
+ * which the template keeps for life (decision 0034): a document renders PDF, Web and Email, an alert
  * Push and SMS. The name field selects the name on arrival so the author can rename it at once: it
  * learns the template is new from a one-shot cookie (`just-created.ts`), so the redirect goes to the
  * template's own address and the address bar never needs tidying (one history entry; Back returns to

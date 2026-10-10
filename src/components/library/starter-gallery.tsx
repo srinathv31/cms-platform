@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { ImportRow } from "./import-row";
 import { StarterPreview } from "./starter-preview";
 
-/** Document · Alert: which kind of template, and so its content type for life (decision 0033). */
+/** Document · Alert: which kind of template, and so its content type for life (decision 0034). */
 const KINDS: readonly SegmentedOption<ChannelFamily>[] = CHANNEL_FAMILIES.map((family) => ({
   value: family,
   label: TEMPLATE_KIND_LABELS[family],

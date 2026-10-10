@@ -4,7 +4,7 @@
 //
 // Only the document channels (PDF, Web, Email) come from the route. Push and SMS are plain text, so
 // the preview renders them in the browser with the route's own function (message-preview.ts,
-// decision 0035): no request.
+// decision 0036): no request.
 //
 // `renderPreview` resolves with something the UI can show in every case: the output, or `{ error }`
 // carrying the route's own message. It rejects only when `signal` aborts (a newer request replaced
@@ -18,6 +18,11 @@ export interface RenderPreviewRequest {
   templateId: string;
   /** The open draft, or a version number. */
   version: "draft" | number;
+  /**
+   * Which round of `version` (a preview only, which this always is): without it the route renders the
+   * number's head, its released row or else its latest round.
+   */
+  round?: number | null;
   channel: DocumentChannel;
   values: VariableValues;
   signal?: AbortSignal;
@@ -42,13 +47,20 @@ const UNREADABLE: RenderError = {
   message: "The preview couldn't be rendered. Try again.",
 };
 
-export async function renderPreview({ templateId, version, channel, values, signal }: RenderPreviewRequest): Promise<RenderPreviewResult> {
+export async function renderPreview({
+  templateId,
+  version,
+  round = null,
+  channel,
+  values,
+  signal,
+}: RenderPreviewRequest): Promise<RenderPreviewResult> {
   let response: Response;
   try {
     response = await fetch(`/api/v1/templates/${encodeURIComponent(templateId)}/render`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, channel, values, preview: true }),
+      body: JSON.stringify({ version, ...(version !== "draft" && round !== null ? { round } : {}), channel, values, preview: true }),
       signal,
     });
   } catch (error) {

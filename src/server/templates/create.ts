@@ -25,6 +25,7 @@ export function draftRow(draft: DraftFields, ids: { id: string; templateId: stri
     id: ids.id,
     templateId: ids.templateId,
     number: draft.number,
+    round: draft.round,
     state: draft.state,
     name: draft.name,
     basedOnVersionId: draft.basedOnVersionId,

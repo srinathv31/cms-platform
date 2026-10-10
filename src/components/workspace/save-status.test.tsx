@@ -46,7 +46,7 @@ function GrabSession() {
   return null;
 }
 
-const page = (children: ReactNode = <SaveStatus templateId="UC-ABC123" basedOn={1} activeNumber={null} />) => (
+const page = (children: ReactNode = <SaveStatus templateId="UC-ABC123" basedOn={{ label: "v1", active: false }} />) => (
   <WorkspaceSessionProvider>
     <GrabSession />
     {children}
@@ -123,6 +123,8 @@ describe("Revert to v1", () => {
   const OPENING: SaveFields = { body: doc("Opening"), variables: [], channels: ["pdf"], ...channelFieldValues({}), sampleSets: [] };
   const V1: BaseVersionContent = {
     number: 1,
+    round: 1,
+    state: "superseded",
     name: "Rate notice",
     body: doc("Version 1"),
     variables: [],
@@ -336,7 +338,7 @@ describe("Revert to v1", () => {
 
   it("puts focus on the header's status row, found through the session, when the menu went away with the changes", async () => {
     // Nothing to revert to but the opening: once that is put back, the status is no menu, and its trigger goes.
-    await act(async () => root.render(page(<SaveStatus templateId="UC-ABC123" basedOn={null} activeNumber={null} />)));
+    await act(async () => root.render(page(<SaveStatus templateId="UC-ABC123" basedOn={null} />)));
     await act(async () => session!.save({ body: doc("Typed") }));
     // The status row as `StatusRow` registers it: by name, whatever its label or markup.
     const row = document.createElement("div");

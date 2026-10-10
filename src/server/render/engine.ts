@@ -55,6 +55,8 @@ export interface EngineInput {
   templateName: string;
   /** null for the open draft. */
   versionNumber: number | null;
+  /** A labelled preview round (`RenderDoc.round`); null or absent otherwise. */
+  round?: number | null;
   variables: readonly Variable[];
   values: Readonly<Record<string, unknown>>;
   body: JSONContent;
@@ -156,6 +158,7 @@ async function renderDocument(
       templateId: input.templateId,
       templateName: input.templateName,
       versionNumber: input.versionNumber,
+      ...(input.round != null ? { round: input.round } : {}),
       blocks: resolveDocument(input.body, ctx),
     };
     fields = Object.fromEntries(

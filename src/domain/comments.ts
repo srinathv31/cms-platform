@@ -15,7 +15,7 @@
 // Where a thread can be answered. Threads belong to the template and anchor to block ids, so one thread
 // shows on several versions. It is answered on a version that takes comments and shows it: the open
 // draft, whose margin shows every thread of the template, or the version in review, whose screen shows
-// the threads that began by it (`threadBeganBy`). Authors and approvers on the template's team act on
+// the threads that began by its round (`threadBeganBy`). Authors and approvers on the template's team act on
 // either. Someone the waiting stage names acts from any team, but only on the version in review and the
 // threads its screen shows (docs/decisions/0010-comments-are-answered-where-they-show.md).
 
@@ -30,6 +30,7 @@ import {
   type NotificationLink,
 } from "./review-types";
 import { fieldsOfChannels } from "./channel-fields";
+import { asNumbered, compareRounds, reviewLink, versionLabel, type RoundRef } from "./rounds";
 import type { Channel, PermissionResult, VersionState, Viewer } from "./types";
 
 // ── Limits and sentences ──────────────────────────────────────
@@ -54,6 +55,8 @@ export interface CommentVersion {
   id: string;
   /** Null while it is the open draft. */
   number: number | null;
+  /** Which submission of `number` it is; null while it is the open draft. */
+  round: number | null;
   state: VersionState;
   createdBy: string;
   submittedBy: string | null;
@@ -72,10 +75,10 @@ export interface CommentTemplate {
   teamId: string;
   /** The template has an open draft. Its margin shows every thread of the template. */
   hasDraft: boolean;
-  /** The version in review, if there is one. Its screen shows the threads that began by it. */
-  inReview: { number: number; stageApproverIds: readonly string[] } | null;
-  /** The template's highest version number (0 with none): a thread begun in the open draft counts as the next. */
-  highestNumber: number;
+  /** The version in review, if there is one. Its screen shows the threads that began by its round. */
+  inReview: { number: number; round: number; stageApproverIds: readonly string[] } | null;
+  /** The round the open draft's submit will be (`nextRound`): a thread begun in the draft counts as it. */
+  next: RoundRef;
 }
 
 /** A thread, with the version it began on (its "origin"). */
@@ -83,7 +86,7 @@ export interface CommentThread {
   id: string;
   blockId: string;
   status: "open" | "resolved";
-  origin: Pick<CommentVersion, "id" | "number" | "state" | "createdBy" | "submittedBy">;
+  origin: Pick<CommentVersion, "id" | "number" | "round" | "state" | "createdBy" | "submittedBy">;
 }
 
 /** A `comment_threads` row to insert. */
@@ -126,12 +129,13 @@ export function takesComments(state: VersionState): boolean {
 }
 
 /**
- * Whether a thread belongs on a frozen version's screen: it began no later than that version. A thread
- * that began in the open draft (no number yet) counts as `nextNumber`, the one the draft will take.
- * (A thread begun in v4's review is not part of v2's record.)
+ * Whether a thread belongs on a frozen round's screen: it began no later than that round, by number and
+ * then round (`compareRounds`). A thread that began in the open draft (no number yet) counts as `next`,
+ * the round the draft will be. (A thread begun in v4's review is not part of v2's record, and one begun
+ * in the draft that resubmits v1 is not part of v1 round 1's.)
  */
-export function threadBeganBy(originNumber: number | null, throughVersion: number, nextNumber: number): boolean {
-  return (originNumber ?? nextNumber) <= throughVersion;
+export function threadBeganBy(origin: RoundRef | null, through: RoundRef, next: RoundRef): boolean {
+  return compareRounds(origin ?? next, through) <= 0;
 }
 
 /**
@@ -174,7 +178,7 @@ export function canActOnThread(
 ): PermissionResult {
   const { template, thread } = input;
   const review = template.inReview;
-  const onReview = review !== null && threadBeganBy(thread.origin.number, review.number, template.highestNumber + 1);
+  const onReview = review !== null && threadBeganBy(originOf(thread), review, template.next);
   const named = onReview ? [...review.stageApproverIds] : [];
   const permitted = can(viewer, "review.comment", { teamId: template.teamId, stageApproverIds: named });
   if (!permitted.ok) return permitted;
@@ -230,10 +234,10 @@ export function addComment(input: {
     {
       kind: "audit",
       action: "comment.added",
-      details: { threadId, blockId, number: version.number, ...(quote ? { quote } : {}) },
+      details: { threadId, blockId, number: version.number, round: version.round, ...(quote ? { quote } : {}) },
     },
     ...notifyEach([authorOf(version)], viewer.userId, {
-      title: `${viewer.name} commented on ${versionLabel(template.name, version)}.`,
+      title: `${viewer.name} commented on ${versionPhrase(template.name, version)}.`,
       body: text.body,
       link: commentLink(template.id, version),
     }),
@@ -286,10 +290,16 @@ export function reply(input: {
     {
       kind: "audit",
       action: "comment.added",
-      details: { threadId: thread.id, blockId: thread.blockId, number: thread.origin.number, reply: true },
+      details: {
+        threadId: thread.id,
+        blockId: thread.blockId,
+        number: thread.origin.number,
+        round: thread.origin.round,
+        reply: true,
+      },
     },
     ...notifyEach([authorOf(thread.origin), ...input.participants], viewer.userId, {
-      title: `${viewer.name} replied on ${versionLabel(template.name, thread.origin)}.`,
+      title: `${viewer.name} replied on ${versionPhrase(template.name, thread.origin)}.`,
       body: text.body,
       link: commentLink(template.id, thread.origin),
     }),
@@ -341,7 +351,7 @@ function setStatus(
       {
         kind: "audit",
         action: to === "resolved" ? "thread.resolved" : "thread.reopened",
-        details: { threadId: thread.id, blockId: thread.blockId, number: thread.origin.number },
+        details: { threadId: thread.id, blockId: thread.blockId, number: thread.origin.number, round: thread.origin.round },
       },
     ],
   };
@@ -368,18 +378,33 @@ function notifyEach(
 
 /**
  * Where a comment notification leads: the review screen while the version is in review, else the
- * template. A numbered version also names itself, so a stage reviewer outside the team (who can't open
- * the template's workspace) gets its review screen in their own space.
+ * template. A numbered version also names itself (and its round, as `reviewLink` does), so a stage
+ * reviewer outside the team (who can't open the template's workspace) gets its review screen in their
+ * own space.
  */
-function commentLink(templateId: string, version: { number: number | null; state: VersionState }): NotificationLink {
+function commentLink(
+  templateId: string,
+  version: { number: number | null; round: number | null; state: VersionState },
+): NotificationLink {
   if (version.number === null) return { to: "template", templateId };
-  return version.state === "in_review"
-    ? { to: "review", templateId, versionNumber: version.number }
-    : { to: "template", templateId, reviewVersion: version.number };
+  const review = reviewLink(templateId, asNumbered(version));
+  if (version.state === "in_review") return review;
+  const { versionNumber: number, round } = review;
+  return { to: "template", templateId, reviewVersion: round === undefined ? { number } : { number, round } };
 }
 
-function versionLabel(templateName: string, version: { number: number | null }): string {
-  return version.number === null ? `the draft of ${templateName}` : `${templateName} v${version.number}`;
+/** "the draft of Spring Travel", "Spring Travel v2", or "Spring Travel v1, round 2" once v1 was sent back. */
+function versionPhrase(
+  templateName: string,
+  version: { number: number | null; round: number | null; state: VersionState },
+): string {
+  if (version.number === null) return `the draft of ${templateName}`;
+  return `${templateName} ${versionLabel(asNumbered(version), { style: "sentence" })}`;
+}
+
+/** The round a thread began on; null when it began in the open draft. */
+function originOf(thread: Pick<CommentThread, "origin">): RoundRef | null {
+  return thread.origin.number === null ? null : asNumbered(thread.origin);
 }
 
 function newComment(id: string, threadId: string, authorId: string, body: string, now: Date): NewComment {

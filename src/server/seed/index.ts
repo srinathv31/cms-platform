@@ -15,7 +15,7 @@ import { seedCoralAlerts } from "./templates/coral-alerts";
 import { seedDepositsTemplates } from "./templates/deposits";
 
 /** Bump when the shape of the seed changes in a way other code may care about. */
-export const SEED_VERSION = "1";
+export const SEED_VERSION = "2";
 
 export interface SeedResult {
   /** Template ids by seed key, e.g. result.templates["cash-back"]. */

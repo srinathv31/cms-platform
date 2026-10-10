@@ -1,4 +1,4 @@
--- Coral delivers alerts: push and SMS reach its customers' phones (decision 0033). Coral's own tables only.
+-- Coral delivers alerts: push and SMS reach its customers' phones (decision 0034). Coral's own tables only.
 -- sim_offers: a row is an offer or an alert (`kind`, every existing row an offer), and an alert has no
 -- terms, so `terms` becomes nullable. sim_customers: each customer has a phone (a fictional number in the
 -- 555-01xx range and a platform, iPhone or Android), a card and, for the alerts' values, the card's

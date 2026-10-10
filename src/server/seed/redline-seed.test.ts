@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { changesOnly, diffDocuments, groupUnchanged } from "@/domain/redline";
 import type { RedlineDoc } from "@/domain/review-types";
+import { headOf } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
 import { checkDocument } from "@/server/render/schema-check";
 import { createContext } from "./context";
@@ -77,9 +78,13 @@ function expectFaithful(base: JSONContent, next: JSONContent, red: RedlineDoc, {
 describe("the seeded Coral versions", () => {
   const ctx = createContext(NOW.getTime());
   seedCoralTemplates(ctx);
+  /** A number's head: its released row, else its latest round (Cash Back v3 is round 2). */
   const body = (key: string, number: number): JSONContent => {
     const templateId = ctx.template(key).id;
-    const version = ctx.sink.versions.find((x) => x.templateId === templateId && x.number === number);
+    const rows = ctx.sink.versions
+      .filter((x) => x.templateId === templateId)
+      .map((x) => ({ ...x, number: x.number ?? null, round: x.round ?? null }));
+    const version = headOf(rows, number);
     if (!version) throw new Error(`no ${key} v${number}`);
     return version.body as JSONContent;
   };

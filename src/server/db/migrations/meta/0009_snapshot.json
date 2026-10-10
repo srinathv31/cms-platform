@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3d101be1-6b09-4c84-bbf7-5826e169a707",
-  "prevId": "c0c01307-185a-4eea-984c-0689a124c476",
+  "id": "c0c01307-185a-4eea-984c-0689a124c476",
+  "prevId": "07d8edc3-7824-44a2-8f42-eb9e8e3ba1d1",
   "tables": {
     "access_requests": {
       "name": "access_requests",
@@ -790,21 +790,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "sms_footer": {
-          "name": "sms_footer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sms_max_parts": {
-          "name": "sms_max_parts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 3
         }
       },
       "indexes": {
@@ -1431,20 +1416,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "app_name": {
-          "name": "app_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sms_sender": {
-          "name": "sms_sender",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -1752,6 +1723,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "round": {
+          "name": "round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "state": {
           "name": "state",
           "type": "text",
@@ -1940,13 +1918,23 @@
           ],
           "isUnique": false
         },
-        "versions_template_number": {
-          "name": "versions_template_number",
+        "versions_template_number_round": {
+          "name": "versions_template_number_round",
+          "columns": [
+            "template_id",
+            "number",
+            "round"
+          ],
+          "isUnique": true
+        },
+        "versions_one_released": {
+          "name": "versions_one_released",
           "columns": [
             "template_id",
             "number"
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "state IN ('active', 'superseded', 'revoked')"
         },
         "versions_one_draft": {
           "name": "versions_one_draft",

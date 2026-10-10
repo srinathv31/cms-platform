@@ -1,3 +1,4 @@
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 import type { SeedCtx } from "../context";
 import { callout, disclosure, hr, inlineDoc, p, table, ul } from "../content";
@@ -20,6 +21,12 @@ const addedEndDate: ContractChange = {
   type: "date",
   required: false,
 };
+
+/** Cash Back v3's change request: round 1 said a fee applies, not when it starts. */
+const CASH_BACK_V3_REASON = "Say when the annual fee starts. \"An annual fee applies\" isn't enough.";
+/** Annual Fee Waiver v1's change request. */
+const WAIVER_V1_REASON =
+  "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.";
 
 // ── Bodies ────────────────────────────────────────────────────
 
@@ -60,7 +67,9 @@ function balanceTransferBody(version: 1 | 2) {
   });
 }
 
-function cashBackBody(version: 1 | 2 | 3) {
+/** `round` is v3's: round 1 says a fee applies but not when it starts, which round 2 fixed. */
+function cashBackBody(version: 1 | 2 | 3, round: 1 | 2 = 2) {
+  const feeStarts = version === 3 && round === 2;
   return disclosure("cash-back", {
     offer: [
       p(
@@ -83,11 +92,21 @@ function cashBackBody(version: 1 | 2 | 3) {
           ["Purchase APR", "{purchase_apr}"],
           ["Cash advance fee", "5% of each advance, $10 minimum"],
           ["Foreign transaction fee", "None"],
-          ["Annual fee", version === 3 ? "$0 the first year, then {annual_fee} per year" : "$0"],
+          [
+            "Annual fee",
+            version !== 3 ? "$0" : feeStarts ? "$0 the first year, then {annual_fee} per year" : "{annual_fee} per year",
+          ],
         ],
       ),
       ...(version === 3
-        ? [p("fee_note", "After your first year, an annual fee of {annual_fee} is billed to your account each year.")]
+        ? [
+            p(
+              "fee_note",
+              feeStarts
+                ? "After your first year, an annual fee of {annual_fee} is billed to your account each year."
+                : "An annual fee of {annual_fee} applies and is billed to your account each year.",
+            ),
+          ]
         : []),
     ],
     legal: [
@@ -274,7 +293,8 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       ],
     },
 
-    // v1 Superseded (no sunset), v2 Active, v3 In review with a breaking contract change.
+    // v1 Superseded (no sunset), v2 Active, v3 In review on round 2 after one send-back (round 1, Changes
+    // requested), with a breaking contract change.
     {
       key: "cash-back",
       teamId: "coral-offers",
@@ -318,11 +338,12 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           activatedAt: 86.5,
         },
         {
-          ref: "v3",
+          ref: "v3r1",
           number: 3,
-          state: "in_review",
+          round: 1,
+          state: "changes_requested",
           basedOn: "v2",
-          body: cashBackBody(3),
+          body: cashBackBody(3, 1),
           variables: vars.list([...CUSTOMER_KEYS, "offer_end_date", "annual_fee"]),
           channels: ["pdf", "web"],
           contractChanges: [
@@ -330,10 +351,38 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           ],
           createdBy: "maya",
           createdAt: 5,
+          submittedBy: "maya",
+          submittedAt: 3.2,
+          submitNote: "Product added an annual fee. Rates table and copy updated.",
+          approvals: [{ actor: "jordan", decision: "changes_requested", reason: CASH_BACK_V3_REASON, at: 2.6, seen: ["typical"] }],
+        },
+        {
+          ref: "v3",
+          number: 3,
+          round: 2,
+          state: "in_review",
+          basedOn: "v3r1",
+          body: cashBackBody(3),
+          variables: vars.list([...CUSTOMER_KEYS, "offer_end_date", "annual_fee"]),
+          channels: ["pdf", "web"],
+          contractChanges: [
+            { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+          ],
+          createdBy: "maya",
+          createdAt: 2.6,
           editSessions: 3,
           submittedBy: "maya",
           submittedAt: 0.9,
           submitNote: "Product confirmed an annual fee after the first year. Rates table and copy updated.",
+        },
+      ],
+      threads: [
+        {
+          // The change request that sent round 1 back, answered by submitting round 2.
+          origin: "v3r1",
+          block: DOCUMENT_THREAD,
+          comments: [{ author: "jordan", kind: "change_request", body: CASH_BACK_V3_REASON, at: 2.6 }],
+          resolved: { by: "maya", at: 0.9 },
         },
       ],
     },
@@ -359,16 +408,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 4.5,
           submitNote: "Waiver for new accounts, first year only.",
-          approvals: [
-            {
-              actor: "jordan",
-              decision: "changes_requested",
-              reason:
-                "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.",
-              at: 3.9,
-              seen: ["typical"],
-            },
-          ],
+          approvals: [{ actor: "jordan", decision: "changes_requested", reason: WAIVER_V1_REASON, at: 3.9, seen: ["typical"] }],
         },
         {
           ref: "draft",
@@ -401,16 +441,11 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           resolved: { by: "maya", at: 3.4 },
         },
         {
+          // The change request that sent v1 back, still open: the draft hasn't been submitted.
           origin: "v1",
-          block: "waiver_terms",
-          quote: "The waiver is automatic.",
+          block: DOCUMENT_THREAD,
           comments: [
-            {
-              author: "jordan",
-              kind: "change_request",
-              body: "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.",
-              at: 3.9,
-            },
+            { author: "jordan", kind: "change_request", body: WAIVER_V1_REASON, at: 3.9 },
             {
               author: "maya",
               body: "Understood. I'm rewording the eligibility rule and will resubmit once Product confirms the 30-day window.",

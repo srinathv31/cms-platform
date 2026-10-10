@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { runAction } from "@/components/primitives/use-action-run";
 import { CHANNEL_FIELD_IDS } from "@/domain/channel-fields";
 import { formatAgo } from "@/domain/dates";
+import { versionLabel } from "@/domain/rounds";
 import { isApple } from "@/editor/lib/platform";
 import { readTemplate } from "@/lib/template-reads";
 import type { BaseVersionContent } from "@/server/queries/base-version";
@@ -30,10 +31,11 @@ const VERSION_FIELDS = ["name", "body", "variables", "channels", ...CHANNEL_FIEL
 
 export interface SaveStatusProps {
   templateId: string;
-  /** The number of the version the draft was started from; null when it wasn't started from one. */
-  basedOn: number | null;
-  /** The number of the Active version, if any. */
-  activeNumber: number | null;
+  /**
+   * The version the draft was started from: its label in a sentence ("v3", "v1, round 1") and whether
+   * it is the Active version. Null when it wasn't started from one.
+   */
+  basedOn: { label: string; active: boolean } | null;
 }
 
 /**
@@ -51,12 +53,12 @@ export interface SaveStatusProps {
  * Undo and redo come first, so nothing the status does moves them: it changes width as it saves, and
  * gains its menu's chevron once the Content tab is on screen. Before them, either would be a layout shift.
  */
-export function SaveStatus({ templateId, basedOn, activeNumber }: SaveStatusProps) {
+export function SaveStatus({ templateId, basedOn }: SaveStatusProps) {
   const { status, error, stopped } = useSaveStatus();
   const canRevert = useCanRevert();
   // The content is on screen to take another version's fields: the Content tab, editable.
   const contentOnScreen = useOwnsFields(VERSION_FIELDS);
-  const base = basedOn !== null && contentOnScreen ? { number: basedOn, active: basedOn === activeNumber } : null;
+  const base = contentOnScreen ? basedOn : null;
   // Stopped, the reason is SaveStopped's: it needs more room than the status row has.
   const indicator = <SaveIndicator status={status} error={stopped ? undefined : error} />;
   return (
@@ -232,7 +234,7 @@ function RevertMenu({
 }: {
   templateId: string;
   sinceOpened: boolean;
-  base: { number: number; active: boolean } | null;
+  base: { label: string; active: boolean } | null;
   children: ReactNode;
 }) {
   const session = useWorkspaceSession();
@@ -263,9 +265,9 @@ function RevertMenu({
           return;
         }
         // Only the base version is read from the server: what Undo puts back is what is on screen now.
-        const { number, ...fields } = result.base;
+        const { number, round, state, ...fields } = result.base;
         const previous = session.replace(fields);
-        if (previous) offerUndo(session, `Reverted to v${number}`, previous);
+        if (previous) offerUndo(session, `Reverted to ${versionLabel({ number, round, state }, { style: "sentence" })}`, previous);
       } finally {
         reading.current = false;
       }
@@ -313,7 +315,7 @@ function RevertMenu({
           >
             <History aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
-              <span className="text-[14px] leading-5">Revert to v{base.number}</span>
+              <span className="text-[14px] leading-5">Revert to {base.label}</span>
               {/* Both lines hold the cell, so the menu keeps its width as one replaces the other. */}
               <span className="grid text-[12px] leading-4 text-text-muted">
                 <span className={cn("col-start-1 row-start-1", pending && "invisible")}>

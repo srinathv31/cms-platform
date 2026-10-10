@@ -512,10 +512,22 @@ test.describe("version rules for consumers", () => {
   });
 
   test("a version sent back for changes is a 409 too, and says so when nothing is active yet", async ({ request }) => {
-    const v = pick(await versions(), "version sent back for changes", (x) => x.state === "changes_requested");
+    // Its latest round: a round sent back before a later one isn't what its number means (decision 0033).
+    const v = pick(await versions(), "version whose latest round was sent back for changes", (x) => x.state === "changes_requested" && x.head);
     const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, v.channels[0]) });
     const error = await expectError(res, 409, "version_not_released", `Version ${v.number} was sent back for changes. ${activeSentence(v.activeNumber, "No version is active yet.")}`);
     expect(error.details).toEqual({ version: v.number, activeVersion: v.activeNumber });
+  });
+
+  test("a number whose round was sent back and whose next round is in review answers for the round in review, naming no round", async ({ request }) => {
+    const all = await versions();
+    const sentBack = pick(all, "round sent back with a later round in review", (x) =>
+      x.state === "changes_requested" && !x.head && all.some((y) => y.templateId === x.templateId && y.number === x.number && y.head && y.state === "in_review"),
+    );
+    const { res } = await render(request, { templateId: sentBack.templateId, body: bodyFor(sentBack, sentBack.channels[0]) });
+    const error = await expectError(res, 409, "version_not_released", `Version ${sentBack.number} is in review. ${activeSentence(sentBack.activeNumber, "No version is active yet.")}`);
+    expect(error.details).toEqual({ version: sentBack.number, activeVersion: sentBack.activeNumber });
+    expect(JSON.stringify(error), "a consumer never sees a round").not.toMatch(/round/i);
   });
 
   test("a version number the template doesn't have is a 404 version_not_found", async ({ request }) => {

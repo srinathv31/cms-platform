@@ -7,7 +7,8 @@ import { DAY_MS } from "@/domain/dates";
 import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import { refuse, type Refusal } from "@/domain/refusals";
-import type { VersionTimelineItem, VersionsData } from "@/domain/review-types";
+import type { CompareOption, RoundHistoryItem, VersionTimelineItem, VersionsData } from "@/domain/review-types";
+import { approvedOnRound, asNumbered, compareRounds, headOf, roundsOf, versionLabel } from "@/domain/rounds";
 import type { ContractChange, PermissionResult, RevokeRecord, VersionState, Viewer } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
@@ -21,7 +22,9 @@ import {
   requireTemplate,
 } from "./review-shared";
 
-// The Versions tab: the template's versions as a timeline, with what the viewer may do on each.
+// The Versions tab: the template's versions as a timeline, with what the viewer may do on each. A number
+// is one entry, its head (domain/rounds.ts `headOf`: the released row, else the latest round), carrying
+// every round of it as its review history.
 
 /**
  * What the viewer may do on one version right now: the permission (with its code and reason) first,
@@ -78,7 +81,10 @@ export function contractItems(changes: readonly ContractChange[], versionNumber:
   );
 }
 
-/** `/{team}/templates/{id}/versions`: newest first, the open draft on top. */
+/**
+ * `/{team}/templates/{id}/versions`: the open draft on top, then one entry per number, newest first. Compare
+ * offers every row, rounds included (`compareOptions`).
+ */
 export const getVersions = cache(async (spaceSlug: string, templateId: string): Promise<VersionsData> => {
   const { space, template } = await requireTemplate(spaceSlug, templateId);
   const nowDate = await demoNow();
@@ -89,6 +95,7 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
     .select({
       id: versions.id,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       createdBy: versions.createdBy,
       createdAt: versions.createdAt,
@@ -126,58 +133,93 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
     loadConsumerUsage(db, template.id, nowDate),
   ]);
   const renders = new Map(renderRows.map((r) => [r.versionId, r]));
+  const decisionsOf = (versionId: string) => decisionRows.filter((d) => d.versionId === versionId);
 
-  const items = rows
-    .sort((a, b) => {
-      if (a.state === "draft" || b.state === "draft") return a.state === "draft" ? -1 : 1;
-      return (b.number ?? 0) - (a.number ?? 0);
-    })
-    .map((v): VersionTimelineItem => {
-      const usage = renders.get(v.id);
-      const item: VersionTimelineItem = {
-        id: v.id,
-        number: v.state === "draft" ? null : v.number,
-        state: v.state,
-        createdAt: iso(v.createdAt),
-        author: personOf(people, v.submittedBy ?? v.createdBy),
-        sunsetPassed: sunsetPassed(v, nowDate),
-        contractLines: v.number !== null && v.contractChanges ? describeChanges(v.contractChanges, v.number) : [],
-        contractItems: v.number !== null && v.contractChanges ? contractItems(v.contractChanges, v.number) : [],
-        decisions: decisionRows
-          .filter((d) => d.versionId === v.id)
-          .map((d) => ({
-            kind: d.decision,
-            stageName: d.stageName,
-            by: personOf(people, d.actorId),
-            at: iso(d.decidedAt),
-            ...(d.reason ? { reason: d.reason } : {}),
-          })),
-        lastRenderAt: usage ? new Date(Number(usage.lastRenderAt)).toISOString() : null,
-        renders30d: usage ? Number(usage.renders30d ?? 0) : 0,
-        can: versionActions(space.viewer, template.teamId, v, nowDate),
+  // Newest first, the open draft on top: every row for Compare, one head per number for the timeline.
+  const newest = [...rows].sort((a, b) => compareRounds(b, a));
+  const isHead = (v: (typeof rows)[number]) => v.number === null || headOf(rows, v.number) === v;
+  const compareOptions: CompareOption[] = newest.map((v) => ({
+    id: v.id,
+    label: v.number === null ? "Draft" : versionLabel(asNumbered(v), { history: true }),
+    state: v.state,
+    head: isHead(v),
+  }));
+  const shown = newest.filter(isHead);
+
+  /** A round as the review history lists it, with its closing decision (its last approvals row) once decided. */
+  const roundItem = (v: (typeof rows)[number]): RoundHistoryItem => {
+    const last = v.state === "in_review" ? undefined : decisionsOf(v.id).at(-1);
+    return {
+      id: v.id,
+      round: asNumbered(v).round,
+      state: v.state,
+      ...(v.submittedAt ? { submittedAt: iso(v.submittedAt) } : {}),
+      submittedBy: personOf(people, v.submittedBy ?? v.createdBy),
+      ...(last
+        ? {
+            decision: {
+              kind: last.decision,
+              by: personOf(people, last.actorId),
+              at: iso(last.decidedAt),
+              stageName: last.stageName,
+              ...(last.reason ? { reason: last.reason } : {}),
+            },
+          }
+        : {}),
+    };
+  };
+
+  const items = shown.map((v): VersionTimelineItem => {
+    const usage = renders.get(v.id);
+    const head = v.number === null ? null : asNumbered(v);
+    const rounds = v.number === null ? [] : roundsOf(rows, v.number);
+    const item: VersionTimelineItem = {
+      id: v.id,
+      number: head?.number ?? null,
+      round: head?.round ?? null,
+      label: head ? versionLabel(head) : null,
+      approvedOnRound: head ? approvedOnRound(head) : null,
+      rounds: rounds.length > 1 ? rounds.map(roundItem) : null,
+      state: v.state,
+      createdAt: iso(v.createdAt),
+      author: personOf(people, v.submittedBy ?? v.createdBy),
+      sunsetPassed: sunsetPassed(v, nowDate),
+      contractLines: v.number !== null && v.contractChanges ? describeChanges(v.contractChanges, v.number) : [],
+      contractItems: v.number !== null && v.contractChanges ? contractItems(v.contractChanges, v.number) : [],
+      decisions: decisionsOf(v.id).map((d) => ({
+        kind: d.decision,
+        stageName: d.stageName,
+        by: personOf(people, d.actorId),
+        at: iso(d.decidedAt),
+        ...(d.reason ? { reason: d.reason } : {}),
+      })),
+      lastRenderAt: usage ? new Date(Number(usage.lastRenderAt)).toISOString() : null,
+      renders30d: usage ? Number(usage.renders30d ?? 0) : 0,
+      can: versionActions(space.viewer, template.teamId, v, nowDate),
+    };
+    if (v.submittedAt) {
+      item.submittedAt = iso(v.submittedAt);
+      item.submitNote = v.submitNote;
+    }
+    if (v.activatedAt) item.activatedAt = iso(v.activatedAt);
+    if (v.supersededAt) item.supersededAt = iso(v.supersededAt);
+    if (v.sunsetAt) item.sunsetDay = sunsetDay(v.sunsetAt, zone);
+    if (v.revoke) {
+      item.revoke = {
+        reason: v.revoke.reason,
+        startedBy: personOf(people, v.revoke.startedBy),
+        startedAt: v.revoke.startedAt,
+        ...(v.revoke.confirmedBy ? { confirmedBy: personOf(people, v.revoke.confirmedBy) } : {}),
+        ...(v.revoke.confirmedAt ? { confirmedAt: v.revoke.confirmedAt } : {}),
       };
-      if (v.submittedAt) {
-        item.submittedAt = iso(v.submittedAt);
-        item.submitNote = v.submitNote;
-      }
-      if (v.activatedAt) item.activatedAt = iso(v.activatedAt);
-      if (v.supersededAt) item.supersededAt = iso(v.supersededAt);
-      if (v.sunsetAt) item.sunsetDay = sunsetDay(v.sunsetAt, zone);
-      if (v.revoke) {
-        item.revoke = {
-          reason: v.revoke.reason,
-          startedBy: personOf(people, v.revoke.startedBy),
-          startedAt: v.revoke.startedAt,
-          ...(v.revoke.confirmedBy ? { confirmedBy: personOf(people, v.revoke.confirmedBy) } : {}),
-          ...(v.revoke.confirmedAt ? { confirmedAt: v.revoke.confirmedAt } : {}),
-        };
-      }
-      return item;
-    });
+    }
+    return item;
+  });
 
   return {
     template: { id: template.id, name: template.name, teamSlug: template.teamSlug },
     items,
+    compareOptions,
     consumerUsage,
     sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
   };

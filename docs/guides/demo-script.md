@@ -156,43 +156,44 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 1. **Do:** As Maya: **Review → Submitted by me → Spring Travel v1**.
    - **They see:** Approve and Request changes disabled: "You submitted this version."
    - **Say:** "Maker-checker: you can never approve your own work."
-2. **Do:** Switch to **Jordan Ellis**. **Review → Waiting on me → Spring Travel v1**. Leave Cash Back v3 ("Breaking change") for Act 8 and Card Used Abroad v1 for Act 5.
+2. **Do:** Switch to **Jordan Ellis**. **Review → Waiting on me → Spring Travel v1**. Leave Cash Back v3 · Round 2 ("Breaking change") for Act 8 and Card Used Abroad v1 for Act 5.
    - In the paragraph under the fees table, select `starts on the transaction date`. Click the floating **Comment**, type `Please state the APR more plainly.` and click **Comment**.
    - Click **Request changes**, reason `The interest wording is too vague. State the purchase APR plainly.`, then **Request changes**.
    - **They see:** the approval stepper, Maya's note, a comment marker in the margin, and the badge change to **Changes requested**.
    - **Say:** "Review happens in the tool, pinned to the exact words, not in an email thread no one can find later."
-3. **Do:** Switch to **Maya**. **Library → Spring Travel** (Draft, "Based on v1"). Click at the end of "…by the due date." and type ` Your purchase APR is 21.99%.` Click **Resolve** on the comment thread.
-   - **Submit for review**, note `Spelled out the purchase APR.`, then **Submit v2**.
-   - **They see:** the change request and thread waiting in the Comments rail, then v2 go to review.
-4. **Do:** Switch to **Jordan**. **Review → Waiting on me → v2 → Approve**, then **Approve v2**.
-   - **They see:** "v2 becomes Active. Consumers can start using it right away." Then the go-live moment ("v2 is Active" in the SHARE ring), and the badge reads **Active**.
+3. **Do:** Switch to **Maya**. **Library → Spring Travel** (Draft, "Based on v1 · Round 1"). Click at the end of "…by the due date." and type ` Your purchase APR is 21.99%.` Click **Resolve** on the comment thread.
+   - **Submit for review**, note `Spelled out the purchase APR.`, then **Submit v1, round 2**.
+   - **They see:** the change request and thread waiting in the Comments rail, then v1 · Round 2 go to review.
+   - **Say:** "Sending it back doesn't use up a version number. This is round 2 of v1, and customers only ever see v1."
+4. **Do:** Switch to **Jordan**. **Review → Waiting on me → v1 · Round 2 → Approve**, then **Approve v1, round 2**.
+   - **They see:** "v1 becomes Active. Consumers can start using it right away." Then the go-live moment ("v1 is Active" in the SHARE ring), and the badge reads **Active**.
    - **Say:** "Two people, a full trail, and a clear moment it goes live."
 5. **Do:** Click the **SHARE** ring. Press Esc when done.
-   - **They see:** the Integration sheet: template ID, Active v2, channels, the variable contract and JSON Schema, a request sample per channel, responses and error codes. It shows "Loading…" for about a second first.
+   - **They see:** the Integration sheet: template ID, Active v1, channels, the variable contract and JSON Schema, a request sample per channel, responses and error codes. It shows "Loading…" for about a second first.
    - **Say:** "Everything an engineering team needs to integrate, without a meeting."
 
 ## Act 4 — Customers receive it
 
-*About 6 minutes · Jordan and the Coral simulator · changes data · needs v2 Active*
+*About 6 minutes · Jordan and the Coral simulator · changes data · needs v1 Active*
 
 **Goal:** one approved template serves every channel, and no customer data is kept.
 
 1. **Do:** Demo pill → **Open simulator**.
    - **They see:** "Coral — simulated". Spring Travel Rewards reads "Not linked"; Balance Transfer reads "v1 Superseded · sunset … · v2 available".
    - **Say:** "This stands in for Coral, the first business system that uses Stencil."
-2. **Do:** **Spring Travel Rewards → Link template**, search `Spring Travel`, and pick the result (its UC- ID, "Active v2").
+2. **Do:** **Spring Travel Rewards → Link template**, search `Spring Travel`, and pick the result (its UC- ID, "Active v1").
    - Map: First name → Customer · First name; Purchase APR → Customer · Purchase APR; Home state → Customer · Home state; Offer end date → Offer · Ends on. Click **Link template**.
-   - **They see:** "Pinned to v2".
+   - **They see:** "Pinned to v1".
    - **Say:** "Coral owns the link between its offer and the template. Stencil stays neutral about the business."
 3. **Do:** Tick Olivia Bennett, Marcus Delgado, Anjali Kapoor, Fatima Al-Sayed and Maximiliano-Bartholomew…, then **Send to 5 customers**.
    - Click Olivia's **Web · Delivered** cell, then **Inbox** and **PDF**. Open the long-name customer's view too.
    - **They see:** "15 delivered"; a phone showing "Hello Olivia!"; the subject "Olivia, your Spring Travel Rewards terms"; the PDF. The long name doesn't break the layout.
    - **Say:** "One approved template, three channels, five customers. Stencil built each one on request and kept none of their data."
 4. **Do:** **Back to Stencil → Usage**. Open the **Consumers** tab, then click the template to see its own Usage tab.
-   - **They see:** renders over 30 days, the channel split, % on Active versions, Nearing sunset, Top templates and a heatmap. Consumers lists Coral · Spring Travel · v2 · 15, and the template shows 100% succeeded.
+   - **They see:** renders over 30 days, the channel split, % on Active versions, Nearing sunset, Top templates and a heatmap. Consumers lists Coral · Spring Travel · v1 · 15, and the template shows 100% succeeded.
    - **Say:** "You always know who uses what, and on which version, before you change anything."
 5. **Optional,** for a technical audience: in the Share sheet, **Copy curl** and paste it into Terminal.
-   - **They see:** HTTP 200 and a `UC-XXXXXX-v2.pdf` file. This adds renders to Usage.
+   - **They see:** HTTP 200 and a `UC-XXXXXX-v1.pdf` file. This adds renders to Usage.
 
 ## Act 5 — Alerts: push and SMS
 
@@ -223,26 +224,26 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 6 — Change it safely
 
-*About 8 minutes · Maya, Jordan and Alex · changes data · moves the clock +15 days · needs Coral pinned to v2*
+*About 8 minutes · Maya, Jordan and Alex · changes data · moves the clock +15 days · needs Coral pinned to v1*
 
 **Goal:** changes never surprise downstream systems, and a bad version can be stopped at once, by two people.
 
-1. **Do:** Switch to **Maya**. Open the template's **Content** tab → **Edit** (a Draft "Based on v2"). At the end of "…APR is 21.99%." type ` The annual fee is {{Annual fee`, choose **Create**, set Type to **Currency**, press Enter, then type `.`
-   - **Submit for review**, note `Added the annual fee.`, then **Submit v3**.
-   - **They see:** "Contract changes — Breaking change: v3 adds required annual_fee (Currency)".
+1. **Do:** Switch to **Maya**. Open the template's **Content** tab → **Edit** (a Draft "Based on v1"). At the end of "…APR is 21.99%." type ` The annual fee is {{Annual fee`, choose **Create**, set Type to **Currency**, press Enter, then type `.`
+   - **Submit for review**, note `Added the annual fee.`, then **Submit v2**.
+   - **They see:** "Contract changes — Breaking change: v2 adds required annual_fee (Currency)".
    - **Say:** "Stencil spots that this change would break Coral before anyone approves it."
-2. **Do:** Switch to **Jordan**. **Review →** v3 (tagged Breaking). Turn on **Show changes**. Click **Approve**, tick **Set a sunset date for v2**, and pick **today + 14 days**. Then **Approve v3**.
+2. **Do:** Switch to **Jordan**. **Review →** v2 (tagged Breaking). Turn on **Show changes**. Click **Approve**, tick **Set a sunset date for v1**, and pick **today + 14 days**. Then **Approve v2**.
    - The date defaults to 30 days out. Change it to 14; 30 breaks step 4.
-   - **They see:** the new sentence highlighted against v2, with a "Changes only" toggle. The dialog says "Coral still renders v2 (last render today). It will keep working until …" and "Coral has to map annual_fee before it moves to v3."
+   - **They see:** the new sentence highlighted against v1, with a "Changes only" toggle. The dialog says "Coral still renders v1 (last render today). It will keep working until …" and "Coral has to map annual_fee before it moves to v2."
    - **Say:** "The approver sees which systems are affected, and when, before committing."
 3. **Do:** Demo pill → **Open simulator**. Look at **Notices**, open the Spring Travel offer, and **Send** to Olivia and Marcus.
-   - **They see:** "v3 available"; notices for the new version and the scheduled sunset; a banner "Stencil released v3. It needs annual_fee mapped…"; still "Pinned to v2"; then "6 delivered", each marked "Newer: v3".
-   - **Say:** "Coral keeps working on v2, and it's told what to do and by when."
+   - **They see:** "v2 available"; notices for the new version and the scheduled sunset; a banner "Stencil released v2. It needs annual_fee mapped…"; still "Pinned to v1"; then "6 delivered", each marked "Newer: v2".
+   - **Say:** "Coral keeps working on v1, and it's told what to do and by when."
 4. **Do:** Demo pill → **+15 days**, then Esc. **Send to 2 customers** (they're still ticked).
-   - **They see:** "v2 stopped rendering. Sends will fail." Then "0 delivered, 6 failed — Version 2 was sunset on … Version 3 is active. 410 version_sunset".
+   - **They see:** "v1 stopped rendering. Sends will fail." Then "0 delivered, 6 failed — Version 1 was sunset on … Version 2 is active. 410 version_sunset".
    - **Say:** "After the sunset, old versions stop with a plain reason. No silently wrong documents."
-5. **Do:** Under "Map Annual fee to send", choose **Offer · Annual fee**, then **Relink to v3**. Tick Olivia and Marcus again (the picker resets), **Send**, and open Olivia's Web view.
-   - **They see:** "Pinned to v3", "6 delivered", and "The annual fee is $95."
+5. **Do:** Under "Map Annual fee to send", choose **Offer · Annual fee**, then **Relink to v2**. Tick Olivia and Marcus again (the picker resets), **Send**, and open Olivia's Web view.
+   - **They see:** "Pinned to v2", "6 delivered", and "The annual fee is $95."
 6. **Do:** Switch to **Jordan**. **Back to Stencil → Library → Balance Transfer Intro — Terms → Versions → v1 → Revoke v1**. Reason `Wrong intro APR in the legal notices.`, then **Start revoke**.
    - **They see:** "Coral rendered v1 N times… Once confirmed, its renders will fail immediately." Confirm is disabled: "You started this revoke. Another approver must confirm it."
    - **Say:** "There's an emergency stop, and no single person can pull it."
@@ -262,7 +263,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    - **They see:** a Team column; filters for Team, Person, Action, Template and Date; Jordan's events counted; a CSV download with When, Who, Team, Template, Version, Action and Details. Times are on the demo clock, in UTC.
    - **Say:** "Compliance gets the full record, across every team, in two clicks."
 3. **Do:** **Usage → Consumers** (All teams).
-   - **They see:** Coral and Deposits Online. Spring Travel v2 reads "Superseded · Sunset … renders fail"; Balance Transfer v1 reads "Revoked … renders fail".
+   - **They see:** Coral and Deposits Online. Spring Travel v1 reads "Superseded · Sunset … renders fail"; Balance Transfer v1 reads "Revoked … renders fail".
 
 ## Act 8 — Access and admin
 
@@ -292,8 +293,8 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    - In **Approval chains → Add stage**: name `Legal reviewer`, reviewer **Dana Park · Coral Offers**, then **Add Legal reviewer stage**. Close Settings.
    - **They see:** "4 Active Disclosure versions stop rendering to Email…" before committing, and Now/After cards: "Dana Park will review Disclosure submissions from every team…"
    - **Say:** "Channel rules and approval chains are settings. Adding a Legal step doesn't need a software release."
-9. **Do:** Switch to **Jordan**. **Review → Cash Back Welcome Bonus — Terms v3** → **Approve** → **Approve v3**.
-   - **They see:** one stage on the stepper, then the go-live moment: v3 was submitted before the Legal stage existed.
+9. **Do:** Switch to **Jordan**. **Review → Cash Back Welcome Bonus — Terms v3 · Round 2** → **Approve** → **Approve v3, round 2**.
+   - **They see:** one stage on the stepper, then the go-live moment: v3, round 2 was submitted before the Legal stage existed.
    - **Say:** "A version keeps the approval steps it was submitted with. Changing the chain never moves work that's already in review."
 10. **Do:** Switch to **Maya**. Open **Cash Back Welcome Bonus — Terms** → **Edit** → **Submit for review** → **Submit v4**.
 11. **Do:** Switch to **Jordan**. **Review → Cash Back v4** ("Stage 1 of 2") → **Approve** → **Approve v4**.
@@ -364,7 +365,7 @@ Every requirement from the Discovery Brief (DB) and the Build Plan (BP), in thei
 | R3 | Works for any business and many teams (DB · Scope and first client) | Three teams, two consumers; content types, channels and approval chains are settings | Team switcher (Priya); Settings (Riley), Act 8 | Covered |
 | R4 | Templates only, no customer data; Stencil renders; consumers can't author (DB · Guiding principles 1–3) | Documents are built on request and never stored; the consumer API can only read and render | Simulator; SHARE, Act 4 | Covered |
 | R5 | Review in the tool; maker-checker (DB · Guiding principles 4; Controls and approvals) | Review queue; the author can't approve their own version | Review (Maya, Jordan), Act 3 | Covered |
-| R6 | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle) | Six states; Versions tab with compare; Activity tab | Versions tab, Acts 1 and 3 | Covered |
+| R6 | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle) | Six states; Versions tab with compare and each version's review rounds; Activity tab | Versions tab, Acts 1 and 3 | Covered |
 | R7 | "One click" simplicity for non-technical users (DB · Guiding principles 6; BP · Experience principles) | Two clicks to typing; a slash menu; plain-language dialogs | New template (Maya), Act 2 | Covered |
 | R8 | No AI inside the app; a Copilot prompt instead (DB · Guiding principles 7; AI roadmap) | The app writes a prompt to copy; a pasted {{key}} becomes a chip. Risk sign-off is still open | Editor rail (Maya), Act 9 | Covered |
 | R9 | Numbers never retyped; customer vs offer variables (DB · Guiding principles 8; Content model and channels) | Typed, auto-formatted variables; Coral maps each to customer or offer data. Variables carry no customer/offer flag, and offer terms are still typed into the text | Variables rail; simulator, Acts 2 and 4 | Partial |
@@ -403,7 +404,8 @@ Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scop
 |---|---|
 | Template | Reusable customer content with a permanent ID, such as UC-4F7K2Q. |
 | Variable (chip) | A typed blank, such as APR, filled in for each customer. |
-| Version | A frozen, numbered snapshot made when a draft is submitted. |
+| Version | A frozen, numbered snapshot made when a draft is submitted. Numbers count what reaches customers: v1, v2, v3, with no gaps. |
+| Round | One submission of a version for review. Sent back, the next submission is round 2 of the same version. Customers only see the version number. |
 | Draft, In review, Changes requested | Being written, waiting for approval, or sent back with a reason. |
 | Active | The approved version consumers use now. |
 | Superseded | An older approved version that still works for consumers pinned to it. |
@@ -433,7 +435,7 @@ Order rules:
 - Leave Cash Back v3 for Act 8, and Card Used Abroad v1 for Act 5.
 - Run Act 5 before the first clock jump.
 - Add the Legal reviewer stage last; it gates Disclosure versions submitted after it.
-- Sunset v2 at most 14 days out.
+- Sunset v1 at most 14 days out.
 - Sam's step and the recertification Keeps come before the +16-day jump.
 - Skipped Act 6? Advance 31 days in Act 8 instead of 16.
 - Mid-demo reset: Demo pill → Reset demo → Reset.

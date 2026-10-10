@@ -12,20 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
-import type { RedlineDoc } from "@/domain/review-types";
+import type { CompareOption, RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
 import { readTemplate } from "@/lib/template-reads";
 import { cn } from "@/lib/utils";
 import type { ComparePair } from "@/server/queries/compare";
-import type { CompareOption } from "./compare-dialog";
 
 // The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline: the
 // name, each channel's own fields (an email's subject and preheader, above the body; an alert's push and
 // SMS, which are its whole content), then the body.
 // The pickers only offer pairs that read forward in time (From is the older one, always), so the
-// diff never runs backwards and no combination is empty. Each pair is read from
-// GET /api/templates/[templateId]/compare.
+// diff never runs backwards and no combination is empty. They list every round, and open on the two
+// newest versions (`openingPair`). Each pair is read from GET /api/templates/[templateId]/compare.
 
 type Loaded = ({ key: string; ok: true } & ComparePair) | { key: string; ok: false };
 
@@ -56,10 +55,11 @@ function VersionSelect({
   const byId = new Map(options.map((o) => [o.id, o]));
   return (
     <Select value={value} onValueChange={(next) => next && onChange(next)}>
-      <SelectTrigger ref={triggerRef} aria-labelledby={labelId} className="h-8 w-28 shrink-0 bg-surface">
+      {/* Wide enough for a round's label ("v3 · Round 2"); the list is as wide as its longest option. */}
+      <SelectTrigger ref={triggerRef} aria-labelledby={labelId} className="h-8 w-36 shrink-0 bg-surface">
         <SelectValue>{(id: string) => byId.get(id)?.label ?? ""}</SelectValue>
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false} className="min-w-44 p-1">
+      <SelectContent alignItemWithTrigger={false} className="w-auto min-w-44 p-1">
         {options.map((o) => (
           <SelectItem key={o.id} value={o.id}>
             <span className="font-medium">{o.label}</span>
@@ -71,10 +71,21 @@ function VersionSelect({
   );
 }
 
+/**
+ * The pair the panel opens on: the two newest versions, each number as its head (`CompareOption.head`, the
+ * draft included), so a version's sent-back rounds aren't what it compares first. With fewer than two
+ * heads (a first version on its second round), the two newest rows.
+ */
+export function openingPair(options: readonly CompareOption[]): { fromId: string; toId: string } {
+  const heads = options.filter((o) => o.head);
+  const [to, from] = heads.length >= 2 ? heads : options;
+  return { fromId: from!.id, toId: to!.id };
+}
+
 export default function ComparePanel({ templateId, options }: { templateId: string; options: CompareOption[] }) {
   // `options` is newest first: index 0 is the newest, so "older" means a higher index.
-  const [fromId, setFromId] = useState(options[1].id);
-  const [toId, setToId] = useState(options[0].id);
+  const [fromId, setFromId] = useState(() => openingPair(options).fromId);
+  const [toId, setToId] = useState(() => openingPair(options).toId);
   const [changesOnly, setChangesOnly] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);

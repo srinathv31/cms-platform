@@ -11,7 +11,7 @@ export const TEAM_STAGE = { id: "stage_disclosure_0", name: "Team approver" } as
 
 /**
  * The Alert content type: messages, rendered to Push and SMS from their own short fields, never from a
- * body (decision 0033). No required sections: an alert has no document. Every SMS ends with its footer,
+ * body (decision 0034). No required sections: an alert has no document. Every SMS ends with its footer,
  * the brand and the opt-out that CTIA asks of a US sender, and may take 3 parts with the long sample
  * values.
  */
@@ -102,17 +102,24 @@ export function seedPlatform(ctx: SeedCtx) {
     },
   );
 
-  const configEvents = [
+  // The Alert's events came after the seed's ids were in use, so they draw from sequences of their own
+  // (`keyed`): one more draw from the shared sequence would move every template id after it.
+  const configEvents: { daysAgo: number; area: string; summary: string; keyed?: string }[] = [
     { daysAgo: 430, area: "content_types", summary: "Created content type Disclosure with 3 required sections" },
     { daysAgo: 430, area: "approval_chains", summary: "Set Disclosure approval chain: Team approver" },
     { daysAgo: 428, area: "channel_rules", summary: "Allowed pdf, web and email for Disclosure" },
-    { daysAgo: 60, area: "content_types", summary: "Created content type Alert with an SMS footer and a 3-part budget" },
-    { daysAgo: 60, area: "approval_chains", summary: "Set Alert approval chain: Team approver" },
-    { daysAgo: 60, area: "channel_rules", summary: "Allowed push and sms for Alert" },
+    {
+      daysAgo: 60,
+      area: "content_types",
+      summary: "Created content type Alert with an SMS footer and a 3-part budget",
+      keyed: "platform:alert:content_types",
+    },
+    { daysAgo: 60, area: "approval_chains", summary: "Set Alert approval chain: Team approver", keyed: "platform:alert:approval_chains" },
+    { daysAgo: 60, area: "channel_rules", summary: "Allowed push and sms for Alert", keyed: "platform:alert:channel_rules" },
   ];
   for (const e of configEvents) {
     ctx.sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: e.keyed ? ctx.keyedId(e.keyed, "ae") : ctx.id("ae"),
       at: ctx.at(e.daysAgo),
       actorId: "riley",
       action: "platform.config_changed",

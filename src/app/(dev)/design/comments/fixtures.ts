@@ -83,6 +83,8 @@ function thread(
     quote: anchor.quote ?? null,
     status: resolved ? "resolved" : "open",
     originVersionNumber: 1,
+    originRound: 1,
+    originLabel: "v1",
     comments,
     resolvedBy: resolved?.by,
     resolvedAt: resolved ? ago(resolved.minutesAgo) : undefined,

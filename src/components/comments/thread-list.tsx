@@ -255,6 +255,8 @@ export function ThreadList({
       quote: quote ?? null,
       status: "open",
       originVersionNumber: null,
+      originRound: null,
+      originLabel: null,
       comments: [
         { id: optimisticId("comment", ++counter.current), author: me, body, kind: "comment", createdAt: stamp() },
       ],

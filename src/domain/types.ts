@@ -20,7 +20,7 @@ import type { ChannelFieldsPatch } from "./channel-fields";
 import type { Refused } from "./refusals";
 
 // ── Channels ──────────────────────────────────────────────────
-// Two families, never mixed on one content type or template (docs/decisions/0033):
+// Two families, never mixed on one content type or template (docs/decisions/0034):
 //   - documents render the one long body: PDF, Web and Email (Email adds its subject and preheader);
 //   - messages render their own short fields and nothing from a body: Push and SMS.
 export const CHANNELS = ["pdf", "web", "email", "push", "sms"] as const;

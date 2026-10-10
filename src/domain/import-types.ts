@@ -71,7 +71,7 @@ export const IMPORT_DOCUMENTS_ONLY = "Only documents can be imported.";
 
 /**
  * Why a template of this family can't be made by importing a file, or null: import makes documents
- * (decision 0033). New template shows the Import row disabled with this reason while Alert is chosen.
+ * (decision 0034). New template shows the Import row disabled with this reason while Alert is chosen.
  */
 export function importUnavailable(family: ChannelFamily): string | null {
   return family === "document" ? null : IMPORT_DOCUMENTS_ONLY;

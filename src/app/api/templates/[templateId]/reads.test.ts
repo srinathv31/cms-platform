@@ -98,6 +98,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
       const side = (v: typeof v1, number: number, state: string) => ({
         id: v.id,
         number,
+        round: 1,
         state,
         name: v.name,
         body: v.body,
@@ -114,7 +115,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     const alert = ids["payment-due-reminder"]!;
     const v1 = await versionOf(alert, { number: 1 });
     // A draft after it, and a new footer on the Alert content type since v1 was submitted.
-    await db.insert(versions).values({ ...v1, id: "v_payment_draft", number: null, state: "draft", smsFooter: null });
+    await db.insert(versions).values({ ...v1, id: "v_payment_draft", number: null, round: null, state: "draft", smsFooter: null });
     const { contentTypes } = await import("@/server/db/schema/ucomp");
     const NOW = "Coral: Reply STOP to end.";
     await db.update(contentTypes).set({ smsFooter: NOW }).where(eq(contentTypes.id, "ct_alert"));
@@ -137,7 +138,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     const fee = ids["annual-fee-waiver"]!;
     const [v1, draft] = [await versionOf(fee, { number: 1 }), await versionOf(fee, { state: "draft" })];
     const { body } = await answer(get(compare, "compare", fee, `?from=${v1.id}&to=${draft.id}`));
-    expect(body).toMatchObject({ ok: true, to: { id: draft.id, number: null, state: "draft" } });
+    expect(body).toMatchObject({ ok: true, to: { id: draft.id, number: null, round: null, state: "draft" } });
   });
 
   it("400 when a version is missing or malformed", async () => {
@@ -218,7 +219,8 @@ describe("GET /api/templates/[templateId]/submit-summary", () => {
     const draft = await versionOf(fee, { state: "draft" });
     const { status, body } = await answer(get(submitSummary, "submit-summary", fee));
     expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, summary: { templateId: fee, rev: draft.rev, name: draft.name, number: 2 } });
+    // v1 was sent back: its draft resubmits as v1, round 2.
+    expect(body).toMatchObject({ ok: true, summary: { templateId: fee, rev: draft.rev, name: draft.name, number: 1, round: 2 } });
   });
 
   it("400 for a malformed template id", async () => {

@@ -9,6 +9,7 @@ import { refusal, type ReadResult } from "@/server/api/reads";
 import { now } from "@/server/clock";
 import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
+import { nextRound } from "@/domain/rounds";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import { listSets } from "@/components/preview/sample-sets/model";
 import type { SubmitSummary } from "@/components/submit/types";
@@ -39,6 +40,7 @@ export async function getSubmitSummary(viewer: Viewer, input: { templateId: stri
   const list = await db
     .select({
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       rev: versions.rev,
       sunsetAt: versions.sunsetAt,
@@ -58,13 +60,15 @@ export async function getSubmitSummary(viewer: Viewer, input: { templateId: stri
   // What submit will compare with: the newest version that still renders (the Active one, if any).
   const baseline = contractBaseline(list, at);
   const today = at.toISOString().slice(0, 10);
+  const next = nextRound(list);
 
   return {
     ok: true,
     summary: {
       templateId: template.id,
       rev: draft.rev,
-      number: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0) + 1,
+      number: next.number,
+      round: next.round,
       name: draft.name,
       channels: CHANNELS.filter((channel) => draft.channels.includes(channel)),
       sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map((set) => set.name),

@@ -47,6 +47,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | | [assert-never.ts](assert-never.ts) | `assertNever`, the exhaustive check. Everything that differs by channel is a `Record<Channel, …>` or a `switch` whose `default` calls it, so a new channel is a compile error at each place that must handle it. The domain, the server and the components use it; Coral has its own copy. |
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
 | Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. `submit` also holds a message to its channels' rules (`messageRefusal`: GSM-7 as typed, the part budget and push size with the long sample values, no public shorteners). Also `contractBaseline`, the version a draft's contract is compared with; `reviewBaseline`, the one the review screen's redline is against; `sunsetPassed`, the one test of a passed sunset; `sweepSunsets`, its audit record; and a new template's content type and channels by the kind the author chose, Document or Alert (`newTemplateContentType`, `DEFAULT_CHANNELS`, `newTemplateChannels`). |
+| | [rounds.ts](rounds.ts) | Version numbers and review rounds: which states are released (`RELEASED_STATES`, `isReleased`), what a submission is numbered (`nextRound`), a template's rows in order (`compareRounds`) and by number (`headOf`, `roundsOf`, and `replacedBy`: the head a sent-back round's work went on to), a version's label (`versionLabel`, `showsRound`, `roundLabel`, `approvedOnRound`, `reviewHistoryLabel`), and its review screen's link (`reviewPath`, `reviewLink`, `parseRoundParam` for `?round=`). |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
 | | [redline.ts](redline.ts) | The diff between two versions' documents, their channel fields (`diffChannelFields`, over the registry: an email's subject, an alert's push and SMS, each word-diffed with the document's engine) and their rename (`nameChange`), for the review screen and Compare. |
 | | [comments.ts](comments.ts) | Review comments: where a thread can anchor (`commentAnchors`: the fields of the channels that are on, then the body's blocks, so a message's threads are on its fields), which versions take them (`takesComments`), who may start a thread (`canComment`) and act on one (`canActOnThread`), the text's limits, and `addComment`, `reply`, `resolveThread`, `reopenThread` with who is notified ([decision 0010](../../docs/decisions/0010-comments-are-answered-where-they-show.md)). |
@@ -70,21 +71,22 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | Term | Meaning here | Where |
 | --- | --- | --- |
 | Template | A document consumers render, with a stable id like `UC-4F7K2Q`. Belongs to one team and one content type. | `templates` in [ucomp.ts](../server/db/schema/ucomp.ts) |
-| Version | One snapshot of a template: body (TipTap JSON), variables, channels, channel fields, sample sets. `number` is null while it is a draft; `submit` sets it to the highest number + 1, and it never changes. | `VersionSnapshot`, `DraftFields` |
-| Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The database allows one open draft and one Active version per template. | [types.ts](types.ts), [status.ts](status.ts) |
+| Version | One snapshot of a template: body (TipTap JSON), variables, channels, channel fields, sample sets. `number` counts releases. It is null while the version is a draft; `submit` sets it to the next released number, or keeps the number of the round it continues, and it never changes. | `VersionSnapshot`, `DraftFields` |
+| Round | One submission of a version for review: a row with `number` and `round`, frozen at submit. A send-back doesn't use up a number: the next submission is the next round of the same number, and the version that goes live is still "v1". Labels show the round only once the number was sent back ("v1 · Round 2", "v1, round 2"); a released version is "vN", and its review history names the round it was approved on. Consumers never see rounds: a number means its released row (its head) ([decision 0033](../../docs/decisions/0033-a-resubmission-is-the-next-round-of-the-same-version.md)). | [rounds.ts](rounds.ts): `nextRound`, `headOf`, `versionLabel` |
+| Version states | `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked` (`VERSION_STATES`). The released ones are `active`, `superseded` and `revoked` (`RELEASED_STATES`). The database allows one open draft and one Active version per template, one row per round of a number, and one released row per number. | [types.ts](types.ts), [status.ts](status.ts), [rounds.ts](rounds.ts) |
 | Sunset | A date on a Superseded version. It ends at 00:00 on that day in the business time zone, and from then on consumer renders fail with `version_sunset`. Once it has passed it is final: nothing moves or clears it, and the clock-driven sweep records it (`version.sunset_passed`) and tells consumers (a `sunset_passed` notice). Not a state. | `setSunset`, `sunsetPassed`, `sweepSunsets`, `checkVersion` |
 | Revoke pending | An Active or Superseded version whose `revoke` record has no `confirmedAt`. Not a state: it renders until a different approver confirms. | `revokePending` |
 | Content type | Platform configuration a template follows: required sections, allowed channels (one family), approval chain, and for a message type the SMS footer and part budget. The seed has Disclosure (documents) and Alert (messages). | [platform-config.ts](platform-config.ts) |
-| Document, message | The two channel families, never mixed on a content type or a template ([decision 0033](../../docs/decisions/0033-message-channels-families-and-the-fields-registry.md)). A document renders its one body to PDF, Web and Email. A message (an Alert) renders its own short fields to Push and SMS, and has no body and no required sections. | `channelFamily`, `channelRuleRefusal` |
+| Document, message | The two channel families, never mixed on a content type or a template ([decision 0034](../../docs/decisions/0034-message-channels-families-and-the-fields-registry.md)). A document renders its one body to PDF, Web and Email. A message (an Alert) renders its own short fields to Push and SMS, and has no body and no required sections. | `channelFamily`, `channelRuleRefusal` |
 | Push | A push notification: a title, an optional subtitle (iPhone only) and a body, one message for both platforms. Rendered for one platform (`PushPlatform`, `ios` or `android`) and measured as that platform's notification JSON in UTF-8 bytes (`payloadBytes`); refused over 4,096. | [render/message.ts](render/message.ts), [messages/push.ts](messages/push.ts) |
-| SMS | A text message: the author's message (GSM-7 as typed, line breaks kept), then the footer on its own line: the content type's, frozen into the version at submit (`smsFooterOf`). Sent in GSM-7 or UCS-2 parts; never truncated or transliterated, refused over 10 parts ([decision 0034](../../docs/decisions/0034-sms-characters-and-length.md)). | [render/message.ts](render/message.ts), [messages/gsm7.ts](messages/gsm7.ts) |
+| SMS | A text message: the author's message (GSM-7 as typed, line breaks kept), then the footer on its own line: the content type's, frozen into the version at submit (`smsFooterOf`). Sent in GSM-7 or UCS-2 parts; never truncated or transliterated, refused over 10 parts ([decision 0035](../../docs/decisions/0035-sms-characters-and-length.md)). | [render/message.ts](render/message.ts), [messages/gsm7.ts](messages/gsm7.ts) |
 | SMS footer, part budget | A message content type's footer (brand and opt-out, counted in the parts) and the most parts an SMS may take with the "long" sample values before submit refuses it (`DEFAULT_SMS_MAX_PARTS`, 3). | `MessageTypeRules` |
 | App name, SMS sender | Who a team's messages come from in the phone preview: the app name over a push, the short code an SMS comes from. Team facts, null until set. | `TeamSenders` |
 | Required section | `{ key, title }`: a heading with `attrs.requiredKey` that the editor protects. Shapes new templates only; `submit` doesn't check sections. | `conformToSections` |
 | Variable | `{ id?, key, label, type, required, sample }`, shown as a chip. Keys are snake_case and unique per template. `id` keeps a variable the same variable across key renames and versions; without one, the key is its identity ([decision 0022](../../docs/decisions/0022-a-variable-keeps-its-identity-across-renames.md)). | `Variable`, `identityOf` |
 | Consumer contract | A version's variable list: what a consumer sends to render it. | [contract.ts](contract.ts), [golive/json-schema.ts](golive/json-schema.ts) |
 | Contract baseline | The version a draft's variable list is compared with: the newest one that still renders. The Active version; with none (it was revoked), the highest-numbered Superseded version whose sunset hasn't passed; null when nothing renders, as for a first version ([decision 0009](../../docs/decisions/0009-correct-a-revoked-version-from-its-content.md)). | `contractBaseline` |
-| Review baseline | The version the review screen's redline, its "vs vN" label and its change count compare with. The Active version; with none (it was revoked), the released version the draft was based on, walking back through versions sent back for changes: the revoked text the correction started from, labelled "vs v3 (revoked)". Without one, the contract baseline; null when nothing renders ([decision 0031](../../docs/decisions/0031-a-correction-is-redlined-against-the-revoked-version.md)). The Approve dialog's previous version is the Active one only. | `reviewBaseline` |
+| Review baseline | The version the review screen's redline, its "vs vN" label and its change count compare with. The Active version; with none (it was revoked), the released version the draft was based on, walking back through the rounds sent back for changes: the revoked text the correction started from, labelled "vs v3 (revoked)". Without one, the contract baseline; null when nothing renders ([decision 0031](../../docs/decisions/0031-a-correction-is-redlined-against-the-revoked-version.md)). The Approve dialog's previous version is the Active one only. | `reviewBaseline` |
 | Breaking change | A change that breaks consumers of the baseline: a required variable added, a variable removed, a key renamed, a type changed, an optional one made required. `submit` stores the diff as `contractChanges`. A renamed key is one `key_renamed` change (`from`, `to`), paired by the variable's id; `ContractChange` is a union, one member per kind. | `diffVariables`, `isBreaking` |
 | Consumer | A registered system (`consumers` table; the simulator plays `coral`) that calls `/api/v1` with `X-Consumer-Id` and pins a version number. It receives notices: `new_version`, `sunset_scheduled`, `sunset_passed`, `revoked`. | [golive/](golive/) |
 | Template kind | Document or Alert (`TEMPLATE_KIND_LABELS`): the channel family an author picks in New template. It decides the content type (`newTemplateContentType`), and so the template's family, for life. Import makes documents only (`importUnavailable`). | `ChannelFamily` |
@@ -103,10 +105,11 @@ The lifecycle, as [lifecycle.ts](lifecycle.ts) implements it:
 
 ```text
 createDraft | editLatest (latest Active or Revoked) | requestChanges   → draft
-draft        submit                                       → in_review (numbered, its stages recorded)
+draft        submit                                       → in_review (numbered and given its round, its stages recorded)
 in_review    approve, earlier of its stages               → in_review, currentStage + 1
 in_review    approve, last of its stages                  → active; the previous active, if any → superseded
-in_review    requestChanges                               → changes_requested, plus a new draft
+in_review    requestChanges                               → changes_requested, plus a new draft (its next submit is
+                                                            the next round of the same number)
 superseded   setSunset, until the sunset has passed       → superseded with sunsetAt
 superseded   the clock passes sunsetAt                    → superseded; renders stop (sweepSunsets records it)
 active | superseded   startRevoke, then confirmRevoke     → revoked   (cancelRevoke withdraws)
@@ -133,12 +136,12 @@ caller in `approveVersion` ([actions/review.ts](../server/actions/review.ts)), s
 
 ```ts
 transaction: async (tx, { viewer, input, found, now: at }) => { // the demo clock, read once before it
-  const version = await loadVersion(tx, found, input.versionNumber); // re-read inside the transaction
+  const version = await loadVersion(tx, found, input.versionNumber, input.round); // re-read inside the transaction
   const outcome = approve({ version, chain, actorId: viewer.userId, now: at, /* … */ });
   if (!outcome.ok) refuse(outcome);                     // the domain's refusal: rolled back, returned as { ok: false, code, reason }
   await updateVersion(tx, version, { state: outcome.changes.state, /* … */ }, at, REFUSALS.notInReview);
   await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-  return { ok: true, wentLive: outcome.wentLive, number: version.number! };
+  return { ok: true, wentLive: outcome.wentLive, number: version.number!, round: version.round! };
 },
 ```
 
@@ -150,8 +153,8 @@ submitter with `REASONS.ownVersion` and any other writer with `REASONS.wroteVers
 
 **Three result shapes, by audience.** People get `{ ok: false, code, reason }`. Consumer API callers get
 `{ ok: false, error }`, where `error` has a code that maps to a status (`RENDER_ERROR_STATUS`, `API_ERROR_STATUS`).
-Bugs and drift throw: `LifecycleError` (a numbered state with no number), `ResolveError` (a node the renderer
-doesn't know).
+Bugs and drift throw: `LifecycleError` (a numbered state with no number or round), `asNumbered` in
+[rounds.ts](rounds.ts) (a row to label without them), `ResolveError` (a node the renderer doesn't know).
 
 ## The sunset rule
 
@@ -207,12 +210,11 @@ Read these before you assume a rule is missing. When you change one, move it her
 | The combined decide check (`decideCheck`) | [queries/review-shared.ts](../server/queries/review-shared.ts) |
 | A new template's sections, fitted to its content type (its channels are `newTemplateChannels`, here) | `conformToContentType` in [templates/create.ts](../server/templates/create.ts) |
 | A version publishes a channel only if the content type still allows it | [queries/consumer-api.ts](../server/queries/consumer-api.ts), [queries/integration.ts](../server/queries/integration.ts), [render-template.ts](../server/render/render-template.ts) |
-| Which states a consumer can see (`RELEASED`: active, superseded, revoked) | [queries/consumer-api.ts](../server/queries/consumer-api.ts) |
 | Who gets notices: consumers with a non-preview render of the template from `CONSUMER_NOTICE_WINDOW_DAYS` (90) before the event on (for `sunset_passed`, the sunset) | `writeEffects` in [server/effects.ts](../server/effects.ts) |
 | An Auditor can't be granted a team role through an access request | [actions/access.ts](../server/actions/access.ts) |
 | Autosave: draft state only, rev compare-and-set, allowed channels, name 1–120 characters | [drafts/apply-patch.ts](../server/drafts/apply-patch.ts), [drafts/parse-patch.ts](../server/drafts/parse-patch.ts) |
 | Note and reason limits (2,000), copied in three places | [actions/review.ts](../server/actions/review.ts), [decision-model.ts](../components/review/decision-model.ts), [validation.ts](../components/versions/validation.ts) |
-| One open draft and one Active version per template | unique indexes in [ucomp.ts](../server/db/schema/ucomp.ts) |
+| One open draft and one Active version per template; one row per round, and one released row, per number | unique indexes in [ucomp.ts](../server/db/schema/ucomp.ts) |
 
 ## Copy these
 
@@ -243,7 +245,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Testing
 
-- Every rule file has a colocated `*.test.ts` (37 files; [types.test.ts](types.test.ts) covers the channel families).
+- Every rule file has a colocated `*.test.ts` (41 files; [types.test.ts](types.test.ts) covers the channel families).
   `status.ts`, `assert-never.ts`, the other types files, and `render/index.ts` have none.
   Run `npx vitest run src/domain`; it takes under a second in the `node` environment.
 - Tests pin time by passing `now`, never with fake timers: `const NOW = new Date("2026-10-04T12:00:00.000Z")`

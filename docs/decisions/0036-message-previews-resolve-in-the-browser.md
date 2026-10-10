@@ -1,4 +1,4 @@
-# 0035. Message previews resolve in the browser, through the render's own function
+# 0036. Message previews resolve in the browser, through the render's own function
 
 Status: Accepted
 Date: 2026-10-09
@@ -59,4 +59,4 @@ database: the route's engine and the golden files already run it as is.
   short code, come with the page's read model.
 - The browser and the server cut an SMS into the same parts because the grapheme clusters are pinned to one Unicode
   version in the domain (`src/domain/messages/graphemes.ts`), not taken from the browser's `Intl.Segmenter`
-  ([0034](0034-sms-characters-and-length.md)).
+  ([0035](0035-sms-characters-and-length.md)).

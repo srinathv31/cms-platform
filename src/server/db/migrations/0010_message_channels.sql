@@ -1,4 +1,4 @@
--- The message channels, Push and SMS (decisions 0033 and 0034). A content type gets an SMS footer (brand and
+-- The message channels, Push and SMS (decisions 0034 and 0035). A content type gets an SMS footer (brand and
 -- opt-out, printed on its own line after every SMS of that type; null: none) and a part budget submit holds
 -- an SMS to with the long sample values (3 unless set). A team gets the app name over its push notifications
 -- and the short code its SMS come from, both null until set. Existing rows keep working as they are: a

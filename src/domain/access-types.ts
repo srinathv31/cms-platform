@@ -9,6 +9,7 @@
 
 import type { Refused } from "./refusals";
 import type { ActionResult, ApprovalStage, NotificationKind, Person, VersionStage } from "./review-types";
+import type { NumberedRound } from "./rounds";
 import type {
   ApproverRule,
   Channel,
@@ -540,7 +541,11 @@ export interface AuditRow {
   actor: Person | null; // null = the system (UCOMP)
   team: { slug: string; name: string } | null;
   template: { id: string; name: string } | null;
-  versionNumber: number | null;
+  /**
+   * The version the event is about, "v3 · Round 1" (chrome; the round only for review events,
+   * `eventVersionLabel` in activity.ts); null when there is none, or it is the open draft.
+   */
+  versionLabel: string | null;
   action: string;
   category: AuditCategory;
   /** "Approved", "Access granted" (the action column). */
@@ -750,7 +755,7 @@ export interface AuditDomain {
    * "Alex Kim approved Morgan Lee's request for Author access." / "Sam Ortiz's access lapsed: not recertified by March 3, 2027."
    */
   describeAuditEvent(
-    e: { action: string; details: Record<string, unknown> | null; versionNumber: number | null },
+    e: { action: string; details: Record<string, unknown> | null; version: NumberedRound | null },
     actor: Person | null,
   ): string;
   /** The action filter's options, grouped by category, in a stable order. */

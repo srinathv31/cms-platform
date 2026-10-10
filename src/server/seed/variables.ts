@@ -15,7 +15,7 @@ export type VarKey =
   | "apy"
   | "minimum_balance"
   | "monthly_fee"
-  // Alerts: push and SMS (decision 0033).
+  // Alerts: push and SMS (decision 0034).
   | "amount_due"
   | "due_date"
   | "statement_balance"

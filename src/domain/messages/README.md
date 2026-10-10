@@ -93,7 +93,7 @@ Database 17.0.0, implemented in `graphemes.ts` with the property table `grapheme
 - **Why.** `Intl.Segmenter` follows the runtime's ICU, and that differs between browsers, between Node releases, and
   in a Java engine. The rules themselves move between versions: GB9c, which keeps an Indic conjunct like क्ष whole,
   arrived in Unicode 15.1 and changes again in 18.0. The composer's preview runs in the author's browser and the API
-  on the server ([decision 0035](../../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)), and both
+  on the server ([decision 0036](../../../docs/decisions/0036-message-previews-resolve-in-the-browser.md)), and both
   must cut the same parts. So the version is part of the specification (docs/render-spec.md §10 and §12).
 - **The table** holds, per run of code points, the Grapheme_Cluster_Break class, Extended_Pictographic and the
   Indic_Conjunct_Break class: about 1,400 runs, 6 KB. Hangul syllables are computed (LV every 28th from U+AC00).

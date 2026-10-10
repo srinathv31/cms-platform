@@ -56,6 +56,7 @@ function version(patch: Partial<CommentVersion> = {}): CommentVersion {
   return {
     id: "v_3",
     number: 3,
+    round: 1,
     state: "in_review",
     createdBy: "maya",
     submittedBy: "maya",
@@ -64,22 +65,31 @@ function version(patch: Partial<CommentVersion> = {}): CommentVersion {
   };
 }
 
-/** The template with v3 in review (its waiting stage names `named`), and an open draft when `draft`. */
+/**
+ * The template with v3 round 1 in review (its waiting stage names `named`), and an open draft when `draft`.
+ * A draft would be v3 round 2 (`next`): nothing above v2 was released.
+ */
 function template(patch: Partial<CommentTemplate> = {}): CommentTemplate {
-  return { ...TEMPLATE, hasDraft: false, inReview: { number: 3, stageApproverIds: [] }, highestNumber: 3, ...patch };
+  return {
+    ...TEMPLATE,
+    hasDraft: false,
+    inReview: { number: 3, round: 1, stageApproverIds: [] },
+    next: { number: 3, round: 2 },
+    ...patch,
+  };
 }
-const reviewNaming = (...ids: string[]) => template({ inReview: { number: 3, stageApproverIds: ids } });
+const reviewNaming = (...ids: string[]) => template({ inReview: { number: 3, round: 1, stageApproverIds: ids } });
 
 function thread(origin: Partial<CommentThread["origin"]> = {}, patch: Partial<Omit<CommentThread, "origin">> = {}): CommentThread {
   return {
     id: "th_1",
     blockId: "b_two",
     status: "open",
-    origin: { id: "v_3", number: 3, state: "in_review", createdBy: "maya", submittedBy: "maya", ...origin },
+    origin: { id: "v_3", number: 3, round: 1, state: "in_review", createdBy: "maya", submittedBy: "maya", ...origin },
     ...patch,
   };
 }
-const onDraft = () => thread({ id: "v_draft", number: null, state: "draft", submittedBy: null });
+const onDraft = () => thread({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null });
 
 describe("which versions take comments", () => {
   it("a draft and a version in review do; a decided version is a record", () => {
@@ -88,12 +98,22 @@ describe("which versions take comments", () => {
     }
   });
 
-  it("a frozen version shows the threads that began by it; a draft's thread counts as the next number", () => {
-    expect(threadBeganBy(1, 2, 4)).toBe(true);
-    expect(threadBeganBy(2, 2, 4)).toBe(true);
-    expect(threadBeganBy(4, 2, 5)).toBe(false);
-    expect(threadBeganBy(null, 3, 4)).toBe(false);
-    expect(threadBeganBy(null, 4, 4)).toBe(true);
+  it("a frozen round shows the threads that began by it; a draft's thread counts as the next round", () => {
+    const r = (number: number, round = 1) => ({ number, round });
+    expect(threadBeganBy(r(1), r(2), r(4))).toBe(true);
+    expect(threadBeganBy(r(2), r(2), r(4))).toBe(true);
+    expect(threadBeganBy(r(4), r(2), r(5))).toBe(false);
+    expect(threadBeganBy(null, r(3), r(4))).toBe(false);
+    expect(threadBeganBy(null, r(4), r(4))).toBe(true);
+  });
+
+  it("orders the rounds of one number: an earlier round's thread shows on the later round, not the other way", () => {
+    const r = (number: number, round: number) => ({ number, round });
+    expect(threadBeganBy(r(3, 1), r(3, 2), r(3, 3))).toBe(true);
+    expect(threadBeganBy(r(3, 2), r(3, 1), r(3, 3))).toBe(false);
+    // Begun in the draft that resubmits v1: part of round 2's review, not round 1's record.
+    expect(threadBeganBy(null, r(1, 1), r(1, 2))).toBe(false);
+    expect(threadBeganBy(null, r(1, 2), r(1, 2))).toBe(true);
   });
 });
 
@@ -101,7 +121,9 @@ describe("canComment: who may start a thread", () => {
   it("the team's authors and approvers, on a draft or a version in review", () => {
     for (const viewer of [maya, jordan]) {
       expect(canComment(viewer, { teamId: "coral-offers", version: version() })).toEqual({ ok: true });
-      expect(canComment(viewer, { teamId: "coral-offers", version: version({ state: "draft", number: null }) })).toEqual({ ok: true });
+      expect(canComment(viewer, { teamId: "coral-offers", version: version({ state: "draft", number: null, round: null }) })).toEqual({
+        ok: true,
+      });
     }
   });
 
@@ -127,7 +149,7 @@ describe("canComment: who may start a thread", () => {
 
 describe("canActOnThread: who may reply, resolve and reopen", () => {
   it("the team acts on any thread while the template has an open draft (its margin shows them all)", () => {
-    const withDraft = template({ hasDraft: true, inReview: null, highestNumber: 2 });
+    const withDraft = template({ hasDraft: true, inReview: null, next: { number: 3, round: 1 } });
     expect(canActOnThread(maya, { template: withDraft, thread: onDraft() })).toEqual({ ok: true });
     expect(canActOnThread(jordan, { template: withDraft, thread: thread({ number: 1, state: "active" }) })).toEqual({ ok: true });
   });
@@ -138,7 +160,7 @@ describe("canActOnThread: who may reply, resolve and reopen", () => {
   });
 
   it("nobody acts on a thread when nothing on the template takes comments", () => {
-    const record = template({ hasDraft: false, inReview: null, highestNumber: 2 });
+    const record = template({ hasDraft: false, inReview: null, next: { number: 3, round: 1 } });
     expect(canActOnThread(maya, { template: record, thread: thread({ number: 2, state: "active" }) })).toEqual(CLOSED);
   });
 
@@ -208,7 +230,11 @@ describe("addComment", () => {
       },
       comment: { id: "cm_new", threadId: "th_new", authorId: "jordan", body: "Still right?", kind: "comment", createdAt: NOW },
       effects: [
-        { kind: "audit", action: "comment.added", details: { threadId: "th_new", blockId: "b_two", number: 3, quote: "spend $1,000" } },
+        {
+          kind: "audit",
+          action: "comment.added",
+          details: { threadId: "th_new", blockId: "b_two", number: 3, round: 1, quote: "spend $1,000" },
+        },
         {
           kind: "notification",
           notification: "comment_added",
@@ -218,6 +244,14 @@ describe("addComment", () => {
           link: { to: "review", templateId: TEMPLATE.id, versionNumber: 3 },
         },
       ],
+    });
+  });
+
+  it("names a second round in review, and links to it", () => {
+    const result = addComment(input({ version: version({ id: "v_3r2", round: 2 }) }));
+    expect(result.ok && result.effects[1]).toMatchObject({
+      title: "Jordan commented on Spring Travel Rewards — Terms v3, round 2.",
+      link: { to: "review", templateId: TEMPLATE.id, versionNumber: 3, round: 2 },
     });
   });
 
@@ -234,7 +268,7 @@ describe("addComment", () => {
   it("needs the block in a frozen version's body; a draft takes any block, and any version takes the whole-version thread", () => {
     expect(addComment(input({ blockId: "b_gone" }))).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
     expect(addComment(input({ blockId: DOCUMENT_THREAD }))).toMatchObject({ ok: true });
-    const draft = version({ id: "v_draft", number: null, state: "draft", submittedBy: null });
+    const draft = version({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null });
     expect(addComment(input({ version: draft, blockId: "b_not_saved_yet" }))).toMatchObject({ ok: true });
   });
 
@@ -252,12 +286,12 @@ describe("addComment", () => {
     expect(blank.ok && blank.effects[0]).toEqual({
       kind: "audit",
       action: "comment.added",
-      details: { threadId: "th_new", blockId: "b_two", number: 3 },
+      details: { threadId: "th_new", blockId: "b_two", number: 3, round: 1 },
     });
   });
 
   it("tells a draft's author, with a link to the template; nobody hears of their own comment", () => {
-    const draft = version({ id: "v_draft", number: null, state: "draft", submittedBy: null, createdBy: "maya" });
+    const draft = version({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null, createdBy: "maya" });
     const onDraftResult = addComment(input({ version: draft }));
     expect(onDraftResult.ok && onDraftResult.effects[1]).toMatchObject({
       to: { kind: "user", userId: "maya" },
@@ -287,7 +321,11 @@ describe("reply", () => {
       ok: true,
       comment: { id: "cm_reply", threadId: "th_1", authorId: "jordan", body: "Agreed.", kind: "comment", createdAt: NOW },
       effects: [
-        { kind: "audit", action: "comment.added", details: { threadId: "th_1", blockId: "b_two", number: 3, reply: true } },
+        {
+          kind: "audit",
+          action: "comment.added",
+          details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1, reply: true },
+        },
         ...["maya", "priya"].map((userId) => ({
           kind: "notification",
           notification: "comment_added",
@@ -303,7 +341,16 @@ describe("reply", () => {
   it("links a decided version's thread to its review screen, for whoever can't open the workspace", () => {
     const decided = reply(input({ template: template({ hasDraft: true }), thread: thread({ number: 2, state: "active" }) }));
     expect(decided.ok && decided.effects[1]).toMatchObject({
-      link: { to: "template", templateId: TEMPLATE.id, reviewVersion: 2 },
+      link: { to: "template", templateId: TEMPLATE.id, reviewVersion: { number: 2 } },
+    });
+  });
+
+  it("names a round sent back, in the sentence and the link: the bare link would open the newer round", () => {
+    const sentBack = thread({ number: 3, round: 1, state: "changes_requested" });
+    const result = reply(input({ template: template({ hasDraft: true, inReview: null }), thread: sentBack }));
+    expect(result.ok && result.effects[1]).toMatchObject({
+      title: "Jordan replied on Spring Travel Rewards — Terms v3, round 1.",
+      link: { to: "template", templateId: TEMPLATE.id, reviewVersion: { number: 3, round: 1 } },
     });
   });
 
@@ -331,12 +378,12 @@ describe("resolveThread and reopenThread", () => {
     expect(resolveThread(input())).toEqual({
       ok: true,
       changes: { status: "resolved", resolvedBy: "jordan", resolvedAt: NOW },
-      effects: [{ kind: "audit", action: "thread.resolved", details: { threadId: "th_1", blockId: "b_two", number: 3 } }],
+      effects: [{ kind: "audit", action: "thread.resolved", details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 } }],
     });
     expect(reopenThread(input({ thread: thread({}, { status: "resolved" }) }))).toEqual({
       ok: true,
       changes: { status: "open", resolvedBy: null, resolvedAt: null },
-      effects: [{ kind: "audit", action: "thread.reopened", details: { threadId: "th_1", blockId: "b_two", number: 3 } }],
+      effects: [{ kind: "audit", action: "thread.reopened", details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 } }],
     });
   });
 

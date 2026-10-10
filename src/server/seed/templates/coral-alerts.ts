@@ -3,7 +3,7 @@ import { emptyBody, inlineDoc, linesDoc } from "../content";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
-// Coral Offers' alerts: push and SMS on the Alert content type (decision 0033), one in each state an
+// Coral Offers' alerts: push and SMS on the Alert content type (decision 0034), one in each state an
 // alert demo needs. Payment Due Reminder is Active with renders on both channels; Card Used Abroad
 // waits for an approver; Rate Change Heads-up is a draft that pairs with the Rate Change Notice letter
 // (a separate template: a letter plus a text heads-up is two templates). Times are days before the reset.

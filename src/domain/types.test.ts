@@ -10,7 +10,7 @@ import {
   isMessageChannel,
 } from "./types";
 
-// The channel families (decision 0033): documents render the body, messages their own fields, and a
+// The channel families (decision 0034): documents render the body, messages their own fields, and a
 // content type or version is one family, never both.
 describe("channel families", () => {
   it("splits every channel into documents and messages, in CHANNELS order", () => {

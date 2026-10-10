@@ -117,7 +117,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
       details: { number: 1, sunsetAt: v1.sunsetAt!.toISOString(), sunsetDay: day21, zone: "America/New_York" },
     });
     // What the Activity tab and the Audit page say for it.
-    expect(describeActivity({ action: rows[0]!.action, details: rows[0]!.details, versionNumber: 1 }, null)).toBe(
+    expect(describeActivity({ action: rows[0]!.action, details: rows[0]!.details, version: { number: 1, round: 1, state: "superseded" } }, null)).toBe(
       `v1 stopped rendering: its sunset passed on ${formatLongDate(day21)}.`,
     );
   });

@@ -1,7 +1,7 @@
 "use server";
 
 import { refresh, revalidatePath } from "next/cache";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { currentStageOf } from "@/domain/approval-chain";
 import {
@@ -19,6 +19,7 @@ import {
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult, VersionStage } from "@/domain/review-types";
+import { compareRounds, nextRound } from "@/domain/rounds";
 import type { Viewer } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
 import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
@@ -57,20 +58,31 @@ async function loadTemplate(reader: Reader, templateId: string, name: string): P
     .limit(1)
     .then((rows) => rows[0]);
   if (!template) return undefined;
-  const list = await reader
-    .select({ number: versions.number, state: versions.state, stages: versions.stages, currentStage: versions.currentStage })
-    .from(versions)
-    .where(eq(versions.templateId, templateId))
-    .orderBy(desc(versions.number));
-  const review = list.find((v) => v.state === "in_review" && v.number !== null);
+  const list = (
+    await reader
+      .select({
+        number: versions.number,
+        round: versions.round,
+        state: versions.state,
+        stages: versions.stages,
+        currentStage: versions.currentStage,
+      })
+      .from(versions)
+      .where(eq(versions.templateId, templateId))
+  ).sort((a, b) => compareRounds(b, a));
+  const review = list.find((v) => v.state === "in_review" && v.number !== null && v.round !== null);
   return {
     ...template,
     name,
     hasDraft: list.some((v) => v.state === "draft"),
     inReview: review
-      ? { number: review.number!, stageApproverIds: await namedOnStage(reader, template.contentTypeId, review) }
+      ? {
+          number: review.number!,
+          round: review.round!,
+          stageApproverIds: await namedOnStage(reader, template.contentTypeId, review),
+        }
       : null,
-    highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
+    next: nextRound(list),
   };
 }
 
@@ -89,6 +101,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
     .select({
       id: versions.id,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       createdBy: versions.createdBy,
       submittedBy: versions.submittedBy,
@@ -111,6 +124,7 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
   const version: CommentVersion = {
     id: row.id,
     number: row.number,
+    round: row.round,
     state: row.state,
     createdBy: row.createdBy,
     submittedBy: row.submittedBy,
@@ -133,6 +147,7 @@ async function loadThread(reader: Reader, threadId: string): Promise<{ template:
       templateId: commentThreads.templateId,
       originId: versions.id,
       originNumber: versions.number,
+      originRound: versions.round,
       originState: versions.state,
       originCreatedBy: versions.createdBy,
       originSubmittedBy: versions.submittedBy,
@@ -156,6 +171,7 @@ async function loadThread(reader: Reader, threadId: string): Promise<{ template:
       origin: {
         id: row.originId,
         number: row.originNumber,
+        round: row.originRound,
         state: row.originState,
         createdBy: row.originCreatedBy,
         submittedBy: row.originSubmittedBy,

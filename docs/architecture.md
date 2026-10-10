@@ -4,7 +4,7 @@ Stencil is a CMS for regulated customer content. Teams write templates with type
 through an approval chain, and publish it. Consumer systems then render the Active version over `/api/v1` as a web
 page, an email, or a PDF, sending their own values for the variables. A template is a document (a Disclosure,
 rendered from its one body) or a message (an Alert, rendered to a push notification or an SMS from its own short
-fields), never both ([decision 0033](decisions/0033-message-channels-families-and-the-fields-registry.md)).
+fields), never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)).
 
 It is one Next.js 16 app (App Router, Cache Components) on one local SQLite file. Three things share the app: the
 CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and a set of
@@ -73,7 +73,8 @@ Conventions that nothing enforces yet, and where the code already breaks them:
 3. [versions-content.tsx](../src/components/versions/versions-content.tsx), a server component, awaits `params` and
    calls `getVersions()` from [queries/versions.ts](../src/server/queries/versions.ts).
 4. The read model checks access (`requireTemplate`), reads the demo time, queries the tables, and returns
-   `VersionsData`: plain, serializable, dates as ISO strings, with `can` results decided per version.
+   `VersionsData`: plain, serializable, dates as ISO strings, one entry per version number with its review rounds
+   folded into it, and `can` results decided per version.
 5. Client components (`version-actions.tsx`, `sunset-dialog.tsx`) receive it as props.
 
 Request data (cookies, `params`, database reads, the clock) is read only inside `<Stream>`. With Cache Components,
@@ -126,7 +127,8 @@ variations to avoid.
 returns. The rules are specified in [render-spec.md](render-spec.md). The one behind all of them: every channel
 prints exactly what the author typed and saw, with no rounding, dropping, renumbering, or rewording.
 
-1. Find the template and version (404). Check the consumer (`X-Consumer-Id`, 403), or for a preview, the viewer.
+1. Find the template and version (404). A version number means its released version, else its latest round.
+   Check the consumer (`X-Consumer-Id`, 403), or for a preview, the viewer.
 2. Version rules, consumers only (`checkVersion` in
    [version-rules.ts](../src/domain/render/version-rules.ts)): Active renders; Superseded renders until its sunset,
    then 410; Revoked is 410; unreleased states are 409.
@@ -141,8 +143,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
 
-The CMS preview posts to the same URL with `preview: true` and the persona cookie instead of `X-Consumer-Id`. It
-skips the version rules and is logged as a preview. Coral calls the URL over HTTP from the server, as a real
+The CMS preview posts to the same URL with `preview: true` and the persona cookie instead of `X-Consumer-Id`, and
+may name the review `round` to render; a consumer can't. It skips the version rules and is logged as a preview. Coral calls the URL over HTTP from the server, as a real
 consumer would. Because the preview shares the endpoint, another backend can't take over `/api/v1` until the two
 are split.
 
@@ -159,10 +161,12 @@ at Turso instead. Two schema files:
     message type the SMS footer and part budget), `approval_stages`.
   - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
     `channel_fields` (each channel's own fields, such as the email subject, by channel and then field key, from
-    the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `rev`,
-    `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, sunset and revoke fields); `approvals` (each decision's
-    stage id). The name is a version field, so a rename goes through
-    review ([decision 0016](decisions/0016-the-name-is-versioned.md)).
+    the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `number` and
+    `round`, `rev`, `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, sunset
+    and revoke fields); `approvals` (each decision's stage id). The name is a version field, so a rename goes
+    through review ([decision 0016](decisions/0016-the-name-is-versioned.md)). A row is one round: the number
+    counts releases, and a resubmission after a send-back is the next round of the same number
+    ([decision 0033](decisions/0033-a-resubmission-is-the-next-round-of-the-same-version.md)).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
   - **Consumers:** `consumers`; `render_log`; `consumer_notices` (an outbox, written with the change that causes it
@@ -172,8 +176,8 @@ at Turso instead. Two schema files:
   reset may import it.
 
 Conventions: JSON columns are typed with domain types; timestamps are millisecond integers read as `Date`, and become
-ISO strings at the read-model boundary. Partial unique indexes allow one open draft and one Active version per
-template. Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`),
+ISO strings at the read-model boundary. Unique indexes, partial where they need to be, allow one row per number
+and round, one released version per number, and one open draft and one Active version per template. Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`),
 and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migrations`; the
 [server README](../src/server/README.md#database) says how to add one.
 

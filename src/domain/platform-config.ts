@@ -13,7 +13,7 @@
 //   - A channel turned off stops rendering at once, Active versions included: the consequence names
 //     how many. At least one channel stays on.
 //   - A content type is one family, documents (PDF, Web, Email) or messages (Push, SMS), never both
-//     (decision 0033): a channel from the other family can't be turned on. Its family is the family of
+//     (decision 0034): a channel from the other family can't be turned on. Its family is the family of
 //     the channels it allows, and since one always stays on, it never changes.
 //   - A message content type has an SMS footer (brand and opt-out, printed on every SMS) and a part
 //     budget that submit checks against the "long" sample set (`DEFAULT_SMS_MAX_PARTS` parts unless
@@ -143,7 +143,7 @@ export const PLATFORM_REFUSALS = {
   sectionDuplicate: refusal("section_duplicate", (title: string) => `There are two sections called ${title}.`),
   oneChannel: refusal("last_channel", "Keep at least one channel on."),
   /**
-   * A channel from the other family (decision 0033): "Disclosures are documents. Push and SMS go on Alert
+   * A channel from the other family (decision 0034): "Disclosures are documents. Push and SMS go on Alert
    * templates." / "Alerts are messages. PDF, Web and Email go on Disclosure templates." `homes` are the
    * content types of the channel's family; with none, the family is named instead.
    */
@@ -495,7 +495,7 @@ export interface ChannelRuleType {
 
 /**
  * Why a content type can't have `channel` set to `allowed`, or null: it must be a channel; at least one
- * channel stays on; and a content type is one family (docs/decisions/0033), so a channel from the
+ * channel stays on; and a content type is one family (docs/decisions/0034), so a channel from the
  * other family can't be turned on: "Disclosures are documents. Push and SMS go on Alert templates."
  * `contentTypes` are the platform's content types, to name the ones the channel's family goes on. The
  * channel rules read model asks it for every switch, so a switch that can't flip shows disabled with

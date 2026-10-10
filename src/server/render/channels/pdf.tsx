@@ -3,6 +3,7 @@ import "server-only";
 import { Circle, Document, Link, Page, Path, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { RenderBlock, RenderDoc, RenderTable, RenderTableCell, RenderTableRow } from "@/domain/render/types";
+import { roundLabel } from "@/domain/rounds";
 import { MAX_TABLE_COLUMNS } from "@/editor/model/table-grid";
 import { GlyphCheck, loadFonts, measure } from "./pdf-fonts";
 import { CALLOUT, CONTENT_AREA, CONTENT_WIDTH, HAIRLINE, INK, LIST, SPACE, TABLE, TYPE, lineBox, styles, type TypeSpec } from "./pdf-styles";
@@ -94,9 +95,14 @@ function wholeSeconds(at: Date): Date {
   return new Date(Math.floor(ms / 1000) * 1000);
 }
 
-/** "UC-4F7K2Q · v2", or "UC-4F7K2Q · Draft" for an unsubmitted draft. */
-export function footerLabel(doc: Pick<RenderDoc, "templateId" | "versionNumber">): string {
-  return `${doc.templateId} · ${doc.versionNumber === null ? "Draft" : `v${doc.versionNumber}`}`;
+/**
+ * "UC-4F7K2Q · v2", "UC-4F7K2Q · Draft" for an unsubmitted draft, or "UC-4F7K2Q · v3 · Round 2" for a
+ * preview of a round whose label names it (`RenderDoc.round`).
+ */
+export function footerLabel(doc: Pick<RenderDoc, "templateId" | "versionNumber" | "round">): string {
+  const version = doc.versionNumber === null ? "Draft" : `v${doc.versionNumber}`;
+  const label = `${doc.templateId} · ${version}`;
+  return doc.round === undefined ? label : `${label} · ${roundLabel(doc.round)}`;
 }
 
 /** Every digit and word the footer's page numbers can use. */

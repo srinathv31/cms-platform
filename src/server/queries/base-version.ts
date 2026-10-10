@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { channelFieldValues, type ChannelFieldValues } from "@/domain/channel-fields";
 import { can } from "@/domain/permissions";
-import type { Channel, JSONContent, SampleSet, Variable, Viewer } from "@/domain/types";
+import type { Channel, JSONContent, SampleSet, Variable, VersionState, Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -21,10 +21,13 @@ import { templates, versions } from "@/server/db/schema/ucomp";
 
 /**
  * The draft's fields as they are in the version it was started from: its name too, and each channel field
- * by id ("email.subject", null when it has none), the way the workspace holds and saves them.
+ * by id ("email.subject", null when it has none), the way the workspace holds and saves them. With its
+ * number, round and state, for its label ("Reverted to v1, round 1", `versionLabel`).
  */
 export interface BaseVersionContent extends ChannelFieldValues {
   number: number;
+  round: number;
+  state: VersionState;
   name: string;
   body: JSONContent;
   variables: Variable[];
@@ -59,6 +62,7 @@ export async function getBaseVersion(
     .select({
       id: versions.id,
       number: versions.number,
+      round: versions.round,
       state: versions.state,
       basedOnVersionId: versions.basedOnVersionId,
       name: versions.name,
@@ -75,12 +79,14 @@ export async function getBaseVersion(
   if (!draft) return refusal(404, REQUEST_REFUSALS.noDraftToRevert);
   if (draft.state !== "draft") return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
   const base = draft.basedOnVersionId ? list.find((v) => v.id === draft.basedOnVersionId) : undefined;
-  if (!base || base.number === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
+  if (!base || base.number === null || base.round === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
 
   return {
     ok: true,
     base: {
       number: base.number,
+      round: base.round,
+      state: base.state,
       name: base.name,
       body: base.body,
       variables: base.variables,

@@ -19,7 +19,7 @@ const item = (id: string, at: string): ActivityItem => ({
   at,
   actor: null,
   action: "draft.edited",
-  versionNumber: null,
+  versionLabel: null,
   summary: id,
 });
 

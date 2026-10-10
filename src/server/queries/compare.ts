@@ -23,6 +23,8 @@ export interface CompareVersion {
   id: string;
   /** Null for the open draft. */
   number: number | null;
+  /** Which submission of `number`; null for the open draft. */
+  round: number | null;
   state: VersionState;
   /** The template's name as this version has it (a rename shows above the redline). */
   name: string;
@@ -71,6 +73,7 @@ export async function loadVersionsToCompare(
       .select({
         id: versions.id,
         number: versions.number,
+        round: versions.round,
         state: versions.state,
         name: versions.name,
         body: versions.body,
@@ -88,7 +91,13 @@ export async function loadVersionsToCompare(
   const pick = (id: string): CompareVersion | undefined => {
     const row = rows.find((r) => r.id === id);
     if (!row) return undefined;
-    return { ...row, number: row.state === "draft" ? null : row.number, smsFooter: smsFooterOf(row, rules.smsFooter) };
+    const draft = row.state === "draft";
+    return {
+      ...row,
+      number: draft ? null : row.number,
+      round: draft ? null : row.round,
+      smsFooter: smsFooterOf(row, rules.smsFooter),
+    };
   };
   const older = pick(from);
   const newer = pick(to);

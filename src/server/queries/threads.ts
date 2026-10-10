@@ -1,9 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { threadBeganBy } from "@/domain/comments";
 import { DOCUMENT_THREAD, type CommentView, type ThreadView } from "@/domain/review-types";
+import { asNumbered, nextRound, versionLabel, type RoundRef } from "@/domain/rounds";
 import { db } from "@/server/db/client";
 import { commentThreads, comments, versions } from "@/server/db/schema/ucomp";
 import { pickLatest } from "./library";
@@ -11,15 +12,15 @@ import { anchorIdsOf, getPeople, iso, isoOrUndefined, personOf, requireTemplate 
 
 // Review threads. A thread belongs to the template and anchors to a stable block id (or a channel field's
 // id, "push.title": an alert's threads are on its fields), so a draft made from a version (same block ids)
-// shows the version's threads in its margin with no copying. A frozen
-// version shows the threads that began by it (`threadBeganBy` in domain/comments.ts).
+// shows the version's threads in its margin with no copying. A frozen round shows the threads that began
+// by it (`threadBeganBy` in domain/comments.ts).
 
 export interface LoadThreadsOptions {
   /**
-   * The version being shown is frozen (it has been submitted): leave out the threads that began after it.
-   * Without it, every thread on the template (the editor's margin).
+   * The round being shown is frozen (it has been submitted): leave out the threads that began after it,
+   * by number and then round. Without it, every thread on the template (the editor's margin).
    */
-  throughVersion?: number | null;
+  through?: RoundRef | null;
 }
 
 /**
@@ -31,7 +32,7 @@ export interface LoadThreadsOptions {
 export async function loadThreads(
   templateId: string,
   anchors: readonly string[],
-  { throughVersion = null }: LoadThreadsOptions = {},
+  { through = null }: LoadThreadsOptions = {},
 ): Promise<ThreadView[]> {
   const allRows = await db
     .select({
@@ -43,16 +44,27 @@ export async function loadThreads(
       resolvedAt: commentThreads.resolvedAt,
       createdAt: commentThreads.createdAt,
       originVersionNumber: versions.number,
+      originRound: versions.round,
+      originState: versions.state,
     })
     .from(commentThreads)
     .innerJoin(versions, eq(versions.id, commentThreads.originVersionId))
     .where(eq(commentThreads.templateId, templateId));
 
+  const originOf = (t: (typeof allRows)[number]) =>
+    t.originVersionNumber === null
+      ? null
+      : asNumbered({ number: t.originVersionNumber, round: t.originRound, state: t.originState });
+
   let threadRows = allRows;
-  if (throughVersion !== null && allRows.length > 0) {
-    const [{ newest }] = await db.select({ newest: max(versions.number) }).from(versions).where(eq(versions.templateId, templateId));
-    const nextNumber = (newest ?? 0) + 1;
-    threadRows = allRows.filter((t) => threadBeganBy(t.originVersionNumber, throughVersion, nextNumber));
+  if (through !== null && allRows.length > 0) {
+    // A thread begun in the open draft counts as the round the draft will be.
+    const rows = await db
+      .select({ number: versions.number, round: versions.round, state: versions.state })
+      .from(versions)
+      .where(eq(versions.templateId, templateId));
+    const next = nextRound(rows);
+    threadRows = allRows.filter((t) => threadBeganBy(originOf(t), through, next));
   }
   if (threadRows.length === 0) return [];
 
@@ -85,12 +97,15 @@ export async function loadThreads(
   return threadRows
     .map((t) => {
       const resolved = t.status === "resolved";
+      const origin = originOf(t);
       const view: ThreadView = {
         id: t.id,
         blockId: t.blockId,
         quote: t.quote,
         status: t.status,
         originVersionNumber: t.originVersionNumber,
+        originRound: origin?.round ?? null,
+        originLabel: origin ? versionLabel(origin, { history: true }) : null,
         comments: byThread.get(t.id) ?? [],
         orphaned: rank(t.blockId) === Infinity,
       };
@@ -104,14 +119,14 @@ export async function loadThreads(
 
 /**
  * The template's threads for one of its versions (by id), or for what the workspace shows (the open
- * draft, else the latest version) when no version is named. 404 when the version isn't the template's.
- * A submitted version is a record: it shows the threads that began by then, not the later ones.
+ * draft, else the latest round) when no version is named. 404 when the version isn't the template's.
+ * A submitted round is a record: it shows the threads that began by then, not the later ones.
  */
 export const getThreads = cache(
   async (spaceSlug: string, templateId: string, versionId?: string): Promise<ThreadView[]> => {
     const { template } = await requireTemplate(spaceSlug, templateId);
     const list = await db
-      .select({ id: versions.id, number: versions.number, state: versions.state })
+      .select({ id: versions.id, number: versions.number, round: versions.round, state: versions.state })
       .from(versions)
       .where(versionId ? and(eq(versions.templateId, template.id), eq(versions.id, versionId)) : eq(versions.templateId, template.id));
     const shown = versionId ? list[0] : pickLatest(list);
@@ -121,6 +136,6 @@ export const getThreads = cache(
       .from(versions)
       .where(eq(versions.id, shown.id))
       .then((rows) => (rows[0] ? anchorIdsOf(rows[0]) : []));
-    return loadThreads(template.id, anchors, { throughVersion: shown.number });
+    return loadThreads(template.id, anchors, { through: shown.number === null ? null : asNumbered(shown) });
   },
 );

@@ -29,6 +29,13 @@ export interface SeedVersion {
   teamId: string;
   /** null for an open draft. */
   number: number | null;
+  /** Which submission of its number this row is (decision 0033); null for an open draft. */
+  round: number | null;
+  /**
+   * The row a consumer's version number means: the number's released row, else its latest round. A round
+   * sent back before a later one is a record only, and asking for its number gets the later round's answer.
+   */
+  head: boolean;
   state: string;
   channels: Channel[];
   variables: Variable[];
@@ -40,14 +47,16 @@ export interface SeedVersion {
   activeNumber: number | null;
 }
 
-/** Every version in the seed, with what the render rules look at. Nothing is hardcoded by id. */
+/** Every version in the seed, every round of it, with what the render rules look at. Nothing is hardcoded by id. */
 export async function allVersions(db: Client): Promise<SeedVersion[]> {
   const { rows } = await db.execute(`
-    SELECT v.id, v.template_id, v.name AS template_name, t.team_id, v.number, v.state, v.channels, v.variables,
+    SELECT v.id, v.template_id, v.name AS template_name, t.team_id, v.number, v.round, v.state, v.channels, v.variables,
            v.sunset_at, v.revoke,
-           (SELECT a.number FROM versions a WHERE a.template_id = v.template_id AND a.state = 'active') AS active_number
+           (SELECT a.number FROM versions a WHERE a.template_id = v.template_id AND a.state = 'active') AS active_number,
+           (SELECT h.id FROM versions h WHERE h.template_id = v.template_id AND h.number = v.number
+            ORDER BY h.state IN ('active', 'superseded', 'revoked') DESC, h.round DESC LIMIT 1) AS head_id
     FROM versions v JOIN templates t ON t.id = v.template_id
-    ORDER BY v.template_id, v.number`);
+    ORDER BY v.template_id, v.number, v.round`);
   return rows.map((r) => {
     const revoke = r.revoke ? (JSON.parse(String(r.revoke)) as { confirmedAt?: string }) : null;
     return {
@@ -56,6 +65,8 @@ export async function allVersions(db: Client): Promise<SeedVersion[]> {
       templateName: String(r.template_name),
       teamId: String(r.team_id),
       number: r.number === null ? null : Number(r.number),
+      round: r.round === null ? null : Number(r.round),
+      head: r.number !== null && r.head_id === r.id,
       state: String(r.state),
       channels: JSON.parse(String(r.channels)) as Channel[],
       variables: JSON.parse(String(r.variables)) as Variable[],
@@ -68,7 +79,7 @@ export async function allVersions(db: Client): Promise<SeedVersion[]> {
 
 /**
  * A document's version (PDF, Web, Email), not an alert's (Push, SMS): what the specs that render and
- * check documents pick from. The seed has both (decision 0033).
+ * check documents pick from. The seed has both (decision 0034).
  */
 export const isDocument = (v: SeedVersion) => v.channels.some((c) => c === "pdf" || c === "web" || c === "email");
 

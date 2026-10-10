@@ -1,4 +1,4 @@
--- A version keeps the SMS footer it was submitted with (decision 0034). The footer is the content type's (brand and
+-- A version keeps the SMS footer it was submitted with (decision 0035). The footer is the content type's (brand and
 -- opt-out), and it used to be read at render time, so changing it changed the text of every Active alert without
 -- approval. Now submit freezes it into the version, and render, review, Compare and Coral print the version's own.
 -- A draft keeps null and shows the content type's footer as it stands. Every version already submitted (in review,

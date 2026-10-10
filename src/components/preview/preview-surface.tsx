@@ -28,6 +28,8 @@ export interface PreviewSurfaceProps {
   templateId: string;
   /** The shown version's number, or null for the open draft. */
   versionNumber: number | null;
+  /** The shown version's round, or null for the open draft: the render is of exactly that row. */
+  round?: number | null;
   /** The team's name: the email frame's sender, and a push's app when the team names none. */
   teamName: string;
   /** The version's channels as the Channels selector has them right now (live, ahead of the save). */
@@ -61,11 +63,12 @@ export interface PreviewSurfaceProps {
  *
  * Values for a render are the selected set's. `variables` is the live list, so a variable added in the
  * panel is in the next render. A document channel renders the saved draft through the route; a
- * message channel renders the fields as typed, in the browser, on every keystroke (decision 0035).
+ * message channel renders the fields as typed, in the browser, on every keystroke (decision 0036).
  */
 export function PreviewSurface({
   templateId,
   versionNumber,
+  round = null,
   teamName,
   channels,
   editable,
@@ -97,6 +100,7 @@ export function PreviewSurface({
   const { slots, rendering, retry } = usePreviewRender({
     templateId,
     version: versionNumber ?? "draft",
+    round: versionNumber === null ? null : round,
     channel: isDocumentChannel(channel) ? channel : null,
     values,
     variables,

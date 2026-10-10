@@ -4,7 +4,7 @@
 // Why not `Intl.Segmenter`: it follows the Unicode version of the runtime's ICU, which differs between browsers,
 // Node releases and a Java engine, and the rules themselves move between versions (GB9c, the Indic conjunct rule,
 // arrived in 15.1 and changed again in 18.0). The composer's preview runs in the browser and the API on the
-// server, and both must cut an SMS into the same parts (decision 0035), so the rules and the property data live
+// server, and both must cut an SMS into the same parts (decision 0036), so the rules and the property data live
 // here, generated from the Unicode Character Database by scripts/unicode-graphemes.ts. A second engine reproduces
 // them at the same version (ICU4J 78 is Unicode 17.0); GraphemeBreakTest.txt, Unicode's own conformance file, is
 // the test (graphemes.test.ts).

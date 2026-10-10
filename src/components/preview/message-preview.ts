@@ -1,4 +1,4 @@
-// The message channels' preview, rendered in the browser (decision 0035). A push or an SMS is plain
+// The message channels' preview, rendered in the browser (decision 0036). A push or an SMS is plain
 // text, so the preview doesn't ask the render route for it: it runs the route's own pure function,
 // `renderMessage` (src/domain/render/message.ts), on the fields as they are now (the composer's,
 // unsaved keystrokes included, or a version's stored ones on the review screen) and the selected

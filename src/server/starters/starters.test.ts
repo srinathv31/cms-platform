@@ -147,7 +147,7 @@ describe.each(STARTER_KEYS.document)("document starter %s", (key) => {
 });
 
 // The Alert starters must be submittable as they come: an author who starts from one and changes only
-// the words never meets a refusal they didn't cause (decisions 0033 and 0034).
+// the words never meets a refusal they didn't cause (decisions 0034 and 0035).
 describe.each(STARTER_KEYS.message)("alert starter %s", (key) => {
   const starter = alert(key);
 

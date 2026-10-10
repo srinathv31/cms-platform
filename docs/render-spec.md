@@ -2,7 +2,7 @@
 
 This document specifies Stencil's render engine: how a template version's stored document and a request's variable values become a web page, an email (subject, preheader, HTML and plain text) and a PDF, and how a message template's own short fields become a push notification or an SMS. It is written so a second engine (the planned Java service) can be built from it without reading the TypeScript, and so the Node engine can be checked against it.
 
-A template is a **document** or a **message**, never both ([decision 0033](decisions/0033-message-channels-families-and-the-fields-registry.md)). A document (a Disclosure) renders its one body to PDF, Web and Email. A message (an Alert) renders its own fields to Push and SMS and never reads a body. A content type allows the channels of one family only.
+A template is a **document** or a **message**, never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)). A document (a Disclosure) renders its one body to PDF, Web and Email. A message (an Alert) renders its own fields to Push and SMS and never reads a body. A content type allows the channels of one family only.
 
 The product rule behind every section:
 
@@ -51,7 +51,7 @@ Contents:
 | # | Stage | Fails with |
 | --- | --- | --- |
 | 1 | Find the template (and its content type) | 404 `template_not_found` |
-| 2 | Find the version by number, or the open draft (preview only) | 404 `version_not_found` |
+| 2 | Find the version by number, or the open draft (preview only). A number is its released row; with none, its latest round, which stage 4 refuses a consumer. A preview may name a `round` of the number | 404 `version_not_found` |
 | 3 | Preview: the viewer may see the template. Consumer: the consumer is registered | 403 `preview_forbidden` / `unknown_consumer` |
 | 4 | Version rules (consumers only): released, not sunset, not revoked | 409 / 410 |
 | 5 | The channel is allowed by the content type and enabled on the version | 422 `channel_not_allowed` / `channel_not_enabled` |
@@ -61,11 +61,11 @@ Contents:
 | 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF; or the message's text → a push for its platform, or an SMS, measured against its limit (section 10) | 500 `render_failed`; a message over its limit: 422 `push_payload_too_large` / `sms_too_long` |
 | 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values) | — |
 
-Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
+Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, `round` only with `preview: true` (a whole number from 1; without `preview` it is ignored, whatever it holds, since consumers never see rounds), a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
 Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run; for push and SMS, stages 8 and 9 are `renderMessage` in `src/domain/render/message.ts`, the same function the composer's preview runs in the browser). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that stage 7 also checks the channel's own fields and stage 8 resolves them, a message channel skips the body, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 
-Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), the channel and, for push, the platform, the version's SMS footer (the content type's footer as it stood when the version was submitted, frozen into it as `versions.sms_footer`; a draft preview uses the content type's `content_types.sms_footer` as it stands; or none), and the render time `at` (used only as the PDF's creation and modification date).
+Inputs to the engine (and nothing else): the version's `body` and `channelFields` (TipTap JSON; see "Channel fields" in section 2), the version's variable list, the request's `values`, the template id, the rendered version's name (a numbered version keeps the name it was submitted and approved with, so a later rename never reaches it; a draft preview uses the draft's name as it stands), the version number (or none for a draft), on a CMS preview of an unreleased round whose label names it (a round sent back, or past the first) that round, the channel and, for push, the platform, the version's SMS footer (the content type's footer as it stood when the version was submitted, frozen into it as `versions.sms_footer`; a draft preview uses the content type's `content_types.sms_footer` as it stands; or none), and the render time `at` (used only as the PDF's creation and modification date).
 
 ---
 
@@ -555,6 +555,7 @@ The RenderDoc is the channel-neutral result of resolution, and the input of ever
   "templateId": "UC-4F7K2Q",
   "templateName": "Cash Back Welcome Bonus",   // the version's name; metadata: PDF title, web <title>; never printed in the body
   "versionNumber": 2,                          // null for an unsubmitted draft
+  "round": 2,                                  // only on a CMS preview of an unreleased round whose label names it; absent otherwise
   "blocks": [ Block, … ]
 }
 ```
@@ -644,7 +645,7 @@ The adapter returns `{ subject, preheader, html, text }`.
 ### PDF (`application/pdf`)
 
 - US Letter pages, 1 inch side margins, real selectable text, embedded fonts. Pagination rules are unchanged (keep-with-next headings, widows and orphans, table rows that never split, repeated table header rows, list items and callouts that move whole up to a size).
-- Document information: /Title = the version's name, /Subject = the footer label (`UC-4F7K2Q · v2`, or `UC-4F7K2Q · Draft`), /Creator (Stencil), /Producer (Stencil), no /Author or /Keywords. /CreationDate = /ModDate = the render time `at` truncated (not rounded) to whole seconds, UTC, written `D:20270304120000Z`. The catalog's /Lang is (en-US). (react-pdf writes /ModificationDate; the Node adapter renames that key in place to /ModDate, padded with spaces so no byte offset moves.)
+- Document information: /Title = the version's name, /Subject = the footer label (`UC-4F7K2Q · v2`, `UC-4F7K2Q · Draft`, or `UC-4F7K2Q · v3 · Round 2` for a preview that names its round), /Creator (Stencil), /Producer (Stencil), no /Author or /Keywords. /CreationDate = /ModDate = the render time `at` truncated (not rounded) to whole seconds, UTC, written `D:20270304120000Z`. The catalog's /Lang is (en-US). (react-pdf writes /ModificationDate; the Node adapter renames that key in place to /ModDate, padded with spaces so no byte offset moves.)
 - A footer on every page: the label on the left, `Page N of M` on the right. The footer is not document content.
 - Prints exactly the RenderDoc: every item's `marker` (right-aligned in a hanging marker column), blank lines (an empty or blank paragraph takes one line of its type's line height per line; an empty paragraph exactly one), spaces and breaks per section 4 (the empty last line after a final hard break included).
 - Spaces: U+0020 and U+00A0 print with the face's own glyphs. Every other Unicode space (U+1680, U+2000–U+200A, U+202F, U+205F, U+3000), which neither face has, is drawn as the face's no-break space with letter spacing that gives it its own width: en quad and en space ½ em; em quad, em space and ideographic space 1 em; three-per-em ⅓ em; four-per-em ¼ em; six-per-em ⅙ em; figure space the width of the face's `0`; punctuation space the width of `.`; thin space and narrow no-break space ⅕ em; hair space 1/10 em; medium mathematical space 4/18 em; Ogham space mark the width of U+0020. So a space is never a character the PDF can't draw, and leading spaces of every kind keep their indent. In the text layer a U+0020 reads U+0020; a space drawn with Liberation Sans's space glyph (U+00A0 and the drawn substitutes) reads U+0020 too.
@@ -678,7 +679,7 @@ Consumers must send `text` as is and turn off provider rewriting such as Twilio'
 
 ### SMS encoding
 
-The reference is `src/domain/messages/gsm7.ts`; its README explains the sources ([decision 0034](decisions/0034-sms-characters-and-length.md)).
+The reference is `src/domain/messages/gsm7.ts`; its README explains the sources ([decision 0035](decisions/0035-sms-characters-and-length.md)).
 
 - **GSM-7 or UCS-2.** `text` is GSM-7 when every character is in the GSM 7-bit default alphabet (3GPP TS 23.038 §6.2.1; 127 characters, 1 septet each) or its extension table (§6.2.1.1: form feed, `^ { } \ [ ~ ] |` and `€`, 2 septets each: an escape and a code). Code 0x09 is `Ç` (capital): `ç` is not GSM-7. One character outside both switches the whole message to UCS-2 (UTF-16).
 - **Units** are septets in GSM-7 and UTF-16 code units in UCS-2 (a character outside the Basic Multilingual Plane, such as most emoji, is 2).

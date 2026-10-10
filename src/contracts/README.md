@@ -36,7 +36,7 @@ previews.
 
 `ApiChannel` is `pdf`, `web`, `email` (a document template's: its body) or `push`, `sms` (a message template's, such
 as an Alert: its own short fields). A template is one or the other, so a version's `channels` never mix
-([decision 0033](../../docs/decisions/0033-message-channels-families-and-the-fields-registry.md)).
+([decision 0034](../../docs/decisions/0034-message-channels-families-and-the-fields-registry.md)).
 
 - **Push** needs `platform: "ios" | "android"` (`ApiPushPlatform`); no other channel takes one (400 `bad_request`).
   The answer is the push for that platform, `ApiPushResponse`: the title, the subtitle (iPhone only: never for
@@ -47,7 +47,7 @@ as an Alert: its own short fields). A template is one or the other, so a version
   `encoding` (`ApiSmsEncoding`, `GSM-7` or `UCS-2`), `parts` and `characters`. A value is never transliterated: one
   outside GSM-7 switches the message to UCS-2, and `encoding` says so. Over 10 parts is 422 `sms_too_long`. Turn off
   provider rewriting such as Twilio's Smart Encoding: the counts are for this text
-  ([decision 0034](../../docs/decisions/0034-sms-characters-and-length.md)).
+  ([decision 0035](../../docs/decisions/0035-sms-characters-and-length.md)).
 - `encoding: "base64"` is for PDF, web and email only; push and SMS are JSON already (400 `bad_request`).
 
 `src/domain/golive-types.ts` holds `ApiChannel` and `Channel` equal, and `ApiPushPlatform`, `ApiSmsEncoding`, the
