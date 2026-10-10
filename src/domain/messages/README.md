@@ -1,7 +1,8 @@
 # `src/domain/messages`: what a text message or push notification costs
 
 The measurements behind the message channels, Push and SMS: which characters an SMS can carry, how many parts it
-is sent in, and how many bytes a push payload weighs. Facts in, numbers out. They are written for the composer to run on every keystroke and for Submit, render and `/api/v1` to run
+is sent in, how many bytes a push payload weighs, and whether a text links through a public shortener. Facts in,
+numbers out. They are written for the composer to run on every keystroke and for Submit, render and `/api/v1` to run
 on the server, so that the numbers an author sees are the numbers a consumer gets.
 
 They follow the [domain rules](../README.md#rules): pure TypeScript, no clock, no framework, safe in the browser.
@@ -13,6 +14,7 @@ They use two built-ins, `Intl.Segmenter` (grapheme clusters) and `String.prototy
 | --- | --- | --- |
 | [gsm7.ts](gsm7.ts) | Is this SMS GSM-7 or UCS-2? How many units, characters and parts? Where are the parts cut? Which characters are outside GSM-7, and what can replace them? | `smsEncoding`, `smsLength`, `smsParts`, `nonGsmCharacters`, `gsm7Septets`, the two tables, the limits |
 | [push.ts](push.ts) | What JSON does a push send on iOS and on Android, and how many UTF-8 bytes is it? | `pushPayload`, `pushPayloadBytes`, `utf8ByteLength`, `PUSH_MAX_BYTES`, `PUSH_PLATFORMS` |
+| [links.ts](links.ts) | Does this text contain a link on a public URL shortener, and where? | `findPublicShorteners`, `PUBLIC_SHORTENER_DOMAINS` |
 
 ## Constants
 
@@ -92,6 +94,20 @@ the limit, so there it errs a few bytes high: the safe side. Two caveats for con
   12, so it can take a payload Stencil measured as fitting over the limit.
 - An FCM message sent to a topic has 2,048 bytes, not 4,096.
 
+## Links: public shorteners
+
+CTIA's Messaging Principles and Best Practices (May 2023), §5.3.2 Embedded Website Links: where a URL shortener is
+used, senders "should use a shortener with a web address and IP address(es) dedicated to the exclusive use of the
+Message Sender". A public shortener's domain is shared by every sender, spammers included: it hides whose link it
+is, and US carriers and 10DLC campaign vetting filter messages that use one. A sender's own branded short domain is
+fine.
+
+`findPublicShorteners` returns each link on a listed domain or a subdomain of one, with or without a scheme, with its
+UTF-16 offset and length, through its path and without trailing punctuation. It scans the whole text, so a shortener
+inside another link's query is found too. A host that only resembles one doesn't match: `bit.lyrics.com`,
+`notbit.ly`, `goo.gle`. The list is curated, not exhaustive: the best-known general-purpose shorteners, plus the
+services that wrap every link their users post (t.co, lnkd.in).
+
 ## Sources
 
 - 3GPP TS 23.038 §6.2.1 and §6.2.1.1: the GSM 7-bit default alphabet and its extension table.
@@ -106,3 +122,4 @@ the limit, so there it errs a few bytes high: the safe side. Two caveats for con
   the payload is limited to 4 KB (4,096 bytes).
 - Firebase, [FCM error codes](https://firebase.google.com/docs/cloud-messaging/error-codes): 4,096 bytes for most
   messages, 2,048 for topic messages, keys and values included.
+- CTIA, Messaging Principles and Best Practices (May 2023), §5.3.2.
