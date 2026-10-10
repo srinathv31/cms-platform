@@ -12,6 +12,7 @@ import { sampleSetValues } from "@/editor/model/sample-sets";
 import { createContext } from "@/server/seed/context";
 import { seedCardStatementsTemplates } from "@/server/seed/templates/card-statements";
 import { seedCoralTemplates } from "@/server/seed/templates/coral";
+import { seedCoralAlerts } from "@/server/seed/templates/coral-alerts";
 import { seedDepositsTemplates } from "@/server/seed/templates/deposits";
 import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starters";
 import { normalizeDocument } from "@/editor/model/normalize";
@@ -320,6 +321,7 @@ describe("seeded templates", () => {
   seedCoralTemplates(ctx);
   seedDepositsTemplates(ctx);
   seedCardStatementsTemplates(ctx);
+  seedCoralAlerts(ctx);
   const versions = ctx.sink.versions;
 
   it("are all reachable without a database", () => {

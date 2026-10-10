@@ -4,7 +4,7 @@ import { inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { HEATMAP_WEEKS, HISTORY_DAYS, TREND_WEEKS, USAGE_WINDOW_DAYS } from "@/domain/golive-types";
-import type { Viewer } from "@/domain/types";
+import { CHANNELS, type Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
@@ -183,7 +183,10 @@ describe("getUsageDashboard", () => {
     const week = d.weekly.at(-2)!;
     const ws = Date.parse(`${week.weekStart}T00:00:00Z`);
     expect(week.count).toBe(await direct("at >= ? and at < ?", "coral-offers", [ws, ws + 7 * DAY]));
-    expect(week.channels.pdf + week.channels.web + week.channels.email).toBe(week.count);
+    // Every channel's renders, the Payment Due Reminder alert's push and SMS among them.
+    expect(CHANNELS.reduce((sum, channel) => sum + week.channels[channel], 0)).toBe(week.count);
+    expect(week.channels.push).toBeGreaterThan(0);
+    expect(week.channels.sms).toBeGreaterThan(0);
   });
 
   it("previews and consumer-less rows never count", async () => {

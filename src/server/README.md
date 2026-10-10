@@ -158,6 +158,21 @@ the app "Coral" and from the short code 26725 ([seed/teams.ts](seed/teams.ts)). 
 type's footer and budget with `loadMessageRules` ([queries/review-shared.ts](queries/review-shared.ts)), and the
 workspace's read model carries them and the team's senders (`messageRules`, `senders`) for the message preview.
 
+The templates are declared in [seed/templates/](seed/templates/), one `SeedTemplate` each, and `buildTemplate`
+([seed/templates/build.ts](seed/templates/build.ts)) derives every row from it: the template, its versions,
+approvals, comment threads, audit events and consumer notices. A template names its content type (`contentType`,
+Disclosure unless it says Alert), and the build checks each version against it: the required sections in order, and
+only channels the type allows. Coral Offers has five disclosures ([coral.ts](seed/templates/coral.ts)), one in each
+lifecycle state, and three alerts ([coral-alerts.ts](seed/templates/coral-alerts.ts)): Payment Due Reminder (v1
+Active, rendered by Coral as push and SMS every day), Card Used Abroad (v1 waiting for an approver) and Rate Change
+Heads-up (a draft that pairs with the Rate Change Notice letter). An alert's body is one empty paragraph; its push
+and SMS are channel fields, and every seeded alert passes submit's message rules with its own sample sets
+(`seed.test.ts`). Deposits ([deposits.ts](seed/templates/deposits.ts)) and Card Statements
+([card-statements.ts](seed/templates/card-statements.ts)) have three disclosures each. The alerts are built last, so
+the ids seeded before them stay the same. [seed/history.ts](seed/history.ts) writes about 90 days of renders (about
+31,000 rows: daily streams, previews, a few failures and the latest renders), and
+[seed/activity.ts](seed/activity.ts) the notifications, access requests and recertification.
+
 **The `sim` schema** belongs to the simulator ("Coral — simulated"). In this layer only `seed/**` and `reset.ts` may import it (lint). `src/simulator/**` and `src/app/(simulator)/**` may import it and nothing else from `@/server`.
 
 ## Clock, viewer, and the access sweep

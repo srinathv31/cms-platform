@@ -970,15 +970,26 @@ describe("the stages backfill in the migration", () => {
     await libsql.execute("UPDATE versions SET current_stage = 7 WHERE state = 'in_review'"); // past the end
     for (const statement of backfill) await libsql.execute(statement);
 
+    // Each version gets its own content type's chain: Disclosure's as edited above, Alert's untouched.
+    const alertChain = [{ id: "stage_alert_0", name: "Team approver" }];
+    const onAlert = new Set(
+      (await db.select({ id: schema.templates.id }).from(schema.templates).where(eq(schema.templates.contentTypeId, "ct_alert"))).map(
+        (t) => t.id,
+      ),
+    );
+    expect(onAlert.size).toBeGreaterThan(0);
+    const chainOf = (v: { templateId: string }) => (onAlert.has(v.templateId) ? alertChain : today);
+
     const rows = await db.select().from(versions);
     expect(rows.some((v) => v.number === null)).toBe(true);
     for (const v of rows) {
-      expect(v.stages).toEqual(v.number === null ? null : today);
-      if (v.state === "in_review") expect(v.currentStage, "read as the last stage, as before").toBe(today.length - 1);
+      expect(v.stages).toEqual(v.number === null ? null : chainOf(v));
+      if (v.state === "in_review") expect(v.currentStage, "read as the last stage, as before").toBe(chainOf(v).length - 1);
     }
     const decisions = await db.select().from(approvals);
     expect(decisions.length).toBeGreaterThan(0);
-    for (const d of decisions) expect(d.stageId).toBe(today[d.stagePosition]?.id ?? null);
+    const versionById = new Map(rows.map((v) => [v.id, v]));
+    for (const d of decisions) expect(d.stageId).toBe(chainOf(versionById.get(d.versionId)!)[d.stagePosition]?.id ?? null);
   });
 
   it("someone who approved before the migration can't approve the stage their approval was matched to", async () => {

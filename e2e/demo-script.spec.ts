@@ -97,8 +97,11 @@ const TEAM = "coral-offers";
 const SEEDED_CORAL = [
   "Annual Fee Waiver — Terms",
   "Balance Transfer Intro — Terms",
+  "Card Used Abroad",
   "Cash Back Welcome Bonus — Terms",
   "Holiday Points Promo — Terms",
+  "Payment Due Reminder",
+  "Rate Change Heads-up",
   "Rate Change Notice",
 ];
 

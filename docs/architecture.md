@@ -197,6 +197,7 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
   | Teams | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space |
   | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer) |
   | Content types | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget |
+  | Templates | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
   | Template ids | `UC-` plus 6 Crockford base32 characters, e.g. `UC-4F7K2Q` |
   | Consumer | `coral`, with offers, customers, and links in the `sim_*` tables |
 

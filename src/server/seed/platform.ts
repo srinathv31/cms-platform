@@ -21,6 +21,22 @@ export const ALERT_SMS_FOOTER = "Coral Offers: Reply STOP to opt out, HELP for h
 /** The Alert chain's one stage. */
 export const ALERT_STAGE = { id: "stage_alert_0", name: "Team approver" } as const;
 
+/**
+ * The seeded content types as a seeded template names its own (`SeedTemplate.contentType`): the row it
+ * belongs to, the chain stage its versions go through, the channels it allows and the required sections
+ * every version's body has, in order.
+ */
+export const SEED_CONTENT_TYPES = {
+  disclosure: {
+    id: CONTENT_TYPE_ID,
+    stage: TEAM_STAGE,
+    channels: CHANNELS_ALL,
+    requiredSections: REQUIRED_SECTIONS.map((s) => s.key) as string[],
+  },
+  alert: { id: ALERT_CONTENT_TYPE_ID, stage: ALERT_STAGE, channels: ALERT_CHANNELS, requiredSections: [] as string[] },
+} as const;
+export type SeedContentType = keyof typeof SEED_CONTENT_TYPES;
+
 export const CONSUMER_IDS = ["coral", "deposits-online"] as const;
 export type ConsumerId = (typeof CONSUMER_IDS)[number];
 

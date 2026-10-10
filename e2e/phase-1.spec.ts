@@ -10,8 +10,11 @@ const PERSONA_COOKIE = "ucomp_persona";
 const CORAL = [
   "Annual Fee Waiver — Terms",
   "Balance Transfer Intro — Terms",
+  "Card Used Abroad",
   "Cash Back Welcome Bonus — Terms",
   "Holiday Points Promo — Terms",
+  "Payment Due Reminder",
+  "Rate Change Heads-up",
   "Rate Change Notice",
 ];
 const DEPOSITS = [
@@ -45,8 +48,8 @@ const CROSS_TEAM_SPACES = ["All teams", "Card Statements", "Coral Offers", "Depo
 
 const PERSONAS: PersonaSpec[] = [
   { id: "maya", name: "Maya Chen", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
-  { id: "jordan", name: "Jordan Ellis", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: 1, rows: CORAL },
-  { id: "alex", name: "Alex Kim", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage", "Audit"], settings: true, review: 1, rows: CORAL },
+  { id: "jordan", name: "Jordan Ellis", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: 2, rows: CORAL },
+  { id: "alex", name: "Alex Kim", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage", "Audit"], settings: true, review: 2, rows: CORAL },
   { id: "priya", name: "Priya Raman", spaces: ["Coral Offers", "Deposits"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
   { id: "sam", name: "Sam Ortiz", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
   { id: "riley", name: "Riley Brooks", spaces: CROSS_TEAM_SPACES, landing: "/all/library", nav: ["Library", "Review", "Usage", "Audit"], settings: true, review: null, rows: ALL },
@@ -309,7 +312,7 @@ test.describe("shell and library, per persona", () => {
       await expect(sidebarFooter(page).getByRole("link", { name: "Settings" })).toHaveCount(spec.settings ? 1 : 0);
       await expect(sidebarFooter(page).getByRole("button", { name: "Help" })).toBeVisible();
 
-      // Review badge ("1" for jordan and alex only)
+      // Review badge ("2" for jordan and alex only: Cash Back v3 and the Card Used Abroad alert)
       const review = sidebarNav(page).getByRole("link", { name: /^Review/ });
       const badge = review.locator("[aria-label$='waiting']");
       if (spec.review === null) await expect(badge).toHaveCount(0);
@@ -322,11 +325,11 @@ test.describe("shell and library, per persona", () => {
       const rows = await libraryRows(page);
       expect(names(rows)).toEqual([...spec.rows].sort());
       if (spec.landing.startsWith("/all/")) {
-        expect(rows).toHaveLength(11);
+        expect(rows).toHaveLength(14);
         await expect(page.locator(".caps-label", { hasText: /^Team$/ }).filter({ visible: true })).toHaveCount(1);
         const byTeam = Object.groupBy(rows, (r) => r.team ?? "");
         expect(Object.keys(byTeam).sort()).toEqual(["Card Statements", "Coral Offers", "Deposits"]);
-        expect(byTeam["Coral Offers"]).toHaveLength(5);
+        expect(byTeam["Coral Offers"]).toHaveLength(8);
         expect(byTeam["Deposits"]).toHaveLength(3);
         expect(byTeam["Card Statements"]).toHaveLength(3);
       } else {
@@ -383,7 +386,7 @@ test.describe("shell and library, per persona", () => {
     await asPersona(page, "riley");
     await page.goto("/");
     await expect(page).toHaveURL(/\/all\/library$/);
-    expect(await libraryRows(page)).toHaveLength(11);
+    expect(await libraryRows(page)).toHaveLength(14);
     const menu = await openSwitcher(page);
     await menu.getByRole("menuitem", { name: "Card Statements" }).click();
     await expect(page).toHaveURL(/\/card-statements\/library$/);
@@ -479,7 +482,7 @@ test.describe("workspace", () => {
     await asPersona(page, "riley");
     await page.goto("/all/library");
     const rows = await libraryRows(page);
-    expect(rows).toHaveLength(11);
+    expect(rows).toHaveLength(14);
 
     const withActive = rows.filter((r) => r.active !== "—");
     const without = rows.filter((r) => r.active === "—");

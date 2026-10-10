@@ -1,12 +1,12 @@
 # Stencil Demo Script
 
-A guided walkthrough for people seeing Stencil for the first time. It follows one disclosure from a blank page to customers' inboxes, through a safe change and an emergency stop, then shows how the platform is governed.
+A guided walkthrough for people seeing Stencil for the first time. It follows one disclosure from a blank page to customers' inboxes, sends an alert to their phones, takes the disclosure through a safe change and an emergency stop, then shows how the platform is governed.
 
-- **8 acts, 47 steps, about 52 minutes** (a 20-minute cut is in [Timing, cuts and rules](#timing-cuts-and-rules)).
-- **Verified:** every step was run end to end, in this order, from a fresh `npm run db:reset` against a production build of `main` @ 9a8bc38 on October 7, 2026. Dates in the app depend on the day you run it, so the steps use relative dates.
+- **9 acts, 54 steps, about 57 minutes** (a 20-minute cut is in [Timing, cuts and rules](#timing-cuts-and-rules)).
+- **Verified:** every step was run end to end, in this order, from a fresh `npm run db:reset` against a production build of `main` @ 9a8bc38 on October 7, 2026, except Act 5 (alerts), which was written with the alert composer and phone preview and hasn't had its end-to-end run yet. Dates in the app depend on the day you run it, so the steps use relative dates.
 - **Screenshots** of each act's key moments are on the [published version of this script](https://claude.ai/artifact/VqfoD2z9CuMw1RBnHc4BsU). That page is private until it's shared from its Share menu.
 
-**Contents:** [The story](#the-story-youre-telling) · [Setup](#before-the-audience-arrives) · [Cast](#the-cast) · [Run of show](#run-of-show) · [Act 1](#act-1--orientation) · [Act 2](#act-2--write-a-disclosure) · [Act 3](#act-3--review-and-approve) · [Act 4](#act-4--customers-receive-it) · [Act 5](#act-5--change-it-safely) · [Act 6](#act-6--governance) · [Act 7](#act-7--access-and-admin) · [Act 8](#act-8--accelerators-and-reset) · [Closing](#closing-whats-next) · [Requirements coverage](#requirements-coverage) · [Glossary](#glossary) · [Timing](#timing-cuts-and-rules) · [Rough edges](#rough-edges-on-stage)
+**Contents:** [The story](#the-story-youre-telling) · [Setup](#before-the-audience-arrives) · [Cast](#the-cast) · [Run of show](#run-of-show) · [Act 1](#act-1--orientation) · [Act 2](#act-2--write-a-disclosure) · [Act 3](#act-3--review-and-approve) · [Act 4](#act-4--customers-receive-it) · [Act 5](#act-5--alerts-push-and-sms) · [Act 6](#act-6--change-it-safely) · [Act 7](#act-7--governance) · [Act 8](#act-8--access-and-admin) · [Act 9](#act-9--accelerators-and-reset) · [Closing](#closing-whats-next) · [Requirements coverage](#requirements-coverage) · [Glossary](#glossary) · [Timing](#timing-cuts-and-rules) · [Rough edges](#rough-edges-on-stage)
 
 ## The story you're telling
 
@@ -59,15 +59,16 @@ Stencil is one controlled place to author, approve and publish customer content.
 - **Switch persona:** click the avatar (initials, top right), then pick a name. The page stays where it is.
 - **Demo pill:** the dashed "Demo" button, bottom right. It opens the Coral simulator, moves the demo clock forward (+15 days, or any number), and has **Reset demo**.
 - **Back to Stencil:** the dark button, top left of the simulator.
-- **Files for Act 8:** `e2e/fixtures/import/spring-offer.docx` and `e2e/fixtures/import/rate-change-notice.pdf`. Keep the Finder window ready.
+- **Files for Act 9:** `e2e/fixtures/import/spring-offer.docx` and `e2e/fixtures/import/rate-change-notice.pdf`. Keep the Finder window ready.
 
-### Five rules that keep the run working
+### Six rules that keep the run working
 
-- Leave **Cash Back Welcome Bonus v3** alone until Act 7; its next version, v4, is the two-stage approval at the end.
-- Add the **Legal reviewer** stage only in Act 7, after Spring Travel's approvals. Once added, it gates every Disclosure version submitted after it.
-- In Act 5, pick a sunset **14 days out or less**. The default (30) breaks the +15-day step.
-- Do Sam's step and the recertification **Keeps** before advancing the clock in Act 7.
-- The clock moves twice: **+15 days** in Act 5 and **+16 days** in Act 7. If you skip Act 5, advance **31** in Act 7.
+- Leave **Card Used Abroad v1** for Act 5, and **Cash Back Welcome Bonus v3** alone until Act 8; its next version, v4, is the two-stage approval at the end.
+- Add the **Legal reviewer** stage only in Act 8, after Spring Travel's approvals. Once added, it gates every Disclosure version submitted after it.
+- In Act 6, pick a sunset **14 days out or less**. The default (30) breaks the +15-day step.
+- Do Sam's step and the recertification **Keeps** before advancing the clock in Act 8.
+- Run Act 5 before the clock moves: its Usage step reads the seeded renders of the last 30 days.
+- The clock moves twice: **+15 days** in Act 6 and **+16 days** in Act 8. If you skip Act 6, advance **31** in Act 8.
 
 ## The cast
 
@@ -93,10 +94,11 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 | 2 · Write a disclosure | 6 | A business user can write a compliant, multi-channel disclosure without help. | R2, R7, R9, R10, R12, R13, R14, R17 |
 | 3 · Review and approve | 6 | Nothing reaches a customer without a second person's approval, and the trail is automatic. | R5, R6, R16, R23 |
 | 4 · Customers receive it | 6 | One approved template serves every channel, and no customer data is kept. | R4, R16, R18, R30, R31, R32 |
-| 5 · Change it safely | 8 | Changes never surprise downstream systems, and a bad version can be stopped at once, by two people. | R5, R20, R32, R34 |
-| 6 · Governance | 3 | Every action is on record and exportable for compliance. | R6, R18, R27 |
-| 7 · Access and admin | 11 | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29 |
-| 8 · Accelerators | 5 | Existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced. | R8, R11 |
+| 5 · Alerts | 5 | Push and SMS get the same control as documents, and the author sees exactly what each phone will show. | R5, R10, R14, R17, R18 |
+| 6 · Change it safely | 8 | Changes never surprise downstream systems, and a bad version can be stopped at once, by two people. | R5, R20, R32, R34 |
+| 7 · Governance | 3 | Every action is on record and exportable for compliance. | R6, R18, R27 |
+| 8 · Access and admin | 11 | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29 |
+| 9 · Accelerators | 5 | Existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced. | R8, R11 |
 
 ## Act 1 — Orientation
 
@@ -105,13 +107,13 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 **Goal:** there's one controlled place for every customer document, and its state is visible at a glance.
 
 1. **Do:** In the Library, click the **Active** filter chip, then **All**.
-   - **They see:** five Coral Offers templates, each with a status badge, and the ACTIVE column showing which version customers get. The chips read "All 5 · Draft 1 · In review 1 · Active 3".
+   - **They see:** eight Coral Offers templates, three of them alerts, each with a status badge, and the ACTIVE column showing which version customers get. The chips read "All 8 · Draft 2 · In review 2 · Active 4".
    - **Say:** "Every customer document this team owns, what state it's in, and which version customers get, at a glance."
 2. **Do:** Click **Help** at the bottom of the sidebar, then press Esc.
    - **They see:** the keyboard shortcuts and the six statuses: Draft, In review, Changes requested, Active, Superseded, Revoked.
    - **Say:** "One lifecycle for every template, whatever the business line."
 3. **Do:** Point out the sidebar and the team switcher (top left, "Coral Offers").
-   - **They see:** Library, Review and Usage. Audit and Settings appear only for the roles that need them, and Maya belongs to one team. Priya shows several teams in Act 7.
+   - **They see:** Library, Review and Usage. Audit and Settings appear only for the roles that need them, and Maya belongs to one team. Priya shows several teams in Act 8.
    - **Say:** "People only see what their role allows."
 4. **Do:** Press ⌘K, type `holiday`, press Enter, then open the **Versions** tab.
    - **They see:** Search with Recent, Actions, Templates and Pages. Then Holiday Points Promo: v2 Active, v1 Revoked, "Started by Jordan Ellis, confirmed by Alex Kim."
@@ -127,7 +129,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 **Goal:** a business user can write a compliant, multi-channel disclosure without help.
 
 1. **Do:** **Library → New template → Card offer terms.** Type `Spring Travel Rewards — Terms` (the em dash is ⌥⇧-) and press Enter.
-   - **They see:** a gallery: Blank, Card offer terms, Rate change notice, Fee schedule and Import a file. The editor opens with the required sections already in place.
+   - **They see:** Document · Alert over a gallery, Document chosen: Blank, Card offer terms, Rate change notice, Fee schedule and Import a file. The editor opens with the required sections already in place.
    - **Say:** "Two clicks and you're writing. The legal skeleton is already there."
 2. **Do:** The caret is at the end of the first paragraph. Type ` Earn triple points on travel.`, press Enter, then type `Hello! Your Spring Travel Rewards offer is ready.`
    - Drag **First name** from the right rail into the gap between "Hello" and "!". Clicking the row also works; it inserts at the caret.
@@ -154,7 +156,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 1. **Do:** As Maya: **Review → Submitted by me → Spring Travel v1**.
    - **They see:** Approve and Request changes disabled: "You submitted this version."
    - **Say:** "Maker-checker: you can never approve your own work."
-2. **Do:** Switch to **Jordan Ellis**. **Review → Waiting on me → Spring Travel v1**. Leave Cash Back v3 ("Breaking change") for Act 7.
+2. **Do:** Switch to **Jordan Ellis**. **Review → Waiting on me → Spring Travel v1**. Leave Cash Back v3 ("Breaking change") for Act 8 and Card Used Abroad v1 for Act 5.
    - In the paragraph under the fees table, select `starts on the transaction date`. Click the floating **Comment**, type `Please state the APR more plainly.` and click **Comment**.
    - Click **Request changes**, reason `The interest wording is too vague. State the purchase APR plainly.`, then **Request changes**.
    - **They see:** the approval stepper, Maya's note, a comment marker in the margin, and the badge change to **Changes requested**.
@@ -192,7 +194,34 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 5. **Optional,** for a technical audience: in the Share sheet, **Copy curl** and paste it into Terminal.
    - **They see:** HTTP 200 and a `UC-XXXXXX-v2.pdf` file. This adds renders to Usage.
 
-## Act 5 — Change it safely
+## Act 5 — Alerts: push and SMS
+
+*About 5 minutes · Maya and Jordan · changes data · before the clock moves*
+
+**Goal:** push and SMS get the same control as documents, and the author sees exactly what each phone will show.
+
+1. **Do:** Switch to **Maya**. **Library → New template → Alert → Statement ready.**
+   - **They see:** Alert's own starters: Blank, Payment reminder, Card activity and Statement ready. Import a file stays greyed: "Only documents can be imported." The template opens on a push and a text message, with a phone in the preview.
+   - **Say:** "A template is a document or an alert, for life. An alert is short plain text, and goes to Push and SMS only."
+2. **Do:** At the end of the push body, type ` Thanks for banking with Coral.`
+   - **They see:** the phone's notification change with every keystroke, the sample values filled in, and the body cut where the lock screen cuts it.
+   - **Say:** "What the author sees is what the phone gets, byte for byte, before anything is saved."
+3. **Do:** In **Subtitle**, type `Coral Rewards card`. Switch the preview from **iPhone** to **Android**, then back.
+   - **They see:** the subtitle under the title on the iPhone; Android leaves it out, as the field's label says.
+   - **Say:** "One message for both phones. The one difference, the iPhone's subtitle, is labelled and shown."
+4. **Do:** At the end of the text message's first line, type ` We’re here to help.` (the curly apostrophe is ⌥⇧]). Click **Replace** on the flag.
+   - **They see:** the ’ underlined with "’ isn't in the SMS character set", the part count beside the message, and the flag gone after Replace.
+   - **Say:** "One curly apostrophe would send every text in the expensive encoding, with a third of the room. Stencil catches it where it's typed, and won't submit it."
+5. **Do:** **Submit for review** → **Submit v1**.
+   - **They see:** the dialog list Push and SMS and the sample sets; the badge turns **In review**.
+6. **Do:** Switch to **Jordan**. **Review → Waiting on me → Statement ready v1 → Approve → Approve v1.**
+   - **They see:** Priya's Card Used Abroad v1 waiting too; one approval stage, because alerts have their own chain; then the go-live moment.
+   - **Say:** "Alerts go through the same maker-checker as documents."
+7. **Do:** **Library → Payment Due Reminder → Usage.**
+   - **They see:** Coral rendering v1 every day, a couple of thousand renders over 30 days, and 3 failed renders 12 days ago. On the team's Usage page, Push and SMS have their own series in the channel split.
+   - **Say:** "Every alert sent is on record, like every document: who, which version, which channel. Never the customer's data."
+
+## Act 6 — Change it safely
 
 *About 8 minutes · Maya, Jordan and Alex · changes data · moves the clock +15 days · needs Coral pinned to v2*
 
@@ -221,7 +250,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    - **They see:** Revoked, then "0 delivered, 4 failed — Version 1 was revoked on … Version 2 is active."
    - **Say:** "Once a second approver confirms, the bad version stops everywhere at once."
 
-## Act 6 — Governance
+## Act 7 — Governance
 
 *About 3 minutes · Alex and Taylor · no data changes*
 
@@ -235,7 +264,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 3. **Do:** **Usage → Consumers** (All teams).
    - **They see:** Coral and Deposits Online. Spring Travel v2 reads "Superseded · Sunset … renders fail"; Balance Transfer v1 reads "Revoked … renders fail".
 
-## Act 7 — Access and admin
+## Act 8 — Access and admin
 
 *About 11 minutes · Priya, Sam, Morgan, Alex, Riley, Jordan, Maya and Dana · changes data · moves the clock +16 days*
 
@@ -273,7 +302,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
     - **They see:** the go-live moment, and v4 Active.
     - **Say:** "A two-stage approval, configured a minute ago, already enforced."
 
-## Act 8 — Accelerators and reset
+## Act 9 — Accelerators and reset
 
 *About 5 minutes · Maya · changes data, then resets*
 
@@ -299,7 +328,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
    - **They see:** a draft "Rate Change Notice" with 6 variables. The PDF's layout is dropped; its text and structure come in.
 4. **Do:** Bell → **Mark all as read**.
 5. **Do:** Demo pill → **Reset demo** → **Reset**.
-   - **They see:** Maya's Library back to 5 templates, and the clock on "Real time". Ready for the next audience.
+   - **They see:** Maya's Library back to 8 templates, and the clock on "Real time". Ready for the next audience.
 
 ## Closing: what's next
 
@@ -332,38 +361,38 @@ Every requirement from the Discovery Brief (DB) and the Build Plan (BP), in thei
 |---|---|---|---|---|
 | R1 | One controlled place for customer content (DB · Purpose and problem) | A Library per team; writing, review and rendering in one app | Library (Maya), Act 1 | Covered |
 | R2 | Coral: a T&C disclosure linked to an offer (DB · Scope and first client) | Disclosure content type; Coral links an offer to it | Editor; simulator, Acts 2 and 4 | Covered |
-| R3 | Works for any business and many teams (DB · Scope and first client) | Three teams, two consumers; content types, channels and approval chains are settings | Team switcher (Priya); Settings (Riley), Act 7 | Covered |
+| R3 | Works for any business and many teams (DB · Scope and first client) | Three teams, two consumers; content types, channels and approval chains are settings | Team switcher (Priya); Settings (Riley), Act 8 | Covered |
 | R4 | Templates only, no customer data; Stencil renders; consumers can't author (DB · Guiding principles 1–3) | Documents are built on request and never stored; the consumer API can only read and render | Simulator; SHARE, Act 4 | Covered |
 | R5 | Review in the tool; maker-checker (DB · Guiding principles 4; Controls and approvals) | Review queue; the author can't approve their own version | Review (Maya, Jordan), Act 3 | Covered |
 | R6 | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle) | Six states; Versions tab with compare; Activity tab | Versions tab, Acts 1 and 3 | Covered |
 | R7 | "One click" simplicity for non-technical users (DB · Guiding principles 6; BP · Experience principles) | Two clicks to typing; a slash menu; plain-language dialogs | New template (Maya), Act 2 | Covered |
-| R8 | No AI inside the app; a Copilot prompt instead (DB · Guiding principles 7; AI roadmap) | The app writes a prompt to copy; a pasted {{key}} becomes a chip. Risk sign-off is still open | Editor rail (Maya), Act 8 | Covered |
+| R8 | No AI inside the app; a Copilot prompt instead (DB · Guiding principles 7; AI roadmap) | The app writes a prompt to copy; a pasted {{key}} becomes a chip. Risk sign-off is still open | Editor rail (Maya), Act 9 | Covered |
 | R9 | Numbers never retyped; customer vs offer variables (DB · Guiding principles 8; Content model and channels) | Typed, auto-formatted variables; Coral maps each to customer or offer data. Variables carry no customer/offer flag, and offer terms are still typed into the text | Variables rail; simulator, Acts 2 and 4 | Partial |
-| R10 | One template, many channels; rules per content type (DB · Content model and channels) | Channel chips; a channel rules matrix; a disallowed channel is refused. SMS and banner are deferred | Editor; Settings (Riley), Acts 2 and 7 | Covered |
-| R11 | Import Word, PDF or text as drafts (DB · Content model and channels) | Import a file, with an Original tab and an import report. No step where the author confirms it matches the original | New template (Maya), Act 8 | Partial |
+| R10 | One template, many channels; rules per content type (DB · Content model and channels) | Channel chips; a channel rules matrix; a disallowed channel is refused. Documents go to PDF, Web and Email; alerts to Push and SMS | Editor; alerts; Settings (Riley), Acts 2, 5 and 8 | Covered |
+| R11 | Import Word, PDF or text as drafts (DB · Content model and channels) | Import a file, with an Original tab and an import report. No step where the author confirms it matches the original | New template (Maya), Act 9 | Partial |
 | R12 | A Notion-like editor with draggable placeholders (DB · Content model; BP · The editor) | Draggable blocks; variable chips that can't be broken, inserted by drag, by typing {{ or by click | Editor (Maya), Act 2 | Covered |
-| R13 | Blueprints with required sections; a starter gallery (DB · Content model and channels) | Required headings can't be deleted; Blank plus three starters. Required variables aren't preset | Editor; Settings (Riley), Acts 2 and 7 | Partial |
+| R13 | Blueprints with required sections; a starter gallery (DB · Content model and channels) | Required headings can't be deleted; Blank plus three starters for documents, and for alerts. Required variables aren't preset | Editor; Settings (Riley), Acts 2 and 8 | Partial |
 | R14 | One version for all channels; approvers see each channel (DB · Content model and channels) | Email subject and preheader take variables; review has a tab per channel | Preview; Review (Jordan), Acts 2 and 3 | Covered |
 | R15 | Clone from a base template (DB · Content model and channels) | Not built. It matters if offer terms stay written into the text | Roadmap | Not built |
 | R16 | Render API: binary by default, base64 opt-in, email as JSON, validation (DB · Rendering; BP · Preview and rendering) | A render endpoint whose errors name the problem | SHARE; Coral results, Acts 3 and 4 | Covered |
 | R17 | Preview with sample data that matches production (DB · Rendering) | One render function for preview, review and Coral; named sample sets | Preview (Maya), Act 2 | Covered |
-| R18 | A log of every render, with no customer data (DB · Rendering) | Records template, version, consumer, channel and outcome, never the values | Usage, Acts 4 and 6 | Covered |
+| R18 | A log of every render, with no customer data (DB · Rendering) | Records template, version, consumer, channel and outcome, never the values | Usage, Acts 4 and 7 | Covered |
 | R19 | Batch rendering; PDF throughput (DB · Rendering; Timeline and risks) | Out of the prototype's scope | Roadmap | Not built |
-| R20 | Pin, sunset, and a revoke that needs a reason and two people (DB · Versioning and lifecycle) | Consumers stay pinned; a sunset date set in the Approve dialog; a two-person revoke | Versions (Jordan, Alex); simulator, Act 5 | Covered |
+| R20 | Pin, sunset, and a revoke that needs a reason and two people (DB · Versioning and lifecycle) | Consumers stay pinned; a sunset date set in the Approve dialog; a two-person revoke | Versions (Jordan, Alex); simulator, Act 6 | Covered |
 | R21 | Retention, review-by dates, tamper evidence (DB · Versioning and lifecycle) | For production | Roadmap | Not built |
-| R22 | Approval chain as configuration (DB · Controls and approvals) | A chain editor; a Legal stage added live. Versions already in review keep the stages they were submitted with | Settings (Riley), Act 7 | Covered |
-| R23 | Side-by-side redline; comments pinned to blocks (DB · Controls and approvals) | Redline with "Changes only"; comments in the margin | Review (Jordan), Acts 3 and 5 | Covered |
+| R22 | Approval chain as configuration (DB · Controls and approvals) | A chain editor; a Legal stage added live. Versions already in review keep the stages they were submitted with | Settings (Riley), Act 8 | Covered |
+| R23 | Side-by-side redline; comments pinned to blocks (DB · Controls and approvals) | Redline with "Changes only"; comments in the margin | Review (Jordan), Acts 3 and 6 | Covered |
 | R24 | Optional approval on the consumer's side (DB · Controls and approvals) | Not built | Roadmap | Not built |
 | R25 | State-specific language (DB · State- and regulation-specific language) | Parked; there's only a US-state variable type | Roadmap | Not built |
-| R26 | Teams see only their own content; access per team (DB · Teams and access control) | Each team is its own space; View only mode elsewhere | Team switcher (Priya), Act 7 | Covered |
-| R27 | Roles, including Auditor, Legal reviewer, and a Platform Admin who can't edit (DB · Teams and access control; BP · Personas and permissions) | One central permission check for every action | Persona switcher, Acts 1, 6 and 7 | Covered |
-| R28 | Access requests in the app, with no self-approval (DB · Teams and access control) | Request access; Access requests; Teams | Request access (Morgan); Settings (Alex), Act 7 | Covered |
-| R29 | Recertification, inactivity expiry, detecting team moves (DB · Teams and access control) | Unconfirmed access lapses; flagged at 90 days idle, suspended at 120; every grant audited. Team moves aren't detected | Settings (Alex), Act 7 | Partial |
-| R30 | Consumer API: search with paging, get, preview, render (DB · Consumer integration and API surface) | Search, get (contract and JSON Schema) and render work. No paging, no consumer preview with dummy data, and consumers aren't limited to their team's templates | SHARE (Sam), Acts 3 and 7 | Partial |
+| R26 | Teams see only their own content; access per team (DB · Teams and access control) | Each team is its own space; View only mode elsewhere | Team switcher (Priya), Act 8 | Covered |
+| R27 | Roles, including Auditor, Legal reviewer, and a Platform Admin who can't edit (DB · Teams and access control; BP · Personas and permissions) | One central permission check for every action | Persona switcher, Acts 1, 7 and 8 | Covered |
+| R28 | Access requests in the app, with no self-approval (DB · Teams and access control) | Request access; Access requests; Teams | Request access (Morgan); Settings (Alex), Act 8 | Covered |
+| R29 | Recertification, inactivity expiry, detecting team moves (DB · Teams and access control) | Unconfirmed access lapses; flagged at 90 days idle, suspended at 120; every grant audited. Team moves aren't detected | Settings (Alex), Act 8 | Partial |
+| R30 | Consumer API: search with paging, get, preview, render (DB · Consumer integration and API surface) | Search, get (contract and JSON Schema) and render work. No paging, no consumer preview with dummy data, and consumers aren't limited to their team's templates | SHARE (Sam), Acts 3 and 8 | Partial |
 | R31 | The offer-to-template link lives in the consumer (DB · Consumer integration and API surface) | Coral searches, links and pins Active versions in its own tables | Simulator, Act 4 | Covered |
-| R32 | Lifecycle events; "who uses v3?" (DB · Consumer integration; BP · Usage) | A notices API; Coral's Notices page; the Usage dashboard | Usage; simulator, Acts 4 and 5 | Covered |
+| R32 | Lifecycle events; "who uses v3?" (DB · Consumer integration; BP · Usage) | A notices API; Coral's Notices page; the Usage dashboard | Usage; simulator, Acts 4 and 6 | Covered |
 | R33 | An endpoint for consumers to request a draft (DB · Consumer integration and API surface) | Later; not built | Roadmap | Not built |
-| R34 | Status always visible; consequences shown before you commit (BP · Experience principles) | One status badge everywhere; dialogs name the consumers affected | Approve, sunset and revoke dialogs, Acts 1 and 5 | Covered |
+| R34 | Status always visible; consequences shown before you commit (BP · Experience principles) | One status badge everywhere; dialogs name the consumers affected | Approve, sunset and revoke dialogs, Acts 1 and 6 | Covered |
 | R35 | Production integrations (DB · Architecture overview; BP · Out of scope and caveats) | Stand-ins for sign-in, the API layer, storage and delivery; PDF output is an approximation | Closing | Stand-in |
 
 Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scope), 1 stand-in.
@@ -382,8 +411,9 @@ Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scop
 | Sunset | The date after which a superseded version stops working. |
 | Revoke | An emergency stop that takes two approvers. |
 | Maker-checker | The author can never approve their own version. |
-| Content type | The Disclosure blueprint: required sections, allowed channels and the approval chain. |
-| Channel | PDF, Web or Email. |
+| Content type | A blueprint: required sections, allowed channels and the approval chain. Disclosure makes documents; Alert makes alerts. |
+| Alert | A template with a push notification and a text message, instead of a document. It stays an alert for life. |
+| Channel | PDF, Web or Email for a document; Push or SMS for an alert. |
 | Sample set | Named dummy data used for preview and review. |
 | Render and consumer | A consumer system such as Coral asks Stencil to fill in a template for one customer. Nothing is stored. |
 | Contract and breaking change | The variables a consumer must send. Adding a required one breaks the contract. |
@@ -393,18 +423,19 @@ Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scop
 
 ## Timing, cuts and rules
 
-- **Full run, about 52 minutes:** Act 1 (3) · Act 2 (6) · Act 3 (6) · Act 4 (6) · Act 5 (8) · Act 6 (3) · Act 7 (11) · Act 8 (5), plus a few minutes for the story and closing.
-- **The 20-minute cut:** tell the story, then Acts 2 and 3, Act 4 steps 1–3, and Act 5 steps 1–5. Close with the roadmap and reset. This covers authoring, maker-checker, delivery and safe change.
-- **Independent pieces:** Acts 1 and 8 work on their own, as Maya, at any point.
+- **Full run, about 57 minutes:** Act 1 (3) · Act 2 (6) · Act 3 (6) · Act 4 (6) · Act 5 (5) · Act 6 (8) · Act 7 (3) · Act 8 (11) · Act 9 (5), plus a few minutes for the story and closing.
+- **The 20-minute cut:** tell the story, then Acts 2 and 3, Act 4 steps 1–3, and Act 6 steps 1–5. Close with the roadmap and reset. This covers authoring, maker-checker, delivery and safe change.
+- **Independent pieces:** Acts 1 and 9 work on their own, as Maya, at any point.
 
 Order rules:
 
 - Each act builds on the last. Run them in order from a fresh reset.
-- Leave Cash Back v3 for Act 7.
+- Leave Cash Back v3 for Act 8, and Card Used Abroad v1 for Act 5.
+- Run Act 5 before the first clock jump.
 - Add the Legal reviewer stage last; it gates Disclosure versions submitted after it.
 - Sunset v2 at most 14 days out.
 - Sam's step and the recertification Keeps come before the +16-day jump.
-- Skipped Act 5? Advance 31 days in Act 7 instead of 16.
+- Skipped Act 6? Advance 31 days in Act 8 instead of 16.
 - Mid-demo reset: Demo pill → Reset demo → Reset.
 
 ## Rough edges on stage
@@ -413,6 +444,7 @@ The dry run found no blocking bugs. These are worth knowing so you can name them
 
 - **The Share sheet's email response example is fixed sample text.** On Spring Travel it mentions an APR change on March 4, 2027. Say it's an example of the response shape, not this template's email.
 - **The Share sheet shows "Loading integration details" for about a second.** Pause a beat before talking through it.
+- **Coral doesn't deliver alerts yet.** Its simulator sends PDF, Web and Email; an approved alert doesn't land on its phone. Usage shows the seeded push and SMS renders.
 - **Importing the PDF adds a second "Rate Change Notice".** There's no duplicate-name warning yet. Reset clears it.
 - **Imported placeholders come in as Text.** For example, "Offer end date" arrives as Text rather than Date. Change the type in the Variables rail if someone asks.
 - **After clock jumps, relative times read as weeks ago.** Actions from minutes earlier show "1 month ago", and Members shows people last active "31 days ago". Explain that the demo clock has moved forward.
