@@ -5,6 +5,7 @@
 //   plural(1204, "render")           "1,204 renders" (the count is `formatCount`'s)
 //   pluralWord(2, "variable")        "variables": the noun alone, for "adds the required variables a and b"
 //   pluralName("Disclosure")         "Disclosures": a content type's name in the plural
+//   withArticle("email subject")     "an email subject" (and "an SMS message"): one of something, in a sentence
 
 import { formatCount } from "./numbers";
 
@@ -23,4 +24,15 @@ export function pluralName(name: string): string {
   if (/s$/i.test(name)) return name;
   if (/[^aeiou]y$/i.test(name)) return `${name.slice(0, -1)}ies`;
   return `${name}s`;
+}
+
+/**
+ * One of a noun, with "a" or "an" by how its first word sounds: "an email subject", "a push title". A
+ * first word in capitals is read letter by letter: "an SMS message", "a PDF".
+ */
+export function withArticle(noun: string): string {
+  const first = noun.split(" ")[0] ?? "";
+  const spelled = first.length > 1 && first === first.toUpperCase();
+  const an = spelled ? /^[AEFHILMNORSX]/.test(first) : /^[aeiou]/i.test(first);
+  return `${an ? "an" : "a"} ${noun}`;
 }
