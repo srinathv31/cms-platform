@@ -205,3 +205,130 @@
   --sidebar-ring: var(--focus-ring);
 }
 
+/* ── 4. Device previews (src/components/device) ────────────────
+ * The phone kit's own palette: the frame, a wallpaper drawn from the brand ramp, the glass
+ * material, and the iOS system colours its screens use. Components read these and nothing else.
+ * The light set is the default; a kit root with data-appearance="dark" swaps in the dark set, so a
+ * dark phone can sit in the light app. One section, so a platform's look changes in one place.
+ */
+
+/* One point of the device, in CSS px. The frame sets it from its container's width (never above 1px), and
+   every size inside is a multiple of it, so the phone wraps text the same at any scale. Registered, so it
+   computes to a length once, where the frame sets it, instead of re-resolving 100cqw in every child. */
+@property --pt {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 1px;
+}
+
+:root,
+[data-appearance="light"] {
+  /* Frame: a generic slab, black glass in a dark metal rim. */
+  --device-bezel: #0b0b0c;
+  --device-rim: #3a3a3d;
+  --device-rim-edge: #77777c;
+  --device-island: #000000;
+  --device-screen: #000000;
+
+  /* Wallpaper, from the brand ramp: teal, with a warm coral bloom where the notifications sit. */
+  --device-wall-top: var(--teal-600);
+  --device-wall-mid: var(--teal-500);
+  --device-wall-low: var(--teal-800);
+  --device-wall-bloom: var(--red-100);
+  --device-wall-glow: var(--amber-100);
+  --device-wall-mint: var(--teal-200);
+  --device-wall-shade: var(--teal-900);
+  /* The clock, the date and the status bar over the wallpaper. */
+  --device-wall-ink: #ffffff;
+
+  /* Glass: the notification material. */
+  --device-glass: rgb(255 255 255 / 0.56);
+  --device-glass-strong: rgb(250 250 252 / 0.8);
+  --device-glass-quiet: rgb(255 255 255 / 0.3);
+  --device-glass-rim: rgb(255 255 255 / 0.5);
+  --device-glass-specular: rgb(255 255 255 / 0.75);
+  --device-glass-shadow: rgb(0 0 0 / 0.14);
+  --device-glass-ink: #000000;
+  --device-glass-ink-2: rgb(60 60 67 / 0.66);
+  /* Glass controls on an app's solid background (Messages' back button and composer). */
+  --device-chrome: rgb(255 255 255 / 0.78);
+  --device-chrome-rim: rgb(0 0 0 / 0.08);
+  /* Over the lock screen while a notification is expanded. */
+  --device-dim: rgb(0 0 0 / 0.14);
+
+  /* Home screen placeholders (no real apps): glass tiles and label bars. */
+  --device-tile: rgb(255 255 255 / 0.3);
+  --device-tile-warm: rgb(255 240 230 / 0.42);
+  --device-tile-deep: rgb(20 60 60 / 0.28);
+  --device-tile-label: rgb(255 255 255 / 0.6);
+  --device-dock: rgb(255 255 255 / 0.24);
+
+  /* The app's mark: a brand-tone tile. */
+  --device-mark-from: var(--teal-500);
+  --device-mark-to: var(--teal-800);
+  --device-mark-ink: #ffffff;
+
+  /* iOS system colours (UIKit's light values). */
+  --device-label: #000000;
+  --device-label-2: rgb(60 60 67 / 0.6);
+  --device-label-3: rgb(60 60 67 / 0.3);
+  --device-separator: rgb(60 60 67 / 0.29);
+  --device-fill: rgb(120 120 128 / 0.12);
+  --device-bg: #ffffff;
+  --device-bubble-in: #e9e9eb;
+  --device-avatar-from: #a5abb9;
+  --device-avatar-to: #858994;
+  --device-avatar-ink: #ffffff;
+}
+
+[data-appearance="dark"] {
+  --device-wall-top: var(--teal-900);
+  --device-wall-mid: var(--teal-800);
+  --device-wall-low: #081413;
+  --device-wall-bloom: #5b3631;
+  --device-wall-glow: #4f4127;
+  --device-wall-mint: var(--teal-700);
+  --device-wall-shade: #050b0b;
+  --device-wall-ink: #ffffff;
+
+  --device-glass: rgb(28 28 30 / 0.52);
+  --device-glass-strong: rgb(36 36 38 / 0.82);
+  --device-glass-quiet: rgb(60 60 64 / 0.36);
+  --device-glass-rim: rgb(255 255 255 / 0.12);
+  --device-glass-specular: rgb(255 255 255 / 0.2);
+  --device-glass-shadow: rgb(0 0 0 / 0.32);
+  --device-glass-ink: #ffffff;
+  --device-glass-ink-2: rgb(235 235 245 / 0.6);
+  --device-chrome: rgb(44 44 46 / 0.82);
+  --device-chrome-rim: rgb(255 255 255 / 0.1);
+  --device-dim: rgb(0 0 0 / 0.36);
+
+  --device-tile: rgb(255 255 255 / 0.14);
+  --device-tile-warm: rgb(255 220 200 / 0.16);
+  --device-tile-deep: rgb(0 0 0 / 0.3);
+  --device-tile-label: rgb(255 255 255 / 0.36);
+  --device-dock: rgb(255 255 255 / 0.1);
+
+  --device-mark-from: var(--teal-500);
+  --device-mark-to: var(--teal-800);
+  --device-mark-ink: #ffffff;
+
+  /* iOS system colours (UIKit's dark values). */
+  --device-label: #ffffff;
+  --device-label-2: rgb(235 235 245 / 0.6);
+  --device-label-3: rgb(235 235 245 / 0.3);
+  --device-separator: rgb(84 84 88 / 0.65);
+  --device-fill: rgb(118 118 128 / 0.24);
+  --device-bg: #000000;
+  --device-bubble-in: #262628;
+  --device-avatar-from: #6d717c;
+  --device-avatar-to: #4c4f57;
+  --device-avatar-ink: #ffffff;
+}
+
+/* The device faces, set on the kit's root, where the next/font class defines --ff-device-inter: SF on Apple
+   devices, Inter (OFL) elsewhere. No SF font files ship: Apple's licence forbids embedding them. */
+[data-device] {
+  --font-device-ios: -apple-system, BlinkMacSystemFont, var(--ff-device-inter, "Inter"), system-ui, sans-serif;
+}
+

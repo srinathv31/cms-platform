@@ -55,8 +55,26 @@ const eslintConfig = defineConfig([
     // UCOMP never reads the consumer simulator's tables.
     // (editor/ and domain/ already forbid @/server and @/simulator above; flat config would override them here.)
     files: ["src/app/(product)/**/*", "src/app/api/**/*", "src/components/**/*"],
+    ignores: ["src/components/device/**/*"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [noSimulatorData] }],
+    },
+  },
+  {
+    // The phone kit is shared by Stencil's preview and Coral's phone, and Coral may not reach Stencil's
+    // internals: it draws resolved strings, with the generated ui/, the primitives and the motion presets only.
+    files: ["src/components/device/**/*"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noSimulatorData,
+            { group: ["@/domain", "@/domain/*", "@/server", "@/server/*", "@/editor", "@/editor/*", "@/app/*"], message: "The phone kit takes resolved strings as props: no Stencil internals (Coral uses it too)." },
+            { regex: "^@/components/(?!(ui|primitives|motion|device)(/|$))", message: "The phone kit may use only @/components/ui, primitives and motion." },
+          ],
+        },
+      ],
     },
   },
   {
