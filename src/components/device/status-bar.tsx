@@ -1,41 +1,66 @@
 import { cn } from "@/lib/utils";
 import { pt } from "./geometry";
+import type { DevicePlatform } from "./types";
 
-// The phone's system chrome: the status bar along the top and the home indicator along the bottom.
-// Generic glyphs drawn here (no SF Symbols, no Material assets), decoration only, hidden from assistive
-// tech. `ink` picks the colour for what is behind: the wallpaper, or an app's own background.
+// The phone's system chrome: the status bar along the top and the home indicator (iOS) or gesture handle
+// (Android) along the bottom. Generic glyphs drawn here (no SF Symbols, no Material assets), decoration only,
+// hidden from assistive tech. `ink` picks the colour for what is behind: the wallpaper, or an app's own
+// background.
 
-/** What the chrome sits on: the wallpaper (white ink) or an app's background (the label colour). */
+/** What the chrome sits on: the wallpaper (light ink) or an app's background (the label colour). */
 export type ChromeInk = "wall" | "app";
 
-const INK: Record<ChromeInk, string> = {
-  wall: "text-(--device-wall-ink)",
-  app: "text-(--device-label)",
+const INK: Record<DevicePlatform, Record<ChromeInk, string>> = {
+  ios: { wall: "text-(--device-wall-ink)", app: "text-(--device-label)" },
+  android: { wall: "text-(--device-wall-ink)", app: "text-(--device-m3-on-surface)" },
 };
 
+/** The status bar's height per platform, in points. */
+export const STATUS_BAR_HEIGHT: Record<DevicePlatform, number> = { ios: 54, android: 46 };
+
 /**
- * The status bar: the time on the left (none on a lock screen, which has its own clock), signal, Wi-Fi and
- * battery on the right, either side of the camera cutout (`cutout` points wide, centred).
+ * The status bar. iOS: the time and the icons either side of the camera pill (`cutout` points wide, centred),
+ * no time on a lock screen. Android: the time at the left and the icons at the right, around the punch hole.
  */
 export function StatusBar({
+  platform = "ios",
   time,
   ink,
-  cutout,
-  height = 54,
+  cutout = 0,
   className,
 }: {
+  platform?: DevicePlatform;
   time: string | null;
   ink: ChromeInk;
-  cutout: number;
-  height?: number;
+  cutout?: number;
   className?: string;
 }) {
+  const height = STATUS_BAR_HEIGHT[platform];
+  if (platform === "android") {
+    return (
+      <div
+        aria-hidden
+        data-slot="status-bar"
+        style={{ height: pt(height), paddingInline: `${pt(24)} ${pt(20)}` }}
+        className={cn("pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between", INK.android[ink], className)}
+      >
+        <span className="font-medium tabular-nums" style={{ fontSize: pt(14), lineHeight: pt(20), letterSpacing: "0.01em" }}>
+          {time}
+        </span>
+        <span className="flex items-center" style={{ gap: pt(5) }}>
+          <AndroidWifi />
+          <AndroidSignal />
+          <AndroidBattery />
+        </span>
+      </div>
+    );
+  }
   return (
     <div
       aria-hidden
       data-slot="status-bar"
       style={{ height: pt(height) }}
-      className={cn("pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center", INK[ink], className)}
+      className={cn("pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center", INK.ios[ink], className)}
     >
       <div className="flex flex-1 justify-center" style={{ paddingTop: pt(3), paddingLeft: pt(10) }}>
         {time ? (
@@ -93,13 +118,43 @@ function Battery() {
   );
 }
 
-/** The bar along the bottom edge. */
-export function HomeIndicator({ ink }: { ink: ChromeInk }) {
+/** Android's Wi-Fi: a filled wedge, pointing down. */
+function AndroidWifi() {
+  return (
+    <svg viewBox="0 0 18 14" style={{ width: pt(17), height: pt(13) }} fill="currentColor">
+      <path d="M9 13.5.4 4.2A12.6 12.6 0 0 1 9 .8a12.6 12.6 0 0 1 8.6 3.4Z" />
+    </svg>
+  );
+}
+
+/** Android's cell signal: a right triangle, full. */
+function AndroidSignal() {
+  return (
+    <svg viewBox="0 0 14 14" style={{ width: pt(13), height: pt(13) }} fill="currentColor">
+      <path d="M13.2.8v12.4H.8Z" />
+    </svg>
+  );
+}
+
+/** Android's battery: a rounded bar, mostly full. */
+function AndroidBattery() {
+  return (
+    <svg viewBox="0 0 26 13" style={{ width: pt(25), height: pt(12.5) }} fill="currentColor">
+      <rect x="0.5" y="0.5" width="22" height="12" rx="4" fill="none" stroke="currentColor" strokeOpacity="0.45" />
+      <rect x="2.2" y="2.2" width="15" height="8.6" rx="2.6" />
+      <rect x="23.8" y="4.2" width="1.8" height="4.6" rx="0.9" fillOpacity="0.45" />
+    </svg>
+  );
+}
+
+/** The bar along the bottom edge: iOS's home indicator, or Android's gesture handle (shorter, thinner). */
+export function HomeIndicator({ ink, platform = "ios" }: { ink: ChromeInk; platform?: DevicePlatform }) {
+  const size = platform === "android" ? { width: 108, height: 4, bottom: 9 } : { width: 139, height: 5, bottom: 8 };
   return (
     <span
       aria-hidden
-      style={{ width: pt(139), height: pt(5), bottom: pt(8) }}
-      className={cn("pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded-full bg-current", INK[ink])}
+      style={{ width: pt(size.width), height: pt(size.height), bottom: pt(size.bottom) }}
+      className={cn("pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded-full bg-current", INK[platform][ink])}
     />
   );
 }

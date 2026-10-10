@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Mic, Plus } from "lucide-react";
 import { fadeRise } from "@/components/motion/presets";
 import { pt } from "../geometry";
 import { linkRuns } from "../links";
+import { Silhouette } from "../silhouette";
 import { cutoutWidth } from "../phone-frame";
 import { HomeIndicator, StatusBar } from "../status-bar";
 import type { DeviceClock, DeviceSettings, SmsContent } from "../types";
@@ -21,16 +22,6 @@ const CHROME: CSSProperties = {
   background: "var(--device-chrome)",
   boxShadow: `inset 0 0 0 ${pt(0.5)} var(--device-chrome-rim)`,
 };
-
-/** The generic contact silhouette: a head and shoulders. */
-function Silhouette() {
-  return (
-    <svg viewBox="0 0 48 48" className="size-full" fill="currentColor">
-      <circle cx="24" cy="19" r="8.6" />
-      <path d="M8.6 41.5C11 33.6 17 29.6 24 29.6s13 4 15.4 11.9A20.4 20.4 0 0 1 24 48a20.4 20.4 0 0 1-15.4-6.5Z" />
-    </svg>
-  );
-}
 
 /** The incoming bubble's tail at its bottom left, in the bubble's colour, under the bubble's text. */
 function Tail() {

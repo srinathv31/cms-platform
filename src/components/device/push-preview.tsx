@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { PLATFORM_STYLE, pushScreenLabel } from "./labels";
 import { NOT_SHOWN, measureFields, useMeasure } from "./measure";
 import { PhoneFrame } from "./phone-frame";
 import { Wallpaper } from "./wallpaper";
+import { HeadsUp } from "./android/heads-up";
+import { AndroidLockScreen } from "./android/lock-screen";
+import { Shade } from "./android/shade";
 import { Banner } from "./ios/banner";
 import { Expanded } from "./ios/expanded";
 import { LockScreen } from "./ios/lock-screen";
@@ -12,21 +16,13 @@ import type { DeviceClock, DeviceSettings, PushContent, PushMeasure, PushScreen 
 /** The clock the phone shows when the caller doesn't set one. */
 export const DEFAULT_CLOCK: DeviceClock = { time: "9:41", date: "Friday, October 9" };
 
-const SCREEN_NAMES: Record<PushScreen, string> = {
-  lock: "Lock screen",
-  banner: "Banner",
-  expanded: "Expanded notification",
-};
-
-const PLATFORM_NAMES: Record<DeviceSettings["platform"], string> = { ios: "iOS-style", android: "Android-style" };
-
 export interface PushPreviewProps {
   settings: DeviceSettings;
   screen: PushScreen;
   content: PushContent;
   /**
-   * Makes the notification a button: clicking it opens the expanded view, and clicking it (or the blurred
-   * backdrop) there goes back to the screen it came from. Without it, the notification is static.
+   * Makes the notification a button: clicking it opens the expanded view, and clicking it (or the backdrop)
+   * there goes back to the screen it came from. Without it, the notification is static.
    */
   onScreenChange?: (screen: PushScreen) => void;
   /** Called with how each field fits whenever that changes: after a render, a resize or a font load. */
@@ -36,9 +32,10 @@ export interface PushPreviewProps {
 }
 
 /**
- * A push notification on a phone, in the platform's look: the lock screen, a banner over the home screen,
- * or the expanded view. It fills its container's height (give the parent one) and is its platform's exact
- * width in points, scaled down evenly when the container is narrower.
+ * A push notification on a phone, in the platform's look: the lock screen, a banner (iOS) or heads-up
+ * (Android) over the home screen, or the expanded view (iOS's long press, Android's shade). It fills its
+ * container's height (give the parent one) and is its platform's exact width, scaled down evenly when the
+ * container is narrower. Android never shows the subtitle.
  */
 export function PushPreview({ settings, screen, content, onScreenChange, onMeasure, clock = DEFAULT_CLOCK, className }: PushPreviewProps) {
   const root = useRef<HTMLElement>(null);
@@ -69,27 +66,32 @@ export function PushPreview({ settings, screen, content, onScreenChange, onMeasu
     onMeasure,
   );
 
+  const props = { content, settings, clock, onToggle };
   return (
     <PhoneFrame
       ref={root}
       platform={settings.platform}
       width={settings.width}
       appearance={settings.appearance}
-      caption={`${SCREEN_NAMES[screen]}, ${PLATFORM_NAMES[settings.platform]} preview`}
+      caption={`${pushScreenLabel(settings.platform, screen)}, ${PLATFORM_STYLE[settings.platform]} preview`}
       className={className}
     >
+      <Wallpaper />
       {settings.platform === "ios" ? (
-        <>
-          <Wallpaper />
-          {screen === "lock" ? (
-            <LockScreen content={content} settings={settings} clock={clock} onToggle={onToggle} />
-          ) : screen === "banner" ? (
-            <Banner content={content} settings={settings} clock={clock} onToggle={onToggle} />
-          ) : (
-            <Expanded content={content} settings={settings} clock={clock} onToggle={onToggle} />
-          )}
-        </>
-      ) : null /* The Android skin (android/) comes next: a blank screen until then. */}
+        screen === "lock" ? (
+          <LockScreen {...props} />
+        ) : screen === "banner" ? (
+          <Banner {...props} />
+        ) : (
+          <Expanded {...props} />
+        )
+      ) : screen === "lock" ? (
+        <AndroidLockScreen {...props} />
+      ) : screen === "banner" ? (
+        <HeadsUp {...props} />
+      ) : (
+        <Shade {...props} />
+      )}
     </PhoneFrame>
   );
 }

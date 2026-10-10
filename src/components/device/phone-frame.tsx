@@ -17,7 +17,7 @@ import type { DeviceAppearance, DevicePlatform, DeviceWidth } from "./types";
 /** The camera cutout per platform: iOS's pill, Android's punch hole. Width and height in points. */
 const CUTOUT: Record<DevicePlatform, { width: number; height: number; top: number }> = {
   ios: { width: 124, height: 36, top: 11 },
-  android: { width: 22, height: 22, top: 14 },
+  android: { width: 22, height: 22, top: 12 },
 };
 
 /** The width a status bar keeps clear for the camera, in points. */

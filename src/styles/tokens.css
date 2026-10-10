@@ -279,6 +279,29 @@
   --device-avatar-from: #a5abb9;
   --device-avatar-to: #858994;
   --device-avatar-ink: #ffffff;
+
+  /* Android: Material 3 roles, tonal to the brand teal, as a Pixel tints its UI from the wallpaper. */
+  --device-m3-primary: #2c6a63;
+  --device-m3-on-primary: #ffffff;
+  --device-m3-primary-container: #b5ece3;
+  --device-m3-on-primary-container: #00201d;
+  --device-m3-secondary-container: #cde8e2;
+  --device-m3-on-secondary-container: #06201d;
+  --device-m3-surface: #f4fbf8;
+  --device-m3-surface-container-low: #eef5f2;
+  --device-m3-surface-container: #e8efec;
+  --device-m3-surface-container-high: #e3eae7;
+  --device-m3-surface-container-highest: #dde4e1;
+  --device-m3-on-surface: #161d1b;
+  --device-m3-on-surface-variant: #3f4946;
+  --device-m3-outline-variant: #bec9c5;
+  --device-m3-bubble-in: #e3e6e5;
+  /* Lock-screen cards, the shade over the blurred screen, and the tinted lock clock. */
+  --device-m3-lock-card: rgb(238 245 242 / 0.94);
+  --device-m3-shade: rgb(232 239 236 / 0.8);
+  --device-m3-shade-card: #f8fcfa;
+  --device-m3-lock-ink: #e3fbf5;
+  --device-m3-shadow: rgb(0 0 0 / 0.16);
 }
 
 [data-appearance="dark"] {
@@ -324,11 +347,34 @@
   --device-avatar-from: #6d717c;
   --device-avatar-to: #4c4f57;
   --device-avatar-ink: #ffffff;
+
+  --device-m3-primary: #8fd5c9;
+  --device-m3-on-primary: #00382f;
+  --device-m3-primary-container: #0f514a;
+  --device-m3-on-primary-container: #abf2e5;
+  --device-m3-secondary-container: #324b47;
+  --device-m3-on-secondary-container: #cde8e2;
+  --device-m3-surface: #0e1513;
+  --device-m3-surface-container-low: #161d1c;
+  --device-m3-surface-container: #1a2120;
+  --device-m3-surface-container-high: #252b2a;
+  --device-m3-surface-container-highest: #2f3635;
+  --device-m3-on-surface: #dde4e1;
+  --device-m3-on-surface-variant: #bec9c5;
+  --device-m3-outline-variant: #3f4946;
+  --device-m3-bubble-in: #2e3332;
+  --device-m3-lock-card: rgb(26 33 32 / 0.92);
+  --device-m3-shade: rgb(14 21 19 / 0.82);
+  --device-m3-shade-card: #252b2a;
+  --device-m3-lock-ink: #b9e9df;
+  --device-m3-shadow: rgb(0 0 0 / 0.4);
 }
 
-/* The device faces, set on the kit's root, where the next/font class defines --ff-device-inter: SF on Apple
-   devices, Inter (OFL) elsewhere. No SF font files ship: Apple's licence forbids embedding them. */
+/* The device faces, set on the kit's root, where the next/font classes define --ff-device-*. iPhone: SF on
+   Apple devices, Inter (OFL) elsewhere; no SF font files ship, as Apple's licence forbids embedding them.
+   Android: Google Sans Flex (OFL), then the platform's Roboto. */
 [data-device] {
   --font-device-ios: -apple-system, BlinkMacSystemFont, var(--ff-device-inter, "Inter"), system-ui, sans-serif;
+  --font-device-android: var(--ff-device-google-sans, "Google Sans Flex", Roboto, system-ui, sans-serif);
 }
 
