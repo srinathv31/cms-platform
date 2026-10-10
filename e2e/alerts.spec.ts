@@ -315,7 +315,7 @@ test.describe("alerts", () => {
       await expect(fieldFrame(dialog, "push.title").locator('ins[data-redline-op="insert"]')).toHaveText(TITLE_ADDED);
       await expect(fieldFrame(dialog, "sms.text").locator('ins[data-redline-op="insert"]')).toHaveText(SMS_ADDED_V2);
       await expect(fieldFrame(dialog, "push.body")).toHaveAttribute("data-redline", "unchanged");
-      await expect(dialog.locator("[data-redline-document]:not([data-fields-document])"), "an alert has no body to redline").toHaveCount(0);
+      await expect(dialog.locator("[data-redline-document]"), "an alert has no body to redline").toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
     });

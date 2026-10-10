@@ -114,7 +114,7 @@ describe("ComparePanel", () => {
     expect(container.querySelector('[data-block-id="sms.text"]')?.getAttribute("data-redline")).toBe("changed");
     expect(marks("ins")).toEqual([" abroad"]);
     expect(container.querySelector('[data-slot="sms-footer"]')?.textContent).toBe("Reply STOP to opt out.");
-    expect(container.querySelector("[data-redline-document]:not([data-fields-document])")).toBeNull();
+    expect(container.querySelector("[data-redline-document]"), "no body to redline").toBeNull();
     expect(container.querySelector('[data-slot="redline-summary"]')?.textContent).toBe("1 changed");
   });
 

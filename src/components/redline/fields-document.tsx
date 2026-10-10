@@ -16,6 +16,7 @@
 //   data-block-id      every field's frame carries its id ("push.title"), a direct child of `.ucomp-doc`,
 //                      so the redline's DOM handle (dom-handle.ts) and the comment markers find it as
 //                      they find a block: a message's threads are on its fields. `activeBlockId` tints one.
+//   data-fields-document  the root, with its layout; `data-redline-document` stays the body's alone.
 
 import { Fragment, type ReactNode } from "react";
 import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
@@ -160,7 +161,6 @@ export function FieldsDocument({
   return (
     <div
       className={cn("ucomp-surface ucomp-redline ucomp-fields relative", className)}
-      data-redline-document=""
       data-static-document=""
       data-fields-document={layout}
       data-align={align === "start" ? "start" : undefined}

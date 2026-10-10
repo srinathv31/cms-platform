@@ -57,7 +57,7 @@ export function FieldsView({
     editorRef,
     () =>
       createRedlineHandle({
-        root: () => wrapper.current?.querySelector<HTMLElement>("[data-redline-document]") ?? null,
+        root: () => wrapper.current?.querySelector<HTMLElement>("[data-fields-document]") ?? null,
         blockOfThread: (id) => latest.current.anchors.find((a) => a.id === id)?.blockId ?? null,
         onRequestComment: (request) => latest.current.onRequestComment?.(request),
       }),
