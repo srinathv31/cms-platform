@@ -268,7 +268,8 @@ What it measures, shown only when it matters and never animated:
 - **Flags in the text**: characters outside GSM-7 in an SMS, public shorteners in an SMS or a push body
   (`messageFieldFlags`), underlined through the field's `flags`, with Replace or Remove where there is a fix.
 - **Cut warnings** under a push field (`push-fit.tsx`): two hidden phones, one per platform, at the lock screen,
-  standard width and default text size, report through the kit's `onMeasure` where they clamp each field;
+  standard width and default text size, report through the kit's `onMeasure` where they clamp each field (they
+  redraw only when the push does: `usePushContent` reads the push's own fields, so an SMS keystroke leaves them);
   `truncationWarnings` says it ("iPhone lock screen cuts after “…payment of”."). The title on either platform; the
   subtitle and body on iPhone only (Android's one-line body is how Android shows it).
 

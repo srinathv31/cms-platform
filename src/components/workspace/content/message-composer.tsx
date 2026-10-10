@@ -2,12 +2,9 @@
 
 import { TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
-import type { PushContent } from "@/components/device";
-import { monogramOf } from "@/components/preview/phone-output";
 import { findSet, listSets, resolveSetValues } from "@/components/preview/sample-sets/model";
 import { createRedlineHandle } from "@/components/redline/dom-handle";
 import {
-  channelFieldsFrom,
   channelFieldsHeading,
   channelFieldsOf,
   fieldLines,
@@ -20,8 +17,6 @@ import {
 import { messageFieldFlags } from "@/domain/messages/flags";
 import { truncationWarnings, type TruncationWarnings } from "@/domain/messages/truncation";
 import type { MessageTypeRules } from "@/domain/platform-config";
-import { resolveMessage } from "@/domain/render/message";
-import { validateValues } from "@/domain/render/validate";
 import type { Channel, JSONContent } from "@/domain/types";
 import { useContractState } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
@@ -30,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { useLiveFields, useLiveSampleSets, type LiveDraft } from "../session/live-draft";
 import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
 import { FieldLabel, LockedFooter } from "./field-chrome";
-import { usePushFit } from "./push-fit";
+import { usePushContent, usePushFit } from "./push-fit";
 import { smsMeta, smsMetaSegments } from "./sms-meta";
 
 export interface MessageComposerProps {
@@ -101,17 +96,9 @@ export function MessageComposer({
   const pushOn = channels.includes("push");
   const smsOn = channels.includes("sms");
 
-  // The push as the selected set resolves it, for the phones the cuts are measured on.
-  const pushContent = useMemo((): PushContent | null => {
-    if (!pushOn) return null;
-    const checked = validateValues(variables, sampleValues);
-    if (!checked.ok) return null;
-    const push = resolveMessage(
-      { channel: "push", platform: "ios" },
-      { fields: channelFieldsFrom(live), variables, values: checked.values, rules },
-    );
-    return { appName, appMark: { monogram: monogramOf(appName) }, ...push, time: "now" };
-  }, [pushOn, variables, sampleValues, live, rules, appName]);
+  // The push as the selected set resolves it, for the phones the cuts are measured on: from the push's
+  // own fields, so an SMS keystroke doesn't redraw those phones.
+  const pushContent = usePushContent({ on: pushOn, fields: live, variables, values: sampleValues, rules, appName });
   const { fits, probe } = usePushFit(pushContent);
   const warnings: TruncationWarnings = pushContent
     ? truncationWarnings(fits, pushContent)
