@@ -9,3 +9,14 @@ export const WELL_INSET = "p-4 pb-10";
 
 // The PDF viewer takes the same mat as its `contentClassName` (it keeps its pages in a column of its own,
 // whose default padding that replaces; see pdf/pdf-viewer.tsx).
+
+// The phone (Push, SMS) is the one output on an even 16px mat. It fits the well whole rather than
+// scrolling, and it is narrower than the well and centred in it, so the Demo pill in the corner never
+// covers it; the 24px the pill's room would take go to the phone's height instead. Where the well is too
+// short for the phone's smallest scale it scrolls, and the phone keeps the same 16px under it at the end
+// (its `room`, inside the phone's box, because the well's own padding doesn't follow an overflow).
+
+/** 16px all round. */
+export const PHONE_INSET = "p-4";
+/** The px kept under the phone when the well scrolls: the mat's own 16. */
+export const PHONE_ROOM = 16;

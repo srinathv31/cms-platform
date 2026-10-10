@@ -30,6 +30,21 @@ export interface DeviceSettings {
   width: DeviceWidth;
 }
 
+/**
+ * How the phone fits its container. It is laid out at its real size and scaled down to fit (never up),
+ * in its true proportions; see Geometry in the kit's README.
+ */
+export interface PhoneFit {
+  /**
+   * The smallest scale for the container's height (default `MIN_SCALE`, 0.55). In a shorter container the
+   * phone keeps this scale and runs past the container's bottom, for a scroller round it to scroll. Width
+   * always fits.
+   */
+  minScale?: number;
+  /** Empty px kept under the phone, inside its box: the space a scroller leaves below it at the end. Default 0. */
+  room?: number;
+}
+
 /** Where a push notification is seen. */
 export type PushScreen = "lock" | "banner" | "expanded";
 

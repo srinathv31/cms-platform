@@ -117,6 +117,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
     trigger.current?.focus();
   };
   const viewRow = viewing ? batch?.rows.find((r) => r.customerId === viewing.customerId) : undefined;
+  const viewPlatform = viewing ? (page.customers.find((c) => c.id === viewing.customerId)?.platform ?? "ios") : "ios";
 
   // ── Header and strips ──────────────────────────────────────────────────────
   const status = linkStatus(link);
@@ -262,6 +263,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
       {viewing && viewRow ? (
         <CustomerDrawer
           customerName={viewRow.customerName}
+          customerPlatform={viewPlatform}
           results={viewRow.results}
           channel={viewing.channel}
           views={views}

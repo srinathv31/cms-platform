@@ -14,8 +14,7 @@ const drawn = vi.hoisted(() => ({ count: 0 }));
 
 // The phone kit loads its fonts through next/font; what matters here is how often a phone is drawn.
 vi.mock("@/components/device", () => ({
-  SCREEN_SIZES: { ios: { standard: { width: 402, height: 874 } }, android: { standard: { width: 412, height: 915 } } },
-  frameWidth: (size: { width: number }) => size.width + 20,
+  frameSize: () => ({ width: 431, height: 903 }),
   PushPreview: ({ content }: { content: PushContent }) => {
     drawn.count++;
     return <figure>{content.title}</figure>;

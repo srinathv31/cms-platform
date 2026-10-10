@@ -21,7 +21,7 @@ of the rail's controls.
   a light set and a `[data-appearance="dark"]` set. Android's Material 3 roles are `--device-m3-*`, tonal to the
   brand teal, as a Pixel tints its UI from the wallpaper. No raw colours here, no `dark:` classes.
 - **Sizes in points.** Write every size as `pt(n)` ([geometry.ts](geometry.ts)), never in px. One `pt` is an iOS
-  point or an Android dp. See Geometry.
+  point or an Android dp, laid out as one CSS px; the whole phone is scaled afterwards. See Geometry.
 - **Legal.** No Apple or Google assets: no bezels or UI-kit vectors, no SF font files, no SF Symbols, no Google
   logo, no Android robot, no Pixel wallpapers, no Messages or Google Messages icon, no app icons. The frame,
   status-bar glyphs, wallpaper and app mark are drawn here; interface glyphs are Lucide; the fonts shipped are
@@ -31,7 +31,7 @@ of the rail's controls.
 ## Using it
 
 ```tsx
-import { PushPreview, SmsPreview, pushScreenLabel, type DeviceSettings } from "@/components/device";
+import { PhoneSkeleton, PushPreview, SmsPreview, pushScreenLabel, type DeviceSettings } from "@/components/device";
 
 const settings: DeviceSettings = {
   platform: "ios",            // "ios" | "android"
@@ -41,7 +41,7 @@ const settings: DeviceSettings = {
   width: "standard",          // "compact" | "standard" | "large" (iOS: 375, 402, 440pt; Android: 360, 412, 448dp)
 };
 
-<div className="h-full">  {/* the kit fills its parent's height: give the parent one */}
+<div className="h-full">  {/* the phone scales to fit its parent: give the parent a height */}
   <PushPreview
     settings={settings}
     screen="lock"                                    // "lock" | "banner" | "expanded"
@@ -49,8 +49,12 @@ const settings: DeviceSettings = {
     onScreenChange={setScreen}                       // optional: makes the notification a toggle button
     onMeasure={(m) => setFit(m)}                     // optional: truncation per field, see below
     clock={{ time: "9:41", date: "Friday, October 9" }}  // optional, this is the default
+    fit={{ minScale: 0.55, room: 16 }}               // optional: the smallest scale, and px kept under the phone
   />
 </div>
+
+// While the content loads: the same phone, empty, in the same place.
+<PhoneSkeleton settings={settings} fit={{ room: 16 }} />
 
 <SmsPreview settings={settings} content={{ sender: "26725", text, time: "9:41 AM", day: "Today" }} />
 
@@ -66,7 +70,8 @@ pushScreenLabel("android", "banner")  // "Heads-up": label controls and captions
 ```
 
 The types are in [types.ts](types.ts); everything public comes from [index.ts](index.ts), including `IOS_LINES`,
-`ANDROID_LINES`, `SCREEN_SIZES` and `SIZE_UNIT` (to label widths "402pt" or "412dp").
+`ANDROID_LINES`, `SCREEN_SIZES` and `SIZE_UNIT` (to label widths "402pt" or "412dp"), and `frameSize` (the whole
+phone at 1:1, for a box that draws it unscaled).
 
 - **`PushContent`**: `appName`, `appMark: { monogram }` (a tile in the brand's tone, never a real icon), `title`,
   `subtitle?` (iPhone only: Android never shows it, even when set; empty means none), `body`, `time` (as printed:
@@ -124,17 +129,43 @@ phone draws. Off Apple devices the iOS face is Inter, slightly wider than SF, so
 
 ## Geometry
 
-The preview is a `<figure>` that fills its parent. The figure is a size container; the phone inside is its
-platform's exact width plus the bezel, and `--pt` (registered in tokens.css, so it computes once) is
-`min(1px, 100cqw / frame width)`. While the phone fits, a point is a pixel; in a narrower container the whole
-phone shrinks evenly, so it wraps text exactly as at 1:1. The phone is as tall as the container, up to the real
-screen's height: like Web → Mobile, it is a window onto the top of the screen, and content is anchored to the
-top. Bottom furniture (the lock screen's buttons, the dock, the composer) sits on the frame's bottom edge and
-gives way first when the frame is short.
+**Real size, then scaled.** The phone is laid out at its real size, one point to one CSS pixel (`pt(n)` is
+`n` px), screen and bezel whole, and then the whole of it is scaled with a CSS transform to fit its container.
+A transform doesn't lay text out again, so every line breaks and every field cuts exactly where it does at 1:1,
+and the text stays crisp (nothing sets `will-change`, so the browser rasterises at the final scale). The scaler
+is the shared `ScaledBox` ([primitives/scaled-viewport.tsx](../primitives/scaled-viewport.tsx)), the same code
+as Web's Desktop page: it reserves the phone's scaled size in the layout, centred across the container and at
+its top, so nothing overlaps the phone and no gap is left under it.
 
-At 1:1 the standard frames are 422px (iPhone, 402 + 2 × 10 bezel) and 432px (Android, 412 + 20): both fit the 1440
-well (531px inside the well's inset) and the 1280 well (437px) at 1:1. The large ones scale to about 0.95 (iPhone)
-and 0.94 (Android) in the 1280 well. The camera cutout is iOS's pill or Android's centred punch hole.
+**Sizes** are in [geometry.ts](geometry.ts), with their sources: iPhone 375 × 812, 402 × 874 and 440 × 956pt;
+Android 360 × 800, 412 × 915 and 448 × 997dp; the screen corners each phone reports (iPhone 44 and 62pt,
+Pixel 39dp). The bezel is the real phones' (an iPhone 17's 14.5pt a side, a Pixel 9's 21.5dp), so the whole
+phone has their proportions: 431 × 903 (0.477) and 455 × 958 (0.475). The camera cutout is iOS's Dynamic Island
+(126 × 37pt) or Android's centred punch hole.
+
+**The scale** (`phoneScale`) fits the whole phone in the container, never above 1, with two rules:
+
+- A phone is never drawn bigger than the platform's standard phone would be in the same container, so the
+  compact width reads smaller, as it is. The standard and large widths fit the container.
+- Height fits down to `MIN_SCALE`, 0.55, where the 15pt notification text is about 8px, the least that reads
+  comfortably. A shorter container keeps that scale and the phone runs past its bottom, for a scroller round
+  it to scroll; width always fits. `fit.minScale` changes it, and `fit.room` keeps that many px under the phone
+  inside its box, the space a scroller leaves at the end (a scroller's own padding doesn't follow an overflow).
+
+What that gives, measured in the running app:
+
+| Container | iPhone (standard) | Android (standard) |
+| --- | --- | --- |
+| Preview well, 1440 × 900 | 0.717, 309 × 647 | 0.675, 307 × 647 |
+| Preview well, 1280 × 800 | 0.606, 261 × 547 | 0.571, 260 × 547 |
+| Preview well, 1000 × 700 overlay | 0.55, the well scrolls 50px | 0.55, the well scrolls 80px |
+| Review's Preview, 1440 × 900 | 0.589 | 0.555 |
+| Coral's drawer, 1440 × 900 | about 0.70 | about 0.66 |
+
+**Measuring** reads layout px, so the scale changes nothing: `measureField` takes the clip from the field's own
+layout and each character's box from the screen, divided by the phone's scale on screen (the frame's
+`getBoundingClientRect` width over its `offsetWidth`). The composer's hidden phones draw at 1:1 in a box their
+own size, and report what the visible phone, at any scale, cuts.
 
 ## Glass and the Backdrop Root
 
@@ -175,11 +206,12 @@ region. The clickable notification takes the app's focus ring; a long text messa
 | [screen-preview.tsx](screen-preview.tsx) | `ScreenPreview`: the frame and the system chrome around any app's content (Coral's web page). |
 | [thread.ts](thread.ts) | A text thread: its messages oldest first, which print their time, and opening on the newest. |
 | [labels.ts](labels.ts) | `pushScreenLabel` (Banner or Heads-up), the skins' names, the SMS caption and the no-sender placeholder. |
-| [phone-frame.tsx](phone-frame.tsx) | The generic frame, the `--pt` setup, the camera cutout, the figure. |
+| [phone-frame.tsx](phone-frame.tsx) | The generic frame, its scale to fit (`ScaledBox`), the camera cutout, the figure. |
+| [phone-skeleton.tsx](phone-skeleton.tsx) | `PhoneSkeleton`: the frame with an empty screen, for a loading state, at the size and place of the phone that replaces it. |
 | [status-bar.tsx](status-bar.tsx) | Each platform's status bar and its home indicator or gesture handle, generic glyphs. |
 | [wallpaper.tsx](wallpaper.tsx) | The wallpaper, drawn from `--device-wall-*`, shared by both platforms. |
 | [app-mark.tsx](app-mark.tsx), [silhouette.tsx](silhouette.tsx) | The sending app's monogram tile; an unknown sender's avatar. |
-| [geometry.ts](geometry.ts) | `pt()`, screen sizes per platform and width, the bezel. |
+| [geometry.ts](geometry.ts) | `pt()`, screen sizes per platform and width with their sources, the bezel, `frameSize`, `phoneScale` and `MIN_SCALE`. |
 | [measure.ts](measure.ts) | Truncation measurement and `useMeasure`. |
 | [links.ts](links.ts) | Which runs of a text message read as links. |
 | [fonts.ts](fonts.ts) | Inter and Google Sans Flex (OFL) via `next/font`, scoped to the kit's root. |
@@ -192,7 +224,8 @@ entry points.
 
 ## Testing
 
-[measure.test.ts](measure.test.ts) (the visible-prefix search), [links.test.ts](links.test.ts),
+[measure.test.ts](measure.test.ts) (the visible-prefix search), [geometry.test.ts](geometry.test.ts) (the
+proportions and the scale), [links.test.ts](links.test.ts),
 [labels.test.ts](labels.test.ts), [thread.test.ts](thread.test.ts), [ios/type.test.ts](ios/type.test.ts), [android/dates.test.ts](android/dates.test.ts),
 [messages-thread.test.tsx](messages-thread.test.tsx) (the sender, or "No sender", in each thread's header) and
 [android/notification-card.test.tsx](android/notification-card.test.tsx) (no subtitle on Android; with previews

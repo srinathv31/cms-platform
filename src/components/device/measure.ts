@@ -10,7 +10,7 @@ import type { FieldFit } from "./types";
 /** A field the screen doesn't show. */
 export const NOT_SHOWN: FieldFit = { shown: false, cut: false, visibleText: "", lines: 0, fullLines: 0, maxLines: 0 };
 
-/** Where one character sits, in viewport px: enough to tell whether it shows. */
+/** Where one character sits, in the phone's layout px from the field's top left: enough to tell whether it shows. */
 export interface CharBox {
   top: number;
   bottom: number;
@@ -86,6 +86,16 @@ function ellipsisWidth(style: CSSStyleDeclaration): number {
   return context.measureText("…").width;
 }
 
+/**
+ * How many screen px one px of the phone's layout covers: the frame's scale, and any scale round it. The
+ * frame's layout width is a whole number of px, so `offsetWidth` is exact.
+ */
+function screenScale(element: HTMLElement): number {
+  const frame = element.closest<HTMLElement>('[data-slot="device-frame"]');
+  const scale = frame && frame.offsetWidth > 0 ? frame.getBoundingClientRect().width / frame.offsetWidth : 1;
+  return scale > 0 ? scale : 1;
+}
+
 /** How a line-clamped element's text fits: whether it is cut, where, and on how many lines. */
 export function measureField(element: HTMLElement, maxLines: number): FieldFit {
   const text = element.textContent ?? "";
@@ -96,9 +106,13 @@ export function measureField(element: HTMLElement, maxLines: number): FieldFit {
   const lines = Math.min(fullLines, maxLines);
   if (!cut) return { shown: true, cut: false, visibleText: text.trimEnd(), lines, fullLines, maxLines };
 
+  // Positions are in the phone's own layout px, from the element's top left corner: the clip from its
+  // layout, each character's box from the screen, unscaled. So the phone's scale (and any round it) changes
+  // nothing: the answer is the one at 1:1.
   const rect = element.getBoundingClientRect();
-  const bottom = rect.top + element.clientTop + element.clientHeight - parseFloat(style.paddingBottom);
-  const right = rect.left + element.clientLeft + element.clientWidth - parseFloat(style.paddingRight);
+  const scale = screenScale(element);
+  const bottom = element.clientTop + element.clientHeight - parseFloat(style.paddingBottom);
+  const right = element.clientLeft + element.clientWidth - parseFloat(style.paddingRight);
   const clip: Clip = { bottom, lastLineTop: bottom - lineHeight, lastLineRight: right - ellipsisWidth(style) };
 
   // The element's text nodes, with where each starts in `text`.
@@ -118,7 +132,8 @@ export function measureField(element: HTMLElement, maxLines: number): FieldFit {
     range.setStart(at.node, offset);
     range.setEnd(at.node, Math.min(offset + charLength(index), at.node.length));
     const box = range.getClientRects()[0];
-    return box && (box.width > 0 || box.height > 0) ? box : null;
+    if (!box || (box.width === 0 && box.height === 0)) return null;
+    return { top: (box.top - rect.top) / scale, bottom: (box.bottom - rect.top) / scale, right: (box.right - rect.left) / scale };
   };
   const candidates: number[] = [];
   for (let i = 0; i < text.length; i++) {

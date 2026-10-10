@@ -215,15 +215,6 @@
  * dark phone can sit in the light app. One section, so a platform's look changes in one place.
  */
 
-/* One point of the device, in CSS px. The frame sets it from its container's width (never above 1px), and
-   every size inside is a multiple of it, so the phone wraps text the same at any scale. Registered, so it
-   computes to a length once, where the frame sets it, instead of re-resolving 100cqw in every child. */
-@property --pt {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 1px;
-}
-
 :root,
 [data-appearance="light"] {
   /* Frame: a generic slab, black glass in a dark metal rim. */

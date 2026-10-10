@@ -129,8 +129,10 @@ Coral's own rows with `apiError` set, and the page shows it in a `Strip`.
   Stencil couldn't be reached at all.
 - **Customer view** (`CustomerDrawer`, `getDeliveryView`). The web page, the push and the texts show on the
   customer's phone, drawn by the phone kit ([src/components/device](../components/device/README.md)) on their
-  platform at its standard width, with the phone's clock at the delivery's time and, above it, the platform and
-  number and what Stencil measured (a push's bytes; a text's encoding, parts and characters). A push shows on the
+  platform at its standard width, in its real proportions and scaled to fit the drawer's height whole (about 0.7
+  of its real size on a 1440 × 900 window; while it loads, the same phone empty, `PhoneSkeleton`), with the
+  phone's clock at the delivery's time and, above it, the platform and number and what Stencil measured (a push's
+  bytes; a text's encoding, parts and characters). A push shows on the
   lock screen from Coral's app; clicking it expands it. A text shows in the customer's thread with Coral's short
   code (`CORAL_SHORT_CODE`), every text Coral delivered to them from any offer or alert, oldest first, up to the
   one viewed. The web page is a sandboxed iframe in `ScreenPreview`. When a send reaches the customer whose drawer

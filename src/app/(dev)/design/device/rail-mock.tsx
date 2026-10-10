@@ -9,6 +9,7 @@ import {
   type DevicePlatform,
   type DeviceSettings,
   type DeviceWidth,
+  type PhoneFit,
   type PushScreen,
 } from "@/components/device";
 import { Segmented } from "@/components/primitives/segmented";
@@ -156,14 +157,20 @@ function DeviceOptions({ state, onChange }: { state: RailState; onChange: (next:
   );
 }
 
-/** The preview well at a window's size: tinted, hairline, the output inset 16px (40px below). */
+/**
+ * The preview well at a window's size, as it holds a phone: tinted, hairline, the phone on an even 16px mat,
+ * scrolling where the well is too short for the phone's smallest scale (pass the phone `WELL_FIT`).
+ */
 export function Well({ width, height, children, className }: { width: number; height: number; children: ReactNode; className?: string }) {
   return (
     <div
       style={{ width, height }}
-      className={cn("shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface-tinted", className)}
+      className={cn("shrink-0 overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-surface-tinted", className)}
     >
-      <div className="h-full p-4 pb-10">{children}</div>
+      <div className="h-full p-4">{children}</div>
     </div>
   );
 }
+
+/** The phone in the well: the mat's 16px stay under it when the well scrolls. */
+export const WELL_FIT: PhoneFit = { room: 16 };

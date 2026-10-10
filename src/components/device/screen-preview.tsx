@@ -7,7 +7,7 @@ import { PLATFORM_STYLE } from "./labels";
 import { PhoneFrame, cutoutWidth } from "./phone-frame";
 import { DEFAULT_CLOCK } from "./push-preview";
 import { HomeIndicator, STATUS_BAR_HEIGHT, StatusBar } from "./status-bar";
-import type { DeviceClock, DevicePlatform, DeviceSettings } from "./types";
+import type { DeviceClock, DevicePlatform, DeviceSettings, PhoneFit } from "./types";
 
 /** The strip a full-screen app leaves clear along the bottom edge for the home indicator or gesture handle. */
 const BOTTOM_INSET: Record<DevicePlatform, number> = { ios: 34, android: 24 };
@@ -26,15 +26,18 @@ export interface ScreenPreviewProps {
   /** The app's content. It fills the screen between the status bar and the bottom inset, top to bottom. */
   children: ReactNode;
   clock?: DeviceClock;
+  /** How the phone fits its container: the smallest scale, and the room under it. */
+  fit?: PhoneFit;
   className?: string;
 }
 
 /**
  * Any app's screen on the phone, for content that isn't a push or a text: the frame, the status bar and the
  * home indicator (iOS) or gesture handle (Android) around what the caller draws, such as a web page in an
- * iframe. Same geometry as `PushPreview`: the container's height, the platform's exact width.
+ * iframe. Same geometry as `PushPreview`: the phone at its real size, scaled to fit its container, so a
+ * web page inside lays out at the phone's real width.
  */
-export function ScreenPreview({ settings, caption, children, clock = DEFAULT_CLOCK, className }: ScreenPreviewProps) {
+export function ScreenPreview({ settings, caption, children, clock = DEFAULT_CLOCK, fit, className }: ScreenPreviewProps) {
   const { platform } = settings;
   return (
     <PhoneFrame
@@ -42,6 +45,7 @@ export function ScreenPreview({ settings, caption, children, clock = DEFAULT_CLO
       width={settings.width}
       appearance={settings.appearance}
       caption={`${caption}, ${PLATFORM_STYLE[platform]} preview`}
+      fit={fit}
       className={className}
     >
       <div

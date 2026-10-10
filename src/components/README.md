@@ -241,7 +241,7 @@ output on a tinted well whose top never moves. Where the output comes from depen
 | Rendered by | the render route, `preview: true` (`render-preview.ts`) | the browser, through the route's own `renderMessage` (`message-preview.ts`) |
 | From | the saved draft (every request waits for `session.flush()`), or the version | the fields as typed (`live-draft.ts`), or the review's stored version |
 | When | on open, on a save, on a channel or values change (`use-preview-render.ts`: one request at a time, the last good output kept) | on every change, synchronously: no loading state, no request |
-| Shown | `PdfViewer`, `WebOutput`, `EmailOutput` | the phone kit, `PushOutput` and `SmsOutput` (`phone-output.tsx`) |
+| Shown | `PdfViewer`, `WebOutput`, `EmailOutput`, on the well's mat (16px, 40px below for the Demo pill) | the phone kit, `PushOutput` and `SmsOutput` (`phone-output.tsx`): the whole phone in its real proportions, scaled to fit the well on an even 16px mat; where the well is too short for the kit's smallest scale (the 1000 × 700 overlay) it scrolls (`well.ts`) |
 | Its controls | Download PDF; Desktop · Mobile | iPhone · Android, and the 32px Device options (`phone-controls.tsx`): screen (push only), appearance, previews (lock screen only), text size, width in the platform's own units. A row that doesn't apply stays, greyed, with why under it. |
 
 Either way, values the route would refuse show as `OutputError`, in the author's words, with Edit values. Its Try

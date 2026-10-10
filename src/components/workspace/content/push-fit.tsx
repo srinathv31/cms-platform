@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PushPreview, SCREEN_SIZES, frameWidth, type DeviceSettings, type PushContent, type PushMeasure } from "@/components/device";
+import { PushPreview, frameSize, type DeviceSettings, type PushContent, type PushMeasure } from "@/components/device";
 import { monogramOf } from "@/components/preview/phone-output";
 import { channelFieldsFrom, channelFieldsOf, type ChannelFieldValues } from "@/domain/channel-fields";
 import { PUSH_PLATFORMS, type PushPlatform } from "@/domain/messages/push";
@@ -92,9 +92,10 @@ export function usePushFit(content: PushContent | null): { fits: LockScreenFit[]
       content ? (
         <div aria-hidden inert data-slot="push-fit" className="pointer-events-none invisible fixed top-0 left-[-10000px]">
           {PUSH_PLATFORMS.map((platform) => {
-            const size = SCREEN_SIZES[platform].standard;
+            // The whole phone's size: it draws at 1:1 (it would cut the same at any scale).
+            const size = frameSize(platform, MEASURED.width);
             return (
-              <div key={platform} style={{ width: frameWidth(size), height: size.height }}>
+              <div key={platform} style={{ width: size.width, height: size.height }}>
                 <PushPreview
                   settings={{ platform, ...MEASURED }}
                   screen="lock"

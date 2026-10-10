@@ -7,17 +7,19 @@ import {
   SmsPreview,
   type DeviceClock,
   type DeviceSettings,
+  type PhoneFit,
   type PushScreen,
 } from "@/components/device";
 import type { RenderError } from "@/domain/render/types";
 import { refusalNotice, type MessageOutput } from "./message-preview";
-import { WELL_INSET } from "./well";
+import { PHONE_INSET, PHONE_ROOM } from "./well";
 
 // Push and SMS in the preview's well, on the phone kit (src/components/device): the text as the
-// browser rendered it (message-preview.ts), on the phone the controls row chose. The phone fills the
-// well's height and is its platform's exact width, scaled down evenly when the well is narrower, so it
-// wraps every line as the phone does. A message the route would refuse still shows on the phone, with
-// the route's sentence above it (announced once, in fixed words, when it turns refused).
+// browser rendered it (message-preview.ts), on the phone the controls row chose. The phone is laid out
+// at its real size and scaled to fit the well whole, in its true proportions, so it wraps and cuts every
+// line as the phone does; in a well too short for the kit's smallest scale it keeps that scale and the
+// well scrolls. A message the route would refuse still shows on the phone, with the route's sentence
+// above it (announced once, in fixed words, when it turns refused).
 
 /** Who the team's messages come from: the app a push is from, and the number an SMS is from. */
 export interface PhoneSenders {
@@ -28,6 +30,9 @@ export interface PhoneSenders {
 
 /** What an SMS's thread shows as its time: the phone's clock. */
 const SMS_TIME = "9:41 AM";
+
+/** The phone on its mat: when the well scrolls, the mat's 16px stay under it (well.ts). */
+const FIT: PhoneFit = { room: PHONE_ROOM };
 
 export function PushOutput({
   output,
@@ -52,6 +57,7 @@ export function PushOutput({
         settings={settings}
         screen={screen}
         onScreenChange={onScreen}
+        fit={FIT}
         clock={clock}
         content={{ appName, appMark: { monogram: monogramOf(appName) }, ...output.push, time: "now" }}
       />
@@ -72,7 +78,7 @@ export function SmsOutput({
 }) {
   return (
     <PhoneWell refusal={output.refusal}>
-      <SmsPreview settings={settings} clock={clock} content={{ sender: senders.smsSender, text: output.text, time: SMS_TIME }} />
+      <SmsPreview settings={settings} clock={clock} fit={FIT} content={{ sender: senders.smsSender, text: output.text, time: SMS_TIME }} />
     </PhoneWell>
   );
 }
@@ -83,7 +89,7 @@ export function monogramOf(appName: string): string {
 }
 
 /**
- * The well's mat around the phone, with a refused message's sentence above it. The sentence has the
+ * The well's mat around the phone (an even 16px, well.ts), with a refused message's sentence above it. The sentence has the
  * message's live size in it ("The SMS is 11 parts…"), so it changes with each keystroke: it is not a live
  * region. A screen reader hears a fixed sentence once, from a polite region, when the message goes from
  * sendable to refused (`refusalNotice`); a message that opens already refused says nothing until it is read.
@@ -91,7 +97,7 @@ export function monogramOf(appName: string): string {
 function PhoneWell({ refusal, children }: { refusal: RenderError | null; children: React.ReactNode }) {
   const notice = useRefusalNotice(refusal);
   return (
-    <div className={`flex h-full flex-col ${WELL_INSET}`}>
+    <div className={`flex h-full flex-col ${PHONE_INSET}`}>
       <p role="status" data-slot="message-refusal-notice" className="sr-only">
         {notice}
       </p>

@@ -11,7 +11,7 @@ import { Shade } from "./android/shade";
 import { Banner } from "./ios/banner";
 import { Expanded } from "./ios/expanded";
 import { LockScreen } from "./ios/lock-screen";
-import type { DeviceClock, DeviceSettings, PushContent, PushMeasure, PushScreen } from "./types";
+import type { DeviceClock, DeviceSettings, PhoneFit, PushContent, PushMeasure, PushScreen } from "./types";
 
 /** The clock the phone shows when the caller doesn't set one. */
 export const DEFAULT_CLOCK: DeviceClock = { time: "9:41", date: "Friday, October 9" };
@@ -28,16 +28,18 @@ export interface PushPreviewProps {
   /** Called with how each field fits whenever that changes: after a render, a resize or a font load. */
   onMeasure?: (measure: PushMeasure) => void;
   clock?: DeviceClock;
+  /** How the phone fits its container: the smallest scale, and the room under it. */
+  fit?: PhoneFit;
   className?: string;
 }
 
 /**
  * A push notification on a phone, in the platform's look: the lock screen, a banner (iOS) or heads-up
- * (Android) over the home screen, or the expanded view (iOS's long press, Android's shade). It fills its
- * container's height (give the parent one) and is its platform's exact width, scaled down evenly when the
- * container is narrower. Android never shows the subtitle.
+ * (Android) over the home screen, or the expanded view (iOS's long press, Android's shade). The phone is
+ * laid out at its real size and scaled to fit its container (give the parent a height), so it cuts the
+ * text exactly as that phone does. Android never shows the subtitle.
  */
-export function PushPreview({ settings, screen, content, onScreenChange, onMeasure, clock = DEFAULT_CLOCK, className }: PushPreviewProps) {
+export function PushPreview({ settings, screen, content, onScreenChange, onMeasure, clock = DEFAULT_CLOCK, fit, className }: PushPreviewProps) {
   const root = useRef<HTMLElement>(null);
 
   // Where the expanded view goes back to: the screen it was opened from.
@@ -74,6 +76,7 @@ export function PushPreview({ settings, screen, content, onScreenChange, onMeasu
       width={settings.width}
       appearance={settings.appearance}
       caption={`${pushScreenLabel(settings.platform, screen)}, ${PLATFORM_STYLE[settings.platform]} preview`}
+      fit={fit}
       className={className}
     >
       <Wallpaper />

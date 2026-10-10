@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ExternalLink, Mail, X } from "lucide-react";
-import { PushPreview, ScreenPreview, SmsPreview, type DeviceSettings, type PushScreen } from "@/components/device";
+import { PhoneSkeleton, PushPreview, ScreenPreview, SmsPreview, type DeviceSettings, type PhoneFit, type PushScreen } from "@/components/device";
 import type { ApiChannel } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
 import type { SimDeliveryResult, SimDeliveryView, SimPlatform } from "@/simulator/types";
@@ -47,6 +47,12 @@ const phoneSettings = (platform: SimPlatform): DeviceSettings => ({
   width: "standard",
 });
 
+/**
+ * The phone fits the drawer's height whole (about 0.7 of its real size on a 900px window, 0.6 on an
+ * 800px one, by the kit's own scale); in a shorter window the drawer scrolls, 16px under the phone at the end.
+ */
+const FIT: PhoneFit = { room: 16 };
+
 /** Small segmented control (Coral's one picker style). */
 function Seg({ label, value, options, onChange }: { label: string; value: ApiChannel; options: { value: ApiChannel; label: string }[]; onChange: (v: ApiChannel) => void }) {
   return (
@@ -72,7 +78,7 @@ function Seg({ label, value, options, onChange }: { label: string; value: ApiCha
 /** The web page on the customer's phone, under Coral's own app bar. */
 function WebPhone({ view, delivery }: { view: Extract<View, { kind: "phone" }>; delivery: SimDeliveryView }) {
   return (
-    <ScreenPreview settings={phoneSettings(delivery.customer.platform)} caption="Web page from Coral" clock={phoneClock(delivery.at)}>
+    <ScreenPreview settings={phoneSettings(delivery.customer.platform)} caption="Web page from Coral" clock={phoneClock(delivery.at)} fit={FIT}>
       <div aria-hidden className="flex h-11 shrink-0 items-center gap-1 border-b border-(--sim-paper-line) px-3">
         <ChevronLeft className="size-5" strokeWidth={1.75} />
         <span className="flex-1 pr-5 text-center text-[14px] font-semibold">Offer terms</span>
@@ -98,6 +104,7 @@ function PushPhone({ view, delivery, arrived }: { view: Extract<View, { kind: "p
       screen={screen}
       onScreenChange={(next) => setScreen(next === "banner" ? "lock" : next)}
       clock={phoneClock(delivery.at)}
+      fit={FIT}
       content={{ appName, appMark: { monogram: Array.from(appName)[0] ?? "" }, title: push.title, subtitle: push.subtitle, body: push.body, time: "now" }}
     />
   );
@@ -111,6 +118,7 @@ function SmsPhone({ view, delivery }: { view: Extract<View, { kind: "sms" }>; de
     <SmsPreview
       settings={phoneSettings(delivery.customer.platform)}
       clock={phoneClock(newest.at)}
+      fit={FIT}
       content={{
         sender: view.sender,
         text: newest.text,
@@ -178,6 +186,7 @@ function PdfFrame({ view, name }: { view: Extract<View, { kind: "pdf" }>; name: 
  */
 export function CustomerDrawer({
   customerName,
+  customerPlatform,
   results,
   channel,
   views,
@@ -186,6 +195,8 @@ export function CustomerDrawer({
   onClose,
 }: {
   customerName: string;
+  /** The customer's phone, drawn empty while a view loads. */
+  customerPlatform: SimPlatform;
   results: SimDeliveryResult[];
   channel: ApiChannel;
   views: Record<string, ViewState>;
@@ -227,7 +238,8 @@ export function CustomerDrawer({
   let body: React.ReactNode;
   if (!state || state.status === "loading") {
     body = phone ? (
-      <Skeleton aria-hidden className="mx-auto h-full w-full max-w-[26rem] rounded-[3.5rem] bg-(--sim-line)" />
+      // The customer's phone itself, empty: the same size and place as what loads into it.
+      <PhoneSkeleton settings={phoneSettings(customerPlatform)} fit={FIT} />
     ) : (
       <Skeleton aria-hidden className="h-[34rem] w-full rounded-lg bg-(--sim-line)" />
     );
@@ -278,7 +290,7 @@ export function CustomerDrawer({
         <Seg label="Customer view" value={channel} options={options} onChange={onChannel} />
       </div>
       {phone ? (
-        <div className="flex min-h-0 flex-1 flex-col bg-(--sim-bg) px-4 pt-3 pb-14">
+        <div className="flex min-h-0 flex-1 flex-col bg-(--sim-bg) px-4 pt-3">
           <p className="m-0 mb-3 flex h-5 shrink-0 items-center justify-between gap-3 text-[12px] text-(--sim-muted)">
             <span className="truncate">
               {ready && platform ? (
@@ -289,7 +301,8 @@ export function CustomerDrawer({
             </span>
             <span className="shrink-0 tabular-nums">{measure}</span>
           </p>
-          <div className="min-h-0 flex-1">{body}</div>
+          {/* The phone fits here whole down to its smallest scale; in a shorter window this scrolls. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-14">{body}</div>
         </div>
       ) : (
         <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-(--sim-bg) p-4 pb-14">{body}</div>

@@ -6,7 +6,7 @@ import {
   SCREEN_SIZES,
   SIZE_UNIT,
   SmsPreview,
-  frameWidth,
+  frameSize,
   pushScreenLabel,
   type DeviceAppearance,
   type DevicePlatform,
@@ -22,17 +22,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Group, Section } from "../section";
 import { CLOCK, PUSH, PUSH_LONG, SETTINGS, SMS } from "./fixtures";
-import { ControlsRow, Well, type RailState } from "./rail-mock";
+import { ControlsRow, WELL_FIT, Well, type RailState } from "./rail-mock";
 
 // The phone kit (src/components/device) on fixture data: a working rail mock to try every option in,
 // iPhone and Android side by side, then each view at 1:1 per platform, in light and dark, at each text size
 // and width, and inside the tightest preview well (469 × 581, a 1280 × 800 window).
 
-/** The preview wells measured in the running app: 1440 × 900 and 1280 × 800 windows. */
-const WELLS = { wide: { width: 563, height: 681 }, tight: { width: 469, height: 581 } } as const;
+/** The preview wells measured in the running app: 1440 × 900, 1280 × 800, and 1000 × 700 (the rail's overlay). */
+const WELLS = {
+  wide: { width: 563, height: 681 },
+  tight: { width: 469, height: 581 },
+  overlay: { width: 682, height: 481 },
+} as const;
 
-/** How tall a 1:1 specimen is: about the wide well's inner height. */
-const SPECIMEN_HEIGHT = 640;
+/**
+ * The box a specimen draws at 1:1 in: its own phone's size, and never smaller than the platform's standard
+ * phone, which is what the kit scales a smaller phone against (so a compact phone sits in a standard one's box).
+ */
+function specimenBox(platform: DevicePlatform, width: DeviceSettings["width"]) {
+  const own = frameSize(platform, width);
+  const standard = frameSize(platform, "standard");
+  return { width: Math.max(own.width, standard.width), height: Math.max(own.height, standard.height) };
+}
 
 const PLATFORMS: DevicePlatform[] = ["ios", "android"];
 const PLATFORM_NAMES: Record<DevicePlatform, string> = { ios: "iPhone", android: "Android" };
@@ -57,18 +68,16 @@ function viewLabel(platform: DevicePlatform, v: View): string {
   return v.hidden ? `${name}, previews hidden` : name;
 }
 
-/** A phone at 1:1: its container is exactly the frame's width, so one point is one pixel. */
+/** A phone at 1:1: its box fits the whole phone, so one point is one pixel. */
 function Specimen({
   settings,
   view: v,
   content = PUSH,
-  height = SPECIMEN_HEIGHT,
   onMeasure,
 }: {
   settings: DeviceSettings;
   view: View;
   content?: PushContent;
-  height?: number;
   onMeasure?: (m: PushMeasure) => void;
 }) {
   return (
@@ -76,7 +85,7 @@ function Specimen({
       data-specimen={v.key}
       data-platform={settings.platform}
       data-appearance={settings.appearance}
-      style={{ width: frameWidth(SCREEN_SIZES[settings.platform][settings.width]), height }}
+      style={specimenBox(settings.platform, settings.width)}
       className="shrink-0"
     >
       {v.screen === "sms" ? (
@@ -116,7 +125,7 @@ export function DeviceGallery() {
             </p>
           </PageHeader>
 
-          <Section id="playground" label="Playground" note="The rail's controls row and well, at either window size. Click the notification to expand it.">
+          <Section id="playground" label="Playground" note="The rail's controls row and well, at each window size. Click the notification to expand it.">
             <Playground />
           </Section>
 
@@ -195,7 +204,7 @@ export function DeviceGallery() {
             </div>
           </Section>
 
-          <Section id="tight-well" label="Tightest well" note="469 × 581, a 1280 × 800 window. A large phone scales down to fit.">
+          <Section id="tight-well" label="Tightest well" note="469 × 581, a 1280 × 800 window. Each phone fits whole; a large Android one holds the smallest scale, and the well scrolls.">
             <Row>
               {[
                 ...PLATFORMS.flatMap((platform) => [
@@ -238,13 +247,14 @@ function TightWell({ view: v, settings }: { view: View; settings: DeviceSettings
       <ControlsRow state={state} onChange={setState} />
       <Well {...WELLS.tight}>
         {state.channel === "sms" ? (
-          <SmsPreview settings={state.settings} content={SMS} clock={CLOCK} />
+          <SmsPreview settings={state.settings} content={SMS} clock={CLOCK} fit={WELL_FIT} />
         ) : (
           <PushPreview
             settings={state.settings}
             screen={state.screen}
             content={PUSH}
             clock={CLOCK}
+            fit={WELL_FIT}
             onScreenChange={(screen) => setState((s) => ({ ...s, screen }))}
           />
         )}
@@ -268,13 +278,14 @@ function Playground() {
         <ControlsRow state={state} onChange={setState} />
         <Well {...well}>
           {state.channel === "sms" ? (
-            <SmsPreview settings={state.settings} content={sms} clock={CLOCK} />
+            <SmsPreview settings={state.settings} content={sms} clock={CLOCK} fit={WELL_FIT} />
           ) : (
             <PushPreview
               settings={state.settings}
               screen={state.screen}
               content={content}
               clock={CLOCK}
+              fit={WELL_FIT}
               onScreenChange={(screen) => setState((s) => ({ ...s, screen }))}
               onMeasure={setMeasure}
             />
@@ -289,6 +300,7 @@ function Playground() {
           options={[
             { value: "wide", label: "1440 × 900" },
             { value: "tight", label: "1280 × 800" },
+            { value: "overlay", label: "1000 × 700" },
           ]}
           onChange={setWindowSize}
         />
@@ -330,8 +342,8 @@ function MeasuredSpecimen({ platform, view: v }: { platform: DevicePlatform; vie
   const settings = settingsFor(platform);
   return (
     <Group title={`${PLATFORM_NAMES[platform]}, ${viewLabel(platform, v)}`}>
-      <Specimen settings={settings} view={v} content={PUSH_LONG} onMeasure={setMeasure} height={560} />
-      <div style={{ width: frameWidth(SCREEN_SIZES[platform].standard) }}>{measure ? <MeasureTable measure={measure} /> : null}</div>
+      <Specimen settings={settings} view={v} content={PUSH_LONG} onMeasure={setMeasure} />
+      <div style={{ width: frameSize(platform, "standard").width }}>{measure ? <MeasureTable measure={measure} /> : null}</div>
     </Group>
   );
 }
