@@ -575,8 +575,9 @@ export function submit(input: SubmitInput): SubmitResult {
  *   3. Public shorteners: no link the author typed in a push body or SMS (`refusesShorteners`) is on a
  *      public URL shortener.
  *   4. Push size: with the long sample values, the push is at most PUSH_MAX_BYTES on each platform.
- * The long values are the draft's "long" sample set (its defaults when the draft has none); when they
- * aren't valid values, 2 and 4 have nothing to measure and pass, and the preview shows why.
+ * The long values are the draft's "long" sample set (its defaults when the draft has none). A value in
+ * it that no longer validates (its variable changed type since) gives way to the generated long value
+ * (`longSampleValues`), so 2 and 4 always measure something, as the composer's meta line does.
  */
 function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date): Refusal | null {
   const on = (channel: Channel) => draft.channels.includes(channel);
@@ -590,9 +591,8 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     }
   }
 
-  const long = longSampleValues(draft, utcDay(now));
-  const input = long && { fields: draft.channelFields, variables: draft.variables, values: long, rules };
-  if (on("sms") && input) {
+  const input = { fields: draft.channelFields, variables: draft.variables, values: longSampleValues(draft, utcDay(now)), rules };
+  if (on("sms")) {
     const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
     if (parts > rules.smsMaxParts) return REFUSALS.smsParts(parts, rules.smsMaxParts);
   }
@@ -603,7 +603,7 @@ function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date):
     if (links.length > 0) return REFUSALS.publicShortener(field, links.map((link) => link.domain));
   }
 
-  if (on("push") && input) {
+  if (on("push")) {
     for (const platform of PUSH_PLATFORMS) {
       const bytes = pushPayloadBytes(platform, resolveMessage({ channel: "push", platform }, input));
       if (bytes > PUSH_MAX_BYTES) return REFUSALS.pushTooLarge(platform, bytes);

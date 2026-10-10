@@ -216,8 +216,18 @@ describe("longSampleValues", () => {
     expect(longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY)?.first_name).toBe("Alexandria-Marguerite");
   });
 
-  it("is null when the long values don't validate: there is nothing to measure", () => {
-    const broken = { id: "long", name: "Long", values: { due_date: "not a date" } };
-    expect(longSampleValues({ variables: VARIABLES, sampleSets: [broken] }, TODAY)).toBeNull();
+  it("measures a stored value that no longer validates with the generated long value for its key", () => {
+    // The set was edited while amount_due was text; it is a currency now. The other stored values stand.
+    const stale = { id: "long", name: "Long", values: { first_name: "Bartholomew", amount_due: "about ten dollars", due_date: "not a date" } };
+    const generated = longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY);
+    expect(longSampleValues({ variables: VARIABLES, sampleSets: [stale] }, TODAY)).toEqual({
+      ...generated,
+      first_name: "Bartholomew",
+    });
+    expect(generated.amount_due).toBe("1000000");
+  });
+
+  it("has a value for every variable, the optional ones included", () => {
+    expect(Object.keys(longSampleValues({ variables: VARIABLES, sampleSets: [] }, TODAY))).toEqual(VARIABLES.map((v) => v.key));
   });
 });

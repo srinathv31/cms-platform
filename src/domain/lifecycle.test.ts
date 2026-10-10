@@ -820,6 +820,22 @@ describe("submit", () => {
       expect(alert({ channelFields: { push, sms: long }, sampleSets: [] }, { ...ALERT, smsMaxParts: 1 }).ok).toBe(false);
     });
 
+    it("measures a long value that no longer validates with the generated one, so a stale set can't skip the checks", () => {
+      // Edited while purchase_apr was text; it's a percent now, so the stored value isn't one any more.
+      const stale = [{ id: "long", name: "Long", values: { purchase_apr: "about twenty percent" } }];
+      const long = { text: lines(text("x".repeat(120)), chip("first_name"), text(" "), chip("purchase_apr")) };
+      const parts = { ...ALERT, smsMaxParts: 1 };
+      const refused = { ok: false, code: "sms_too_many_parts", reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer." };
+      expect(alert({ channelFields: { push, sms: long }, sampleSets: [] }, parts)).toEqual(refused);
+      expect(alert({ channelFields: { push, sms: long }, sampleSets: stale }, parts)).toEqual(refused);
+      // And the push size: a body over 4,096 bytes with the long values is refused whatever the stored set holds.
+      const huge = oneLine(text("é".repeat(2040)), chip("purchase_apr"), chip("first_name"), chip("first_name"));
+      expect(alert({ channels: ["push"], channelFields: { push: { ...push, body: huge } }, sampleSets: stale })).toMatchObject({
+        ok: false,
+        code: "push_too_large",
+      });
+    });
+
     it("refuses a public link shortener in an SMS or a push body", () => {
       const shortened = { text: lines(text("Pay at https://bit.ly/3xYz or tinyurl.com/a")) };
       expect(alert({ channelFields: { push, sms: shortened } })).toEqual({

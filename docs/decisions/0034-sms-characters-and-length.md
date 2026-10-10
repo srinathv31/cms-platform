@@ -34,7 +34,9 @@ exactly what the author typed and every value as sent.
   a text stops being a text.
 - **Submit holds a budget.** Each message content type has a part budget (`content_types.sms_max_parts`, 3 unless
   set); submit measures the SMS with the draft's "long" sample values and the content type's footer, and refuses it
-  over the budget. Typical values usually fit in fewer.
+  over the budget. Typical values usually fit in fewer. A stored long value that no longer validates (the set was
+  edited before its variable changed type) gives way to the generated long value for that key, in submit and in the
+  composer's "Long values" line alike, so a stale sample set can never switch the budget or the push size check off.
 - **The footer counts.** The content type's footer (the brand and "Reply STOP to opt out", which CTIA asks of a US
   sender) is printed on its own last line, exactly as written, and counts toward the parts.
 - **No public link shorteners** in an SMS or a push body: carriers filter them (CTIA §5.3.2). A branded short domain
