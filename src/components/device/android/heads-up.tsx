@@ -94,7 +94,8 @@ export function HeadsUp({
   return (
     <>
       <AndroidHomeScreen clock={clock} />
-      <div className="absolute inset-x-0 z-10" style={{ top: pt(STATUS_BAR_HEIGHT.android + 2), paddingInline: pt(10) }}>
+      {/* Over the status bar (z-20) as it drops past it, under the punch hole (z-30). */}
+      <div className="absolute inset-x-0 z-[25]" style={{ top: pt(STATUS_BAR_HEIGHT.android + 2), paddingInline: pt(10) }}>
         <AndroidNotification
           content={content}
           screen="banner"

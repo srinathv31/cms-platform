@@ -26,7 +26,8 @@ export function Banner({
   return (
     <>
       <HomeScreen time={clock.time} />
-      <div className="absolute inset-x-0 z-10" style={{ top: pt(52), paddingInline: pt(10) }}>
+      {/* Over the status bar (z-20) as it drops past it, under the camera pill (z-30). */}
+      <div className="absolute inset-x-0 z-[25]" style={{ top: pt(52), paddingInline: pt(10) }}>
         <NotificationCard content={content} screen="banner" textSize={settings.textSize} onToggle={onToggle} motion={DROP} />
       </div>
     </>
