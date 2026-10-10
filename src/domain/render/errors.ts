@@ -137,7 +137,7 @@ export function versionRevoked(version: number, revokedAt: Date | null, activeVe
 
 // ── 422: channels ────────────────────────────────────────────────────────────
 
-/** The content type doesn't allow the channel: "Disclosures don't render to sms." */
+/** The content type doesn't allow the channel: "Disclosures don't render to fax." */
 export function channelNotAllowed(contentTypeName: string, channel: string): RenderError {
   return renderError("channel_not_allowed", `${pluralName(contentTypeName)} don't render to ${channelLabel(channel)}.`, {
     channel,

@@ -3,6 +3,7 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 import { connection } from "next/server";
 import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import { assertNever } from "./assert-never";
 import { simDb } from "./db";
 import { SIM_FIELDS, simField } from "./fields";
 import { blockedSentence, missingRequired, suggestMapping } from "./mapping";
@@ -390,11 +391,20 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
   const src = deliveryFileHref(d.id);
   let view: SimDeliveryView["view"] = null;
   if (d.status === "delivered" && d.output) {
-    if (d.channel === "web") view = { kind: "phone", src };
-    else if (d.channel === "pdf") view = { kind: "pdf", src };
-    else {
-      const email = parseEmail(d.output);
-      view = { kind: "inbox", src, from: CORAL_SENDER, subject: email?.subject ?? "", preheader: email?.preheader ?? "" };
+    switch (d.channel) {
+      case "web":
+        view = { kind: "phone", src };
+        break;
+      case "pdf":
+        view = { kind: "pdf", src };
+        break;
+      case "email": {
+        const email = parseEmail(d.output);
+        view = { kind: "inbox", src, from: CORAL_SENDER, subject: email?.subject ?? "", preheader: email?.preheader ?? "" };
+        break;
+      }
+      default:
+        assertNever(d.channel, "channel");
     }
   }
 
@@ -419,10 +429,16 @@ export async function loadDeliveryFile(
   const [d]: DeliveryRow[] = await simDb.select().from(simDeliveries).where(eq(simDeliveries.id, deliveryId));
   if (!d || d.status !== "delivered" || !d.output) return null;
   const name = `${d.templateId ?? "delivery"}-v${d.versionNumber ?? 0}-${d.channel}`.replace(/[^\w.-]/g, "_");
-  if (d.channel === "pdf") {
-    return { contentType: "application/pdf", body: new Uint8Array(Buffer.from(d.output, "base64")), filename: `${name}.pdf` };
+  switch (d.channel) {
+    case "pdf":
+      return { contentType: "application/pdf", body: new Uint8Array(Buffer.from(d.output, "base64")), filename: `${name}.pdf` };
+    case "web":
+      return { contentType: "text/html; charset=utf-8", body: d.output, filename: `${name}.html` };
+    case "email": {
+      const email = parseEmail(d.output);
+      return email ? { contentType: "text/html; charset=utf-8", body: email.html, filename: `${name}.html` } : null;
+    }
+    default:
+      return assertNever(d.channel, "channel");
   }
-  if (d.channel === "web") return { contentType: "text/html; charset=utf-8", body: d.output, filename: `${name}.html` };
-  const email = parseEmail(d.output);
-  return email ? { contentType: "text/html; charset=utf-8", body: email.html, filename: `${name}.html` } : null;
 }

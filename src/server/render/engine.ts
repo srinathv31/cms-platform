@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNever } from "@/domain/assert-never";
 import {
   renderFailed,
   renderFailedDocument,
@@ -111,6 +112,8 @@ async function adapt(channel: Channel, doc: RenderDoc, fields: { subject: string
       return renderWeb(doc);
     case "email":
       return renderEmail(doc, fields);
+    default:
+      return assertNever(channel, "channel");
   }
 }
 

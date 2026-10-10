@@ -431,7 +431,7 @@ test.describe("channels", () => {
 
   test("an unknown channel name is a 400 bad_request", async ({ request }) => {
     const v = await activeEverywhere();
-    for (const channel of ["sms", "PDF", "", 7, null]) {
+    for (const channel of ["fax", "PDF", "", 7, null]) {
       const { res } = await render(request, { templateId: v.templateId, body: { version: v.number, channel, values: validValues(v.variables) } });
       await expectError(res, 400, "bad_request", "channel must be one of pdf, web, email.");
     }
@@ -824,7 +824,7 @@ test.describe("render_log", () => {
       ["unknown template", { templateId: "UC-ZZZZZZ", body: { version: 1, channel: "web", values } }],
       ["unknown version", { templateId: v.templateId, body: { version: 9999, channel: "web", values } }],
       ["no open draft", { templateId: noDraft.templateId, body: { version: "draft", channel: "web", values: validValues(noDraft.variables), preview: true } }],
-      ["malformed body", { templateId: v.templateId, body: { version: v.number, channel: "sms", values } }],
+      ["malformed body", { templateId: v.templateId, body: { version: v.number, channel: "fax", values } }],
       ["draft without preview", { templateId: draft.templateId, body: { version: "draft", channel: "web", values } }],
       ["no consumer", { templateId: v.templateId, consumer: null, body: bodyFor(v, "web") }],
     ];

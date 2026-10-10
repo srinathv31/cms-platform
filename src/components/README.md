@@ -97,6 +97,9 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
 
 A channel's name ("PDF", "Web", "Email") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere.
+Anything else that differs by channel is a `Record<Channel, …>` or a `switch` that ends in `assertNever` from
+`src/domain/assert-never.ts` (the preview's output and its controls row, `renderPreview`, the usage charts' hues),
+never an `if` with a fallthrough: a new channel is then a compile error at each place that must handle it.
 [primitives/one-copy.test.ts](primitives/one-copy.test.ts) fails when a component pastes a second copy of one of
 these (the segmented track, a hand-rolled tablist, the clipboard, the stat numeral, the team icons, a channel label
 map).

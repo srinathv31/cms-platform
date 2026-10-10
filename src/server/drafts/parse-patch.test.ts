@@ -145,7 +145,7 @@ describe("parseDraftPatch", () => {
   });
 
   it("refuses unknown or repeated channels", () => {
-    expect(message({ ...base, channels: ["sms"] })).toMatch(/^channels\b/);
+    expect(message({ ...base, channels: ["fax"] })).toMatch(/^channels\b/);
     expect(message({ ...base, channels: ["pdf", "pdf"] })).toMatch(/repeated channel/);
   });
 

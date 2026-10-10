@@ -48,6 +48,7 @@ Conventions (not linted):
 | [actions.ts](actions.ts) | Server actions: `searchTemplates`, `linkTemplate`, `saveMapping`, `sendToCustomers`, `markNoticesRead`, `getDeliveryView`. Each returns `SimResult`; the four that write call `refresh()`. |
 | [fields.ts](fields.ts), [mapping.ts](mapping.ts) | Pure: Coral's 14 field paths (`SIM_FIELDS`) and the variable types each fits; `suggestMapping`, `missingRequired`, `valuesFor`, `blockedSentence`. |
 | [types.ts](types.ts) | Coral's read models and `SimResult`, built on the `Api*` wire types. |
+| [assert-never.ts](assert-never.ts) | Coral's own exhaustive check. Every branch on a channel is a `switch` over `ApiChannel` (the client) or `SimChannel` (a stored delivery, `schema/sim.ts`) that ends in `assertNever`, so a channel added to either is a compile error at each place that must handle it. |
 | [db.ts](db.ts) | `simDb`, a Drizzle client that knows only the sim schema, and `withBusyRetry` for writes. |
 | [theme.css](theme.css) | Coral's palette, fonts and radii. |
 | [ui/offer-view.tsx](ui/offer-view.tsx) | Client. One offer: Template, Values and Send tabs (`?tab=`), optimistic mapping rows, send, customer drawer. |

@@ -87,8 +87,15 @@ function pickChannel(rng: Rng, channels: Channel[]): Channel {
   return channels[0];
 }
 
+/** How long a render takes, in ms: at least `min`, plus up to `spread`. */
+const CHANNEL_DURATION: Record<Channel, readonly [min: number, spread: number]> = {
+  pdf: [180, 420],
+  web: [35, 90],
+  email: [55, 110],
+};
+
 function duration(rng: Rng, channel: Channel): number {
-  const [min, spread] = channel === "pdf" ? [180, 420] : channel === "email" ? [55, 110] : [35, 90];
+  const [min, spread] = CHANNEL_DURATION[channel];
   const slow = rng() < 0.05 ? 3 : 1;
   return Math.round((min + rng() * spread) * slow);
 }

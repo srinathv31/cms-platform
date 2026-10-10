@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { assertNever } from "@/domain/assert-never";
 import { BAD_REQUEST_MESSAGES, MAX_BODY_BYTES, badRequest, bodyTooLarge, consumerRequired, renderFailed } from "@/domain/render";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import type { Base64ResponseBody, EmailRender, EmailResponseBody, RenderError } from "@/domain/render/types";
@@ -92,39 +93,39 @@ function successResponse(
   if (opts.preview) headers.set("X-Stencil-Preview", "true");
 
   const { newerVersion } = result;
-
-  if (result.channel === "email") {
-    const email = result.body as EmailRender;
-    const body: EmailResponseBody =
-      opts.encoding === "base64"
-        ? { ...email, html: toBase64(email.html), text: toBase64(email.text), newerVersion, encoding: "base64" }
-        : { ...email, newerVersion };
+  // PDF and web are files: as they are, or wrapped in JSON as base64.
+  const base64 = (channel: Base64ResponseBody["channel"], contentType: Base64ResponseBody["contentType"], data: Uint8Array | string) => {
+    const body: Base64ResponseBody = { channel, contentType, encoding: "base64", data: toBase64(data), newerVersion };
     return Response.json(body, { headers });
-  }
+  };
 
-  const contentType = result.channel === "pdf" ? "application/pdf" : "text/html; charset=utf-8";
-  const data = result.body as Uint8Array | string;
-
-  if (opts.encoding === "base64") {
-    const body: Base64ResponseBody = {
-      channel: result.channel,
-      contentType,
-      encoding: "base64",
-      data: toBase64(data),
-      newerVersion,
-    };
-    return Response.json(body, { headers });
+  switch (result.channel) {
+    case "pdf": {
+      const bytes = result.body as Uint8Array;
+      if (opts.encoding === "base64") return base64("pdf", "application/pdf", bytes);
+      headers.set("Content-Type", "application/pdf");
+      headers.set("Content-Disposition", `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`);
+      // A copy on its own ArrayBuffer: the Response body type wants exactly that.
+      return new Response(new Uint8Array(bytes), { headers });
+    }
+    case "web": {
+      const html = result.body as string;
+      if (opts.encoding === "base64") return base64("web", "text/html; charset=utf-8", html);
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      headers.set("Content-Security-Policy", WEB_CSP);
+      return new Response(html, { headers });
+    }
+    case "email": {
+      const email = result.body as EmailRender;
+      const body: EmailResponseBody =
+        opts.encoding === "base64"
+          ? { ...email, html: toBase64(email.html), text: toBase64(email.text), newerVersion, encoding: "base64" }
+          : { ...email, newerVersion };
+      return Response.json(body, { headers });
+    }
+    default:
+      return assertNever(result.channel, "channel");
   }
-
-  headers.set("Content-Type", contentType);
-  if (result.channel === "pdf") {
-    headers.set("Content-Disposition", `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`);
-    const bytes = data as Uint8Array;
-    // A copy on its own ArrayBuffer: the Response body type wants exactly that.
-    return new Response(new Uint8Array(bytes), { headers });
-  }
-  headers.set("Content-Security-Policy", WEB_CSP);
-  return new Response(data as string, { headers });
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────

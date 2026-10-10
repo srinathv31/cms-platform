@@ -10,6 +10,7 @@
 
 import type {
   ApiBase64Response,
+  ApiChannel,
   ApiContractChange,
   ApiEmailResponse,
   ApiErrorBody,
@@ -29,6 +30,9 @@ export type * from "@/contracts/api-v1";
 type Assert<T extends true> = T;
 type Fits<A, B> = [A] extends [B] ? true : false;
 export type _DriftChecks = [
+  // A channel the domain renders is one the API names, and the other way round.
+  Assert<Fits<Channel, ApiChannel>>,
+  Assert<Fits<ApiChannel, Channel>>,
   Assert<Fits<RenderErrorCode, ApiErrorCode>>,
   Assert<Fits<RenderErrorBody, ApiErrorBody>>,
   Assert<Fits<EmailResponseBody, ApiEmailResponse>>,

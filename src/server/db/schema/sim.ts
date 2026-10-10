@@ -4,7 +4,8 @@
 
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-type Channel = "pdf" | "web" | "email";
+/** The channels Coral sends and stores deliveries for. Its own type: Coral reaches Stencil only over /api/v1. */
+export type SimChannel = "pdf" | "web" | "email";
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
 const json = <T>(name: string) => text(name, { mode: "json" }).$type<T>();
 
@@ -39,7 +40,7 @@ export const simLinks = sqliteTable(
     templateId: text("template_id").notNull(),
     templateName: text("template_name").notNull(),
     pinnedVersion: integer("pinned_version").notNull(),
-    channels: json<Channel[]>("channels").notNull(),
+    channels: json<SimChannel[]>("channels").notNull(),
     mapping: json<Record<string, string>>("mapping").notNull(), // variable key → customer/offer field path
     linkedAt: ts("linked_at").notNull(),
   },
@@ -61,7 +62,7 @@ export const simDeliveries = sqliteTable(
     // Phase 5: what was asked for. Nullable only so the column can be added; always written.
     templateId: text("template_id"),
     versionNumber: integer("version_number"),
-    channel: text("channel").$type<Channel>().notNull(),
+    channel: text("channel").$type<SimChannel>().notNull(),
     status: text("status").$type<"delivered" | "failed">().notNull(),
     error: json<{ status: number; code: string; message: string }>("error"),
     /** X-Stencil-Newer-Version on a delivered render of a Superseded version. */

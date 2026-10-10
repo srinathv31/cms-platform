@@ -10,6 +10,7 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { assertNever } from "@/domain/assert-never";
 import type { EmailRender, RenderDoc, RenderError } from "@/domain/render/types";
 import type { Channel } from "@/domain/types";
 import { renderPdf } from "@/server/render/channels/pdf";
@@ -102,8 +103,16 @@ export async function runJobs(jobs: readonly FreshJob[]): Promise<FreshResult[]>
 }
 
 function bodyText(channel: Channel, body: Uint8Array | string | EmailRender): string {
-  if (channel === "pdf") return Buffer.from(body as Uint8Array).toString("base64");
-  return typeof body === "string" ? body : JSON.stringify(body);
+  switch (channel) {
+    case "pdf":
+      return Buffer.from(body as Uint8Array).toString("base64");
+    case "web":
+      return body as string;
+    case "email":
+      return JSON.stringify(body);
+    default:
+      return assertNever(channel, "channel");
+  }
 }
 
 /** A PDF result's bytes. */

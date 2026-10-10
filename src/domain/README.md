@@ -42,6 +42,7 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
 | --- | --- | --- |
 | Vocabulary | [types.ts](types.ts) | `VersionState`, `Channel`, roles, `Viewer`, the permission `Action` list, `DraftPatch`. Re-exports the editor model's `Variable` and `ContractChange`. |
 | | [status.ts](status.ts) | Label, tone, and icon for each version state. |
+| | [assert-never.ts](assert-never.ts) | `assertNever`, the exhaustive check. Everything that differs by channel is a `Record<Channel, …>` or a `switch` whose `default` calls it, so a new channel is a compile error at each place that must handle it. The domain, the server and the components use it; Coral has its own copy. |
 | | [review-types.ts](review-types.ts), [access-types.ts](access-types.ts), [golive-types.ts](golive-types.ts), [import-types.ts](import-types.ts), [render/types.ts](render/types.ts) | Each area's contract: inputs, effects, limits, read models. `golive-types.ts` re-exports `@/contracts/api-v1` and type-checks the render types against it (`_DriftChecks`). |
 | Lifecycle | [lifecycle.ts](lifecycle.ts) | Every version transition: `createDraft`, `planDraftStart`, `editLatest`, `submit`, `requestChanges`, `approve`, `setSunset`, and the two-person revoke. Also `contractBaseline`, the version a draft's contract is compared with; `reviewBaseline`, the one the review screen's redline is against; `sunsetPassed`, the one test of a passed sunset; and `sweepSunsets`, its audit record. |
 | Review | [approval-chain.ts](approval-chain.ts) | Stage order, the stages a version records at submit and goes through (`recordStages`, `ownStages`, `stageOf`), the default chain (`DEFAULT_CHAIN`, stage id `default`), who approved a stage of this round (`approvedThisRound`), whose stage it is (`canActOnStage`), who a stage notifies, the stepper. |
@@ -232,7 +233,7 @@ Read these before you assume a rule is missing. When you change one, move it her
 
 ## Testing
 
-- Every rule file has a colocated `*.test.ts` (30 files). `status.ts`, the types files, and `render/index.ts`
+- Every rule file has a colocated `*.test.ts` (30 files). `status.ts`, `assert-never.ts`, the types files, and `render/index.ts`
   have none.
   Run `npx vitest run src/domain`; it takes under a second in the `node` environment.
 - Tests pin time by passing `now`, never with fake timers: `const NOW = new Date("2026-10-04T12:00:00.000Z")`

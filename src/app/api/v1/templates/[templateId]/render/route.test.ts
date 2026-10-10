@@ -274,7 +274,7 @@ describe("POST …/render: 400 bad requests", () => {
     ["a JSON array", "[]", BODY],
     ["no values", { version: 2, channel: "web" }, BODY],
     ["no version", { channel: "web", values: {} }, BODY],
-    ["an unknown channel", { ...good, channel: "sms" }, "channel must be one of pdf, web, email."],
+    ["an unknown channel", { ...good, channel: "fax" }, "channel must be one of pdf, web, email."],
     ["a version as a string", { ...good, version: "2" }, "version must be a version number."],
     ["version 0", { ...good, version: 0 }, "version must be a version number."],
     ["a fractional version", { ...good, version: 1.5 }, "version must be a version number."],
@@ -292,7 +292,7 @@ describe("POST …/render: 400 bad requests", () => {
   });
 
   it("generates a correlation id when none is sent, and replaces an unusable one", async () => {
-    const res = await post("balance-transfer", { ...good, channel: "sms" });
+    const res = await post("balance-transfer", { ...good, channel: "fax" });
     expect(res.headers.get("X-Correlation-Id")).toMatch(/^req_[0-9a-z]{12}$/);
     const odd = await post("balance-transfer", good, { ...CORAL, "X-Correlation-Id": "x".repeat(200) });
     expect(odd.headers.get("X-Correlation-Id")).toMatch(/^req_/);

@@ -113,10 +113,10 @@ describe("render_failed with a reason the caller can act on", () => {
 
 describe("channel messages", () => {
   it("names the content type in the plural", () => {
-    expect(channelNotAllowed("Disclosure", "sms")).toEqual({
+    expect(channelNotAllowed("Disclosure", "fax")).toEqual({
       code: "channel_not_allowed",
-      message: "Disclosures don't render to sms.",
-      details: { channel: "sms" },
+      message: "Disclosures don't render to fax.",
+      details: { channel: "fax" },
     });
     expect(channelNotAllowed("Disclosure", "email").message).toBe("Disclosures don't render to Email.");
     expect(channelNotAllowed("Policy", "pdf").message).toBe("Policies don't render to PDF.");

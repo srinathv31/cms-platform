@@ -11,6 +11,7 @@ import type {
   ApiTemplateSearch,
 } from "@/contracts/api-v1";
 import { API_HEADERS } from "@/contracts/api-v1";
+import { assertNever } from "./assert-never";
 import type { SimApiError } from "./types";
 
 // Coral's client for UCOMP's /api/v1. It runs on the server only (server components and actions) and
@@ -96,6 +97,19 @@ export function answeredAt(response?: Response): Date {
   return Number.isNaN(parsed) ? new Date() : new Date(parsed);
 }
 
+/** Coral stores text, so it asks for the PDF as base64 JSON; the page and the email come as they are. */
+function asBase64(channel: ApiChannel): boolean {
+  switch (channel) {
+    case "pdf":
+      return true;
+    case "web":
+    case "email":
+      return false;
+    default:
+      return assertNever(channel, "channel");
+  }
+}
+
 function newerVersionOf(response: Response, fromBody?: number | null): number | null {
   const header = response.headers.get(API_HEADERS.newerVersion);
   const parsed = header === null ? NaN : Number.parseInt(header, 10);
@@ -149,7 +163,7 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
 
     async render(templateId, body, correlationId) {
       const channel: ApiChannel = body.channel;
-      const request: ApiRenderRequest = channel === "pdf" ? { ...body, encoding: "base64" } : { ...body };
+      const request: ApiRenderRequest = asBase64(channel) ? { ...body, encoding: "base64" } : { ...body };
       const result = await call(`/api/v1/templates/${id(templateId)}/render`, {
         method: "POST",
         headers: { "Content-Type": "application/json", [API_HEADERS.correlation]: correlationId },
@@ -159,16 +173,21 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
       if (!result.ok) return { ok: false, error: result.error, at };
       const { response } = result;
       try {
-        if (channel === "web") {
-          return { ok: true, data: { output: await response.text(), newerVersion: newerVersionOf(response) }, at };
+        switch (channel) {
+          case "web":
+            return { ok: true, data: { output: await response.text(), newerVersion: newerVersionOf(response) }, at };
+          case "pdf": {
+            const json = (await response.json()) as ApiBase64Response;
+            return { ok: true, data: { output: json.data, newerVersion: newerVersionOf(response, json.newerVersion) }, at };
+          }
+          case "email": {
+            const json = (await response.json()) as ApiEmailResponse;
+            const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
+            return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
+          }
+          default:
+            return assertNever(channel, "channel");
         }
-        if (channel === "pdf") {
-          const json = (await response.json()) as ApiBase64Response;
-          return { ok: true, data: { output: json.data, newerVersion: newerVersionOf(response, json.newerVersion) }, at };
-        }
-        const json = (await response.json()) as ApiEmailResponse;
-        const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
-        return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
       } catch {
         return { ok: false, error: { status: response.status, code: "bad_response", message: "Stencil's render answer couldn't be read." }, at };
       }

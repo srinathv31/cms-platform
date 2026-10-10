@@ -2,6 +2,7 @@
 
 import { m } from "motion/react";
 import type { Variable } from "@/editor/model/types";
+import { assertNever } from "@/domain/assert-never";
 import type { Channel } from "@/domain/types";
 import { duration, ease } from "@/components/motion/presets";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
@@ -79,9 +80,7 @@ export function PreviewPane({
         className="@container/controls flex h-8 shrink-0 items-center justify-between gap-3"
       >
         <ChannelTabs channels={channels} value={channel} onChange={onChannel} />
-        {/* While the pane shows an error, the last good PDF is still in memory but isn't what is on screen: nothing to save. */}
-        {channel === "pdf" ? <DownloadPdfButton output={error ? null : output} /> : null}
-        {channel === "web" ? <DevicePicker value={device} onChange={onDevice} /> : null}
+        <ChannelControl channel={channel} output={error ? null : output} device={device} onDevice={onDevice} />
       </div>
 
       <div
@@ -132,35 +131,67 @@ function Output({
   sender: PreviewPaneProps["sender"];
   recipient: string | null;
 }) {
-  if (channel === "pdf") {
-    const pdf = output?.kind === "pdf" ? output : null;
-    // No bytes yet: PdfViewer draws its own page-shaped skeleton.
-    return (
-      <PdfViewer
-        data={pdf?.bytes ?? null}
-        fileName={pdf?.filename ?? ""}
-        className="min-h-full bg-transparent"
-        contentClassName={WELL_INSET}
-      />
-    );
+  switch (channel) {
+    case "pdf": {
+      const pdf = output?.kind === "pdf" ? output : null;
+      // No bytes yet: PdfViewer draws its own page-shaped skeleton.
+      return (
+        <PdfViewer
+          data={pdf?.bytes ?? null}
+          fileName={pdf?.filename ?? ""}
+          className="min-h-full bg-transparent"
+          contentClassName={WELL_INSET}
+        />
+      );
+    }
+    case "web":
+      return output?.kind === "web" ? (
+        <WebOutput html={output.html} device={device} host={host} />
+      ) : (
+        <WebSkeleton device={device} host={host} />
+      );
+    case "email":
+      return output?.kind === "email" ? (
+        <EmailOutput
+          subject={output.subject}
+          preheader={output.preheader}
+          html={output.html}
+          senderName={sender.name}
+          senderAddress={sender.address}
+          recipient={recipient}
+        />
+      ) : (
+        <EmailSkeleton />
+      );
+    default:
+      return assertNever(channel, "channel");
   }
-  if (channel === "web") {
-    return output?.kind === "web" ? (
-      <WebOutput html={output.html} device={device} host={host} />
-    ) : (
-      <WebSkeleton device={device} host={host} />
-    );
+}
+
+/**
+ * The right slot of the controls row: the channel's own control, or nothing. While the pane shows an
+ * error `output` is null: the last good PDF is still in memory, but it isn't what is on screen, so
+ * there is nothing to save.
+ */
+function ChannelControl({
+  channel,
+  output,
+  device,
+  onDevice,
+}: {
+  channel: Channel;
+  output: PreviewSlot["output"];
+  device: PreviewDevice;
+  onDevice: (device: PreviewDevice) => void;
+}) {
+  switch (channel) {
+    case "pdf":
+      return <DownloadPdfButton output={output} />;
+    case "web":
+      return <DevicePicker value={device} onChange={onDevice} />;
+    case "email":
+      return null;
+    default:
+      return assertNever(channel, "channel");
   }
-  return output?.kind === "email" ? (
-    <EmailOutput
-      subject={output.subject}
-      preheader={output.preheader}
-      html={output.html}
-      senderName={sender.name}
-      senderAddress={sender.address}
-      recipient={recipient}
-    />
-  ) : (
-    <EmailSkeleton />
-  );
 }

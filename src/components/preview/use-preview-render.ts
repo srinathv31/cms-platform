@@ -19,6 +19,7 @@
 // The route can still disagree with the browser (a real 4xx or 5xx); that is shown as it comes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { assertNever } from "@/domain/assert-never";
 import type { RenderError } from "@/domain/render/types";
 import { validateValues } from "@/domain/render/validate";
 import type { Channel, Variable, VariableValues } from "@/domain/types";
@@ -159,6 +160,8 @@ export function sameOutput(a: PreviewOutput, b: PreviewOutput): boolean {
       const other = b as typeof a;
       return a.subject === other.subject && a.preheader === other.preheader && a.html === other.html;
     }
+    default:
+      return assertNever(a, "preview output");
   }
 }
 

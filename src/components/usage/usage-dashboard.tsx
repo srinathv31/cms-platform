@@ -5,6 +5,7 @@ import { plural } from "@/domain/plural";
 import { cn } from "@/lib/utils";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { UsageDashboard } from "@/domain/golive-types";
+import { CHANNELS, type Channel } from "@/domain/types";
 import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
 import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/components/primitives/stat-card";
@@ -19,12 +20,12 @@ import { UsageTabs } from "./usage-tabs";
 // Renders over time and the failure rate. Consumers: renders by consumer and who renders what. The
 // numbers are `getUsageDashboard`'s; this file only lays them out. Reads inside the page's <Stream>.
 
-/** PDF, Web, Email: the same hues here and in the channel mix. */
-const CHANNEL_SERIES: StackSeries[] = [
-  { label: CHANNEL_LABELS.pdf, ...SERIES[0] },
-  { label: CHANNEL_LABELS.web, ...SERIES[1] },
-  { label: CHANNEL_LABELS.email, ...SERIES[2] },
-];
+/**
+ * Each channel's hue. The charts list the channels in `CHANNELS` order, and the channel mix colours its
+ * parts in the order it gets them, so a channel has the same hue here and there.
+ */
+const CHANNEL_HUE: Readonly<Record<Channel, (typeof SERIES)[number]>> = { pdf: SERIES[0], web: SERIES[1], email: SERIES[2] };
+const CHANNEL_SERIES: StackSeries[] = CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], ...CHANNEL_HUE[c] }));
 
 function Overview({ d }: { d: UsageDashboard }) {
   const { stats, onActive, heatmap } = d;
@@ -52,7 +53,7 @@ function Overview({ d }: { d: UsageDashboard }) {
         </StatLabel>
         <div className="mt-6 border-t border-hairline-strong pt-5">
           <ChannelMix
-            parts={(["pdf", "web", "email"] as const).map((c) => ({ label: CHANNEL_LABELS[c], value: d.byChannel[c] }))}
+            parts={CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], value: d.byChannel[c] }))}
           />
         </div>
       </StatCard>
@@ -125,7 +126,7 @@ function Overview({ d }: { d: UsageDashboard }) {
             data={d.weekly.map((w, i) => ({
               label: formatShortDate(w.weekStart),
               title: `Week of ${formatShortDate(w.weekStart)}`,
-              parts: [w.channels.pdf, w.channels.web, w.channels.email],
+              parts: CHANNELS.map((c) => w.channels[c]),
               partial: i === d.weekly.length - 1 && d.today < addDays(w.weekStart, 6),
             }))}
           />

@@ -3,6 +3,7 @@
 
 import { API_ERROR_STATUS } from "../golive-types";
 import type { ApiErrorCode, ApiRenderRequest, Channel, ResponseFormat, Variable } from "../golive-types";
+import { CHANNELS } from "../types";
 import { exampleOf } from "./json-schema";
 
 /** "/api/v1/templates/UC-4F7K2Q/render". */
@@ -31,6 +32,9 @@ const FETCH_RESULT: Readonly<Record<Channel, string>> = {
   email: "const { subject, preheader, html, text } = await res.json();",
 };
 
+/** curl writes the answer to a file (`--output`) only for a binary file: the PDF. */
+const TO_FILE: Readonly<Record<Channel, boolean>> = { pdf: true, web: false, email: false };
+
 /**
  * curl and fetch for one channel, ready to paste. curl sends the body pretty-printed with
  * `--data-raw` and writes a PDF to a file with `--output`; fetch reads the body by channel and
@@ -52,7 +56,7 @@ export function integrationSamples(input: {
     `  -H 'Content-Type: application/json'`,
     `  -H ${shellQuote(`X-Consumer-Id: ${input.consumerId}`)}`,
     `  --data-raw ${shellQuote(json)}`,
-    ...(input.channel === "pdf" ? [`  --output ${shellQuote(pdfFilename(input.templateId, input.versionNumber))}`] : []),
+    ...(TO_FILE[input.channel] ? [`  --output ${shellQuote(pdfFilename(input.templateId, input.versionNumber))}`] : []),
   ].join(" \\\n");
 
   const fetch = [
@@ -72,11 +76,10 @@ export function integrationSamples(input: {
 }
 
 /** What comes back on a 200, per channel and for the base64 opt-in. */
-export const RESPONSE_FORMATS: readonly ResponseFormat[] = [
-  { channel: "pdf", contentType: "application/pdf", body: "The PDF file itself.", example: null },
-  { channel: "web", contentType: "text/html; charset=utf-8", body: "A complete HTML page.", example: null },
-  {
-    channel: "email",
+const FORMATS: Readonly<Record<ResponseFormat["channel"], Omit<ResponseFormat, "channel">>> = {
+  pdf: { contentType: "application/pdf", body: "The PDF file itself.", example: null },
+  web: { contentType: "text/html; charset=utf-8", body: "A complete HTML page.", example: null },
+  email: {
     contentType: "application/json",
     body: "JSON with subject, preheader, html and text.",
     example: JSON.stringify(
@@ -91,8 +94,7 @@ export const RESPONSE_FORMATS: readonly ResponseFormat[] = [
       2,
     ),
   },
-  {
-    channel: "base64",
+  base64: {
     contentType: "application/json",
     body: 'Send "encoding": "base64" to get JSON instead: the PDF or page as base64 in data, or the email\'s html and text as base64.',
     example: JSON.stringify(
@@ -101,7 +103,13 @@ export const RESPONSE_FORMATS: readonly ResponseFormat[] = [
       2,
     ),
   },
-];
+};
+
+/** Every channel's format in `CHANNELS` order, then the base64 opt-in. */
+export const RESPONSE_FORMATS: readonly ResponseFormat[] = [...CHANNELS, "base64" as const].map((channel) => ({
+  channel,
+  ...FORMATS[channel],
+}));
 
 const handle = (code: ApiErrorCode, when: string) => ({ status: API_ERROR_STATUS[code], code, when });
 

@@ -298,7 +298,7 @@ export interface Base64ResponseBody {
  * | 409    | version_not_released  | "Version 3 is in review. Version 2 is active." / "… No version is active yet." |
  * | 410    | version_sunset        | "Version 1 was sunset on March 1, 2027. Version 2 is active."             |
  * | 410    | version_revoked       | "Version 1 was revoked on March 1, 2027. Version 2 is active."            |
- * | 422    | channel_not_allowed   | "Disclosures don't render to sms." (the content type doesn't allow it)    |
+ * | 422    | channel_not_allowed   | "Disclosures don't render to fax." (the content type doesn't allow it)    |
  * | 422    | channel_not_enabled   | "Version 2 doesn't render to Email. Its channels are PDF and Web."        |
  * | 422    | missing_variables     | "Missing required variables: first_name, purchase_apr."                   |
  * | 422    | invalid_values        | "purchase_apr must be a percentage, like 21.99."                          |

@@ -6,6 +6,7 @@
 // carrying the route's own message. It rejects only when `signal` aborts (a newer request replaced
 // this one), with the AbortError fetch throws, so a caller can drop the result without a branch.
 
+import { assertNever } from "@/domain/assert-never";
 import type { EmailResponseBody, RenderError, RenderErrorBody } from "@/domain/render/types";
 import type { Channel, VariableValues } from "@/domain/types";
 
@@ -60,14 +61,20 @@ export async function renderPreview({
   try {
     if (!response.ok) return { kind: "error", error: await readError(response) };
 
-    if (channel === "pdf") {
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      return { kind: "pdf", bytes, filename: filenameOf(response, templateId) };
+    switch (channel) {
+      case "pdf": {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return { kind: "pdf", bytes, filename: filenameOf(response, templateId) };
+      }
+      case "web":
+        return { kind: "web", html: await response.text() };
+      case "email": {
+        const body = (await response.json()) as EmailResponseBody;
+        return { kind: "email", subject: body.subject, preheader: body.preheader, html: body.html, text: body.text };
+      }
+      default:
+        return assertNever(channel, "channel");
     }
-    if (channel === "web") return { kind: "web", html: await response.text() };
-
-    const body = (await response.json()) as EmailResponseBody;
-    return { kind: "email", subject: body.subject, preheader: body.preheader, html: body.html, text: body.text };
   } catch (error) {
     if (signal?.aborted) throw error;
     return { kind: "error", error: response.ok ? UNREADABLE : UNREACHABLE };
