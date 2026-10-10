@@ -200,25 +200,25 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 **Goal:** push and SMS get the same control as documents, and the author sees exactly what each phone will show.
 
-1. **Do:** Switch to **Maya**. **Library → New template → Alert → Statement ready.**
-   - **They see:** Alert's own starters: Blank, Payment reminder, Card activity and Statement ready. Import a file stays greyed: "Only documents can be imported." The template opens on a push and a text message, with a phone in the preview.
+1. **Do:** Switch to **Maya**. **Library → New template → Alert → Statement ready.** Click **Preview** (the eye).
+   - **They see:** Alert's own starters: Blank, Payment reminder, Card activity and Statement ready. Import a file stays greyed: "Only documents can be imported." The template opens on a push and a text message, and Copilot prompt is greyed ("Copilot drafts documents only."). Preview shows the push on an iPhone lock screen.
    - **Say:** "A template is a document or an alert, for life. An alert is short plain text, and goes to Push and SMS only."
-2. **Do:** At the end of the push body, type ` Thanks for banking with Coral.`
-   - **They see:** the phone's notification change with every keystroke, the sample values filled in, and the body cut where the lock screen cuts it.
+2. **Do:** At the end of the push body, type ` Thanks for banking with Coral. Pay in the app.`
+   - **They see:** the phone's notification change with every keystroke, the sample values filled in. Once the body runs past the lock screen's four lines, a warning appears under the field: "iPhone lock screen cuts after “…Pay in the”."
    - **Say:** "What the author sees is what the phone gets, byte for byte, before anything is saved."
 3. **Do:** In **Subtitle**, type `Coral Rewards card`. Switch the preview from **iPhone** to **Android**, then back.
    - **They see:** the subtitle under the title on the iPhone; Android leaves it out, as the field's label says.
    - **Say:** "One message for both phones. The one difference, the iPhone's subtitle, is labelled and shown."
-4. **Do:** At the end of the text message's first line, type ` We’re here to help.` (the curly apostrophe is ⌥⇧]). Click **Replace** on the flag.
-   - **They see:** the ’ underlined with "’ isn't in the SMS character set", the part count beside the message, and the flag gone after Replace.
+4. **Do:** Click after "Due date.", the end of the text message's first line, and type ` We’re here to help.` (the curly apostrophe is ⌥⇧]). Click the underlined ’, then **Replace with '**.
+   - **They see:** the ’ underlined, and the line under the message jump to "UCS-2 · 3 parts". The flag says "’ isn't in the SMS character set." After the replace the flag is gone and the line reads "GSM-7 · 2 parts".
    - **Say:** "One curly apostrophe would send every text in the expensive encoding, with a third of the room. Stencil catches it where it's typed, and won't submit it."
 5. **Do:** **Submit for review** → **Submit v1**.
    - **They see:** the dialog list Push and SMS and the sample sets; the badge turns **In review**.
 6. **Do:** Switch to **Jordan**. **Review → Waiting on me → Statement ready v1 → Approve → Approve v1.**
-   - **They see:** Priya's Card Used Abroad v1 waiting too; one approval stage, because alerts have their own chain; then the go-live moment.
+   - **They see:** Priya's Card Used Abroad v1 waiting too. The review opens on the push and the text message as Maya wrote them, in the composer's look, with Preview one tab away. One approval stage, because alerts have their own chain; then the go-live moment.
    - **Say:** "Alerts go through the same maker-checker as documents."
 7. **Do:** **Library → Payment Due Reminder → Usage.**
-   - **They see:** Coral rendering v1 every day, a couple of thousand renders over 30 days, and 3 failed renders 12 days ago. On the team's Usage page, Push and SMS have their own series in the channel split.
+   - **They see:** Coral rendering v1 every day, a couple of thousand renders over 30 days, and 3 failed SMS renders about two weeks ago, under Recent failures. On the team's Usage page, Push and SMS have their own series in the channel split.
    - **Say:** "Every alert sent is on record, like every document: who, which version, which channel. Never the customer's data."
 
 ## Act 6 — Change it safely
