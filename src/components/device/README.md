@@ -162,6 +162,12 @@ What that gives, measured in the running app:
 | Review's Preview, 1440 × 900 | 0.589 | 0.555 |
 | Coral's drawer, 1440 × 900 | about 0.70 | about 0.66 |
 
+**The screen's content** is laid out for the real screen's height, where each OS puts it: iOS's date and clock
+near the top and its notifications rising from the bottom, the stack just above the flashlight and camera;
+Android's notifications under its clock; a home screen's full grid of tiles down to the search and the dock (six
+rows on iOS, the launcher's five on Android); the shade's notification list, with Clear all, under its quick
+settings; a text thread's messages under the header, and the composer at the bottom.
+
 **Measuring** reads layout px, so the scale changes nothing: `measureField` takes the clip from the field's own
 layout and each character's box from the screen, divided by the phone's scale on screen (the frame's
 `getBoundingClientRect` width over its `offsetWidth`). The composer's hidden phones draw at 1:1 in a box their

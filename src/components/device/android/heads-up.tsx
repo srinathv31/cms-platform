@@ -11,8 +11,9 @@ import { AndroidNotification } from "./notification-card";
 import { androidFixed } from "./type";
 
 // A heads-up notification on an unlocked Pixel-style phone: it drops in over an abstract home screen (the
-// date where the at-a-glance line sits, rows of round themed tiles, the dock and a plain search bar; no real
-// apps, no logo), collapsed to one line of title and one of text. It drops once, when the view opens, and
+// date where the at-a-glance line sits, the launcher's grid of round themed tiles down the screen, the dock
+// and a plain search bar at the bottom; no real apps, no logo), collapsed to one line of title and one of
+// text. It drops once, when the view opens, and
 // stays still under reduced motion. The phone is unlocked, so previews hidden doesn't change it.
 
 const TILE = 52;
@@ -23,7 +24,7 @@ const TONES = [
   "--device-m3-surface-container-high",
   "--device-m3-primary-container",
 ] as const;
-const PATTERN = [0, 1, 2, 3, 1, 2, 0, 1, 2, 0, 3, 1, 3, 2, 1, 0];
+const PATTERN = [0, 1, 2, 3, 1, 2, 0, 1, 2, 0, 3, 1, 3, 2, 1, 0, 1, 3, 0, 2, 2, 0, 1, 3];
 const ROW: CSSProperties = { gridTemplateColumns: `repeat(4, ${pt(TILE)})` };
 
 function Tile({ tone, label = true }: { tone: (typeof TONES)[number]; label?: boolean }) {
@@ -46,12 +47,9 @@ function AndroidHomeScreen({ clock }: { clock: DeviceClock }) {
       <div className="shrink-0 text-(--device-wall-ink)" style={{ padding: `${pt(STATUS_BAR_HEIGHT.android + 28)} ${pt(28)} 0` }}>
         <div style={androidFixed(24, 30)}>{shortDate(clock.date)}</div>
       </div>
-      {/* Whole rows only: a row that doesn't fit wraps into a second, clipped column. */}
-      <div
-        className="flex min-h-0 flex-1 flex-col flex-wrap overflow-hidden"
-        style={{ paddingTop: pt(32), paddingInline: pt(30), rowGap: pt(20), columnGap: pt(60) }}
-      >
-        {[0, 4, 8].map((start) => (
+      {/* The launcher's grid: five rows of four, spread evenly down the space between the date and the dock. */}
+      <div className="flex min-h-0 flex-1 flex-col justify-evenly overflow-hidden" style={{ paddingInline: pt(30) }}>
+        {[0, 4, 8, 12, 16].map((start) => (
           <div key={start} className="grid w-full shrink-0 justify-between" style={ROW}>
             {PATTERN.slice(start, start + 4).map((tone, i) => (
               <Tile key={i} tone={TONES[tone]!} />
@@ -60,7 +58,7 @@ function AndroidHomeScreen({ clock }: { clock: DeviceClock }) {
         ))}
       </div>
       <div className="grid shrink-0 justify-between" style={{ ...ROW, paddingInline: pt(30), paddingBlock: pt(16) }}>
-        {PATTERN.slice(12, 16).map((tone, i) => (
+        {PATTERN.slice(20, 24).map((tone, i) => (
           <Tile key={i} tone={TONES[tone]!} label={false} />
         ))}
       </div>

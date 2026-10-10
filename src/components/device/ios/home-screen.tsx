@@ -8,11 +8,14 @@ import { HomeIndicator, StatusBar } from "../status-bar";
 import { glass } from "./glass";
 import { fixedText } from "./type";
 
-// An abstract iPhone home screen for the banner to land on: a widget, rows of blank glass tiles with label
-// bars, the search pill and the dock. No real apps, no glyphs, nothing to read: decoration only.
+// An abstract iPhone home screen for the banner to land on: a widget and rows of blank glass tiles with
+// label bars down the screen, then the search pill and the dock at the bottom. No real apps, no glyphs,
+// nothing to read: decoration only.
 
 const TILE = 62;
 const TILE_CORNER = TILE * 0.2237;
+/** Between rows: a tile and its label are 75pt, so a row every 100pt, as on a 402pt iPhone. */
+const ROW_GAP = 25;
 
 /** Tile tints in a fixed, irregular order, so the grid reads as different apps without being any. */
 const TINTS = ["--device-tile", "--device-tile-warm", "--device-tile", "--device-tile-deep"] as const;
@@ -46,13 +49,12 @@ export function HomeScreen({ time }: { time: string }) {
   return (
     <div aria-hidden className="absolute inset-0 flex flex-col">
       <StatusBar time={time} ink="wall" cutout={cutoutWidth("ios")} />
-      {/* Rows in a wrapping column: a row that doesn't fit the frame's height wraps into a second column,
-          off to the right and clipped, so a short frame shows whole rows only. */}
+      {/* Six rows from the top, as a full first page has them: the widget's two, then four of tiles. */}
       <div
-        className="flex min-h-0 flex-1 flex-col flex-wrap overflow-hidden"
-        style={{ paddingTop: pt(70), paddingInline: pt(27), rowGap: pt(17), columnGap: pt(60) }}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        style={{ paddingTop: pt(70), paddingInline: pt(27), rowGap: pt(ROW_GAP) }}
       >
-        <div className="grid w-full shrink-0 justify-between" style={{ ...ROW, rowGap: pt(17) }}>
+        <div className="grid w-full shrink-0 justify-between" style={{ ...ROW, rowGap: pt(ROW_GAP) }}>
           {/* A 2 × 2 widget: a glass panel with a few bars where its content would be. */}
           <span
             className="col-span-2 row-span-2 flex flex-col justify-end"

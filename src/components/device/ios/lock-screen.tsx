@@ -12,10 +12,11 @@ import { glass } from "./glass";
 import { NotificationCard } from "./notification-card";
 import { fixedText } from "./type";
 
-// The iPhone lock screen: the date and the large clock, the notification as the front card of a stack
-// with two quiet cards behind it, and the flashlight and camera buttons at the bottom. Everything but the
-// notification is decoration. The wallpaper is drawn under it by the caller (it is shared with the banner
-// and expanded views, so it doesn't flash between them).
+// The iPhone lock screen: the date and the large clock near the top, and, as iOS lists notifications from
+// the bottom up, the notification low on the screen as the front card of a stack with two quiet cards
+// behind it, just above the flashlight and camera buttons. Everything but the notification is decoration.
+// The wallpaper is drawn under it by the caller (it is shared with the banner and expanded views, so it
+// doesn't flash between them).
 
 /** The date and the large clock. Also the blurred backdrop of the expanded view. */
 export function LockClock({ clock }: { clock: DeviceClock }) {
@@ -74,7 +75,10 @@ export function LockScreen({
     <div className="absolute inset-0 flex flex-col">
       <StatusBar time={null} ink="wall" cutout={cutoutWidth("ios")} />
       <LockClock clock={clock} />
-      <div className="relative shrink-0" style={{ margin: `${pt(30)} ${pt(12)} 0`, paddingBottom: pt(16) }}>
+      {/* Notifications rise from the bottom: the stack sits just above the flashlight and camera, the
+          front card on top and the two behind it showing their lower edges. */}
+      <div className="min-h-0 flex-1" style={{ minHeight: pt(24) }} />
+      <div className="relative shrink-0" style={{ margin: `0 ${pt(12)} ${pt(14)}`, paddingBottom: pt(16) }}>
         <StackedCard inset={16} drop={0} />
         <StackedCard inset={8} drop={8} />
         <NotificationCard
@@ -87,7 +91,6 @@ export function LockScreen({
           className="relative"
         />
       </div>
-      <div className="min-h-0 flex-1" />
       <div
         aria-hidden
         className="flex shrink-0 justify-between"

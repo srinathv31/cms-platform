@@ -7,12 +7,13 @@ import { fadeRise } from "@/components/motion/presets";
 import { pt } from "../geometry";
 import { HomeIndicator, STATUS_BAR_HEIGHT, StatusBar } from "../status-bar";
 import type { DeviceClock, DeviceSettings, PushContent } from "../types";
-import { AndroidLockClock } from "./lock-screen";
+import { AndroidLockClock, QuietCard } from "./lock-screen";
 import { AndroidNotification } from "./notification-card";
+import { androidFixed } from "./type";
 
 // The notification shade, pulled down, with the notification expanded in the long-text style: the screen
 // behind blurred under the shade's tint, a row of quick-settings tiles and the brightness slider (glyphs
-// only, nothing to read), then the card. No subtitle, ever: Android doesn't have one. Expanding it from the
+// only), then the notification list (ours, two quiet ones, Clear all). No subtitle, ever: Android doesn't have one. Expanding it from the
 // lock screen needs the phone unlocked, so previews hidden doesn't change it. Clicking the shade collapses
 // the card, like a tap outside it; the card's own button does the same from the keyboard.
 
@@ -83,16 +84,29 @@ export function Shade({
             <Sun strokeWidth={2.2} style={{ width: pt(20), height: pt(20) }} />
           </span>
         </m.div>
-        <AndroidNotification
-          content={content}
-          screen="expanded"
-          textSize={settings.textSize}
-          onToggle={onToggle}
-          motion={fadeRise}
-          background="var(--device-m3-shade-card)"
-          corners={[28, 28, 28, 28]}
-          className="mt-1"
-        />
+        {/* The notification list: ours expanded on top of two quiet ones, grouped as the lock screen groups
+            them, then the list's Clear all. Below it the shade's tint runs to the bottom of the screen. */}
+        <div className="mt-1 flex flex-col" style={{ gap: pt(2) }}>
+          <AndroidNotification
+            content={content}
+            screen="expanded"
+            textSize={settings.textSize}
+            onToggle={onToggle}
+            motion={fadeRise}
+            background="var(--device-m3-shade-card)"
+            corners={[28, 28, 6, 6]}
+          />
+          <QuietCard corners={[6, 6, 6, 6]} background="var(--device-m3-shade-card)" />
+          <QuietCard corners={[6, 6, 28, 28]} background="var(--device-m3-shade-card)" />
+        </div>
+        <m.span
+          {...fadeRise}
+          aria-hidden
+          className="self-end rounded-full bg-(--device-m3-surface-container-highest) font-medium text-(--device-m3-on-surface)"
+          style={{ ...androidFixed(14, 20), padding: `${pt(8)} ${pt(16)}` }}
+        >
+          Clear all
+        </m.span>
       </div>
       <HomeIndicator platform="android" ink="app" />
     </>

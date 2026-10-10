@@ -38,14 +38,20 @@ export function AndroidLockClock({ clock }: { clock: DeviceClock }) {
   );
 }
 
-/** A quiet notification under ours: an icon and two bars, nothing to read. */
-function QuietCard({ corners }: { corners: readonly [number, number, number, number] }) {
+/** A quiet notification under ours, on the lock screen's card or the shade's: an icon and two bars, nothing to read. */
+export function QuietCard({
+  corners,
+  background = "var(--device-m3-lock-card)",
+}: {
+  corners: readonly [number, number, number, number];
+  background?: string;
+}) {
   return (
     <m.span
       {...fadeRise}
       aria-hidden
-      className="flex items-center bg-(--device-m3-lock-card)"
-      style={{ borderRadius: corners.map(pt).join(" "), height: pt(60), padding: `0 ${pt(16)}`, gap: pt(12) }}
+      className="flex items-center"
+      style={{ background, borderRadius: corners.map(pt).join(" "), height: pt(60), padding: `0 ${pt(16)}`, gap: pt(12) }}
     >
       <span className="shrink-0 rounded-full bg-(--device-m3-surface-container-highest)" style={{ width: pt(32), height: pt(32) }} />
       <span className="flex flex-col" style={{ gap: pt(7) }}>
