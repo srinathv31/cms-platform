@@ -1,0 +1,60 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "An Indic conjunct at a part boundary",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "word",
+      "label": "Word",
+      "type": "text",
+      "required": true,
+      "sample": "क्ष"
+    }
+  ],
+  "values": {
+    "word": "क्ष"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "word"
+                }
+              },
+              {
+                "type": "text",
+                "text": "yyyyyyyyyy"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ]
+}

@@ -53,3 +53,16 @@ exactly what the author typed and every value as sent.
 - The API's `parts` for a given request can be higher than the composer's estimate with sample values: values decide.
 - The character tables and splitting rules (`src/domain/messages/gsm7.ts`) are part of the render specification
   (docs/render-spec.md, "SMS encoding"); a second engine must reproduce them, checked by the golden files.
+- **Grapheme clusters are pinned to Unicode 17.0, not taken from the runtime.** A UCS-2 part never splits a cluster
+  and `characters` counts them, so the clusters decide the parts. `Intl.Segmenter` follows each runtime's ICU, and
+  the rules move between Unicode versions (GB9c, which keeps an Indic conjunct like क्ष whole, arrived in 15.1 and
+  changes again in 18.0), so an older browser's preview, the server and a Java engine could each cut a different
+  SMS. Two ways out were weighed. Saying "Unicode 15.1 or later" in the specification would have named a range, not a
+  version, and left the browser preview free to disagree with the API, which decision
+  [0035](0035-message-previews-resolve-in-the-browser.md) forbids. Implementing UAX #29 here, over one version's
+  data, keeps all three in agreement in any runtime: `src/domain/messages/graphemes.ts`, with a 6 KB property table
+  generated from the Unicode Character Database 17.0.0 (`scripts/unicode-graphemes.ts`) and Unicode's own
+  conformance file as its test. 17.0 is the version Node 24's ICU has, so nothing moved when it landed. A Java engine
+  uses ICU4J 78 (Unicode 17.0) or ports the module and its table, and runs the same conformance file; the golden
+  case `sms-conjunct-at-part-boundary` fails an engine on older rules. Moving to a newer Unicode version is a change
+  to the specification, made in every engine at once.

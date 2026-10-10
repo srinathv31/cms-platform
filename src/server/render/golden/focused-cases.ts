@@ -796,6 +796,16 @@ const smsFooter = message("sms-footer", "The footer counts", {
   channelFields: { sms: { text: line(t("z".repeat(108))) } },
 });
 
+// GB9c, Unicode's rule that keeps an Indic conjunct (क्ष: ka, virama, ssa) one grapheme cluster since 15.1:
+// 65 units, then the conjunct's 3 don't fit in 67, so the second part starts with it whole. `characters`
+// counts it once. An engine on older rules makes 2 clusters of it, and cuts after the virama.
+const smsConjunct = message("sms-conjunct-at-part-boundary", "An Indic conjunct at a part boundary", {
+  channels: ["sms"],
+  variables: [variable("word", "Word", "text", true, "क्ष")],
+  values: { word: "क्ष" },
+  channelFields: { sms: { text: line(t("y".repeat(65)), v("word"), t("y".repeat(10))) } },
+});
+
 const smsTooLong = message("sms-error-too-long", "SMS over 10 parts", {
   channels: ["sms"],
   smsFooter: FOOTER,
@@ -854,4 +864,5 @@ export const FOCUSED_CASES: FocusedCase[] = [
   smsEmojiBoundary,
   smsFooter,
   smsTooLong,
+  smsConjunct,
 ];

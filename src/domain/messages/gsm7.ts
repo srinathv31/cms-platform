@@ -13,9 +13,13 @@
 //   - 3GPP TS 23.040 §9.2.3.24.1 for the concatenation header (6 octets with an 8-bit reference).
 //   - Twilio's open-source segment calculator, https://github.com/TwilioDevEd/message-segment-calculator, as a
 //     cross-check. The split below gives the same parts as it does, except where noted at `smsParts`.
+//   - Unicode's extended grapheme clusters (UAX #29) at Unicode 17.0, for the clusters a UCS-2 part never splits and
+//     `characters` counts: graphemes.ts, so the browser, the server and a second engine cut the same parts.
 //
 // UCS-2 is the name SMS uses for its 16-bit encoding. Handsets read it as UTF-16, so an emoji outside the Basic
 // Multilingual Plane travels as a surrogate pair and costs 2 units.
+
+import { graphemeCount, graphemes } from "./graphemes";
 
 // ---------------------------------------------------------------------------------------------------------------
 // The character tables
@@ -155,8 +159,8 @@ export function smsLength(text: string): SmsLength {
  *   - A cluster longer than a whole part (over 67 units, which only a pathological run of combining marks or
  *     joiners reaches) splits between code points here. Twilio's overfills a part with it.
  *   - The empty text has 0 parts. Twilio's reports 1 segment.
- *   - Clusters come from the runtime's Intl.Segmenter. Twilio's uses the grapheme-splitter package, whose older
- *     Unicode rules can join a newer emoji sequence differently.
+ *   - Clusters follow Unicode 17.0's rules and data (graphemes.ts), whatever the runtime's Unicode version. Twilio's
+ *     uses the grapheme-splitter package, whose older Unicode rules can join a newer emoji sequence differently.
  */
 export function smsParts(text: string): string[] {
   return split(text).parts.map((part) => text.slice(part.start, part.end));
@@ -362,15 +366,7 @@ function split(text: string): { encoding: SmsEncoding; parts: Span[] } {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Grapheme clusters
-
-let segmenter: Intl.Segmenter | undefined;
-
-/** The grapheme clusters of `text`, with their UTF-16 offsets (Unicode's extended grapheme clusters, UAX #29). */
-function graphemes(text: string): Iterable<{ segment: string; index: number }> {
-  segmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  return segmenter.segment(text);
-}
+// Grapheme clusters: graphemes.ts, Unicode 17.0's rules and data, never the runtime's
 
 function countGraphemes(text: string): number {
   if (smsEncoding(text) === "GSM-7") {
@@ -379,5 +375,5 @@ function countGraphemes(text: string): number {
     for (let i = text.indexOf("\r\n"); i !== -1; i = text.indexOf("\r\n", i + 2)) crlf++;
     return text.length - crlf;
   }
-  return Array.from(graphemes(text)).length;
+  return graphemeCount(text);
 }
