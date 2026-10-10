@@ -24,6 +24,7 @@ import {
   sweepSunsets,
   withWriter,
   newTemplateChannels,
+  newTemplateContentType,
   type ReviewVersion,
   type SunsetFacts,
   type StarterContent,
@@ -100,6 +101,32 @@ const BLANK: StarterContent = {
     { id: "minimum", name: "Minimum values", values: {} },
   ],
 };
+
+// A template is a document or an alert for life: its content type is one family (decision 0033).
+describe("newTemplateContentType", () => {
+  const disclosure = { id: "ct_disclosure", name: "Disclosure", allowedChannels: ["pdf", "web", "email"] as const };
+  const notice = { id: "ct_notice", name: "Notice", allowedChannels: ["pdf"] as const };
+  const alert = { id: "ct_alert", name: "Alert", allowedChannels: ["push", "sms"] as const };
+
+  it("makes a document on the document content type, and an alert on the message one", () => {
+    expect(newTemplateContentType("document", [disclosure, alert])).toEqual({ ok: true, contentType: disclosure });
+    expect(newTemplateContentType("message", [disclosure, alert])).toEqual({ ok: true, contentType: alert });
+  });
+
+  it("takes the first by name when several content types are of the family", () => {
+    expect(newTemplateContentType("document", [notice, alert, disclosure])).toEqual({ ok: true, contentType: disclosure });
+  });
+
+  it("refuses a family no content type is of, naming the kind", () => {
+    expect(newTemplateContentType("message", [disclosure, notice])).toEqual({
+      ok: false,
+      code: "no_content_type",
+      reason: "No content type makes alerts yet.",
+    });
+    expect(newTemplateContentType("document", [alert])).toMatchObject({ reason: "No content type makes documents yet." });
+    expect(newTemplateContentType("document", [])).toMatchObject({ ok: false, code: REFUSALS.noContentType.code });
+  });
+});
 
 describe("initialTemplateName", () => {
   it("names Blank untitled and every example after itself", () => {

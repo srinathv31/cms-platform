@@ -68,7 +68,7 @@ export async function createTemplateWithDraft(
   opts: { teamId: string; createdBy: string; at: Date; name?: string },
 ): Promise<{ templateId: string; draftId: string }> {
   const templateId = newTemplateId();
-  const starter = buildStarter("card_offer_terms", { scope: templateId, now: opts.at });
+  const starter = buildStarter({ family: "document", starterKey: "card_offer_terms" }, { scope: templateId, now: opts.at });
   const { changes } = createDraft({ starter, createdBy: opts.createdBy, now: opts.at });
   const draftId = newId("v");
   await db.insert(schema.templates).values({

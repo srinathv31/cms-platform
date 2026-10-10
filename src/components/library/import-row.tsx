@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type DragEvent, type Ref } from "react";
+import { useEffect, useId, useRef, useState, useTransition, type DragEvent, type Ref } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { FileUp } from "lucide-react";
@@ -18,17 +18,22 @@ import { IMPORT_FAILED, precheckImport, precheckImportBytes, uploadImport } from
  * A file whose first bytes don't match its name (a renamed picture) is refused here, unsent.
  *
  * `locked` while a starter card is being created; `onBusyChange` tells the gallery to lock its cards
- * while a file is importing, so there is one busy state at a time.
+ * while a file is importing, so there is one busy state at a time. `unavailable` is why the row can't
+ * be used at all (Alert is chosen, and only documents can be imported): it stays in place, greyed and
+ * still focusable, with the reason at its end, and takes no click and no file.
  */
 export function ImportRow({
   teamSlug,
   locked,
+  unavailable = null,
   onBusyChange,
   onImported,
   rowRef,
 }: {
   teamSlug: string;
   locked: boolean;
+  /** Why Import can't make this kind of template (`importUnavailable`), or null. */
+  unavailable?: string | null;
   onBusyChange: (busy: boolean) => void;
   /** The template is made and opening: the dialog closes with that navigation (the Library stays mounted, hidden). */
   onImported?: () => void;
@@ -50,7 +55,8 @@ export function ImportRow({
     onBusyChange(busy);
   }, [busy, onBusyChange]);
 
-  const unusable = busy || locked;
+  const unusable = busy || locked || unavailable !== null;
+  const reasonId = useId();
 
   async function importFile(file: File | undefined) {
     if (!file || unusable) return;
@@ -113,6 +119,7 @@ export function ImportRow({
         aria-label={busy ? `Importing ${fileName}` : undefined}
         aria-disabled={unusable || undefined}
         aria-busy={busy || undefined}
+        aria-describedby={unavailable ? reasonId : undefined}
         data-dragging={dragging ? "" : undefined}
         onClick={() => {
           if (!unusable) input.current?.click();
@@ -124,19 +131,27 @@ export function ImportRow({
           "flex h-14 w-full items-center gap-3 rounded-2xl border border-dashed border-hairline px-4 text-left outline-none transition-colors",
           "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-hover",
           busy && "cursor-default bg-selected hover:bg-selected",
-          locked && !busy && "cursor-default opacity-50 hover:bg-transparent",
+          !busy && (locked || unavailable) && "cursor-default hover:bg-transparent",
         )}
       >
-        <span className="grid size-5 shrink-0 place-items-center text-text-muted">
-          {busy ? (
-            <Spinner aria-hidden role={undefined} aria-label={undefined} className="size-4" />
-          ) : (
-            <FileUp aria-hidden strokeWidth={1.75} className="size-[18px]" />
-          )}
+        {/* Greyed when it can't be used; the reason beside it stays readable. */}
+        <span className={cn("flex min-w-0 items-center gap-3", !busy && (locked || unavailable) && "opacity-50")}>
+          <span className="grid size-5 shrink-0 place-items-center text-text-muted">
+            {busy ? (
+              <Spinner aria-hidden role={undefined} aria-label={undefined} className="size-4" />
+            ) : (
+              <FileUp aria-hidden strokeWidth={1.75} className="size-[18px]" />
+            )}
+          </span>
+          <span className="min-w-0 truncate text-[15px] leading-5 font-medium text-text">
+            {busy ? `Importing ${fileName}` : "Import a file"}
+          </span>
         </span>
-        <span className="min-w-0 truncate text-[15px] leading-5 font-medium text-text">
-          {busy ? `Importing ${fileName}` : "Import a file"}
-        </span>
+        {unavailable ? (
+          <span id={reasonId} className="ml-auto shrink-0 text-[13px] leading-5 text-text-muted">
+            {unavailable}
+          </span>
+        ) : null}
       </button>
       <input
         ref={input}

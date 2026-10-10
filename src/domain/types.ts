@@ -51,6 +51,15 @@ export function channelFamily(channel: Channel): ChannelFamily {
   }
 }
 
+/**
+ * What a template of each family is called where an author chooses one (New template). A template is
+ * one or the other for life: its content type is one family and never changes family.
+ */
+export const TEMPLATE_KIND_LABELS: { readonly [F in ChannelFamily]: string } = {
+  document: "Document",
+  message: "Alert",
+};
+
 /** The family's channels, in `CHANNELS` order. */
 export function familyChannels(family: ChannelFamily): readonly Channel[] {
   return family === "document" ? DOCUMENT_CHANNELS : MESSAGE_CHANNELS;

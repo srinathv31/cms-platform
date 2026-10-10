@@ -42,7 +42,7 @@ Convention only (no lint rule):
 | [business-zone.ts](business-zone.ts) | The business time zone sunset dates are read in: `readBusinessZone(reader)` (inside a transaction), `getBusinessZone()` (read models), `countPendingSunsets`. |
 | [reset.ts](reset.ts), [seed/](seed/) | `resetDemo()` and the deterministic demo dataset, simulator rows included. |
 | [templates/create.ts](templates/create.ts) | The write side of "new template plus first draft", shared by New template and Import. |
-| [starters/](starters/) | Starter bodies. [catalog.ts](starters/catalog.ts) has no imports, so the client gallery can read it. |
+| [starters/](starters/) | Starters for each kind of template: document bodies, and alerts' push and SMS ([alerts.ts](starters/alerts.ts)). [catalog.ts](starters/catalog.ts) has only a type import, so the client gallery can read it. |
 | [drafts/](drafts/) | Autosave: patch parsing, the transactional save, the per-session audit merge, the status table. |
 | [documents/prepare.ts](documents/prepare.ts) | The one way a document is made ready for storage: normalized, checked, block ids added. Autosave and import call it. |
 | [render/](render/) | The render pipeline ([render-template.ts](render/render-template.ts)), the engine it runs ([engine.ts](render/engine.ts)), the document check, the render log, [channels/](render/channels/) (web, email, pdf, push, sms), the [golden files](render/golden/README.md), and shared test helpers in [testing/](render/testing/). |
@@ -101,7 +101,7 @@ The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true 
 
 Variations today:
 - [actions/access.ts](actions/access.ts) runs its actions through `accessAction`, the kit plus two things: `runAccessSweep()` and `runSunsetSweep()` run once the check has passed, each in its own transaction, so a refusal doesn't roll a sweep back (and the pages refresh when one changed something, whatever the answer); and a request, membership or review that's gone is refused with its own sentence before the permission check, since a colleague acting first deletes it. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
-- `startDraft` and `createTemplate` answer a refusal (a newer version in review, a viewer who can't edit or create) and redirect on success. `createTemplate` reads the content type and a fresh template id inside its transaction (`disclosureContentType(tx)`, `freshTemplateId(tx)`); Import reads them through `db`.
+- `startDraft` and `createTemplate` answer a refusal (a newer version in review, a viewer who can't edit or create) and redirect on success. `createTemplate` takes the kind the author chose (`family`, Document or Alert) with a starter of that kind, and reads the content type the domain picks for it and a fresh template id inside its transaction (`newTemplateType(family, tx)`, `freshTemplateId(tx)`); Import always makes a document, and reads them through `db`.
 - [actions/demo.ts](actions/demo.ts) and [actions/persona.ts](actions/persona.ts) are demo tools: no permission to check, and the modules they call write in their own transactions, so they don't run on the kit. Input they can't use is answered with `invalid_input`.
 
 ## Anatomy of a read

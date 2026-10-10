@@ -7,7 +7,7 @@
 // `uploads` table and `versions.import_upload_id` already exist (0000_init). If something here is
 // wrong, make the smallest additive change and say so first in your report.
 
-import type { Channel, JSONContent, RequiredSection, Variable, VersionState } from "./types";
+import type { Channel, ChannelFamily, JSONContent, RequiredSection, Variable, VersionState } from "./types";
 
 // ── Files ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +65,17 @@ export const IMPORT_REFUSALS = {
   content: "This file can't be imported as it is.",
 } as const;
 export type ImportRefusalCode = keyof typeof IMPORT_REFUSALS;
+
+/** Why Import a file isn't offered for an alert: a file's text becomes a body, and only a document has one. */
+export const IMPORT_DOCUMENTS_ONLY = "Only documents can be imported.";
+
+/**
+ * Why a template of this family can't be made by importing a file, or null: import makes documents
+ * (decision 0033). New template shows the Import row disabled with this reason while Alert is chosen.
+ */
+export function importUnavailable(family: ChannelFamily): string | null {
+  return family === "document" ? null : IMPORT_DOCUMENTS_ONLY;
+}
 
 // ── Storage (./data/uploads stands in for Azure Blob) ────────────────────────
 //
