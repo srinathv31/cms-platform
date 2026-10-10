@@ -1,11 +1,14 @@
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
-import type { Channel } from "@/domain/types";
+import { isDocumentChannel, type Channel } from "@/domain/types";
 import { CodeBlock } from "./code-block";
 
 const NAME: Readonly<Record<Channel | "base64", string>> = { ...CHANNEL_LABELS, base64: "Base64" };
 
-/** What comes back on a 200 for each enabled channel (and the base64 opt-in), then the errors worth handling. */
+/**
+ * What comes back on a 200 for each enabled channel (and the base64 opt-in, which only a document channel
+ * answers: Push and SMS are JSON already), then the errors worth handling.
+ */
 export function Responses({
   responses,
   errors,
@@ -15,7 +18,7 @@ export function Responses({
   errors: IntegrationPanelData["errors"];
   channels: readonly Channel[];
 }) {
-  const shown = responses.filter((r) => r.channel === "base64" || channels.includes(r.channel));
+  const shown = responses.filter((r) => (r.channel === "base64" ? channels.some(isDocumentChannel) : channels.includes(r.channel)));
   return (
     <div className="flex flex-col gap-5">
       <ul aria-label="Response formats" className="flex flex-col">

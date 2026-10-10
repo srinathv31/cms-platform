@@ -58,4 +58,13 @@ describe("getCopilotPrompt", () => {
     expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, code: "template_unavailable", reason: "This template isn't available." });
     expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
   });
+
+  it("refuses an alert's draft: Copilot writes a document's body, and an alert has none", async () => {
+    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toEqual({
+      ok: false,
+      status: 409,
+      code: "copilot_documents_only",
+      reason: "Copilot drafts documents only.",
+    });
+  });
 });

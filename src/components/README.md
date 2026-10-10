@@ -56,7 +56,7 @@ Feature folders:
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
 | `versions/` | Versions timeline, compare, sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
-| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt, save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
+| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks
 

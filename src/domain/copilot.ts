@@ -8,7 +8,8 @@
 import { TYPE_META } from "@/editor/model/variables";
 import type { CopilotPrompt, CopilotPromptInput } from "./import-types";
 import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
-import { CHANNELS, type Channel, type JSONContent, type RequiredSection } from "./types";
+import { REQUEST_REFUSALS } from "./refusals";
+import { CHANNELS, type Channel, type ChannelFamily, type JSONContent, type RequiredSection } from "./types";
 
 /**
  * How the prompt names a channel. Copilot writes a document's body, so only a document's channels
@@ -21,6 +22,15 @@ const CHANNEL_NAMES: Record<Channel, string> = {
   push: "push notification",
   sms: "SMS",
 };
+
+/**
+ * Why a template of this family gets no Copilot prompt, or null. Copilot writes a document's body, and an
+ * alert has none: its fields are a few lines each, written in the composer. The rail shows the Copilot row
+ * disabled with this reason, and the prompt's read refuses with it.
+ */
+export function copilotUnavailable(family: ChannelFamily): string | null {
+  return family === "document" ? null : REQUEST_REFUSALS.copilotDocumentsOnly.reason;
+}
 
 /** "a", "a and b", "a, b and c" (the product's lists). */
 function andList(items: string[]): string {

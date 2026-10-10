@@ -9,6 +9,7 @@ import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-
 import { PreviewSurface } from "@/components/preview/preview-surface";
 import { phoneSenders } from "@/components/preview/preview-sender";
 import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type ChannelFields } from "@/domain/channel-fields";
+import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import type { Person, ThreadView } from "@/domain/review-types";
@@ -420,7 +421,7 @@ export function ContentWorkspace({
         }
         original={importOriginal !== null}
         takeArrival={takeArrival}
-        footer={editable ? <CopilotPromptButton templateId={templateId} /> : null}
+        footer={editable ? <CopilotPromptButton templateId={templateId} blocked={copilotUnavailable(family)} /> : null}
         reviewHref={reviewHref}
         preview={
           <PreviewSurface

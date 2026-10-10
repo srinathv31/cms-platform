@@ -2,10 +2,10 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { buildCopilotPrompt } from "@/domain/copilot";
+import { buildCopilotPrompt, copilotUnavailable } from "@/domain/copilot";
 import type { CopilotPrompt } from "@/domain/import-types";
 import { can } from "@/domain/permissions";
-import type { Viewer } from "@/domain/types";
+import { familyOf, type Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -49,6 +49,7 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
     .limit(1)
     .then((rows) => rows[0]);
   if (!draft) return refusal(409, REQUEST_REFUSALS.noDraftToWrite);
+  if (copilotUnavailable(familyOf(draft.channels) ?? "document")) return refusal(409, REQUEST_REFUSALS.copilotDocumentsOnly);
 
   const prompt = buildCopilotPrompt({
     templateName: draft.name,

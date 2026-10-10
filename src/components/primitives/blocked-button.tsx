@@ -10,6 +10,8 @@ const STILL = {
   default: "data-disabled:hover:bg-primary",
   /** Outline buttons here sit on `bg-surface`. */
   outline: "data-disabled:hover:bg-surface",
+  /** A quiet row (the rail's Copilot prompt on an alert): no fill to keep. */
+  ghost: "data-disabled:hover:bg-transparent",
 } as const;
 
 export type BlockedButtonProps = Omit<
