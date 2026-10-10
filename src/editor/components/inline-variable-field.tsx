@@ -1,12 +1,15 @@
 "use client";
 
-// <InlineVariableField>: a one-line editor for text and variable chips (email subject, preheader).
-// It registers with its <EditorRoot> like the document body does, under its own `label`, so the
-// panel counts its chips, click-to-insert can target it, panel rows drop into it and the `{{`
-// picker, chip popover, key renames and "remove chips" all reach it.
+// <InlineVariableField>: an editor for a channel field's text and variable chips (the email subject
+// and preheader, a push title or body, an SMS message). It registers with its <EditorRoot> like the
+// document body does, under its own `label`, so the panel counts its chips, click-to-insert can target
+// it, panel rows drop into it and the `{{` picker, chip popover, key renames and "remove chips" all
+// reach it.
 //
-// One line: Enter never adds a line, and a multi-line paste joins its lines with spaces
-// (extensions/single-line.ts). `{{key}}` in pasted text becomes chips, as in the document.
+// One line by default: Enter never adds a line, and a multi-line paste joins its lines with spaces
+// (extensions/single-line.ts). With `lines="lines"` it keeps line breaks as hard breaks: Enter adds
+// one and a paste keeps its lines (extensions/field-lines.ts). `{{key}}` in pasted text becomes
+// chips, as in the document.
 //
 // `hidden` keeps the field mounted and registered while it isn't shown, so its chips still count
 // and a key renamed meanwhile still reaches them (and `onChange` reports it). Unmounting it instead
@@ -18,6 +21,7 @@ import { useStore } from "zustand";
 import { cx } from "../lib/cx";
 import { captureHistory, restoreHistory, type HistoryCarry } from "../lib/history-carry";
 import { useHydrated } from "../lib/use-hydrated";
+import type { FieldLines } from "../model/normalize";
 import { NODE, type JSONContent, type Variable } from "../model/types";
 import { inlineFieldExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
@@ -34,13 +38,14 @@ const BOX =
 
 const EMPTY_FIELD: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
-export function InlineVariableField({ label, value, onChange, hidden = false, id, className }: InlineVariableFieldProps) {
+export function InlineVariableField({ label, value, lines = "line", onChange, hidden = false, id, className }: InlineVariableFieldProps) {
   const root = useEditorRoot("InlineVariableField");
   const readOnly = useStore(root.config, (s) => s.readOnly);
   const variables = useStore(root.variables, (s) => s.variables);
   const hydrated = useHydrated();
   const fieldId = useId();
   const [initial] = useState<JSONContent>(() => value ?? EMPTY_FIELD);
+  const [mode] = useState<FieldLines>(lines);
   const latestRef = useRef<JSONContent | null>(null);
 
   useState(() => {
@@ -58,9 +63,17 @@ export function InlineVariableField({ label, value, onChange, hidden = false, id
   return (
     <div id={id} hidden={hidden} className={cx(BOX, FOCUS_WITHIN_RING, className)} data-read-only={readOnly ? "" : undefined}>
       {hydrated ? (
-        <LiveField label={label} fieldId={fieldId} initial={initial} latestRef={latestRef} readOnly={readOnly} onChange={onChange} />
+        <LiveField
+          label={label}
+          lines={mode}
+          fieldId={fieldId}
+          initial={initial}
+          latestRef={latestRef}
+          readOnly={readOnly}
+          onChange={onChange}
+        />
       ) : (
-        <StaticField label={label} value={initial} variables={variables} />
+        <StaticField label={label} lines={mode} value={initial} variables={variables} />
       )}
     </div>
   );
@@ -68,6 +81,7 @@ export function InlineVariableField({ label, value, onChange, hidden = false, id
 
 function LiveField({
   label,
+  lines,
   fieldId,
   initial,
   latestRef,
@@ -75,6 +89,7 @@ function LiveField({
   onChange,
 }: {
   label: string;
+  lines: FieldLines;
   fieldId: string;
   initial: JSONContent;
   latestRef: RefObject<JSONContent | null>;
@@ -86,11 +101,14 @@ function LiveField({
   const [picker] = useState(createVariablePickerController);
   const [chip] = useState(createChipPopoverStore);
   const [extensions] = useState(() =>
-    inlineFieldExtensions({
-      store: root.variables,
-      pickerRender: picker.render,
-      binding: { fieldId, kind: "inline", root, chip },
-    }),
+    inlineFieldExtensions(
+      {
+        store: root.variables,
+        pickerRender: picker.render,
+        binding: { fieldId, kind: "inline", root, chip },
+      },
+      lines,
+    ),
   );
 
   const onChangeRef = useRef(onChange);
@@ -104,11 +122,11 @@ function LiveField({
         class: "ucomp-field-input",
         role: "textbox",
         "aria-label": label,
-        "aria-multiline": "false",
+        "aria-multiline": String(lines === "lines"),
         "aria-readonly": String(readOnly),
       },
     }),
-    [label, readOnly],
+    [label, lines, readOnly],
   );
 
   // Like the document: a field destroyed while its route is hidden comes back with its latest value,
@@ -152,7 +170,7 @@ function LiveField({
   }, [editor, readOnly]);
 
   if (!editor || editor.isDestroyed) {
-    return <StaticField label={label} value={snapshot} variables={variables} />;
+    return <StaticField label={label} lines={lines} value={snapshot} variables={variables} />;
   }
 
   return (
@@ -165,17 +183,28 @@ function LiveField({
 }
 
 /** Same markup as the live field, for the server and the hydration pass. */
-function StaticField({ label, value, variables }: { label: string; value: JSONContent; variables: readonly Variable[] }) {
+function StaticField({
+  label,
+  lines,
+  value,
+  variables,
+}: {
+  label: string;
+  lines: FieldLines;
+  value: JSONContent;
+  variables: readonly Variable[];
+}) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
   const inline = value.content?.[0]?.content ?? [];
   return (
-    <div className="ucomp-field-input" role="textbox" aria-label={label} aria-readonly="true">
+    <div className="ucomp-field-input" role="textbox" aria-label={label} aria-multiline={lines === "lines" ? "true" : undefined} aria-readonly="true">
       <p>
         {inline.map((node, i) => {
           if (node.type === NODE.variable) {
             const key = (node.attrs?.key as string | undefined) ?? null;
             return <VariableChipView key={i} variableKey={key} variable={key ? byKey.get(key) : undefined} />;
           }
+          if (node.type === "hardBreak") return <br key={i} />;
           return node.type === "text" ? <span key={i}>{node.text}</span> : null;
         })}
       </p>

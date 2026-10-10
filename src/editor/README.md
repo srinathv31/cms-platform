@@ -53,7 +53,7 @@ Server and domain code use only the server-safe ones: `schema`, `model/*` and `p
 | `EditorRoot` | Holds one variable list for everything inside it (document, panel, inline fields). |
 | `DocumentEditor` | The document. Inside a root, or standalone (it then makes a private root). |
 | `VariablesPanel` | The template's variables: insert, drag, edit, delete, contract flags. Inside a root. |
-| `InlineVariableField` | A one-line field with chips (email subject, preheader). Inside a root. |
+| `InlineVariableField` | A channel field with chips: one line (email subject and preheader, a push title or body), or with `lines="lines"` keeping its line breaks as hard breaks (an SMS message: Enter adds one, a paste keeps its lines and blank lines). Inside a root. |
 | `StaticDocument` | Server-safe render of a document (no JS), identical markup to the live editor. |
 | `VariableChipView` | The presentational chip, to show a variable outside the editor the same way. |
 | `useContractState()` | Inside a root: `{ variables, changes }`, the live contract diff against `baseline`. |
@@ -100,6 +100,7 @@ interface VariablesPanelProps { className?: string }
 interface InlineVariableFieldProps {
   label: string;                                  // accessible name; how "where it's used" names it
   value: JSONContent | null;                      // one paragraph; read once
+  lines?: "line" | "lines";                       // "lines": Enter and paste add hard breaks (an SMS); read once
   onChange?: (value: JSONContent) => void;
   hidden?: boolean;                               // not shown, still in the root (see Composition)
   id?: string; className?: string;
@@ -141,8 +142,8 @@ interface DocumentEditorHandle {
 | `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
 | `chipsInJSON(doc)`, `variableKeys(doc)` | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses. |
-| `normalizeDocument(doc)`, `normalizeField(doc)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
-| `documentProblem(doc)`, `fieldProblem(doc)`, `DOCUMENT_MESSAGES` | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences. `src/server/render/schema-check.ts` adds the schema parse. |
+| `normalizeDocument(doc)`, `normalizeField(doc, lines?)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
+| `documentProblem(doc)`, `fieldProblem(doc, check?)`, `DOCUMENT_MESSAGES` | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences, and a channel field's check (`FieldCheck`: its lines, and the problem it is refused with: the email's, a push's or an SMS's sentence; the domain picks them by channel). `src/server/render/schema-check.ts` adds the schema parse. |
 | `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)` | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them. |
 | `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
 | `looksLikeMarkdown(text)`, `markdownToHtml(markdown)` | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import. |
@@ -555,6 +556,11 @@ a rename into the contract diff, which change the contract types (the last item)
 - **New prop**: `hidden` on `InlineVariableField`, backed by the root runtime's
   `setFieldHidden(fieldId, hidden)`. A hidden field still counts and follows renames and deletes;
   insert, undo and redo pass it by (see Composition).
+- **New prop**: `lines` on `InlineVariableField` (`"line"`, the default, or `"lines"`), and the same
+  as the second argument of `inlineFieldExtensions`. A `"lines"` field's schema has the hard break;
+  `extensions/field-lines.ts` makes Enter add one (after the `{{` picker) and turns a paste into one
+  paragraph with a hard break for each line, blank lines kept (`flattenToLines`, `linesOfText` in
+  `paste/chips.ts`). `normalizeField`, `fieldProblem` and `ContentLimits` take the same setting.
 - No new handle methods or dependencies.
 - **Renames reach the contract**: `Variable` gains an optional `id` (see Behavior, Variables), and
   `onVariablesChange` reports it. `ContractChange` is a union with one member per kind, each with
@@ -584,13 +590,13 @@ a rename into the contract diff, which change the contract types (the last item)
 | Placeholder | `Placeholder` from `@tiptap/extensions` |
 | Markdown paste | Our parser (`paste/markdown.ts`): Markdown → schema HTML → ProseMirror's clipboard parser (no Markdown dependency) |
 | Server first paint | `@tiptap/static-renderer` (`components/static-document.tsx`) |
-| *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields; Home/End; the paste normalizer; the Markdown parser and the section-merging paste |
+| *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields and fields that keep their lines; Home/End; the paste normalizer; the Markdown parser and the section-merging paste |
 
 ### Files
 
 ```
 types.ts                  component contract
-schema.ts                 the one extension list (+ the one-line field list, ensureBlockIds)
+schema.ts                 the one extension list (+ the channel field list, on one line or keeping lines; ensureBlockIds)
 styles.css                document typography and editor states (tokens only)
 model/                    pure TS: Variable types, values and keys, contract diff, usage, form rules,
                           default sample sets

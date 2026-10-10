@@ -32,8 +32,11 @@
 // is left for the document check (schema-check.ts), which refuses it with a message.
 // Normalizing twice gives the same result.
 //
-// One-line fields (email subject and preheader) take `normalizeField`: the same text rules, but a
-// line break (character or hardBreak) becomes one space, and marks are removed (the field has none).
+// Channel fields (the email subject, a push title, an SMS message) take `normalizeField`: the same text
+// rules, marks removed (a field has none), and the paragraphs joined into one. A one-line field
+// (`"line"`) turns each line break (character or hardBreak) into one space and joins paragraphs with a
+// space; a field that keeps its line breaks (`"lines"`, an SMS message) keeps each as a hardBreak and
+// joins paragraphs with one, so an empty paragraph stays a blank line.
 
 import { LINE_BREAKS, cleanCharacters } from "./characters";
 import { normalizeLink } from "./links";
@@ -64,9 +67,15 @@ interface Edges {
   openEnd: number;
 }
 
+/**
+ * How a channel field holds its text: `"line"` on one line (a line break becomes a space), `"lines"`
+ * with its line breaks kept as hardBreaks. Either way it is one paragraph with no marks.
+ */
+export type FieldLines = "line" | "lines";
+
 interface Options {
-  /** A one-line field: breaks become spaces, marks go. */
-  field: boolean;
+  /** A channel field: marks go, paragraphs join, and on `"line"` breaks become spaces. */
+  field: FieldLines | false;
   /** A paste into the editor: what the author will see is brought inside the limits (a list's start). */
   paste?: boolean;
 }
@@ -78,9 +87,9 @@ export function normalizeDocument(doc: JSONContent): JSONContent {
   return normalizeNode(doc, CLOSED, { field: false })[0] ?? doc;
 }
 
-/** A one-line field (email subject, preheader), normalized. */
-export function normalizeField(doc: JSONContent): JSONContent {
-  return normalizeNode(doc, CLOSED, { field: true })[0] ?? doc;
+/** A channel field, normalized: on one line (the email subject, a push title), or keeping its line breaks (an SMS message). */
+export function normalizeField(doc: JSONContent, lines: FieldLines = "line"): JSONContent {
+  return normalizeNode(doc, CLOSED, { field: lines })[0] ?? doc;
 }
 
 /**
@@ -89,7 +98,12 @@ export function normalizeField(doc: JSONContent): JSONContent {
  * `inCell`: the paste lands inside a table cell (at any depth), so its blocks become what a cell
  * holds. A table is the exception: the table plugin pastes it as cells into the grid.
  */
-export function normalizeFragment(nodes: readonly JSONContent[], edges: Edges, field = false, inCell = false): JSONContent[] {
+export function normalizeFragment(
+  nodes: readonly JSONContent[],
+  edges: Edges,
+  field: FieldLines | false = false,
+  inCell = false,
+): JSONContent[] {
   const out = normalizeChildren(nodes, edges, { field, paste: true }, null, inCell);
   return inCell ? cellContent(out, edges, { keepTables: true, fill: false }) : out;
 }
@@ -136,7 +150,7 @@ function normalizeChildren(
 function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent: string | null = null, inCell = false): JSONContent[] {
   if (!isNode(node)) return [node];
   if (node.type === "text") return normalizeText(node, options);
-  if (node.type === "hardBreak" && options.field) return [{ type: "text", text: " " }];
+  if (node.type === "hardBreak" && options.field === "line") return [{ type: "text", text: " " }];
   if (node.type === "variable") return [withMarks(node, normalizeMarks(node.marks, options))];
 
   const open = edges.openStart > 0 || edges.openEnd > 0;
@@ -170,8 +184,8 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
   // A text block whose text was all removed (control or invisible characters) has no `content`.
   if (TEXTBLOCKS.has(node.type ?? "") && children && children.length === 0) next = withoutKey(next, "content");
 
-  // A field's paragraphs join into one line.
-  if (options.field && node.type === "doc" && parent === null) next = joinFieldParagraphs(next);
+  // A field's paragraphs join into one.
+  if (options.field && node.type === "doc" && parent === null) next = joinFieldParagraphs(next, options.field);
   return [next];
 }
 
@@ -181,7 +195,7 @@ function normalizeText(node: JSONContent, options: Options): JSONContent[] {
   if (typeof node.text !== "string") return [node]; // the check refuses it
   const marks = normalizeMarks(node.marks, options);
   let text = cleanCharacters(node.text);
-  if (options.field) text = text.replace(LINE_BREAKS, " ");
+  if (options.field === "line") text = text.replace(LINE_BREAKS, " ");
   const out: JSONContent[] = [];
   text.split(LINE_BREAKS).forEach((part, i) => {
     if (i > 0) out.push({ type: "hardBreak" });
@@ -212,15 +226,24 @@ function withMarks<T extends JSONContent>(node: T, marks: Marks): T {
   return withoutKey(node, "marks");
 }
 
-function joinFieldParagraphs(doc: JSONContent): JSONContent {
+/**
+ * A field's paragraphs as one. On one line, joined by a space, empty ones skipped; keeping its line
+ * breaks, joined by a hardBreak, so an empty paragraph is a blank line.
+ */
+function joinFieldParagraphs(doc: JSONContent, lines: FieldLines): JSONContent {
   const blocks = doc.content ?? [];
   if (blocks.length < 2 || !blocks.every((b) => isNode(b) && b.type === "paragraph")) return doc;
   const inline: JSONContent[] = [];
-  for (const block of blocks) {
-    if (!block.content?.length) continue;
+  blocks.forEach((block, i) => {
+    if (lines === "lines") {
+      if (i > 0) inline.push({ type: "hardBreak" });
+      inline.push(...(block.content ?? []));
+      return;
+    }
+    if (!block.content?.length) return;
     if (inline.length) inline.push({ type: "text", text: " " });
     inline.push(...block.content);
-  }
+  });
   const first = blocks[0];
   return { ...doc, content: [inline.length ? { ...first, content: inline } : withoutKey(first, "content")] };
 }

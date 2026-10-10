@@ -5,6 +5,7 @@
 // it in field-binding.ts).
 
 import { Fragment, Slice, type Node as PMNode, type NodeType, type Schema } from "@tiptap/pm/model";
+import { LINE_BREAKS } from "../model/characters";
 import { NODE, type JSONContent } from "../model/types";
 import { isValidKey } from "../model/variables";
 
@@ -145,6 +146,43 @@ export function flattenToLine(slice: Slice, schema: Schema): Slice {
       return false;
     }
     return true;
+  });
+  const paragraph = schema.nodes.paragraph.create(null, inline);
+  return new Slice(Fragment.from(paragraph), 1, 1);
+}
+
+/**
+ * Flattens a slice to the inline content of one paragraph that keeps its lines (a field with `lines`,
+ * an SMS message): blocks are joined with a hard break, an empty one included (a blank line), and the
+ * slice's own hard breaks stay.
+ */
+export function flattenToLines(slice: Slice, schema: Schema): Slice {
+  const hardBreak = schema.nodes.hardBreak;
+  if (!hardBreak) return flattenToLine(slice, schema);
+  const inline: PMNode[] = [];
+  let blocks = 0;
+  slice.content.descendants((node) => {
+    if (node.isTextblock) {
+      if (blocks++ > 0) inline.push(hardBreak.create());
+      return true;
+    }
+    if (node.isInline) {
+      inline.push(node);
+      return false;
+    }
+    return true;
+  });
+  const paragraph = schema.nodes.paragraph.create(null, inline);
+  return new Slice(Fragment.from(paragraph), 1, 1);
+}
+
+/** Pasted plain text as one paragraph, each line break (CR LF, CR, LF, U+2028, U+2029) a hard break. */
+export function linesOfText(text: string, schema: Schema): Slice {
+  const hardBreak = schema.nodes.hardBreak;
+  const inline: PMNode[] = [];
+  text.split(LINE_BREAKS).forEach((line, i) => {
+    if (i > 0) inline.push(hardBreak ? hardBreak.create() : schema.text(" "));
+    if (line) inline.push(schema.text(line));
   });
   const paragraph = schema.nodes.paragraph.create(null, inline);
   return new Slice(Fragment.from(paragraph), 1, 1);

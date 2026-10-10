@@ -7,7 +7,7 @@
 //   <EditorRoot variables onVariablesChange baseline requiredSections readOnly>
 //     <DocumentEditor content onChange ref />        the document body
 //     <VariablesPanel />                             the right-hand panel
-//     <InlineVariableField label value onChange />   one-line fields (email subject, preheader)
+//     <InlineVariableField label value onChange />   channel fields (email subject, push title, SMS message)
 //   </EditorRoot>
 //
 // Everything inside one root shares a single variable list, so a chip, a panel row and an inline
@@ -15,6 +15,7 @@
 // root from its own `variables`, `requiredSections`, `readOnly` and `onVariablesChange` props.
 
 import type { ReactNode, Ref } from "react";
+import type { FieldLines } from "./model/normalize";
 import type { ContractChange, JSONContent, RequiredSection, Variable } from "./model/types";
 
 /**
@@ -178,9 +179,10 @@ export interface VariablesPanelProps {
 // ── <InlineVariableField> ─────────────────────────────────────
 
 /**
- * A one-line editor that accepts text and variable chips, with the same `{{` picker, drag and
- * click-to-insert as the document. Used for the email subject and preheader. Must render inside
- * an <EditorRoot>. Enter never adds a line.
+ * A field editor that accepts text and variable chips, with the same `{{` picker, drag and
+ * click-to-insert as the document. Used for the channel fields: the email subject and preheader, a
+ * push's title and body, an SMS message. Must render inside an <EditorRoot>. On one line (the default)
+ * Enter never adds a line; with `lines="lines"` Enter adds a hard break.
  */
 export interface InlineVariableFieldProps {
   /** Accessible name, and how the field is named in a chip's "where it's used" list ("Email subject"). */
@@ -190,6 +192,11 @@ export interface InlineVariableFieldProps {
    * for empty. Read once (remount with a new `key` to reset).
    */
   value: JSONContent | null;
+  /**
+   * `"line"` (default): one line; a pasted line break becomes a space. `"lines"`: line breaks are kept
+   * as hard breaks (Enter adds one, a paste keeps its lines). Read once, like `value`.
+   */
+  lines?: FieldLines;
   onChange?: (value: JSONContent) => void;
   /**
    * Not shown for now (the email subject while Email is off), but still part of the root: its chips

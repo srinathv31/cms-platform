@@ -6,7 +6,8 @@
 //                          required-section guard, the section-merging paste, block moves, the
 //                          field binding (usage, drop, chip popover, paste), Home/End,
 //                          review-thread highlights and list markers.
-// inlineFieldExtensions()  a one-line field (email subject, preheader): text + chips only.
+// inlineFieldExtensions()  a channel field (email subject, push title, SMS message): text + chips only,
+//                          on one line, or keeping its line breaks as hard breaks.
 
 import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
@@ -27,6 +28,8 @@ import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
 import { ListMarkers } from "./extensions/list-markers";
 import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
+import { FieldLines } from "./extensions/field-lines";
+import type { FieldLines as FieldLinesMode } from "./model/normalize";
 import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
 import { SectionPaste } from "./extensions/section-paste";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
@@ -264,7 +267,8 @@ const InlineDocument = Node.create({
   content: "paragraph",
 });
 
-function buildInline(opts: InternalBaseOptions): Extensions {
+/** `lines`: the field keeps its line breaks (an SMS message), so its schema has the hard break. */
+function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode): Extensions {
   return [
     InlineDocument,
     StarterKit.configure({
@@ -278,7 +282,8 @@ function buildInline(opts: InternalBaseOptions): Extensions {
       code: false,
       codeBlock: false,
       horizontalRule: false,
-      hardBreak: false,
+      // Shift+Enter and Mod+Enter add one; FieldLines makes Enter add one too.
+      hardBreak: lines === "lines" ? { keepMarks: false } : false,
       bold: false,
       italic: false,
       underline: false,
@@ -289,17 +294,21 @@ function buildInline(opts: InternalBaseOptions): Extensions {
       dropcursor: { color: false, width: 2, class: "ucomp-dropcursor" },
     }),
     variableNode(opts),
-    ContentLimits.configure({ field: true }),
+    ContentLimits.configure({ field: lines }),
   ];
 }
 
-/** Client extensions of a one-line field: the same `{{` picker, drop and chips as the document. */
-export function inlineFieldExtensions(options: EditorExtensionOptions): Extensions {
+/**
+ * Client extensions of a channel field: the same `{{` picker, drop and chips as the document. On one
+ * line (`"line"`, the default: an email subject, a push title or body), Enter adds nothing; keeping its
+ * line breaks (`"lines"`, an SMS message), Enter adds a hard break.
+ */
+export function inlineFieldExtensions(options: EditorExtensionOptions, lines: FieldLinesMode = "line"): Extensions {
   return [
-    ...buildInline(clientVariableOptions(options)),
+    ...buildInline(clientVariableOptions(options), lines),
     FieldBindingExtension.configure({ binding: options.binding ?? null }),
     LineBoundaryKeys,
-    SingleLine,
+    lines === "lines" ? FieldLines : SingleLine,
   ];
 }
 

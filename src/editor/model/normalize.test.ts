@@ -335,3 +335,21 @@ describe("normalizeField (email subject, preheader)", () => {
     expect(normalizeField(doc(p(t("a")), p(), p(t("b"))))).toEqual(doc(p(t("a"), t(" "), t("b"))));
   });
 });
+
+describe("normalizeField with its lines kept (an SMS message)", () => {
+  it("keeps hard breaks, makes line break characters hard breaks, and drops marks", () => {
+    const field = doc(p(t("Your\tAPR", [{ type: "bold" }]), br, t("is\nchanging"), { type: "variable", attrs: { key: "apr" }, marks: [{ type: "italic" }] }));
+    expect(normalizeField(field, "lines")).toEqual(
+      doc(p(t("Your APR"), br, t("is"), br, t("changing"), { type: "variable", attrs: { key: "apr" } })),
+    );
+  });
+
+  it("joins paragraphs with a hard break each, so an empty one stays a blank line", () => {
+    expect(normalizeField(doc(p(t("a")), p(), p(t("b"))), "lines")).toEqual(doc(p(t("a"), br, br, t("b"))));
+  });
+
+  it("is the same when normalized twice", () => {
+    const once = normalizeField(doc(p(t("a\r\nb")), p(t("c"))), "lines");
+    expect(normalizeField(once, "lines")).toEqual(once);
+  });
+});
