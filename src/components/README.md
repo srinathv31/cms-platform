@@ -27,9 +27,10 @@ Convention only (nothing checks these):
   in review, and "Based on v1 · Round 1" on the draft a send-back opened, with its "Reverted to v1, round 1"), the
   submit dialog, comment threads, notifications, the audit log, Activity, the Versions tab and its review history,
   the Compare dialog, and the footer of a round's PDF preview. A sent-back round's review screen is a record: its
-  decision row says who requested changes and when, and links to where the work went ("Open v3, round 2", or "Open v3"
-  once released), the read model's `replacedBy`. The Library, Usage, consumers and the integration panel
-  speak released numbers only (`v${n}`).
+  returned stage in the stepper says who requested changes and when ("Jordan Ellis · 3 days ago", like an approved
+  stage; the icon's accessible name says which), and the decision row under it only links to where the work went
+  ("Open v3, round 2", or "Open v3" once released), the read model's `replacedBy`, or is empty while that is a draft.
+  The Library, Usage, consumers and the integration panel speak released numbers only (`v${n}`).
 - The screen-level UI rules (one black primary button per screen, one segmented style, one tab idiom, 32px
   controls in rails, skeletons with the real geometry, focus return, zero console errors) live in
   [docs/reference/ui-checklist.md](../../docs/reference/ui-checklist.md). Read it before you build a screen.

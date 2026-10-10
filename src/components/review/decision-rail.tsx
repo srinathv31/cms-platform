@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatAgo } from "@/domain/dates";
 import type { StepView } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
-import type { DecisionAccess } from "./decision-model";
+import type { DecisionAccess, DecisionRow } from "./decision-model";
 import { RV } from "./review-grid";
 import { SectionLabel } from "./rail-sections";
 
@@ -20,10 +20,9 @@ import { SectionLabel } from "./rail-sections";
 //
 // The pinned head is one height for everyone (151px with one stage): the decision row is always
 // there, 32px, whatever stands in it: the two buttons (theirs to press, or greyed when they can't
-// decide it), a line once it is decided, or nothing when the viewer isn't an approver. So the content
-// below never moves when the persona changes, and the skeleton has the same height. A sent-back round
-// that was resubmitted fits two lines in the same 32px: who sent it back, and a link to where its work
-// went (its number's head).
+// decide it), a line once it is decided, a link on a sent-back round to where its work went (its
+// number's head), or nothing when the viewer isn't an approver. So the content below never moves when
+// the persona changes, and the skeleton has the same height.
 
 // ── Approval chain ───────────────────────────────────────────────
 
@@ -33,6 +32,21 @@ const STEP_ICON: Record<StepView["status"], string> = {
   waiting: "border border-hairline-strong bg-surface",
   returned: "bg-status-changes text-status-changes-text",
 };
+
+/**
+ * What a decided step's icon says to assistive technology: its line names who decided it and when, the same
+ * for both outcomes. A name, not text, so it is no status word on screen (that is the header's StatusBadge).
+ */
+const STEP_LABEL: Partial<Record<StepView["status"], string>> = {
+  done: "Approved",
+  returned: "Changes requested",
+};
+
+/** Who decided a step and when: "Jordan Ellis · 3 days ago". */
+function decidedLine(step: StepView, now: Date, unknown: string): string {
+  if (!step.decidedBy) return unknown;
+  return `${step.decidedBy.name}${step.decidedAt ? ` · ${formatAgo(step.decidedAt, now)}` : ""}`;
+}
 
 /** The id of the line that says why Approve and Request changes are blocked: it describes them. */
 export const BLOCKED_ID = "decision-blocked";
@@ -54,18 +68,21 @@ function StepRow({
   const reason = step.status === "current" ? blocked : null;
   const sub =
     step.status === "done"
-      ? step.decidedBy
-        ? `${step.decidedBy.name}${step.decidedAt ? ` · ${formatAgo(step.decidedAt, now)}` : ""}`
-        : "Approved"
+      ? decidedLine(step, now, "Approved")
       : step.status === "current"
         ? (reason ?? "Waiting for a decision")
         : step.status === "returned"
-          ? "Changes requested"
+          ? decidedLine(step, now, "Sent back")
           : `After ${previous?.name ?? "the previous stage"}`;
+  const label = STEP_LABEL[step.status];
   return (
     <li className="relative grid grid-cols-[1.25rem_1fr] gap-x-3" data-step={step.status}>
       {!last ? <span aria-hidden className="absolute top-6 bottom-[-0.25rem] left-[9.5px] w-px bg-hairline-strong" /> : null}
-      <span className={cn("mt-0.5 grid size-5 place-items-center rounded-full transition-colors", STEP_ICON[step.status])}>
+      <span
+        role={label ? "img" : undefined}
+        aria-label={label}
+        className={cn("mt-0.5 grid size-5 place-items-center rounded-full transition-colors", STEP_ICON[step.status])}
+      >
         {step.status === "done" ? <Check aria-hidden strokeWidth={2.5} className="size-3" /> : null}
         {step.status === "current" ? <span className="size-2 rounded-full bg-brand" /> : null}
         {step.status === "returned" ? <CornerUpLeft aria-hidden strokeWidth={2.25} className="size-3" /> : null}
@@ -115,7 +132,7 @@ export interface NextRound {
 }
 
 /**
- * The decision row, under the stepper: 32px for everyone.
+ * The decision row, under the stepper: 32px for everyone. What stands in it is the model's `DecisionRow`.
  * - Open: Approve and Request changes.
  * - Blocked (the viewer wrote this version, or is an approver the stage doesn't wait on): the same two,
  *   greyed but still focusable, so a keyboard user reaches them. The reason is the current stage's own
@@ -125,12 +142,12 @@ export interface NextRound {
  * - Decided, or not in review: a line (what was decided, or the version's state) stands where the buttons
  *   were. It is a status, and it takes focus when the decision was made here, since the button that
  *   opened the dialog is gone.
- * - A sent-back round that was resubmitted: the line (who sent it back, and when) and under it the link
- *   to the round that carried its work on, two 16px lines in the row.
+ * - A sent-back round: the link to the round that carried its work on, or nothing while that is still a
+ *   draft. Who sent it back, and when, is its returned stage's line just above; the row doesn't repeat it.
  */
 function Decision({
   access,
-  line,
+  row,
   next,
   describedBy,
   onApprove,
@@ -140,9 +157,8 @@ function Decision({
   regionRef,
 }: {
   access: DecisionAccess;
-  /** Replaces the buttons. */
-  line: string | null;
-  /** With the line: where this round's work went. */
+  row: DecisionRow;
+  /** A sent-back round's: where its work went. */
   next: NextRound | null;
   /** The id of the stepper's line that gives a blocked pair its reason, when that line is on screen. */
   describedBy: string | undefined;
@@ -153,32 +169,30 @@ function Decision({
   /** Where focus goes when the button that opened a dialog is gone (the decision was made). */
   regionRef: Ref<HTMLDivElement>;
 }) {
+  const line = row.kind === "line" ? row.text : null;
   return (
     <div
       ref={regionRef}
       data-decision=""
-      data-decided={line ? "" : undefined}
+      data-decided={row.kind === "buttons" ? undefined : ""}
       role={line ? "status" : undefined}
       tabIndex={line ? -1 : undefined}
-      className={cn("mt-4 flex h-8 items-center outline-none", line && "text-[14px] leading-6 text-text-muted")}
+      className={cn("mt-4 flex h-8 items-center outline-none", row.kind !== "buttons" && "text-[14px] leading-6 text-text-muted")}
     >
-      {line && next ? (
-        <div className="flex min-w-0 flex-col text-[13px] leading-4">
-          <span className="truncate" title={line}>
-            {line}
-          </span>
-          <Link
-            href={next.href}
-            className="inline-flex w-fit items-center gap-1 rounded-sm font-medium text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Open {next.label}
-            <ArrowRight aria-hidden strokeWidth={2} className="size-3.5" />
-          </Link>
-        </div>
-      ) : line ? (
+      {line ? (
         <span className="min-w-0 truncate" title={line}>
           {line}
         </span>
+      ) : row.kind === "sentBack" ? (
+        next ? (
+          <Link
+            href={next.href}
+            className="inline-flex min-w-0 items-center gap-1 rounded-sm font-medium text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="truncate">Open {next.label}</span>
+            <ArrowRight aria-hidden strokeWidth={2} className="size-3.5 shrink-0" />
+          </Link>
+        ) : null
       ) : access.kind === "open" ? (
         <div className="flex w-full gap-2">
           <Button ref={approveRef} className="flex-1" onClick={onApprove}>
@@ -208,7 +222,7 @@ export function DecisionRail({
   steps,
   nowIso,
   access,
-  line,
+  row,
   next = null,
   onApprove,
   onRequest,
@@ -220,8 +234,8 @@ export function DecisionRail({
   steps: readonly StepView[];
   nowIso: string;
   access: DecisionAccess;
-  line: string | null;
-  /** A sent-back round that was resubmitted: the round its work went on to, linked under the line. */
+  row: DecisionRow;
+  /** A sent-back round that was resubmitted: the round its work went on to, linked in the row. */
   next?: NextRound | null;
   onApprove: () => void;
   onRequest: () => void;
@@ -232,15 +246,15 @@ export function DecisionRail({
   children: ReactNode;
 }) {
   // A blocked pair's reason stands on the stage the version waits at, and the two buttons point to it.
-  const reason = access.kind === "blocked" && line === null && steps.some((s) => s.status === "current") ? access.reason : null;
+  const reason = access.kind === "blocked" && row.kind === "buttons" && steps.some((s) => s.status === "current") ? access.reason : null;
   return (
     <aside aria-label="Decision" data-slot="rail" className={RV.rail}>
       <div data-rail-head="" className={RV.railHead}>
         <Approval steps={steps} now={new Date(nowIso)} blocked={reason} />
         <Decision
           access={access}
-          line={line}
-          next={line === null ? null : next}
+          row={row}
+          next={row.kind === "sentBack" ? next : null}
           describedBy={reason === null ? undefined : BLOCKED_ID}
           onApprove={onApprove}
           onRequest={onRequest}

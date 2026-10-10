@@ -14,7 +14,7 @@ import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { ApproveDialog, type Approved } from "./approve-dialog";
 import { BlockCommentMenu } from "./block-comment-menu";
 import { DecisionBar } from "./decision-bar";
-import { approvalStage, decisionAccess, decisionLine, type LocalDecision } from "./decision-model";
+import { approvalStage, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
 import { DecisionRail, type NextRound } from "./decision-rail";
 import { DocumentView } from "./document-view";
 import { GoLive } from "./go-live";
@@ -246,14 +246,13 @@ export function ReviewWorkspace({
 
   // The decision went through: the buttons the dialog came from are replaced by a line, and focus goes
   // to the place they stood. (The dialog's own return of focus can land on a button just as it goes.)
-  const line = decisionLine({
+  const row = decisionRow({
     version: { number: version.number, round: version.round, state: version.state },
     authorName: version.submittedBy.name,
     local,
     canDecideAgain: can.approve.ok,
-    steps,
-    nowIso,
   });
+  const line = row.kind === "line" ? row.text : null;
   // A sent-back round that was resubmitted links on to where its work went, in this space.
   const { replacedBy } = data;
   const next: NextRound | null = replacedBy
@@ -367,7 +366,7 @@ export function ReviewWorkspace({
 
       <DecisionBar
         access={access}
-        line={line}
+        row={row}
         decidedHere={local !== null}
         onApprove={(from) => openDialog("approve", from)}
         onRequest={(from) => openDialog("request", from)}
@@ -377,7 +376,7 @@ export function ReviewWorkspace({
         steps={steps}
         nowIso={nowIso}
         access={access}
-        line={line}
+        row={row}
         next={next}
         onApprove={() => openDialog("approve")}
         onRequest={() => openDialog("request")}

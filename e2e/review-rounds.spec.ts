@@ -214,8 +214,12 @@ test("a send-back keeps the version number: v1 goes back, returns as v1, round 2
     await expect(header(page)).toContainText("v1 · Round 1 by Maya Chen");
     await expect(statusBadge(page)).toHaveText("Changes requested");
     await expect(approveButton(page), "a sent-back round is decided").toHaveCount(0);
-    // Who sent it back, and where its work went: v1, released since, at its bare link.
-    await expect(decision(page).locator("[data-decided]")).toContainText("Jordan Ellis requested changes");
+    // Who sent it back is the returned stage's line; the row under it only says where its work went:
+    // v1, released since, at its bare link.
+    const returned = decision(page).locator('[data-step="returned"]');
+    await expect(returned).toContainText(/Jordan Ellis · /);
+    await expect(returned.getByRole("img", { name: "Changes requested", exact: true })).toBeVisible();
+    await expect(decision(page).locator("[data-decided]")).toHaveText("Open v1");
     await expect(decision(page).getByRole("link", { name: "Open v1", exact: true })).toHaveAttribute("href", `/${TEAM}/review/${id}/1`);
 
     const list = await rowsOf(db, "SELECT number, round, state FROM versions WHERE template_id = ? ORDER BY number, round", [id]);

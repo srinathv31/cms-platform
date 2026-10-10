@@ -9,7 +9,7 @@ import {
   approvalStage,
   approveLines,
   decisionAccess,
-  decisionLine,
+  decisionRow,
   reasonProblem,
   reasonReady,
   type ApproveLinesInput,
@@ -164,53 +164,45 @@ describe("approveLines", () => {
   });
 });
 
-describe("decisionLine", () => {
-  const base = { authorName: "Maya Chen", local: null, canDecideAgain: false, steps: [], nowIso: "2026-10-04T12:00:00.000Z" } as const;
-  const JORDAN = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 200 };
+describe("decisionRow", () => {
+  const base = { authorName: "Maya Chen", local: null, canDecideAgain: false } as const;
   const at = (state: VersionState, round = 1) => ({ version: { number: 3, round, state } });
+  const line = (text: string) => ({ kind: "line", text });
 
   it("leaves the buttons in place while the version is in review", () => {
-    expect(decisionLine({ ...base, ...at("in_review") })).toBeNull();
+    expect(decisionRow({ ...base, ...at("in_review") })).toEqual({ kind: "buttons" });
   });
 
   it("tells the approver of an earlier stage who is next, unless they can decide it too", () => {
     const local = { kind: "approved", wentLive: false, nextStage: "Legal reviewer" } as const;
-    expect(decisionLine({ ...base, ...at("in_review"), local })).toBe("You approved this stage. Legal reviewer is next.");
-    expect(decisionLine({ ...base, ...at("in_review"), local, canDecideAgain: true })).toBeNull();
+    expect(decisionRow({ ...base, ...at("in_review"), local })).toEqual(line("You approved this stage. Legal reviewer is next."));
+    expect(decisionRow({ ...base, ...at("in_review"), local, canDecideAgain: true })).toEqual({ kind: "buttons" });
   });
 
   it("words the decision as the viewer's own right after they make it, and as a plain record otherwise", () => {
-    expect(decisionLine({ ...base, ...at("active"), local: { kind: "approved", wentLive: true, nextStage: null } })).toBe(
-      "You approved v3.",
+    expect(decisionRow({ ...base, ...at("active"), local: { kind: "approved", wentLive: true, nextStage: null } })).toEqual(
+      line("You approved v3."),
     );
-    expect(decisionLine({ ...base, ...at("active") })).toBe("v3 is Active.");
-    expect(decisionLine({ ...base, ...at("changes_requested"), local: { kind: "returned" } })).toBe(
-      "You returned v3, round 1 to Maya Chen.",
+    expect(decisionRow({ ...base, ...at("active") })).toEqual(line("v3 is Active."));
+    expect(decisionRow({ ...base, ...at("changes_requested"), local: { kind: "returned" } })).toEqual(
+      line("You returned v3, round 1 to Maya Chen."),
     );
-    expect(decisionLine({ ...base, ...at("superseded") })).toBe("v3 is Superseded.");
-    expect(decisionLine({ ...base, ...at("revoked") })).toBe("v3 is Revoked.");
+    expect(decisionRow({ ...base, ...at("superseded") })).toEqual(line("v3 is Superseded."));
+    expect(decisionRow({ ...base, ...at("revoked") })).toEqual(line("v3 is Revoked."));
   });
 
-  it("says who sent a round back, and when, as a record (the reason stays in its thread)", () => {
-    const returned: StepView[] = [
-      { position: 0, name: "Team approver", status: "returned", decidedBy: JORDAN, decidedAt: "2026-10-01T09:00:00.000Z" },
-    ];
-    expect(decisionLine({ ...base, ...at("changes_requested"), steps: returned })).toBe("Jordan Ellis requested changes 3 days ago.");
-    const yesterday = [{ ...returned[0]!, decidedAt: "2026-10-03T18:00:00.000Z" }];
-    expect(decisionLine({ ...base, ...at("changes_requested", 2), steps: yesterday })).toBe("Jordan Ellis requested changes yesterday.");
-    // Right after the viewer sent it back, it is theirs.
-    expect(decisionLine({ ...base, ...at("changes_requested"), steps: returned, local: { kind: "returned" } })).toBe(
-      "You returned v3, round 1 to Maya Chen.",
-    );
+  it("adds no sentence to a round sent back before: its returned stage says who and when", () => {
+    expect(decisionRow({ ...base, ...at("changes_requested") })).toEqual({ kind: "sentBack" });
+    expect(decisionRow({ ...base, ...at("changes_requested", 2) })).toEqual({ kind: "sentBack" });
   });
 
   it("names the round it returned (a sent-back round always shows it), and a released version by its number", () => {
-    expect(decisionLine({ ...base, ...at("changes_requested", 2), local: { kind: "returned" } })).toBe(
-      "You returned v3, round 2 to Maya Chen.",
+    expect(decisionRow({ ...base, ...at("changes_requested", 2), local: { kind: "returned" } })).toEqual(
+      line("You returned v3, round 2 to Maya Chen."),
     );
-    expect(decisionLine({ ...base, ...at("active", 3), local: { kind: "approved", wentLive: true, nextStage: null } })).toBe(
-      "You approved v3.",
+    expect(decisionRow({ ...base, ...at("active", 3), local: { kind: "approved", wentLive: true, nextStage: null } })).toEqual(
+      line("You approved v3."),
     );
-    expect(decisionLine({ ...base, ...at("superseded", 3) })).toBe("v3 is Superseded.");
+    expect(decisionRow({ ...base, ...at("superseded", 3) })).toEqual(line("v3 is Superseded."));
   });
 });

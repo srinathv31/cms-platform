@@ -286,6 +286,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
 | `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |
+| `e2e/review-rounds.spec.ts` | A send-back keeps the version number: v1 goes back, returns as v1, round 2 (the draft, the submit dialog, the queue), goes live approved on round 2, and the Versions tab folds its rounds, round 1 linking to its own read-only review screen. |
 | `e2e/revoke-recovery.spec.ts` | After the Active version is revoked: Edit from the revoked content, contract changes against the version that still renders, approve, render. |
 | `e2e/action-refusals.spec.ts` | A refusal an action used to throw shows the domain's sentence: Edit refused because a newer version went into review. |
 | `e2e/autosave-session.spec.ts` | Autosave never drops an edit silently: a rename on the Versions tab saves, a conflict turns the page read-only with Reload, and leaving with a save out asks first. |

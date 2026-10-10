@@ -1,10 +1,9 @@
 // What the review screen's decision dialogs and the decision rail decide, as pure functions: whether
 // an approval is the last stage, the consequence lines the Approve dialog shows (recomputed as the
-// sunset date changes), what a reason may be, and the line that replaces the buttons once the version
+// sunset date changes), what a reason may be, and what stands in place of the buttons once the version
 // has been decided. No React, so they are tested without the screen.
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
-import { formatAgo } from "@/domain/dates";
 import { formatCount } from "@/domain/numbers";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import { versionLabel, type NumberedRound } from "@/domain/rounds";
@@ -113,19 +112,24 @@ export type LocalDecision =
   | null;
 
 /**
- * The one line that stands where Approve and Request changes were, or null when the buttons still
- * belong there (the round is in review). A round that isn't in review is a read-only record. The
- * version reads as its label in its state now: "You returned v1, round 1 to Maya Chen.", "v3 is Active."
- * A round sent back before says who sent it back, and when: "Jordan Ellis requested changes 3 days ago."
- * (its reason stays in the resolved change-request thread).
+ * What stands in the decision row, under the stepper:
+ * - buttons: the round is in review, and Approve and Request changes belong there (the access says whether
+ *   they are the viewer's to press, greyed, or absent).
+ * - line: one sentence where they were, once the version has been decided or isn't in review. A round
+ *   that isn't in review is a read-only record. The version reads as its label in its state now: "You
+ *   returned v1, round 1 to Maya Chen.", "v3 is Active."
+ * - sentBack: a round sent back before. Its returned stage in the stepper already says who sent it back
+ *   and when, and the header's badge that changes were requested (the reason stays in the resolved
+ *   change-request thread), so the row adds no sentence: only the link to where its work went, when it
+ *   went somewhere.
  */
-export function decisionLine({
+export type DecisionRow = { kind: "buttons" } | { kind: "line"; text: string } | { kind: "sentBack" };
+
+export function decisionRow({
   version,
   authorName,
   local,
   canDecideAgain,
-  steps,
-  nowIso,
 }: {
   /** The round on screen, in the state it is in now. */
   version: NumberedRound;
@@ -133,35 +137,26 @@ export function decisionLine({
   local: LocalDecision;
   /** The server says this viewer may decide the version's current stage. */
   canDecideAgain: boolean;
-  /** The stepper: a sent-back round's returned stage carries who returned it, and when. */
-  steps: readonly StepView[];
-  /** The demo clock's instant. */
-  nowIso: string;
-}): string | null {
+}): DecisionRow {
   const v = versionLabel(version, { style: "sentence" });
+  const line = (text: string): DecisionRow => ({ kind: "line", text });
   switch (version.state) {
     case "in_review":
       // Approved an earlier stage and has no say on the next: say so instead of a dead pair of buttons.
       if (local?.kind === "approved" && !local.wentLive && !canDecideAgain) {
-        return local.nextStage ? `You approved this stage. ${local.nextStage} is next.` : "You approved this stage.";
+        return line(local.nextStage ? `You approved this stage. ${local.nextStage} is next.` : "You approved this stage.");
       }
-      return null;
+      return { kind: "buttons" };
     case "changes_requested":
-      return local?.kind === "returned" ? `You returned ${v} to ${authorName}.` : sentBackLine(steps, nowIso);
+      // Right after the viewer sent it back, it is theirs.
+      return local?.kind === "returned" ? line(`You returned ${v} to ${authorName}.`) : { kind: "sentBack" };
     case "active":
-      return local?.kind === "approved" && local.wentLive ? `You approved ${v}.` : `${v} is Active.`;
+      return line(local?.kind === "approved" && local.wentLive ? `You approved ${v}.` : `${v} is Active.`);
     case "superseded":
-      return `${v} is Superseded.`;
+      return line(`${v} is Superseded.`);
     case "revoked":
-      return `${v} is Revoked.`;
+      return line(`${v} is Revoked.`);
     case "draft":
-      return null;
+      return { kind: "buttons" };
   }
-}
-
-/** "Jordan Ellis requested changes 3 days ago.", from the stage the round was returned at. */
-function sentBackLine(steps: readonly StepView[], nowIso: string): string {
-  const returned = steps.find((step) => step.status === "returned");
-  if (!returned?.decidedBy || !returned.decidedAt) return "Changes requested.";
-  return `${returned.decidedBy.name} requested changes ${formatAgo(returned.decidedAt, nowIso)}.`;
 }
