@@ -63,6 +63,8 @@ describe("getBaseVersion", () => {
       ok: true,
       base: {
         number: 1,
+        round: 1,
+        state: "changes_requested",
         name: v1.name,
         body: v1.body,
         variables: v1.variables,

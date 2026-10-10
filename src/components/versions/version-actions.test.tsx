@@ -35,6 +35,10 @@ function superseded(over: Partial<VersionTimelineItem> = {}): VersionTimelineIte
   return {
     id: "v_1",
     number: 1,
+    round: 1,
+    label: "v1",
+    approvedOnRound: null,
+    rounds: null,
     state: "superseded",
     createdAt: "2026-09-01T12:00:00.000Z",
     author: { id: "priya", name: "Priya Shah", initials: "PS", hue: 0 },

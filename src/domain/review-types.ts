@@ -16,6 +16,7 @@ import type {
   VersionState,
 } from "./types";
 import type { Refused } from "./refusals";
+import type { NumberedRound } from "./rounds";
 
 // ── People ───────────────────────────────────────────────────────────────────
 
@@ -78,18 +79,23 @@ export type AuditEffect = {
   };
 }[AuditAction];
 
-/** Where a notification links to. The server turns it into an href with the team slug. */
+/**
+ * Where a notification links to. The server turns it into an href with the team slug. A review link
+ * names its round exactly when the round's label shows it (`reviewLink` in rounds.ts): without one, the
+ * review screen is the number's head, or for a stage reviewer outside the team who can't open the head
+ * (the next round waits on another stage), the newest round of the number they decided.
+ */
 export type NotificationLink =
-  | { to: "review"; templateId: string; versionNumber: number }
+  | { to: "review"; templateId: string; versionNumber: number; round?: number }
   | {
       to: "template";
       templateId: string;
       /**
        * A released or decided version the notification is about. A recipient outside the template's
        * team (a stage-named reviewer) can't open the workspace, so they get this version's review
-       * screen in their own space instead.
+       * screen in their own space instead. `round` as on a review link.
        */
-      reviewVersion?: number;
+      reviewVersion?: { number: number; round?: number };
     }
   | { to: "versions"; templateId: string };
 
@@ -112,7 +118,7 @@ export interface NotificationEffect {
   kind: "notification";
   notification: NotificationKind;
   to: Recipients;
-  /** One plain sentence: "Maya Chen submitted Spring Travel Rewards — Terms v1 for review." */
+  /** One plain sentence: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review." */
   title: string;
   body?: string;
   link: NotificationLink;
@@ -198,6 +204,10 @@ export interface ThreadView {
   quote: string | null;
   status: "open" | "resolved";
   originVersionNumber: number | null;
+  /** The round of the version it began on; null when it began in the open draft. */
+  originRound: number | null;
+  /** The version it began on, for "on v3 · Round 1" (chrome, with history); null for the open draft. */
+  originLabel: string | null;
   comments: CommentView[];
   resolvedBy?: Person;
   resolvedAt?: string;
@@ -289,6 +299,8 @@ export interface ReviewQueueRow {
   teamName: string;
   versionId: string;
   versionNumber: number;
+  /** Which submission of `versionNumber` this row is (rounds.ts): `versionLabel` and `reviewPath` read it. */
+  round: number;
   state: VersionState;
   author: Person;
   submittedAt: string;
@@ -309,6 +321,8 @@ export interface ReviewScreenData {
   version: {
     id: string;
     number: number;
+    /** The round on screen: `?round=`, or the number's head without one. */
+    round: number;
     state: VersionState;
     /** The template's name as this version has it: the header's title, and what goes live. */
     name: string;
@@ -330,20 +344,31 @@ export interface ReviewScreenData {
   /**
    * What the redline, its "vs vN" label and the change count compare with (`reviewBaseline`): the Active
    * version; with none Active (after a revoke), the released version the draft was based on, then the
-   * newest version that still renders. Null for a first version, or when that would be this version.
-   * `state` is for the label ("vs v3 (revoked)"). The contract changes come from submit (`contractBaseline`).
+   * newest version that still renders. Never a round's own number: a round sent back before its number
+   * went live compares with the released version it was drafted from. Null for a first version, or when
+   * that would be this version. `state` is for the label ("vs v3 (revoked)"). The contract changes come
+   * from submit (`contractBaseline`).
    */
   baseline: { id: string; number: number; state: VersionState; body: JSONContent; variables: Variable[] } | null;
   /**
    * The Active version this one would replace, for the Approve dialog's consequences and its sunset
-   * offer. Null when nothing is Active, or this is the Active version. Not `baseline`: after a revoke the
-   * redline compares with the revoked version, which approving replaces nothing of.
+   * offer. Null when nothing is Active, or the Active version is this one or its number's release. Not
+   * `baseline`: after a revoke the redline compares with the revoked version, which approving replaces
+   * nothing of.
    */
   previousNumber: number | null;
   /**
+   * Where this round's work went (`replacedBy`), when it is a sent-back round that was resubmitted: its
+   * number's head, a later round or the release, with its label ("v3, round 2", or "v3" once released).
+   * Null when this round is the head (in review, released, or sent back with only a draft after it), and
+   * when the viewer can't open the head.
+   */
+  replacedBy: (NumberedRound & { label: string }) | null;
+  /**
    * The name customers get today, which the rail shows a rename against: the Active version's or, with
-   * none Active, the newest version that still renders (`contractBaseline`). Null when nothing else
-   * renders, or that is this version.
+   * none Active, the newest version that still renders (`renameBaseline`). For a round sent back before
+   * its number went live, the name of the version it was drafted from. Null when nothing else renders,
+   * or that is this version.
    */
   liveName: string | null;
   steps: StepView[];
@@ -357,9 +382,32 @@ export interface ReviewScreenData {
   sunsetCalendar: SunsetCalendar;
 }
 
+/** One round of a number in the Versions tab's review history, and how it was decided. */
+export interface RoundHistoryItem {
+  id: string;
+  round: number;
+  state: VersionState;
+  submittedAt?: string;
+  submittedBy: Person;
+  /** The round's closing decision (its last approvals row); none while it is in review. */
+  decision?: { kind: "approved" | "changes_requested"; by: Person; at: string; stageName: string; reason?: string };
+}
+
+/**
+ * One entry of the Versions tab: the open draft, or a number shown as its head (its released row, else
+ * its latest round), with every round of it in `rounds`.
+ */
 export interface VersionTimelineItem {
   id: string;
   number: number | null; // null for the open draft
+  /** The head's round; null for the open draft. */
+  round: number | null;
+  /** "v3 · Round 2" (chrome, no history: `versionLabel`); null for the open draft. */
+  label: string | null;
+  /** "Approved on round 3" (`approvedOnRound`); null unless released after a send-back. */
+  approvedOnRound: string | null;
+  /** Every round of the number, newest first; null when it has one round (or for the open draft). */
+  rounds: RoundHistoryItem[] | null;
   state: VersionState;
   createdAt: string;
   author: Person;
@@ -388,9 +436,24 @@ export interface VersionTimelineItem {
   can: { setSunset: PermissionResult; startRevoke: PermissionResult; confirmRevoke: PermissionResult; cancelRevoke: PermissionResult };
 }
 
+/** One version Compare can pick: any row, every round included. */
+export interface CompareOption {
+  id: string;
+  /** "Draft" for the open draft, else `versionLabel` (chrome, with history): "v2", "v3 · Round 1". */
+  label: string;
+  state: VersionState;
+  /**
+   * The row the Versions timeline shows for its number (its head: the released row, else the latest
+   * round), or the open draft. Compare opens on the two newest of these; the other rounds stay selectable.
+   */
+  head: boolean;
+}
+
 export interface VersionsData {
   template: { id: string; name: string; teamSlug: string };
   items: VersionTimelineItem[]; // newest first; the open draft first when there is one
+  /** Every row, rounds included, newest first, "Draft" first when there is one. */
+  compareOptions: CompareOption[];
   consumerUsage: ConsumerUsage[];
   /** The sunset dialog's picker. */
   sunsetCalendar: SunsetCalendar;
@@ -401,7 +464,8 @@ export interface ActivityItem {
   at: string;
   actor: Person | null; // null = system
   action: AuditAction | string;
-  versionNumber: number | null;
+  /** "v3 · Round 1" (chrome; the round only for review events, `eventVersionLabel`); null for the draft. */
+  versionLabel: string | null;
   /** One plain sentence from domain/activity.ts: "Jordan Ellis started revoking v1: Wrong APR in legal notices." */
   summary: string;
 }

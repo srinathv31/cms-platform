@@ -9,6 +9,7 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { getTemplateDetail, listNotices, searchActiveTemplates } from "@/server/queries/consumer-api";
+import { findRound } from "@/server/queries/find-round";
 import { getIntegrationPanel } from "@/server/queries/integration";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { getLibraryRows } from "@/server/queries/library";
@@ -76,8 +77,8 @@ async function paletteName(id: string) {
   return result.ok ? result.templates.find((t) => t.id === id)?.name : undefined;
 }
 
-const version = (number: number) =>
-  db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, number)) }).then((v) => v!);
+/** A version by number: its head, the released row, else its latest round. */
+const version = (number: number) => findRound(db, templateId, number).then((v) => v!);
 const draft = () =>
   db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) }).then((v) => v!);
 
@@ -161,7 +162,7 @@ describe("a rename in a draft goes live only with its version", () => {
 
   it("submitted, it is reviewed under its new name; customers still see the old one", async () => {
     const at = as("maya");
-    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3 });
+    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 1 });
     expect((await version(3)).name).toBe(RENAMED);
     const sent = await db.select().from(notifications).where(eq(notifications.createdAt, at));
     expect(sent.map((n) => n.title)).toContain(`Maya Chen submitted ${RENAMED} v3 for review.`);
@@ -180,24 +181,28 @@ describe("a rename in a draft goes live only with its version", () => {
 
   it("a change request hands the author a draft with the name it was sent back with", async () => {
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 3, reason: "Keep the intro period on its own line." })).toEqual({ ok: true });
+    expect(await requestChanges({ templateId, versionNumber: 3, round: 1, reason: "Keep the intro period on its own line." })).toEqual({
+      ok: true,
+    });
     expect((await draft()).name).toBe(RENAMED);
     expect((await apiName()).name).toBe(LIVE);
   });
 
   it("approved, the new name is live: its renders, the API, search and its notice; the old version keeps its own", async () => {
     as("maya");
-    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 4 });
+    // Sent back, it comes back as round 2 of v3: consumers get v3, never a round.
+    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 2 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 4, sunsetPrevious: "2026-12-01", sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: "2026-12-01", sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
-      number: 4,
+      number: 3,
+      round: 2,
     });
 
-    expect(await webTitle(4)).toBe(RENAMED);
+    expect(await webTitle(3)).toBe(RENAMED);
     expect(await webTitle(2)).toBe(LIVE); // Superseded, still rendering until its sunset, under the name it went live with
-    expect(await apiName()).toEqual({ name: RENAMED, schemaTitle: `${RENAMED} v4: values` });
+    expect(await apiName()).toEqual({ name: RENAMED, schemaTitle: `${RENAMED} v3: values` });
     expect(await found("card terms")).toEqual([RENAMED]);
 
     const notices = await db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, at));
@@ -207,7 +212,7 @@ describe("a rename in a draft goes live only with its version", () => {
     ]);
     const listed = (await listNotices("coral", { templateId, limit: 200 })).notices.slice(-2);
     expect(listed.map((n) => n.message)).toEqual([
-      expect.stringMatching(new RegExp(`^${RENAMED} v4 is available\\.`)),
+      expect.stringMatching(new RegExp(`^${RENAMED} v3 is available\\.`)),
       expect.stringMatching(new RegExp(`^${LIVE} v2 stops rendering on `)),
     ]);
   });

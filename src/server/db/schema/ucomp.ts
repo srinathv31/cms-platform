@@ -134,6 +134,9 @@ export const versions = sqliteTable(
       .notNull()
       .references(() => templates.id),
     number: integer("number"), // null while draft; assigned at submit, then frozen
+    // Null while draft; assigned at submit with number, then frozen; a resubmission after a send-back is
+    // the next round of the same number.
+    round: integer("round"),
     state: text("state").$type<VersionState>().notNull(),
     // The template's name as this version has it: an author renames the open draft, and customers see
     // the name of the version they render (the Active one's, where the API speaks of the template).
@@ -172,7 +175,12 @@ export const versions = sqliteTable(
   },
   (t) => [
     index("versions_template").on(t.templateId),
-    uniqueIndex("versions_template_number").on(t.templateId, t.number),
+    // One row per round of a number. Drafts (no number, no round) don't collide: NULLs stay distinct.
+    uniqueIndex("versions_template_number_round").on(t.templateId, t.number, t.round),
+    // At most one released row per number: a number's rounds before it were sent back.
+    uniqueIndex("versions_one_released")
+      .on(t.templateId, t.number)
+      .where(sql`state IN ('active', 'superseded', 'revoked')`),
     // At most one open draft and one Active version per template.
     uniqueIndex("versions_one_draft")
       .on(t.templateId)

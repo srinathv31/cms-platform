@@ -302,6 +302,19 @@ describe("getTemplateDetail", () => {
     expect((await detail("cash-back")).versions.map((v) => v.number)).toEqual([2, 1]);
   });
 
+  it("rounds never show: a number is its released row, and nothing a consumer reads names a round", async () => {
+    // High-Yield v2 went live on round 3; rounds 1 and 2 were sent back.
+    const d = await detail("high-yield-savings");
+    expect(d.versions.map((v) => [v.number, v.state])).toEqual([
+      [2, "active"],
+      [1, "superseded"],
+    ]);
+    expect((await detail("high-yield-savings", { version: 2 })).contract).toMatchObject({ version: 2, state: "active" });
+    expect(JSON.stringify(d)).not.toMatch(/"round"/i);
+    const { notices } = await listNotices("coral", { limit: 200 });
+    expect(JSON.stringify(notices)).not.toMatch(/"round"/i);
+  });
+
   it("with nothing Active: activeVersion and contract are null (unless a version is named)", async () => {
     const where = and(eq(versions.templateId, id("rate-change-notice")), eq(versions.number, 1));
     await db.update(versions).set({ state: "revoked", revoke: { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() } }).where(where);

@@ -20,6 +20,17 @@ Convention only (nothing checks these):
 - `cacheComponents` is on ([next.config.ts](../../next.config.ts)). A server component that reads request
   data (`params`, cookies, the viewer) must render inside `<Stream>`. There is no `loading.tsx`.
 - Colors, radii, fonts, and motion come from tokens and presets (see below). Links take typed routes (`as Route`).
+- A version's label and its review link come from [src/domain/rounds.ts](../domain/rounds.ts): `versionLabel`
+  ("v3 · Round 2" where it stands alone, `{ style: "sentence" }` for "v3, round 2" in a title, button or line) and
+  `reviewPath`, which adds `?round=` exactly when the label shows the round. Rounds appear wherever a version's review,
+  or a round it sent back, is on screen: the review queue and screen, the workspace header (a sent-back round, a round
+  in review, and "Based on v1 · Round 1" on the draft a send-back opened, with its "Reverted to v1, round 1"), the
+  submit dialog, comment threads, notifications, the audit log, Activity, the Versions tab and its review history,
+  the Compare dialog, and the footer of a round's PDF preview. A sent-back round's review screen is a record: its
+  returned stage in the stepper says who requested changes and when ("Jordan Ellis · 3 days ago", like an approved
+  stage; the icon's accessible name says which), and the decision row under it only links to where the work went
+  ("Open v3, round 2", or "Open v3" once released), the read model's `replacedBy`, or is empty while that is a draft.
+  The Library, Usage, consumers and the integration panel speak released numbers only (`v${n}`).
 - The screen-level UI rules (one black primary button per screen, one segmented style, one tab idiom, 32px
   controls in rails, skeletons with the real geometry, focus return, zero console errors) live in
   [docs/reference/ui-checklist.md](../../docs/reference/ui-checklist.md). Read it before you build a screen.
@@ -48,13 +59,13 @@ Feature folders:
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, PDF, Web and Email output, pdf.js viewer, sample sets. | `workspace/`, `review/` |
 | `redline/` | `RedlineDocument`, a version diff painted like the document, and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
-| `review/` | The approver's review screen: views, decision rail, approve and request-changes dialogs, go-live. | `/[team]/review/[templateId]/[version]` |
-| `review-queue/` | Review queue tabs and rows. | `/[team]/review` |
+| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. | `/[team]/review/[templateId]/[version]` |
+| `review-queue/` | Review queue tabs and rows; a row links to its own round. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
-| `versions/` | Versions timeline, compare, sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
+| `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round, opening on the two newest versions), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
 | `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`), autosave, session store, Copilot prompt, save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks

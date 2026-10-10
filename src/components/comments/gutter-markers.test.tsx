@@ -17,6 +17,8 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}, co
     quote: null,
     status: "open",
     originVersionNumber: 1,
+    originRound: 1,
+    originLabel: "v1",
     comments: Array.from({ length: comments }, (_, i) => ({
       id: `${id}-${i}`,
       author: JORDAN,

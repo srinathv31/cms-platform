@@ -1,3 +1,4 @@
+import { reviewPath } from "@/domain/rounds";
 import { now } from "@/server/clock";
 import { getPeople, personOf, requireTemplate } from "@/server/queries/review-shared";
 import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
@@ -14,11 +15,11 @@ export async function WorkspaceContent({
   // Review comments: who is looking (their comments show at once, under their name). Whether they may comment comes
   // decided with the document (`doc.can.comment`).
   const { space } = await requireTemplate(team, templateId);
-  const { status, versionNumber } = await getWorkspaceHeader(team, templateId);
+  const { inReview } = await getWorkspaceHeader(team, templateId);
   const viewer = personOf(await getPeople(), space.viewer.userId);
   const nowIso = (await now()).toISOString();
-  // A version in review opens on the review screen, in this space (anyone who sees the template here can).
-  const reviewHref = status === "in_review" ? `/${team}/review/${templateId}/${versionNumber}` : null;
+  // A round in review opens on its review screen, in this space (anyone who sees the template here can).
+  const reviewHref = inReview ? reviewPath(team, templateId, inReview) : null;
   return (
     <ContentWorkspace
       // A different version is a different document and editor. So is the same version once it can't
@@ -29,6 +30,7 @@ export async function WorkspaceContent({
       teamName={doc.teamName}
       versionId={doc.versionId}
       versionNumber={doc.versionNumber}
+      round={doc.round}
       rev={doc.rev}
       body={doc.body}
       variables={doc.variables}

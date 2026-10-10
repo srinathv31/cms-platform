@@ -109,6 +109,8 @@ export function StoreProvider({
         quote: pending.quote,
         status: "open",
         originVersionNumber: 2,
+        originRound: 1,
+        originLabel: "v2",
         comments: [comment(body)],
         orphaned: false,
       };

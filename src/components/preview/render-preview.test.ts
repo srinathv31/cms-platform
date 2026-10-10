@@ -33,7 +33,20 @@ describe("renderPreview", () => {
   it("asks for a numbered version by its number", async () => {
     respondWith(new Response("<html></html>", { status: 200 }));
     await renderPreview({ ...request, version: 2, channel: "web" });
-    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)).version).toBe(2);
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
+    expect(body.version).toBe(2);
+    // No round: the route renders the number's head.
+    expect(body).not.toHaveProperty("round");
+  });
+
+  it("names the round of a numbered version when it has one, and never for the draft", async () => {
+    respondWith(new Response("<html></html>", { status: 200 }));
+    await renderPreview({ ...request, version: 3, round: 1, channel: "web" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toMatchObject({ version: 3, round: 1, preview: true });
+
+    respondWith(new Response("<html></html>", { status: 200 }));
+    await renderPreview({ ...request, round: 2, channel: "web" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).not.toHaveProperty("round");
   });
 
   it("returns a PDF as its exact bytes with the file name the route gave it", async () => {

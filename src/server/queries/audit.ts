@@ -9,7 +9,7 @@ import {
   type AuditPageData,
   type AuditRow,
 } from "@/domain/access-types";
-import { SYSTEM_ACTOR, SYSTEM_INITIALS } from "@/domain/activity";
+import { SYSTEM_ACTOR, SYSTEM_INITIALS, eventVersionLabel } from "@/domain/activity";
 import {
   AUDIT_CATEGORIES,
   CATEGORY_LABEL,
@@ -31,7 +31,8 @@ import {
 } from "@/domain/audit";
 import { ALL_SPACE, can, isCrossTeam } from "@/domain/permissions";
 import type { Person } from "@/domain/review-types";
-import type { Viewer } from "@/domain/types";
+import type { NumberedRound } from "@/domain/rounds";
+import type { VersionState, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -201,7 +202,10 @@ interface EventRow {
   currentTemplateName: string | null;
   action: string;
   details: Record<string, unknown> | null;
+  /** The event's version row as it is now (left-joined: null when there is none). */
   versionNumber: number | null;
+  versionRound: number | null;
+  versionState: VersionState | null;
 }
 
 /**
@@ -223,6 +227,8 @@ async function loadEvents(teamId: string | null): Promise<EventRow[]> {
       action: auditEvents.action,
       details: auditEvents.details,
       versionNumber: versions.number,
+      versionRound: versions.round,
+      versionState: versions.state,
     })
     .from(auditEvents)
     .leftJoin(versions, eq(versions.id, auditEvents.versionId))
@@ -240,7 +246,10 @@ function toRow(
   const actor = e.actorId ? personOf(people, e.actorId) : null;
   const subjectId = subjectIdOf(e.action, e.details);
   const team = e.teamId ? (teamsById.get(e.teamId) ?? { slug: e.teamId, name: e.teamId }) : null;
-  const versionNumber = e.versionNumber ?? null;
+  const version: NumberedRound | null =
+    e.versionNumber !== null && e.versionRound !== null && e.versionState !== null
+      ? { number: e.versionNumber, round: e.versionRound, state: e.versionState }
+      : null;
   const category: AuditCategory = categoryOf(e.action);
   return {
     id: e.id,
@@ -248,11 +257,12 @@ function toRow(
     actor,
     team: team ? { slug: team.slug, name: team.name } : null,
     template: e.templateId ? { id: e.templateId, name: e.templateName ?? e.templateId } : null,
-    versionNumber,
+    // The cell names the version as the event does: the round for a review event (`eventVersionLabel`).
+    versionLabel: eventVersionLabel(e.action, version),
     action: e.action,
     category,
     actionLabel: actionLabel(e.action, actor !== null),
-    summary: describeAuditEvent({ action: e.action, details: e.details, versionNumber }, actor),
+    summary: describeAuditEvent({ action: e.action, details: e.details, version }, actor),
     subject: subjectId ? personOf(people, subjectId) : null,
     when: formatDateTime(e.at, nowDate),
     ago: formatAgo(e.at, nowDate, { capitalize: true }),

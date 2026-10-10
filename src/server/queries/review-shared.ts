@@ -8,10 +8,12 @@ import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
+import { roundsOf } from "@/domain/rounds";
 import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
 import { approvalStages, approvals, consumers, renderLog, teams, templates, users, versions } from "@/server/db/schema/ucomp";
+import { findRound } from "./find-round";
 import { requireSpace, type SpaceContext } from "./spaces";
 import { currentName } from "./template-name";
 
@@ -90,25 +92,57 @@ function seesInSpace(space: SpaceContext, template: { teamSlug: string }): boole
 export type ReviewVersionRow = typeof versions.$inferSelect;
 
 /**
- * The review screen's template and version. As `requireTemplate`, plus one way in from outside the
- * template's team (Phase 6, a stage that names a person): someone named on the stage a version waits
- * on opens it from their own space, in any team, and keeps seeing it once they decided it. Any other
- * version of that template stays a 404 for them.
+ * The review screen's template and version: the round asked for (`?round=`), or without one the number's
+ * head, its released row or else its latest round (`findRound`). As `requireTemplate`, plus one way in
+ * from outside the template's team (Phase 6, a stage that names a person): someone named on the stage a
+ * version waits on opens it from their own space, in any team, and keeps seeing it once they decided it.
+ * Any other version of that template stays a 404 for them. A round that doesn't exist is a 404.
+ *
+ * A bare link stored before a send-back (the notification that asked them, a comment's link) names no
+ * round. Once the next round is in review at a stage that doesn't name them, the head is closed to them,
+ * so for them the bare link opens the newest round of the number they may open (`roundsOf`), the one
+ * they decided. The template's own team always gets the head.
  */
 export const requireReviewVersion = cache(
-  async (spaceSlug: string, templateId: string, versionNumber: number): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
+  async (
+    spaceSlug: string,
+    templateId: string,
+    versionNumber: number,
+    round: number | null = null,
+  ): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
     const space = await requireSpace(spaceSlug);
     const template = await findTemplate(templateId);
     if (!template || !Number.isInteger(versionNumber) || versionNumber < 1) notFound();
-    const version = await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)),
-    });
+    if (round !== null && (!Number.isInteger(round) || round < 1)) notFound();
+    const version = await findRound(db, template.id, versionNumber, round);
     if (!version || version.number === null) notFound();
     if (seesInSpace(space, template)) return { space, template, version };
     if (await namedOnVersion(space.viewer, template, version)) return { space, template, version };
+    if (round === null) {
+      const rows = await db
+        .select()
+        .from(versions)
+        .where(and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)));
+      for (const earlier of roundsOf(rows, versionNumber)) {
+        if (earlier.id === version.id) continue;
+        if (await namedOnVersion(space.viewer, template, earlier)) return { space, template, version: earlier };
+      }
+    }
     notFound();
   },
 );
+
+/**
+ * Whether the viewer may open this round's review screen from the space, by the rule
+ * `requireReviewVersion` lets them in by: the template's team in its space, or someone the round's stage
+ * names or who decided it. A screen links to another round only when this holds, so it never links to a 404.
+ */
+export async function opensRound(access: TemplateAccess, versionId: string): Promise<boolean> {
+  const { space, template } = access;
+  if (seesInSpace(space, template)) return true;
+  const version = await db.query.versions.findFirst({ where: eq(versions.id, versionId) });
+  return version !== undefined && namedOnVersion(space.viewer, template, version);
+}
 
 async function namedOnVersion(
   viewer: Viewer,

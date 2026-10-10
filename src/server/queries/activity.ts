@@ -1,13 +1,14 @@
 import "server-only";
 import { cache } from "react";
 import { desc, eq, sql } from "drizzle-orm";
-import { describeActivity } from "@/domain/activity";
+import { describeActivity, eventVersionLabel } from "@/domain/activity";
 import type { ActivityItem } from "@/domain/review-types";
 import { db } from "@/server/db/client";
 import { auditEvents, versions } from "@/server/db/schema/ucomp";
 import { getPeople, iso, personOf, requireTemplate } from "./review-shared";
 
-// The template's Activity tab: its audit events, newest first, each as one plain sentence.
+// The template's Activity tab: its audit events, newest first, each as one plain sentence. An event about
+// a version is labelled by its row as it is now, with its round for a review event (`eventVersionLabel`).
 
 /** A template's history is short; this only guards against a runaway list. */
 export const ACTIVITY_LIMIT = 500;
@@ -23,6 +24,8 @@ export const getActivity = cache(async (spaceSlug: string, templateId: string): 
         action: auditEvents.action,
         details: auditEvents.details,
         versionNumber: versions.number,
+        versionRound: versions.round,
+        versionState: versions.state,
       })
       .from(auditEvents)
       .leftJoin(versions, eq(versions.id, auditEvents.versionId))
@@ -35,14 +38,17 @@ export const getActivity = cache(async (spaceSlug: string, templateId: string): 
 
   return rows.map((r) => {
     const actor = r.actorId ? personOf(people, r.actorId) : null;
-    const versionNumber = r.versionNumber ?? null;
+    const version =
+      r.versionNumber !== null && r.versionRound !== null && r.versionState !== null
+        ? { number: r.versionNumber, round: r.versionRound, state: r.versionState }
+        : null;
     return {
       id: r.id,
       at: iso(r.at),
       actor,
       action: r.action,
-      versionNumber,
-      summary: describeActivity({ action: r.action, details: r.details ?? {}, versionNumber }, actor),
+      versionLabel: eventVersionLabel(r.action, version),
+      summary: describeActivity({ action: r.action, details: r.details ?? {}, version }, actor),
     };
   });
 });

@@ -27,6 +27,8 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): T
     quote: patch.quote ?? null,
     status: "open",
     originVersionNumber: 1,
+    originRound: 1,
+    originLabel: "v1",
     comments: [{ id: `c-${id}`, author: JORDAN, body: `Comment ${id}`, kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
     orphaned: false,
     ...patch,
@@ -115,6 +117,19 @@ describe("ThreadList: what is listed, and in what order", () => {
     expect(card("spend").textContent).toContain("Jordan Ellis");
     expect(card("spend").textContent).toContain("2 hours ago");
     expect(card("doc").textContent).toContain("Changes requested");
+  });
+
+  it("says which version a change request was made on, by its label", () => {
+    expect(card("doc").textContent).toContain("on v1");
+    act(() =>
+      root.render(
+        <ThreadList
+          {...base}
+          threads={[{ ...THREADS[0], originVersionNumber: 3, originRound: 1, originLabel: "v3 · Round 1" }]}
+        />,
+      ),
+    );
+    expect(card("doc").textContent).toContain("on v3 · Round 1");
   });
 
   it("is quiet when nothing is open", () => {

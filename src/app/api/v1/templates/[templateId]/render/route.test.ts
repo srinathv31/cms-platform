@@ -263,6 +263,35 @@ describe("POST …/render: previews", () => {
   });
 });
 
+// The CMS preview may name a round of a number (the review screen's `?round=`); a consumer never sees
+// rounds, so without `preview` the field is dropped unread and the number is its head.
+describe("POST …/render: rounds", () => {
+  const FEE = { ...CUSTOMER, annual_fee: "95" };
+
+  it("a preview of a round renders that round, labelled in the filename; the version header stays the number", async () => {
+    const res = await post("cash-back", { version: 3, round: 1, channel: "pdf", values: FEE, preview: true }, {});
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Stencil-Version")).toBe("3");
+    expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["cash-back"]}-v3-round-1.pdf"`);
+  }, 30_000);
+
+  it("a consumer's round is ignored, whatever it holds: the number's head answers", async () => {
+    for (const round of [1, "x", 0]) {
+      const res = await post("cash-back", { version: 3, round, channel: "web", values: FEE });
+      await expectError(res, 409, "version_not_released", "Version 3 is in review. Version 2 is active.");
+    }
+    const released = await post("balance-transfer", { version: 2, round: 7, channel: "web", values: CUSTOMER });
+    expect(released.status).toBe(200);
+  });
+
+  it("a preview's round must be a whole number from 1", async () => {
+    for (const round of [0, "1", 1.5]) {
+      const res = await post("cash-back", { version: 3, round, channel: "web", values: FEE, preview: true }, {});
+      await expectError(res, 400, "bad_request", "round must be a whole number from 1.");
+    }
+  });
+});
+
 // ── Errors ───────────────────────────────────────────────────────────────────
 
 describe("POST …/render: 400 bad requests", () => {

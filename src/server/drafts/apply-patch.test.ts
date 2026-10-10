@@ -186,6 +186,7 @@ describe("applyDraftPatch: a good save", () => {
       id: "v_active",
       templateId: "UC-AAAAAA",
       number: 1,
+      round: 1,
       state: "active",
       name: "Annual fee",
       body: doc(para("Live", "p1")),

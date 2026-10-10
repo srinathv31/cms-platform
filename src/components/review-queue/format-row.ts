@@ -3,13 +3,14 @@
 
 import type { Person, ReviewQueueRow } from "@/domain/review-types";
 import { formatAgo } from "@/domain/dates";
+import { reviewPath, versionLabel } from "@/domain/rounds";
 
 export interface QueueRowView {
   key: string;
-  /** The review screen: /{space}/review/{templateId}/{n}. */
+  /** The row's round's review screen: /{space}/review/{templateId}/{n}, with `?round=` when the label shows it. */
   href: string;
   name: string;
-  /** "v3" */
+  /** "v3", or "v3 · Round 2" once v3 was sent back; a decided row names the round it was approved on too. */
   versionLabel: string;
   teamName: string;
   breaking: boolean;
@@ -38,11 +39,12 @@ export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: 
         when: formatAgo(row.decision.at, nowDate),
       }
     : undefined;
+  const version = { number: row.versionNumber, round: row.round, state: row.state };
   return {
     key: row.versionId,
-    href: `/${spaceSlug}/review/${row.templateId}/${row.versionNumber}`,
+    href: reviewPath(spaceSlug, row.templateId, version),
     name: row.templateName,
-    versionLabel: `v${row.versionNumber}`,
+    versionLabel: versionLabel(version, { history: true }),
     teamName: row.teamName,
     breaking: row.breaking,
     author: row.author,

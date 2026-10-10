@@ -12,11 +12,11 @@ const named = alias(versions, NAMED);
 
 /**
  * The name the CMS shows for a template, as a column: its open draft's, otherwise its newest
- * version's. The same version `pickLatest` (library.ts) picks, so a list agrees with the workspace
- * header. A template with no version at all (never the case through the app) shows its id, as the
- * Library and the header do. Screens about one version (review, notifications) use that version's
- * name instead.
+ * version's (by number, then round). The same version `pickLatest` (library.ts) picks, so a list
+ * agrees with the workspace header. A template with no version at all (never the case through the app)
+ * shows its id, as the Library and the header do. Screens about one version (review, notifications)
+ * use that version's name instead.
  */
 export function currentName(templateId: AnySQLiteColumn): SQL<string> {
-  return sql<string>`coalesce((select ${named.name} from ${versions} ${sql.identifier(NAMED)} where ${named.templateId} = ${templateId} order by ${named.state} = 'draft' desc, ${named.number} desc limit 1), ${templateId})`;
+  return sql<string>`coalesce((select ${named.name} from ${versions} ${sql.identifier(NAMED)} where ${named.templateId} = ${templateId} order by ${named.state} = 'draft' desc, ${named.number} desc, ${named.round} desc limit 1), ${templateId})`;
 }

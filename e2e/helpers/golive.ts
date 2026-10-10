@@ -140,6 +140,7 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     id: v2Id,
     template_id: templateId,
     number: 2,
+    round: 1,
     state: "active",
     name: SPRING_NAME,
     based_on_version_id: null,

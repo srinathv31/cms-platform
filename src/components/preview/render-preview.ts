@@ -13,6 +13,11 @@ export interface RenderPreviewRequest {
   templateId: string;
   /** The open draft, or a version number. */
   version: "draft" | number;
+  /**
+   * Which round of `version` (a preview only, which this always is): without it the route renders the
+   * number's head, its released row or else its latest round.
+   */
+  round?: number | null;
   channel: Channel;
   values: VariableValues;
   signal?: AbortSignal;
@@ -40,6 +45,7 @@ const UNREADABLE: RenderError = {
 export async function renderPreview({
   templateId,
   version,
+  round = null,
   channel,
   values,
   signal,
@@ -49,7 +55,7 @@ export async function renderPreview({
     response = await fetch(`/api/v1/templates/${encodeURIComponent(templateId)}/render`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, channel, values, preview: true }),
+      body: JSON.stringify({ version, ...(version !== "draft" && round !== null ? { round } : {}), channel, values, preview: true }),
       signal,
     });
   } catch (error) {

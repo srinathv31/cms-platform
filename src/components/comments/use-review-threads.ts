@@ -142,6 +142,8 @@ export function useReviewThreads(initial: ThreadView[]): ReviewThreads {
       quote: composer.quote ?? null,
       status: "open",
       originVersionNumber: null,
+      originRound: null,
+      originLabel: null,
       comments: [],
       orphaned: false,
     };

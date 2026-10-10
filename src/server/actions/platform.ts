@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { ActionResult, ApproverFacts } from "@/domain/access-types";
 import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { asNumbered, reviewLink, versionLabel } from "@/domain/rounds";
 import {
   PLATFORM_REFUSALS,
   createTeam as createTeamRule,
@@ -266,6 +267,8 @@ export async function saveApprovalChain(input: {
           stages: versions.stages,
           currentStage: versions.currentStage,
           number: versions.number,
+          round: versions.round,
+          state: versions.state,
           writers: versions.writers,
           templateId: templates.id,
           templateName: versions.name,
@@ -307,6 +310,7 @@ export async function saveApprovalChain(input: {
         if (!before || !after || sameRule(before.rule, after.rule) || v.number === null) continue;
         const asked = stageRecipients({ ...before, rule: after.rule }, v.writers, approvedThisRound(decisions.get(v.versionId) ?? []));
         if (!asked) continue;
+        const round = asNumbered(v);
         await writeEffects(
           tx,
           [
@@ -314,8 +318,8 @@ export async function saveApprovalChain(input: {
               kind: "notification",
               notification: "review_requested",
               to: asked,
-              title: `${v.templateName} v${v.number} is waiting on ${before.name}.`,
-              link: { to: "review", templateId: v.templateId, versionNumber: v.number },
+              title: `${v.templateName} ${versionLabel(round, { style: "sentence" })} is waiting on ${before.name}.`,
+              link: reviewLink(v.templateId, round),
             },
           ],
           { at, actorId: viewer.userId, teamId: v.teamId, templateId: v.templateId, versionId: v.versionId },

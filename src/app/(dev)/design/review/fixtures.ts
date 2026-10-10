@@ -326,6 +326,8 @@ export const THREADS: ThreadView[] = [
     quote: "Annual fee",
     status: "open",
     originVersionNumber: 3,
+    originRound: 1,
+    originLabel: "v3",
     orphaned: false,
     comments: [
       { id: "c1", author: ALEX, kind: "comment", body: "Does $95 apply to every Spring card tier?", createdAt: iso(52) },
@@ -344,6 +346,8 @@ export const THREADS: ThreadView[] = [
     quote: "never expire",
     status: "open",
     originVersionNumber: 3,
+    originRound: 1,
+    originLabel: "v3",
     orphaned: false,
     comments: [
       {
@@ -361,6 +365,8 @@ export const THREADS: ThreadView[] = [
     quote: "$4,000",
     status: "resolved",
     originVersionNumber: 3,
+    originRound: 1,
+    originLabel: "v3",
     orphaned: false,
     resolvedBy: ALEX,
     resolvedAt: iso(36),

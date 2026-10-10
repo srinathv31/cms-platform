@@ -16,11 +16,12 @@ const actions = vi.hoisted(() => ({
     (input: {
       templateId: string;
       versionNumber: number;
+      round: number;
       sunsetPrevious?: string | null;
       sampleSetsSeen: string[];
-    }) => Promise<ActionResult<{ wentLive: boolean; number: number }>>
+    }) => Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>>
   >(),
-  requestChanges: vi.fn<(input: { templateId: string; versionNumber: number; reason: string }) => Promise<ActionResult>>(),
+  requestChanges: vi.fn<(input: { templateId: string; versionNumber: number; round: number; reason: string }) => Promise<ActionResult>>(),
   // The Versions tab's dialogs share this module; they aren't under test here.
   setSunset: vi.fn(),
   startRevoke: vi.fn(),
@@ -89,16 +90,19 @@ async function typeInto(el: HTMLTextAreaElement, value: string) {
   });
 }
 
+const title = () => dialog().querySelector('[data-slot="dialog-title"]')!.textContent;
+
 describe("RequestChangesDialog", () => {
   const onOpenChange = vi.fn();
   const onRequested = vi.fn();
-  const open = () =>
+  const open = (round = 1) =>
     render(
       <RequestChangesDialog
         open
         onOpenChange={onOpenChange}
         templateId="UC-ABC123"
         versionNumber={3}
+        round={round}
         authorName="Maya Chen"
         onRequested={onRequested}
       />,
@@ -111,7 +115,7 @@ describe("RequestChangesDialog", () => {
 
   it("asks for a reason, with the cursor already in it", async () => {
     await open();
-    expect(dialog().textContent).toContain("Request changes");
+    expect(title()).toBe("Request changes on v3");
     const field = dialog().querySelector("textarea")!;
     expect(field.getAttribute("aria-required")).toBe("true");
     await vi.waitFor(() => expect(document.activeElement).toBe(field));
@@ -141,6 +145,17 @@ describe("RequestChangesDialog", () => {
     expect(button("Cancel")).toBeTruthy();
   });
 
+  it("names the round it sends back once the version was sent back before, and sends that round", async () => {
+    actions.requestChanges.mockResolvedValue({ ok: true });
+    await open(2);
+    expect(title()).toBe("Request changes on v3, round 2");
+    // The new draft is of the version: its submission is the version's next round.
+    expect(description()).toBe("Maya Chen gets a new draft of v3 with your reason and the comments.");
+    await typeInto(dialog().querySelector("textarea")!, "Say when the fee starts.");
+    await click(button("Request changes"));
+    expect(actions.requestChanges).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: 3, round: 2 }));
+  });
+
   it("sends the trimmed reason, then says so and closes", async () => {
     actions.requestChanges.mockResolvedValue({ ok: true });
     await open();
@@ -150,6 +165,7 @@ describe("RequestChangesDialog", () => {
     expect(actions.requestChanges).toHaveBeenCalledWith({
       templateId: "UC-ABC123",
       versionNumber: 3,
+      round: 1,
       reason: "The APR in Legal notices is wrong.",
     });
     expect(onRequested).toHaveBeenCalledTimes(1);
@@ -191,7 +207,13 @@ describe("ApproveDialog", () => {
   const onFailed = vi.fn();
 
   const open = (
-    over: { previousNumber?: number | null; stage?: typeof ONE; sampleSetsSeen?: string[]; contractChanges?: ContractChange[] } = {},
+    over: {
+      previousNumber?: number | null;
+      stage?: typeof ONE;
+      sampleSetsSeen?: string[];
+      contractChanges?: ContractChange[];
+      round?: number;
+    } = {},
   ) =>
     render(
       <ApproveDialog
@@ -199,6 +221,7 @@ describe("ApproveDialog", () => {
         onOpenChange={onOpenChange}
         templateId="UC-ABC123"
         versionNumber={2}
+        round={over.round ?? 1}
         previousNumber={over.previousNumber === undefined ? 1 : over.previousNumber}
         contractChanges={over.contractChanges ?? []}
         stage={over.stage ?? ONE}
@@ -218,7 +241,7 @@ describe("ApproveDialog", () => {
 
   it("says what goes live and that the previous version keeps rendering until it relinks, as its description", async () => {
     await open();
-    expect(dialog().textContent).toContain("Approve v2");
+    expect(title()).toBe("Approve v2");
     expect(description()).toBe("v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.");
     // No lead-in about "what happens", and nothing more to say: no box.
     expect(dialog().textContent).not.toContain("What happens when");
@@ -266,12 +289,13 @@ describe("ApproveDialog", () => {
   });
 
   it("approves with no sunset by default, and records the sample sets that were looked at", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2 });
+    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 1 });
     await open({ sampleSetsSeen: ["typical", "long"] });
     await click(button("Approve v2"));
     expect(actions.approveVersion).toHaveBeenCalledWith({
       templateId: "UC-ABC123",
       versionNumber: 2,
+      round: 1,
       sunsetPrevious: null,
       sampleSetsSeen: ["typical", "long"],
     });
@@ -281,8 +305,19 @@ describe("ApproveDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("names the round it approves once the version was sent back, and approves exactly that round", async () => {
+    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 3 });
+    await open({ round: 3 });
+    expect(title()).toBe("Approve v2, round 3");
+    // What goes live is the version consumers know: no round.
+    expect(description()).toBe("v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.");
+    await click(button("Approve v2, round 3"));
+    expect(actions.approveVersion).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: 2, round: 3 }));
+    expect(onApproved).toHaveBeenCalledWith({ wentLive: true });
+  });
+
   it("sends the sunset date as a calendar day when it is on", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2 });
+    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 1 });
     await open();
     await click(sunsetLabel()!);
     await click(button("Approve v2"));
@@ -296,7 +331,7 @@ describe("ApproveDialog", () => {
   });
 
   it("only moves the version along at an earlier stage: no sunset row, nothing goes live", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: false, number: 2 });
+    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: false, number: 2, round: 1 });
     await open({ stage: FIRST_OF_TWO });
     expect(lines()).toEqual(["v2 moves to Legal reviewer for approval. It isn't Active until the last stage approves."]);
     expect(sunsetSwitch()).toBeNull();

@@ -5,6 +5,7 @@ import type { PaletteResults, PaletteTemplateRow } from "@/domain/import-types";
 import { normalizePaletteQuery, PALETTE_QUERY_MAX, paletteTemplates } from "@/domain/palette";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { RoundRow } from "@/domain/rounds";
 import type { VersionState, Viewer } from "@/domain/types";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -71,7 +72,7 @@ async function spaceTemplates(viewer: Viewer, space: string): Promise<PaletteTem
 
   // Light columns only: never load `body` for a list.
   const versionRows = await db
-    .select({ templateId: versions.templateId, number: versions.number, state: versions.state })
+    .select({ templateId: versions.templateId, number: versions.number, round: versions.round, state: versions.state })
     .from(versions)
     .where(
       inArray(
@@ -79,7 +80,7 @@ async function spaceTemplates(viewer: Viewer, space: string): Promise<PaletteTem
         visible.map((r) => r.id),
       ),
     );
-  const byTemplate = new Map<string, { number: number | null; state: VersionState }[]>();
+  const byTemplate = new Map<string, RoundRow[]>();
   for (const v of versionRows) {
     const list = byTemplate.get(v.templateId);
     if (list) list.push(v);

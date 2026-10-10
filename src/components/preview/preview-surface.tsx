@@ -24,6 +24,8 @@ export interface PreviewSurfaceProps {
   templateId: string;
   /** The shown version's number, or null for the open draft. */
   versionNumber: number | null;
+  /** The shown version's round, or null for the open draft: the render is of exactly that row. */
+  round?: number | null;
   /** The team's name: the email frame's sender. */
   teamName: string;
   /** The version's channels as the Channels selector has them right now (live, ahead of the save). */
@@ -57,6 +59,7 @@ export interface PreviewSurfaceProps {
 export function PreviewSurface({
   templateId,
   versionNumber,
+  round = null,
   teamName,
   channels,
   editable,
@@ -86,6 +89,7 @@ export function PreviewSurface({
   const { slots, rendering, retry } = usePreviewRender({
     templateId,
     version: versionNumber ?? "draft",
+    round: versionNumber === null ? null : round,
     channel,
     values,
     variables,

@@ -24,6 +24,7 @@ import {
   toggleFilterValue,
 } from "./audit";
 import type { AuditAction, Person } from "./review-types";
+import type { NumberedRound } from "./rounds";
 
 const alex: Person = { id: "alex", name: "Alex Kim", initials: "AK", hue: 152 };
 const sam: Person = { id: "sam", name: "Sam Ortiz", initials: "SO", hue: 48 };
@@ -107,13 +108,16 @@ const DETAILS: Record<AccessAuditAction, Record<string, unknown>> = {
   "platform.config_changed": { area: "channel_rules", summary: "Turned off PDF for Disclosure: 2 Active versions stopped rendering to PDF" },
 };
 
+/** A released version, round 1: the label is "vN" whatever the event. */
+const v = (number: number): NumberedRound => ({ number, round: 1, state: "superseded" });
+
 function row(over: Partial<AuditRow> & Pick<AuditRow, "id" | "at" | "action">): AuditRow {
   const category = categoryOf(over.action);
   return {
     actor: alex,
     team: { slug: "coral-offers", name: "Coral Offers" },
     template: null,
-    versionNumber: null,
+    versionLabel: null,
     category,
     actionLabel: actionLabel(over.action, (over.actor === undefined ? alex : over.actor) !== null),
     summary: "",
@@ -171,7 +175,7 @@ describe("describeAuditEvent", () => {
   it("writes one plain sentence for every access and platform action", () => {
     for (const action of ACCESS) {
       for (const actor of [alex, null]) {
-        const s = describeAuditEvent({ action, details: DETAILS[action], versionNumber: null }, actor);
+        const s = describeAuditEvent({ action, details: DETAILS[action], version: null }, actor);
         expect(s, action).toMatch(/^[A-Z].*[.]$/);
         expect(s, action).not.toMatch(/undefined|null|\[object|NaN/);
       }
@@ -180,18 +184,18 @@ describe("describeAuditEvent", () => {
 
   it("writes one plain sentence for every lifecycle action, through describeActivity", () => {
     for (const action of [...LIFECYCLE, "version.approved", "version.revoke_confirmed", "comment.resolved"]) {
-      const s = describeAuditEvent({ action, details: { reason: "Wrong APR" }, versionNumber: 3 }, maya);
+      const s = describeAuditEvent({ action, details: { reason: "Wrong APR" }, version: v(3) }, maya);
       // "v3 was superseded." starts with the version, as the Activity tab does.
       expect(s, action).toMatch(/^[A-Zv].*[.]$/);
       expect(s, action).not.toMatch(/undefined|null/);
     }
-    expect(describeAuditEvent({ action: "version.submitted", details: { note: "Ready" }, versionNumber: 3 }, maya)).toBe(
+    expect(describeAuditEvent({ action: "version.submitted", details: { note: "Ready" }, version: v(3) }, maya)).toBe(
       "Maya Chen submitted v3 for review: Ready.",
     );
-    expect(describeAuditEvent({ action: "version.activated", details: {}, versionNumber: 2 }, null)).toBe("v2 became Active.");
+    expect(describeAuditEvent({ action: "version.activated", details: {}, version: v(2) }, null)).toBe("v2 became Active.");
     expect(
       describeAuditEvent(
-        { action: "version.sunset_passed", details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" }, versionNumber: 1 },
+        { action: "version.sunset_passed", details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" }, version: v(1) },
         null,
       ),
     ).toBe("v1 stopped rendering: its sunset passed on March 1, 2027.");
@@ -199,7 +203,7 @@ describe("describeAuditEvent", () => {
 
   it("reads the details the access rules write", () => {
     const say = (action: AccessAuditAction, actor: Person | null, details = DETAILS[action]) =>
-      describeAuditEvent({ action, details, versionNumber: null }, actor);
+      describeAuditEvent({ action, details, version: null }, actor);
     expect(say("access.granted", alex)).toBe("Alex Kim approved Morgan Lee's request for Author access.");
     expect(say("access.granted", alex, { ...DETAILS["access.granted"], note: "Welcome" })).toBe(
       "Alex Kim approved Morgan Lee's request for Author access: Welcome.",
@@ -253,7 +257,7 @@ describe("describeAuditEvent", () => {
   it("survives missing and malformed details", () => {
     for (const action of ACCESS) {
       for (const details of [null, {}, { userName: 42, roles: "author", dueAt: "not a date", daysInactive: "x" }]) {
-        const s = describeAuditEvent({ action, details: details as Record<string, unknown> | null, versionNumber: null }, sam);
+        const s = describeAuditEvent({ action, details: details as Record<string, unknown> | null, version: null }, sam);
         expect(s, action).toMatch(/^[A-Z].*[.]$/);
         expect(s, action).not.toMatch(/undefined|null|\[object|NaN|Invalid/);
       }
@@ -356,14 +360,14 @@ describe("filtering rows", () => {
   const deposits = { slug: "deposits", name: "Deposits" };
   const cashBack = { id: "UC-4F7K2Q", name: "Cash Back" };
   const rows: AuditRow[] = [
-    row({ id: "1", at: "2026-10-05T09:00:00.000Z", action: "version.submitted", actor: maya, template: cashBack, versionNumber: 3 }),
-    row({ id: "2", at: "2026-10-04T23:59:59.000Z", action: "version.activated", actor: alex, template: cashBack, versionNumber: 2 }),
-    row({ id: "3", at: "2026-10-03T00:00:00.000Z", action: "version.activated", actor: null, template: cashBack, versionNumber: 2 }),
+    row({ id: "1", at: "2026-10-05T09:00:00.000Z", action: "version.submitted", actor: maya, template: cashBack, versionLabel: "v3" }),
+    row({ id: "2", at: "2026-10-04T23:59:59.000Z", action: "version.activated", actor: alex, template: cashBack, versionLabel: "v2" }),
+    row({ id: "3", at: "2026-10-03T00:00:00.000Z", action: "version.activated", actor: null, template: cashBack, versionLabel: "v2" }),
     row({ id: "4", at: "2026-10-02T12:00:00.000Z", action: "access.granted", actor: alex, subject: sam }),
     row({ id: "5", at: "2026-10-01T12:00:00.000Z", action: "access.lapsed", actor: null, subject: sam }),
     row({ id: "6", at: "2026-09-20T12:00:00.000Z", action: "access.granted", actor: riley, subject: alex, team: deposits }),
     row({ id: "7", at: "2026-09-10T12:00:00.000Z", action: "platform.config_changed", actor: riley, team: null }),
-    row({ id: "8", at: "2026-09-01T12:00:00.000Z", action: "version.revoke_confirmed", actor: alex, template: cashBack, versionNumber: 1 }),
+    row({ id: "8", at: "2026-09-01T12:00:00.000Z", action: "version.revoke_confirmed", actor: alex, template: cashBack, versionLabel: "v1" }),
   ];
   const ids = (f: AuditFilters) => filterAuditRows(rows, f).map((r) => r.id);
 
@@ -434,7 +438,7 @@ describe("toCsv", () => {
       action: "version.revoke_started",
       actor: { ...alex, name: 'Alex "AK" Kim' },
       template: { id: "UC-4F7K2Q", name: "Cash Back, Terms" },
-      versionNumber: 2,
+      versionLabel: "v2",
       summary: tricky,
     }),
     row({ id: "2", at: "2026-10-04T08:00:00.000Z", action: "access.lapsed", actor: null, summary: "Sam Ortiz's access lapsed." }),
@@ -462,6 +466,20 @@ describe("toCsv", () => {
     ]);
     expect(second).toEqual(["2026-10-04T08:00:00.000Z", "Stencil", "Coral Offers", "", "", "Access lapsed", "Sam Ortiz's access lapsed."]);
     expect(third![2]).toBe("All teams");
+  });
+
+  it("writes the version as the row labels it, the round included", () => {
+    const round = row({
+      id: "4",
+      at: "2026-10-02T08:00:00.000Z",
+      action: "version.submitted",
+      actor: maya,
+      template: { id: "UC-4F7K2Q", name: "Cash Back" },
+      versionLabel: "v3 · Round 1",
+      summary: "Maya Chen submitted v3, round 1 for review.",
+    });
+    const [, line] = parseCsv(toCsv([round]));
+    expect(line![4]).toBe("v3 · Round 1");
   });
 
   it("quotes only when needed, and defuses spreadsheet formulas", () => {

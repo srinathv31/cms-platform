@@ -1,19 +1,21 @@
 "use client";
 
 import { Activity, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import type { Route } from "next";
 import { useReducedMotion } from "motion/react";
 import { COMPOSER_THREAD_ID, ThreadList, blockTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
 import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher, findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
 import { diffDocuments, nameChange } from "@/domain/redline";
 import { DOCUMENT_THREAD, type Person, type ReviewScreenData } from "@/domain/review-types";
+import { reviewPath } from "@/domain/rounds";
 import type { Channel, VersionState } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { ApproveDialog, type Approved } from "./approve-dialog";
 import { BlockCommentMenu } from "./block-comment-menu";
 import { DecisionBar } from "./decision-bar";
-import { approvalStage, decisionAccess, decisionLine, type LocalDecision } from "./decision-model";
-import { DecisionRail } from "./decision-rail";
+import { approvalStage, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
+import { DecisionRail, type NextRound } from "./decision-rail";
 import { DocumentView } from "./document-view";
 import { GoLive } from "./go-live";
 import { PreviewView } from "./preview-view";
@@ -31,7 +33,8 @@ import { ChangeToggles, ViewTabs, type ReviewView } from "./view-tabs";
  *
  * The server's data (`data`) is the truth and arrives anew after every action (the actions refresh the
  * page); what is kept here is what the viewer did on this screen: "You approved v3.", and the moment's
- * own clock.
+ * own clock. The screen is one round of the version (`version.round`): the decisions name it, and the
+ * preview renders it.
  */
 
 /** Scrolls the canvas (the page's own scroll area, not the window) to its top. */
@@ -243,13 +246,18 @@ export function ReviewWorkspace({
 
   // The decision went through: the buttons the dialog came from are replaced by a line, and focus goes
   // to the place they stood. (The dialog's own return of focus can land on a button just as it goes.)
-  const line = decisionLine({
-    state: version.state,
-    number: version.number,
+  const row = decisionRow({
+    version: { number: version.number, round: version.round, state: version.state },
     authorName: version.submittedBy.name,
     local,
     canDecideAgain: can.approve.ok,
   });
+  const line = row.kind === "line" ? row.text : null;
+  // A sent-back round that was resubmitted links on to where its work went, in this space.
+  const { replacedBy } = data;
+  const next: NextRound | null = replacedBy
+    ? { label: replacedBy.label, href: reviewPath(team, template.id, replacedBy) as Route }
+    : null;
   useEffect(() => {
     if (line !== null && decided.current) decisionRegion.current?.focus({ preventScroll: true });
   }, [line]);
@@ -304,6 +312,7 @@ export function ReviewWorkspace({
         templateId={template.id}
         templateName={version.name}
         versionNumber={version.number}
+        round={version.round}
         state={shownState}
         sunsetDay={version.sunsetDay ?? null}
         author={version.submittedBy}
@@ -342,6 +351,7 @@ export function ReviewWorkspace({
           <PreviewView
             templateId={template.id}
             versionNumber={version.number}
+            round={version.round}
             teamName={template.teamName}
             channels={channels}
             variables={version.variables}
@@ -356,7 +366,7 @@ export function ReviewWorkspace({
 
       <DecisionBar
         access={access}
-        line={line}
+        row={row}
         decidedHere={local !== null}
         onApprove={(from) => openDialog("approve", from)}
         onRequest={(from) => openDialog("request", from)}
@@ -366,7 +376,8 @@ export function ReviewWorkspace({
         steps={steps}
         nowIso={nowIso}
         access={access}
-        line={line}
+        row={row}
+        next={next}
         onApprove={() => openDialog("approve")}
         onRequest={() => openDialog("request")}
         approveRef={approveButton}
@@ -419,6 +430,7 @@ export function ReviewWorkspace({
         onOpenChange={(open) => !open && setDialog(null)}
         templateId={template.id}
         versionNumber={version.number}
+        round={version.round}
         previousNumber={data.previousNumber}
         contractChanges={version.contractChanges}
         stage={stage}
@@ -437,6 +449,7 @@ export function ReviewWorkspace({
         onOpenChange={(open) => !open && setDialog(null)}
         templateId={template.id}
         versionNumber={version.number}
+        round={version.round}
         authorName={version.submittedBy.name}
         onRequested={() => {
           decided.current = true;

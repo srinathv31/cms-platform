@@ -48,7 +48,8 @@ const STREAMS: Stream[] = [
 
 /** Previews are authors and reviewers looking at drafts; no consumer, no customer. */
 const PREVIEWS: { tpl: string; ver: string; from: number; to: number; count: number }[] = [
-  { tpl: "cash-back", ver: "v3", from: 5, to: 0.9, count: 14 },
+  { tpl: "cash-back", ver: "v3r1", from: 5, to: 3.2, count: 8 },
+  { tpl: "cash-back", ver: "v3", from: 2.6, to: 0.9, count: 6 },
   { tpl: "annual-fee-waiver", ver: "draft", from: 3.9, to: 0.8, count: 9 },
   { tpl: "annual-fee-waiver", ver: "v1", from: 10, to: 4.5, count: 6 },
   { tpl: "balance-transfer", ver: "v2", from: 55, to: 50, count: 7 },

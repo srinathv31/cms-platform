@@ -34,6 +34,8 @@ export interface ContentWorkspaceProps {
   versionId: string;
   /** The shown version's number; null for an open draft (the preview renders "draft"). */
   versionNumber: number | null;
+  /** The shown version's round; null for an open draft. The preview renders exactly it. */
+  round: number | null;
   /** Where autosave starts. */
   rev: number;
   body: JSONContent;
@@ -93,6 +95,7 @@ export function ContentWorkspace({
   teamName,
   versionId,
   versionNumber,
+  round,
   rev,
   body,
   variables,
@@ -351,6 +354,7 @@ export function ContentWorkspace({
           <PreviewSurface
             templateId={templateId}
             versionNumber={versionNumber}
+            round={round}
             teamName={teamName}
             channels={channels}
             editable={editing}

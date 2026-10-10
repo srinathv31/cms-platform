@@ -70,8 +70,9 @@ import {
 
 // Phase 7 gate: the whole demo script (build plan, "Demo script", scenarios 1–11) as ONE story, in order,
 // on ONE database state, from a fresh `db:reset`. No fixtures and no resets or restores in between:
-// scenario 4 links the Spring Travel v2 that Maya and Jordan made through the UI in scenarios 2–3,
-// scenario 5 approves the real v3 and sunsets that v2, scenario 6 revokes on a clock already 15 days on,
+// scenario 4 links the Spring Travel v1 that Maya and Jordan made through the UI in scenarios 2–3 (sent
+// back once, so it went live on round 2: decision 0033), scenario 5 approves the real v2 and sunsets that
+// v1, scenario 6 revokes on a clock already 15 days on,
 // scenario 8 runs its deadline on top of that, and scenario 11 is the demo drawer's own Reset.
 //
 // The per-scenario specs (scenario-02 … scenario-10) assert the details; this one asserts the "what to
@@ -119,10 +120,10 @@ const QUOTE = "starts on the transaction date";
 const COMMENT = "Please state the APR more plainly.";
 const REASON_CHANGES = "The interest wording is too vague. State the purchase APR plainly.";
 const FIX = " Your purchase APR is 21.99%.";
-const NOTE_V2 = "Spelled out the purchase APR.";
+const NOTE_V1_ROUND_2 = "Spelled out the purchase APR.";
 const OWN_VERSION = "You submitted this version.";
 // Scenario 5
-const NOTE_V3 = "Added the annual fee.";
+const NOTE_V2 = "Added the annual fee.";
 const SUNSET_DAYS = 14;
 const ADVANCE_DAYS = 15;
 // Scenario 6
@@ -160,7 +161,9 @@ const decision = (page: Page) => page.locator('aside[aria-label="Decision"]').fi
 const approveButton = (page: Page) => decision(page).getByRole("button", { name: "Approve", exact: true });
 const requestButton = (page: Page) => decision(page).getByRole("button", { name: "Request changes", exact: true });
 const queueTab = (page: Page, name: string) => page.getByRole("tab", { name: new RegExp(`^${escapeRe(name)}`) });
-const queueRow = (page: Page, id: string, number: number) => page.locator(`a[href="/${TEAM}/review/${id}/${number}"]`).filter({ visible: true });
+/** A round's queue row: its link names the round once the label does ("v1 · Round 2", `?round=2`). */
+const queueRow = (page: Page, id: string, number: number, round?: number) =>
+  page.locator(`a[href="/${TEAM}/review/${id}/${number}${round ? `?round=${round}` : ""}"]`).filter({ visible: true });
 const gutterMarkers = (page: Page) => page.locator('[data-slot="gutter-markers"] [data-marker]').filter({ visible: true });
 const docBlock = (page: Page, text: string) => documentEditor(page).locator("p", { hasText: text });
 const sidebarCard = (page: Page) => page.locator('[data-slot="sidebar-card"]').filter({ visible: true });
@@ -218,8 +221,8 @@ async function openQueue(page: Page, tab?: string) {
   }
 }
 
-async function expectReviewScreen(page: Page, id: string, number: number, name: string) {
-  await expect(page).toHaveURL(new RegExp(`/${TEAM}/review/${id}/${number}$`));
+async function expectReviewScreen(page: Page, id: string, number: number, name: string, round?: number) {
+  await expect(page).toHaveURL(new RegExp(`/${TEAM}/review/${id}/${number}${round ? `\\?round=${round}` : ""}$`));
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
   await expect(decision(page)).toBeVisible();
   await liveEditor(page);
@@ -375,7 +378,8 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
   test.setTimeout(demoTimeout(20 * 60_000));
 
   let springId = "";
-  let springV2Id = "";
+  /** Spring Travel v1 as it went live: its round 2. */
+  let springV1Id = "";
   let importedId = "";
   let sunsetDay = "";
   let revokedDay = "";
@@ -583,7 +587,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await shoot(page, "demo-03-jordan-comment");
 
     await click(requestButton(page));
-    const dialog = page.getByRole("dialog", { name: "Request changes" });
+    const dialog = page.getByRole("dialog", { name: "Request changes on v1", exact: true });
     await expect(dialog.getByRole("textbox", { name: "Reason" })).toBeFocused();
     await typeSlowly(page, REASON_CHANGES);
     await beat(page, 600);
@@ -595,12 +599,12 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     expect(draft, "a new draft appeared").toBeTruthy();
   });
 
-  await test.step("3.3 Maya: the comment in the margin; she fixes it, resolves it and resubmits as v2", async () => {
+  await test.step("3.3 Maya: the comment in the margin; she fixes it, resolves it and resubmits as v1, round 2", async () => {
     await switchPersona(page, "Maya Chen");
     await openFromLibrary(page, `/${TEAM}/templates/${springId}`, NAME);
     await liveEditor(page);
     await expect(statusBadge(page)).toHaveText("Draft");
-    await expect(page.locator("header").filter({ visible: true }).getByText("Based on v1", { exact: true })).toBeVisible();
+    await expect(page.locator("header").filter({ visible: true }).getByText("Based on v1 · Round 1", { exact: true })).toBeVisible();
     const rail = page.locator('aside[aria-label="Comments and variables"]');
     await expect(rail.getByRole("tab", { name: /^Comments/ })).toHaveAttribute("aria-selected", "true");
     await expect(rail.locator('article[aria-label="Change request"]')).toContainText(REASON_CHANGES);
@@ -618,46 +622,51 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await expect(gutterMarkers(page)).toHaveCount(0);
     await beat(page, 600);
 
+    // Sending it back didn't use up a version number: this is round 2 of v1.
     await tap(page.getByRole("button", { name: "Submit for review" }));
-    const dialog = page.getByRole("dialog", { name: "Submit v2 for review" });
+    const dialog = page.getByRole("dialog", { name: "Submit v1, round 2 for review", exact: true });
     await expect(dialog).toBeVisible({ timeout: 20_000 });
     await expect(dialog.getByRole("textbox", { name: "Note to reviewers" })).toBeFocused();
-    await typeSlowly(page, NOTE_V2);
-    await tap(dialog.getByRole("button", { name: "Submit v2", exact: true }));
+    await typeSlowly(page, NOTE_V1_ROUND_2);
+    await tap(dialog.getByRole("button", { name: "Submit v1, round 2", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
     await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
-    await expect(page.locator("header").filter({ visible: true }).getByText("v2", { exact: true })).toBeVisible();
+    await expect(page.locator("header").filter({ visible: true }).getByText("v1 · Round 2", { exact: true })).toBeVisible();
   });
 
-  await test.step("3.4 Jordan approves: v2 goes Active with the signature moment, and the Share button appears", async () => {
+  await test.step("3.4 Jordan approves v1, round 2: v1 goes Active with the signature moment, and the Share button appears", async () => {
     await switchPersona(page, "Jordan Ellis");
     await openQueue(page, "Waiting on me");
-    await click(queueRow(page, springId, 2));
-    await expectReviewScreen(page, springId, 2, NAME);
+    await expect(queueRow(page, springId, 1, 2)).toContainText("v1 · Round 2");
+    await click(queueRow(page, springId, 1, 2));
+    await expectReviewScreen(page, springId, 1, NAME, 2);
     await expect(documentEditor(page)).toContainText(FIX.trim());
     await click(approveButton(page));
-    const dialog = page.getByRole("dialog", { name: "Approve v2" });
-    await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v2 becomes Active.");
+    const dialog = page.getByRole("dialog", { name: "Approve v1, round 2", exact: true });
+    await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v1 becomes Active.");
     await beat(page, 700);
-    await tap(dialog.getByRole("button", { name: "Approve v2", exact: true }));
+    await tap(dialog.getByRole("button", { name: "Approve v1, round 2", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
     const moment = page.locator("[data-go-live]");
     await expect(moment, "the go-live moment plays").toBeVisible({ timeout: 10_000 });
-    await expect(moment.getByRole("status")).toHaveText("v2 is Active");
+    await expect(moment.getByRole("status")).toHaveText("v1 is Active");
     await shoot(page, "demo-03-go-live-moment");
     await expect(moment).toHaveCount(0, { timeout: 15_000 });
     await expect(statusBadge(page)).toHaveText("Active");
     await expect(page.locator('[data-slot="share"]').filter({ visible: true }).getByRole("button", { name: `Share ${NAME} — integration details` })).toBeVisible();
     await beat(page, 1000);
     await shoot(page, "demo-03-active");
-    const [v2] = await rows(db, "SELECT id, state FROM versions WHERE template_id = ? AND number = 2", [springId]);
-    expect(v2.state).toBe("active");
-    springV2Id = String(v2.id);
+    const v1 = await rows(db, "SELECT id, round, state FROM versions WHERE template_id = ? AND number = 1 ORDER BY round", [springId]);
+    expect(v1.map((r) => [r.round, r.state])).toEqual([
+      [1, "changes_requested"],
+      [2, "active"],
+    ]);
+    springV1Id = String(v1[1].id);
   });
 
   // ── 4. Going live ──────────────────────────────────────────────────────────
 
-  await test.step("4.1 The simulator from the demo drawer: link Spring Travel Rewards to the template (by search), pinned to v2, mapped", async () => {
+  await test.step("4.1 The simulator from the demo drawer: link Spring Travel Rewards to the template (by search), pinned to v1, mapped", async () => {
     const drawer = await openDemoDrawer(page);
     await beat(page, 600);
     await click(drawer.getByRole("button", { name: "Open simulator" }));
@@ -680,7 +689,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     const result = page.getByRole("list", { name: "Templates" }).getByRole("button", { name: new RegExp(`^${escapeRe(NAME)}`) });
     await expect(result, "UCOMP's search finds the one Active template of that name").toHaveCount(1);
     await expect(result).toContainText(springId);
-    await expect(result).toContainText("Active v2");
+    await expect(result).toContainText("Active v1");
     await beat(page, 700);
     await shoot(page, "demo-04-link-search");
     await click(result);
@@ -688,7 +697,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await expect(page).toHaveURL(new RegExp(`/link\\?template=${springId}$`), { timeout: 30_000 });
 
     for (const channel of ["PDF", "Web", "Email"]) await expect(page.getByRole("checkbox", { name: channel, exact: true })).toBeChecked();
-    // What Maya's v2 asks for: the starter's first_name, purchase_apr and home_state, and the offer_end_date she made.
+    // What Maya's v1 asks for: the starter's first_name, purchase_apr and home_state, and the offer_end_date she made.
     await expect(page.getByRole("table", { name: "Variables" }).getByRole("combobox")).toHaveCount(4);
     await mapTo(page, "Variables", "First name", "Customer · First name");
     await mapTo(page, "Variables", "Purchase APR", "Customer · Purchase APR");
@@ -700,7 +709,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await click(page.getByRole("button", { name: "Link template", exact: true }));
     await expect(page).toHaveURL(/\/sim\/offers\/offer_spring_travel\?tab=send$/, { timeout: 30_000 });
     const [link] = await rows(db, "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'");
-    expect(link).toMatchObject({ template_id: springId, pinned_version: 2 });
+    expect(link).toMatchObject({ template_id: springId, pinned_version: 1 });
   });
 
   await test.step("4.2 Send to five customers: all Delivered; one in the phone frame, one as a PDF; the long name holds", async () => {
@@ -765,15 +774,15 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     const row = page.getByRole("table", { name: "Consumers" }).getByRole("row").filter({ has: page.locator(`a[href$="/templates/${springId}/usage"]`) });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText("Coral");
-    await expect(row).toContainText("v2");
-    await expect(row.getByRole("cell").nth(3), "Coral rendered v2 fifteen times").toHaveText("15");
+    await expect(row).toContainText("v1");
+    await expect(row.getByRole("cell").nth(3), "Coral rendered v1 fifteen times").toHaveText("15");
     await beat(page, 900);
     await row.scrollIntoViewIfNeeded();
     await shoot(page, "demo-04-usage");
 
     const log = await rows(db, "SELECT * FROM render_log WHERE template_id = ? AND is_preview = 0", [springId]);
     expect(log).toHaveLength(15);
-    for (const entry of log) expect(entry).toMatchObject({ consumer_id: "coral", version_id: springV2Id, version_number: 2, outcome: "ok" });
+    for (const entry of log) expect(entry).toMatchObject({ consumer_id: "coral", version_id: springV1Id, version_number: 1, outcome: "ok" });
     const haystack = JSON.stringify([
       ...(await rows(db, "SELECT * FROM render_log WHERE template_id = ?", [springId])),
       ...(await rows(db, "SELECT * FROM audit_events WHERE template_id = ?", [springId])),
@@ -784,7 +793,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
 
   // ── 5. Breaking change, pin and sunset ─────────────────────────────────────
 
-  await test.step("5.1 Maya edits, adds required annual_fee, and submits v3: the submit dialog flags the breaking change", async () => {
+  await test.step("5.1 Maya edits, adds required annual_fee, and submits v2: the submit dialog flags the breaking change", async () => {
     // The switch refreshes the page in place: Usage keeps `?tab=consumers` and its Consumers tab.
     await switchPersona(page, "Maya Chen");
     await expect(page).toHaveURL(new RegExp(`/${TEAM}/usage\\?tab=consumers$`));
@@ -795,7 +804,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await reactReady(edit);
     await click(edit);
     await expect(statusBadge(page)).toHaveText("Draft");
-    await expect(page.locator("header").filter({ visible: true }).getByText("Based on v2", { exact: true })).toBeVisible();
+    await expect(page.locator("header").filter({ visible: true }).getByText("Based on v1", { exact: true })).toBeVisible();
     await liveEditor(page);
 
     await caretAtEnd(page, docBlock(page, INTEREST_STARTS), FIX.trim());
@@ -808,26 +817,26 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await shoot(page, "demo-05-annual-fee");
 
     await tap(page.getByRole("button", { name: "Submit for review" }));
-    const dialog = page.getByRole("dialog", { name: "Submit v3 for review" });
+    const dialog = page.getByRole("dialog", { name: "Submit v2 for review", exact: true });
     await expect(dialog).toBeVisible({ timeout: 20_000 });
     const contract = dialog.getByText("Contract changes", { exact: true }).locator("xpath=ancestor::section[1]");
     await expect(contract).toContainText("Breaking change");
     await expect(contract).toContainText("annual_fee");
     await expect(dialog.getByRole("textbox", { name: "Note to reviewers" })).toBeFocused();
-    await typeSlowly(page, NOTE_V3);
+    await typeSlowly(page, NOTE_V2);
     await beat(page, 900);
     await shoot(page, "demo-05-submit-breaking");
-    await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
+    await tap(dialog.getByRole("button", { name: "Submit v2", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
     await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
   });
 
-  await test.step("5.2 Jordan sees the contract change, approves, and sets v2's sunset 14 days out: the consequence names Coral", async () => {
+  await test.step("5.2 Jordan sees the contract change, approves, and sets v1's sunset 14 days out: the consequence names Coral", async () => {
     await switchPersona(page, "Jordan Ellis");
     await openQueue(page, "Waiting on me");
-    await expect(queueRow(page, springId, 3)).toContainText("Breaking");
-    await click(queueRow(page, springId, 3));
-    await expectReviewScreen(page, springId, 3, NAME);
+    await expect(queueRow(page, springId, 2)).toContainText("Breaking");
+    await click(queueRow(page, springId, 2));
+    await expectReviewScreen(page, springId, 2, NAME);
     const contract = decision(page).getByRole("region", { name: "Contract changes" });
     await expect(contract).toContainText("Breaking change");
     await expect(contract).toContainText("annual_fee");
@@ -835,47 +844,52 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await shoot(page, "demo-05-review-breaking");
 
     await click(approveButton(page));
-    const dialog = page.getByRole("dialog", { name: "Approve v3" });
+    const dialog = page.getByRole("dialog", { name: "Approve v2", exact: true });
     await expect(dialog).toBeVisible();
     const consequences = dialog.locator('[data-slot="consequences"]');
-    await expect(consequences).toContainText("Coral has to map annual_fee before it moves to v3.");
-    await click(dialog.getByText("Set a sunset date for v2", { exact: true }));
+    await expect(consequences).toContainText("Coral has to map annual_fee before it moves to v2.");
+    await click(dialog.getByText("Set a sunset date for v1", { exact: true }));
     await expect(dialog.getByRole("checkbox")).toBeChecked();
     sunsetDay = await clockDay(db, SUNSET_DAYS);
     await click(dialog.getByRole("button", { name: /^Sunset date/ }));
     await pickDay(page, sunsetDay);
     const sunsetLong = longDate(`${sunsetDay}T00:00:00Z`);
-    await expect(consequences).toContainText(/Coral still renders v2 \(last render .+\)\. It will keep working until /);
+    await expect(consequences).toContainText(/Coral still renders v1 \(last render .+\)\. It will keep working until /);
     await expect(consequences).toContainText(`It will keep working until ${sunsetLong}.`);
     await beat(page, 1000);
     await shoot(page, "demo-05-approve-sunset");
-    await click(dialog.getByRole("button", { name: "Approve v3", exact: true }));
+    await click(dialog.getByRole("button", { name: "Approve v2", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
     await expect(page.locator("[data-go-live]")).toHaveCount(0, { timeout: 25_000 });
     await expect(statusBadge(page)).toHaveText("Active");
-    const versions = await rows(db, "SELECT number, state, sunset_at FROM versions WHERE template_id = ? AND number IN (2, 3) ORDER BY number", [springId]);
+    // The released rows (v1's sent-back round 1 is a record and keeps its state).
+    const versions = await rows(
+      db,
+      "SELECT number, round, state, sunset_at FROM versions WHERE template_id = ? AND state IN ('active', 'superseded') ORDER BY number",
+      [springId],
+    );
     expect(versions).toEqual([
       // 00:00 Eastern on the day picked (the business time zone, decision 0017).
-      { number: 2, state: "superseded", sunset_at: sunsetInstant(sunsetDay, "America/New_York").getTime() },
-      { number: 3, state: "active", sunset_at: null },
+      { number: 1, round: 2, state: "superseded", sunset_at: sunsetInstant(sunsetDay, "America/New_York").getTime() },
+      { number: 2, round: 1, state: "active", sunset_at: null },
     ]);
   });
 
-  await test.step("5.3 In the simulator the offer shows “v3 available” and still sends on v2", async () => {
+  await test.step("5.3 In the simulator the offer shows “v2 available” and still sends on v1", async () => {
     await openSimulator(page);
-    await expect(offerRow(page, SPRING_OFFER_NAME)).toContainText("v3 available");
+    await expect(offerRow(page, SPRING_OFFER_NAME)).toContainText("v2 available");
     await beat(page, 800);
-    await shoot(page, "demo-05-v3-available");
+    await shoot(page, "demo-05-v2-available");
     await openOffer(page, SPRING_OFFER_NAME);
-    await expect(page.getByText("Pinned to v2", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pinned to v1", { exact: true })).toBeVisible();
     await openOfferTab(page, "Send");
     await chooseOnly(page, [CUSTOMERS.olivia, CUSTOMERS.marcus]);
     await send(page);
     await expect(resultsHeadline(page)).toHaveText("6 delivered", { timeout: 90_000 });
-    await expect(page.getByRole("table", { name: "Results" }).getByText("Newer: v3").first()).toBeVisible();
+    await expect(page.getByRole("table", { name: "Results" }).getByText("Newer: v2").first()).toBeVisible();
     await beat(page, 900);
     await resultsHeadline(page).scrollIntoViewIfNeeded();
-    await shoot(page, "demo-05-send-on-v2");
+    await shoot(page, "demo-05-send-on-v1");
   });
 
   await test.step("5.4 Advance the clock 15 days (the Demo pill): sending fails with the sunset message", async () => {
@@ -897,15 +911,15 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await chooseOnly(page, [CUSTOMERS.olivia, CUSTOMERS.marcus]);
     await send(page);
     await expect(resultsHeadline(page)).toHaveText("0 delivered, 6 failed", { timeout: 90_000 });
-    await expectFailed(page, 6, { status: 410, code: "version_sunset", message: `Version 2 was sunset on ${longDate(`${sunsetDay}T00:00:00Z`)}. Version 3 is active.` });
+    await expectFailed(page, 6, { status: 410, code: "version_sunset", message: `Version 1 was sunset on ${longDate(`${sunsetDay}T00:00:00Z`)}. Version 2 is active.` });
     await beat(page, 900);
     await resultsHeadline(page).scrollIntoViewIfNeeded();
     await shoot(page, "demo-05-sunset-failed");
   });
 
-  await test.step("5.5 Relink to v3: the mapping asks for annual_fee; mapped, the send succeeds", async () => {
-    await click(page.getByRole("link", { name: "Relink to v3" }).or(page.getByRole("button", { name: "Relink to v3" })).first());
-    await expect(page.getByRole("heading", { level: 1, name: "Relink to v3" })).toBeVisible();
+  await test.step("5.5 Relink to v2: the mapping asks for annual_fee; mapped, the send succeeds", async () => {
+    await click(page.getByRole("link", { name: "Relink to v2" }).or(page.getByRole("button", { name: "Relink to v2" })).first());
+    await expect(page.getByRole("heading", { level: 1, name: "Relink to v2" })).toBeVisible();
     const annualFee = page.getByRole("table", { name: "New values" }).getByRole("combobox", { name: "Annual fee", exact: true });
     await expect(annualFee).toHaveValue("");
     await expect(page.getByText("Map Annual fee to send.")).toBeVisible();
@@ -913,9 +927,9 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await shoot(page, "demo-05-relink");
     await mapTo(page, "New values", "Annual fee", "Offer · Annual fee");
     await expect(page.getByText("Map Annual fee to send.")).toHaveCount(0);
-    await click(page.getByRole("button", { name: "Relink to v3", exact: true }));
+    await click(page.getByRole("button", { name: "Relink to v2", exact: true }));
     await expect(page).toHaveURL(/\/sim\/offers\/offer_spring_travel\?tab=send$/, { timeout: 30_000 });
-    await expect(page.getByText("Pinned to v3", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pinned to v2", { exact: true })).toBeVisible();
 
     await chooseOnly(page, [CUSTOMERS.olivia, CUSTOMERS.marcus]);
     await send(page);
@@ -923,7 +937,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await click(deliveredCell(page, CUSTOMERS.olivia.name, "Web"));
     await expect(page.frameLocator(`iframe[title="${CUSTOMERS.olivia.name} · Web"]`).locator("body")).toContainText(/annual fee is \$95/i, { timeout: 20_000 });
     await beat(page, 1000);
-    await shoot(page, "demo-05-send-on-v3");
+    await shoot(page, "demo-05-send-on-v2");
     await page.keyboard.press("Escape");
   });
 

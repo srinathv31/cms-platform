@@ -23,17 +23,17 @@ import {
   versionNotFound,
   versionNotReleased,
 } from "@/domain/render";
-import { CHANNELS, type Channel, type VersionState } from "@/domain/types";
+import { headOf, isReleased } from "@/domain/rounds";
+import { CHANNELS, type Channel } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { consumerNotices, consumers, contentTypes, settings, teams, templates, versions } from "@/server/db/schema/ucomp";
 
 // The consumer API's reads (GET /api/v1/…). No viewer: a consumer is identified by X-Consumer-Id and
-// sees every released version of every template, nothing else. Drafts and versions in review never
-// leave UCOMP; a template with no released version doesn't exist as far as a consumer can tell.
-
-const RELEASED: readonly ApiVersionState[] = ["active", "superseded", "revoked"];
-const isReleased = (state: VersionState): state is ApiVersionState => (RELEASED as readonly string[]).includes(state);
+// sees every released version of every template, nothing else (`isReleased` in domain/rounds.ts). Drafts,
+// versions in review and the rounds sent back never leave UCOMP: a consumer never sees a round, and its
+// number means the number's released row. A template with no released version doesn't exist as far as a
+// consumer can tell.
 
 /**
  * The channels a consumer can render, in the contract's order (pdf, web, email): the ones turned on
@@ -225,9 +225,12 @@ export async function getTemplateDetail(
   const name = (contractBaseline(released, now) ?? released[0]!).name;
   const zone = await readBusinessZone(db);
 
-  /** A version a consumer may read by number: 404 when there's none, 409 when it isn't released. */
+  /**
+   * A version a consumer may read by number: its head (`headOf`), so the released row when there is one.
+   * 404 when there's none, 409 when it isn't released (its latest round is in review or was sent back).
+   */
   const readable = (number: number) => {
-    const found = all.find((v) => v.number === number);
+    const found = headOf(all, number);
     if (!found) return { ok: false as const, error: versionNotFound(template.id, number) };
     if (!isReleased(found.state)) {
       const state = found.state as "draft" | "in_review" | "changes_requested";

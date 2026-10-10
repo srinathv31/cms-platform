@@ -1,4 +1,6 @@
 import { DEFAULT_BUSINESS_ZONE, sunsetInstant, todayIn } from "@/domain/business-zone";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
+import { isReleased } from "@/domain/rounds";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import {
   REQUIRED_SECTIONS,
@@ -50,11 +52,57 @@ function check(spec: SeedTemplate, v: SeedVersion) {
   if ((v.state === "draft") !== (v.number === null)) {
     throw new Error(`Seed: ${where} number and state disagree`);
   }
+  if (v.round !== undefined && (v.number === null || !Number.isInteger(v.round) || v.round < 1)) {
+    throw new Error(`Seed: ${where} has a round without a number`);
+  }
   if (v.state === "draft" && v.updatedAt === undefined) {
     throw new Error(`Seed: ${where} is a draft and needs updatedAt`);
   }
   if (v.email && !v.channels.includes("email")) {
     throw new Error(`Seed: ${where} has email copy but no email channel`);
+  }
+}
+
+/** A numbered version's round: 1 unless the seed says otherwise. Null for a draft. */
+function roundOf(v: SeedVersion): number | null {
+  return v.number === null ? null : (v.round ?? 1);
+}
+
+/**
+ * Fails the reset early if a template's rounds don't add up (rounds.ts): each number's rounds are 1..n
+ * with no repeat, and a number has at most one released row (Active, Superseded or Revoked).
+ */
+function checkRounds(spec: SeedTemplate) {
+  const byNumber = new Map<number, SeedVersion[]>();
+  for (const v of spec.versions) {
+    if (v.number !== null) byNumber.set(v.number, [...(byNumber.get(v.number) ?? []), v]);
+  }
+  for (const [number, rows] of byNumber) {
+    const rounds = rows.map((v) => roundOf(v)!).sort((a, b) => a - b);
+    if (rounds.some((round, i) => round !== i + 1)) {
+      throw new Error(`Seed: ${spec.key} v${number} has rounds ${rounds.join(", ")}, not 1..${rounds.length}`);
+    }
+    if (rows.filter((v) => isReleased(v.state)).length > 1) {
+      throw new Error(`Seed: ${spec.key} v${number} has more than one released round`);
+    }
+  }
+}
+
+/**
+ * Fails the reset early if a send-back isn't shaped as `requestChanges` writes it: every changes-requested
+ * decision has a whole-version thread on that round whose first comment is the reason, a change request by
+ * the approver at the moment they decided.
+ */
+function checkSendBacks(spec: SeedTemplate) {
+  for (const v of spec.versions) {
+    for (const a of v.approvals ?? []) {
+      if (a.decision !== "changes_requested") continue;
+      const thread = (spec.threads ?? []).find((t) => t.origin === v.ref && t.block === DOCUMENT_THREAD);
+      const first = thread?.comments[0];
+      if (!first || first.kind !== "change_request" || first.author !== a.actor || first.body !== a.reason || first.at !== a.at) {
+        throw new Error(`Seed: ${spec.key}/${v.ref} was sent back without a whole-version thread holding the reason`);
+      }
+    }
   }
 }
 
@@ -84,10 +132,13 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     teamId: spec.teamId,
     versions: {},
   };
+  checkRounds(spec);
+  checkSendBacks(spec);
   for (const v of spec.versions) {
     ref.versions[v.ref] = {
       id: ctx.id("v"),
       number: v.number,
+      round: roundOf(v),
       state: v.state,
       channels: v.channels,
       variables: v.variables,
@@ -111,16 +162,19 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     return [...new Set([...inherited, v.createdBy, ...(v.submittedBy ? [v.submittedBy] : [])])];
   };
 
-  const audit = (e: {
-    at: number;
-    actor: string | null;
-    action: string;
-    version?: VersionRef;
-    details?: Record<string, unknown>;
-    sessionKey?: string;
-  }) => {
+  const audit = (
+    e: {
+      at: number;
+      actor: string | null;
+      action: string;
+      version?: VersionRef;
+      details?: Record<string, unknown>;
+      sessionKey?: string;
+    },
+    newId: (prefix: string) => string = ctx.id,
+  ) => {
     sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: newId("ae"),
       at: ctx.at(e.at),
       actorId: e.actor,
       teamId: spec.teamId,
@@ -156,6 +210,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       id: info.id,
       templateId,
       number: v.number,
+      round: info.round,
       state: v.state,
       // The name is a version field; no seeded template has been renamed, so every version has its name.
       name: spec.name,
@@ -221,6 +276,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         version: info,
         details: {
           number: v.number,
+          round: info.round,
           note: v.submitNote ?? null,
           contractChanges: changes.length,
           breaking: changes.some((c) => c.breaking),
@@ -248,6 +304,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         version: info,
         details: {
           number: v.number,
+          round: info.round,
           stage: STAGE_NAME,
           ...(a.reason ? { reason: a.reason } : {}),
         },
@@ -261,7 +318,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         actor: null,
         action: "version.activated",
         version: info,
-        details: { number: v.number, supersedes: replaced },
+        details: { number: v.number, round: info.round, supersedes: replaced },
       });
       if (replaced !== null) {
         for (const consumerId of spec.consumers ?? []) {
@@ -351,10 +408,12 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   for (const thread of spec.threads ?? []) {
     const origin = versionOf(thread.origin);
     const originSpec = specOf(thread.origin);
-    const id = blockId(spec.key, thread.block);
+    // A thread about the whole version has no block to anchor to.
+    const whole = thread.block === DOCUMENT_THREAD;
+    const id = whole ? DOCUMENT_THREAD : blockId(spec.key, thread.block);
 
     // The anchor must exist in the origin version and in every draft that carries it forward.
-    const carriers = [originSpec, ...spec.versions.filter((s) => s.basedOn === thread.origin)];
+    const carriers = whole ? [] : [originSpec, ...spec.versions.filter((s) => s.basedOn === thread.origin)];
     for (const c of carriers) {
       const block = (c.body.content ?? []).find((b) => b.attrs?.id === id);
       if (!block) {
@@ -362,15 +421,16 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       }
     }
     const anchored = (originSpec.body.content ?? []).find((b) => b.attrs?.id === id);
+    const newId = thread.keyedIds ? (prefix: string) => ctx.keyedId(`${spec.key}:${thread.origin}:${id}`, prefix) : ctx.id;
 
-    const threadId = ctx.id("th");
+    const threadId = newId("th");
     const first = thread.comments[0];
     sink.commentThreads.push({
       id: threadId,
       templateId,
       originVersionId: origin.id,
       blockId: id,
-      quote: thread.quote ?? blockText(anchored),
+      quote: thread.quote ?? (whole ? null : blockText(anchored)),
       status: thread.resolved ? "resolved" : "open",
       resolvedBy: thread.resolved?.by ?? null,
       resolvedAt: thread.resolved ? ctx.at(thread.resolved.at) : null,
@@ -378,7 +438,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     });
     for (const c of thread.comments) {
       sink.comments.push({
-        id: ctx.id("cm"),
+        id: newId("cm"),
         threadId,
         authorId: c.author,
         body: c.body,
@@ -386,23 +446,47 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         createdAt: ctx.at(c.at),
       });
       if ((c.kind ?? "comment") === "comment") {
-        audit({
-          at: c.at,
-          actor: c.author,
-          action: "comment.added",
-          version: origin,
-          details: { threadId, blockId: id, author: userName(c.author) },
-        });
+        audit(
+          {
+            at: c.at,
+            actor: c.author,
+            action: "comment.added",
+            version: origin,
+            details: { threadId, blockId: id, author: userName(c.author) },
+          },
+          newId,
+        );
       }
     }
-    if (thread.resolved) {
-      audit({
-        at: thread.resolved.at,
-        actor: thread.resolved.by,
-        action: "comment.resolved",
-        version: origin,
-        details: { threadId, blockId: id },
-      });
+    if (thread.resolved && whole) {
+      // Answered by submitting the next round, as `submitVersion` resolves it: the round that answered it.
+      const answer = spec.versions.find((s) => s.basedOn === thread.origin && s.number !== null);
+      if (!answer) throw new Error(`Seed: ${spec.key}/${thread.origin} has a resolved change request but no next round`);
+      if (thread.resolved.by !== answer.submittedBy || thread.resolved.at !== answer.submittedAt) {
+        throw new Error(`Seed: ${spec.key}/${thread.origin}'s change request is resolved by ${answer.ref}'s submit, so by its submitter then`);
+      }
+      const next = versionOf(answer.ref);
+      audit(
+        {
+          at: thread.resolved.at,
+          actor: thread.resolved.by,
+          action: "thread.resolved",
+          version: origin,
+          details: { threadId, blockId: id, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
+        },
+        newId,
+      );
+    } else if (thread.resolved) {
+      audit(
+        {
+          at: thread.resolved.at,
+          actor: thread.resolved.by,
+          action: "comment.resolved",
+          version: origin,
+          details: { threadId, blockId: id },
+        },
+        newId,
+      );
     }
   }
 

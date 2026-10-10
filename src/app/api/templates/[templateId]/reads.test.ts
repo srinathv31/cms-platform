@@ -97,8 +97,8 @@ describe("GET /api/templates/[templateId]/compare", () => {
       expect(status).toBe(200);
       expect(body).toEqual({
         ok: true,
-        from: { id: v1.id, number: 1, state: "superseded", name: v1.name, body: v1.body, variables: v1.variables },
-        to: { id: v2.id, number: 2, state: "active", name: v2.name, body: v2.body, variables: v2.variables },
+        from: { id: v1.id, number: 1, round: 1, state: "superseded", name: v1.name, body: v1.body, variables: v1.variables },
+        to: { id: v2.id, number: 2, round: 1, state: "active", name: v2.name, body: v2.body, variables: v2.variables },
       });
     }
   });
@@ -107,7 +107,7 @@ describe("GET /api/templates/[templateId]/compare", () => {
     const fee = ids["annual-fee-waiver"]!;
     const [v1, draft] = [await versionOf(fee, { number: 1 }), await versionOf(fee, { state: "draft" })];
     const { body } = await answer(get(compare, "compare", fee, `?from=${v1.id}&to=${draft.id}`));
-    expect(body).toMatchObject({ ok: true, to: { id: draft.id, number: null, state: "draft" } });
+    expect(body).toMatchObject({ ok: true, to: { id: draft.id, number: null, round: null, state: "draft" } });
   });
 
   it("400 when a version is missing or malformed", async () => {
@@ -188,7 +188,8 @@ describe("GET /api/templates/[templateId]/submit-summary", () => {
     const draft = await versionOf(fee, { state: "draft" });
     const { status, body } = await answer(get(submitSummary, "submit-summary", fee));
     expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, summary: { templateId: fee, rev: draft.rev, name: draft.name, number: 2 } });
+    // v1 was sent back: its draft resubmits as v1, round 2.
+    expect(body).toMatchObject({ ok: true, summary: { templateId: fee, rev: draft.rev, name: draft.name, number: 1, round: 2 } });
   });
 
   it("400 for a malformed template id", async () => {

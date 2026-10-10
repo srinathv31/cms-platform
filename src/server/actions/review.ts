@@ -29,11 +29,15 @@ import { db } from "@/server/db/client";
 import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
+import { findRound } from "@/server/queries/find-round";
 import { loadChain, loadDecisions, stageApproverIds } from "@/server/queries/review-shared";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
-// The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. Each one
-// runs the server action kit (kit.ts):
+// The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. A version is
+// named by its number and, to decide it, its round (domain/rounds.ts): approve and request changes act on
+// exactly the round the approver was shown; sunset and revoke act on the number's head (`findRound`),
+// its released row, and the transition refuses any other state. Each one runs the server action kit
+// (kit.ts):
 //   1. `authorize`: the version (or the template), read only to learn its team and its people, and
 //      `check` on that team. An unknown one is refused like a forbidden one, and then as gone;
 //   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle.ts),
@@ -60,6 +64,8 @@ function refreshAfter() {
 
 const TemplateRef = z.object({ templateId: z.string().min(1).max(32) });
 const VersionRef = TemplateRef.extend({ versionNumber: z.number().int().positive() });
+/** A decision names the round it decides: the one on the approver's screen, never whichever is newest. */
+const RoundRefInput = VersionRef.extend({ round: z.number().int().positive() });
 
 /** The template, read only to learn its team (and the version's people) for the permission check. */
 async function findTemplate(templateId: string) {
@@ -71,24 +77,24 @@ async function findTemplate(templateId: string) {
     .then((rows) => rows[0]);
 }
 
-async function findVersion(templateId: string, number: number) {
-  return db
-    .select({
-      templateId: templates.id,
-      teamId: templates.teamId,
-      contentTypeId: templates.contentTypeId,
-      submittedBy: versions.submittedBy,
-      writers: versions.writers,
-      revoke: versions.revoke,
-      state: versions.state,
-      stages: versions.stages,
-      currentStage: versions.currentStage,
-    })
-    .from(versions)
-    .innerJoin(templates, eq(templates.id, versions.templateId))
-    .where(and(eq(versions.templateId, templateId), eq(versions.number, number)))
-    .limit(1)
-    .then((rows) => rows[0]);
+/**
+ * The version's template and people, read only for the permission check: the round given, or without
+ * one the number's head (`findRound`). The transaction reads it again (`loadVersion`).
+ */
+async function findVersion(templateId: string, number: number, round?: number) {
+  const [template, version] = await Promise.all([findTemplate(templateId), findRound(db, templateId, number, round)]);
+  if (!template || !version) return undefined;
+  return {
+    templateId: template.id,
+    teamId: template.teamId,
+    contentTypeId: template.contentTypeId,
+    submittedBy: version.submittedBy,
+    writers: version.writers,
+    revoke: version.revoke,
+    state: version.state,
+    stages: version.stages,
+    currentStage: version.currentStage,
+  };
 }
 
 /**
@@ -105,11 +111,9 @@ async function decideResource(found: FoundVersion | undefined): Promise<Permissi
 
 type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
 
-/** The version as the transitions read it (a whole row), fresh inside the transaction. */
-async function loadVersion(tx: Tx, found: FoundVersion, number: number) {
-  const row = await tx.query.versions.findFirst({
-    where: and(eq(versions.templateId, found.templateId), eq(versions.number, number)),
-  });
+/** The version as the transitions read it (a whole row), fresh inside the transaction: as `findVersion` found it. */
+async function loadVersion(tx: Tx, found: FoundVersion, number: number, round?: number) {
+  const row = await findRound(tx, found.templateId, number, round);
   if (!row) refuse(REQUEST_REFUSALS.versionGone);
   return row satisfies ReviewVersion;
 }
@@ -162,6 +166,7 @@ function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
     id: ids.id,
     templateId: ids.templateId,
     number: draft.number,
+    round: draft.round,
     state: draft.state,
     name: draft.name,
     basedOnVersionId: draft.basedOnVersionId,
@@ -190,13 +195,14 @@ function effectContext(viewer: Viewer, found: { teamId: string; templateId: stri
 const SubmitInput = TemplateRef.extend({ note: z.string().nullish(), rev: z.number().int().nonnegative() });
 
 /**
- * "Submit v2": the template's open draft becomes its next version, In review, with the optional note
- * to reviewers. The first stage's approvers are notified. The draft, the highest number and the
- * variables of the newest version that still renders (`contractBaseline`: the Active one, or after a
- * revoke the newest Superseded one before its sunset) are read in the transaction that writes, so the
- * number and the contract changes can't go stale; the rev and state in the update make it a
- * compare-and-set, and the rev bump makes an autosave still in flight fail rather than land on a
- * frozen version.
+ * "Submit v2" (or "Submit v1, round 2" after a send-back): the template's open draft becomes its next
+ * round, In review, with the optional note to reviewers: round 1 of the next version after a release, or
+ * the next round of the number sent back (`nextRound`). The first stage's approvers are notified. The
+ * draft, the template's rows and the variables of the newest version that still renders
+ * (`contractBaseline`: the Active one, or after a revoke the newest Superseded one before its sunset) are
+ * read in the transaction that writes, so the number, the round and the contract changes can't go stale;
+ * the rev and state in the update make it a compare-and-set, and the rev bump makes an autosave still in
+ * flight fail rather than land on a frozen version.
  *
  * `rev` is the draft's rev from the submit summary the author saw (`getSubmitSummary`). A draft that
  * has changed since, by a save from this page or any other, is refused (`REFUSALS.summaryStale`), so
@@ -210,7 +216,7 @@ export async function submitVersion(input: {
   templateId: string;
   note?: string | null;
   rev: number;
-}): Promise<ActionResult<{ number: number }>> {
+}): Promise<ActionResult<{ number: number; round: number }>> {
   return serverAction(input, {
     input: SubmitInput,
     authorize: async ({ viewer, input }) => {
@@ -222,7 +228,13 @@ export async function submitVersion(input: {
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
       const list = await tx
-        .select({ id: versions.id, number: versions.number, state: versions.state, sunsetAt: versions.sunsetAt })
+        .select({
+          id: versions.id,
+          number: versions.number,
+          round: versions.round,
+          state: versions.state,
+          sunsetAt: versions.sunsetAt,
+        })
         .from(versions)
         .where(eq(versions.templateId, found.id));
 
@@ -243,7 +255,7 @@ export async function submitVersion(input: {
       const outcome = submit({
         draft,
         seenRev: input.rev,
-        highestNumber: list.reduce((max, v) => Math.max(max, v.number ?? 0), 0),
+        versions: list,
         baseline,
         now: at,
         submittedBy: viewer.userId,
@@ -262,6 +274,7 @@ export async function submitVersion(input: {
         {
           state: changes.state,
           number: changes.number,
+          round: changes.round,
           submittedBy: changes.submittedBy,
           submittedAt: changes.submittedAt,
           writers: changes.writers,
@@ -273,8 +286,8 @@ export async function submitVersion(input: {
         at,
         REQUEST_REFUSALS.draftChanged,
       );
-      // Submitting the next version answers the change request that sent the last one back (Sri, Oct 5):
-      // open whole-version threads resolve as the submitter's, recording the version that answered them.
+      // Submitting the next round answers the change request that sent the last one back (Sri, Oct 5):
+      // open whole-version threads resolve as the submitter's, recording the round that answered them.
       // Block comments stay as they are; the author resolves those one by one.
       const answered = await tx
         .select({ id: commentThreads.id, originVersionId: commentThreads.originVersionId })
@@ -296,7 +309,13 @@ export async function submitVersion(input: {
         kind: "audit",
         action: "thread.resolved",
         versionId: t.originVersionId,
-        details: { threadId: t.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: changes.number },
+        details: {
+          threadId: t.id,
+          blockId: DOCUMENT_THREAD,
+          auto: true,
+          resolvedWith: changes.number,
+          resolvedWithRound: changes.round,
+        },
       }));
 
       await writeEffects(
@@ -304,7 +323,7 @@ export async function submitVersion(input: {
         [...effects, ...answeredEffects],
         effectContext(viewer, { teamId: found.teamId, templateId: found.id }, draft.id, at),
       );
-      return { ok: true, number: changes.number };
+      return { ok: true, number: changes.number, round: changes.round };
     },
     after: refreshAfter,
   });
@@ -312,30 +331,32 @@ export async function submitVersion(input: {
 
 // ── Request changes ───────────────────────────────────────────
 
-const RequestChangesInput = VersionRef.extend({ reason: z.string() });
+const RequestChangesInput = RoundRefInput.extend({ reason: z.string() });
 
 /**
- * In review → Changes requested, with the reason. In one transaction: the decision (an approvals row),
- * the version's state, the author's new draft (a copy of the version with the same block ids, so every
- * thread lands in its margin), and the reason as a thread about the whole version (`DOCUMENT_THREAD`)
- * whose first comment is a `change_request`. The author is notified.
+ * In review → Changes requested, with the reason, on the round the approver was shown (`round`). In one
+ * transaction: the decision (an approvals row), the version's state, the author's new draft (a copy of
+ * the version with the same block ids, so every thread lands in its margin; its submit is the next round
+ * of the same number), and the reason as a thread about the whole version (`DOCUMENT_THREAD`) whose first
+ * comment is a `change_request`. The author is notified.
  */
 export async function requestChanges(input: {
   templateId: string;
   versionNumber: number;
+  round: number;
   reason: string;
 }): Promise<ActionResult> {
   return serverAction(input, {
     input: RequestChangesInput,
     authorize: async ({ viewer, input }) => {
-      const found = await findVersion(input.templateId, input.versionNumber);
+      const found = await findVersion(input.templateId, input.versionNumber, input.round);
       check(viewer, "version.decide", await decideResource(found));
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
       if (input.reason.trim().length > REASON_MAX) refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
       return found;
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
-      const version = await loadVersion(tx, found, input.versionNumber);
+      const version = await loadVersion(tx, found, input.versionNumber, input.round);
       const chain = await loadChain(tx, found.contentTypeId);
       assertStage(viewer, chain, version, found.teamId);
 
@@ -399,14 +420,15 @@ export async function requestChanges(input: {
 
 // ── Approve ───────────────────────────────────────────────────
 
-const ApproveInput = VersionRef.extend({
+const ApproveInput = RoundRefInput.extend({
   sunsetPrevious: z.string().nullish(),
   sampleSetsSeen: z.array(z.string().max(64)).max(50),
 });
 
 /**
- * Approves the stage the version waits on: one of the stages it recorded at submit, with the rule that
- * stage has in approval_stages now. At an earlier stage the version moves on to the next of its own; at
+ * Approves the stage the round on the approver's screen (`round`) waits on: one of the stages it recorded
+ * at submit, with the rule that stage has in approval_stages now. A round that was sent back in the
+ * meantime is refused as not in review. At an earlier stage the version moves on to the next of its own; at
  * the last it goes live: the previous Active version, if there is one, becomes Superseded first (one
  * Active per template), optionally with a sunset date, and the version becomes Active. With none (a
  * first version, or the correction after the Active version was revoked) nothing is superseded and a
@@ -415,13 +437,14 @@ const ApproveInput = VersionRef.extend({
 export async function approveVersion(input: {
   templateId: string;
   versionNumber: number;
+  round: number;
   sunsetPrevious?: string | null;
   sampleSetsSeen: string[];
-}): Promise<ActionResult<{ wentLive: boolean; number: number }>> {
+}): Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>> {
   return serverAction(input, {
     input: ApproveInput,
     authorize: async ({ viewer, input }) => {
-      const found = await findVersion(input.templateId, input.versionNumber);
+      const found = await findVersion(input.templateId, input.versionNumber, input.round);
       check(viewer, "version.decide", await decideResource(found));
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
       // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
@@ -429,7 +452,7 @@ export async function approveVersion(input: {
       return found;
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
-      const version = await loadVersion(tx, found, input.versionNumber);
+      const version = await loadVersion(tx, found, input.versionNumber, input.round);
       const chain = await loadChain(tx, found.contentTypeId);
       assertStage(viewer, chain, version, found.teamId);
       const active = await activeVersion(tx, found.templateId);
@@ -473,7 +496,7 @@ export async function approveVersion(input: {
       );
       await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
       await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-      return { ok: true, wentLive: outcome.wentLive, number: version.number! };
+      return { ok: true, wentLive: outcome.wentLive, number: version.number!, round: version.round! };
     },
     after: refreshAfter,
   });

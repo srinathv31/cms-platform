@@ -13,6 +13,7 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { loadPersona } from "@/server/testing/review-fixtures";
+import { findRound } from "./find-round";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "./review";
@@ -21,7 +22,9 @@ import { getVersions } from "./versions";
 import { getWorkspaceDocument } from "./workspace";
 
 // The Phase 4 read models against a temporary database filled by the real seed:
-//   - Cash Back v3 is In review (submitted by Maya, breaking), v2 Active and rendered by Coral;
+//   - Cash Back v3 is In review on round 2 (submitted by Maya, breaking) after Jordan sent round 1 back
+//     2.6 days ago; v2 Active and rendered by Coral;
+//   - High-Yield Savings v2 is Active, approved on round 3 after Naomi sent rounds 1 and 2 back;
 //   - Annual Fee Waiver v1 has Changes requested (Jordan, 3.9 days ago) and an open draft with threads;
 //   - Balance Transfer v1 is Superseded with a sunset in 21 days, v2 Active, both rendered by Coral;
 //   - Holiday Points v1 is Revoked.
@@ -67,7 +70,7 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 // ── Queue ─────────────────────────────────────────────────────
 
 describe("getReviewQueue", () => {
-  it("Jordan waits on Cash Back v3, and sees Annual Fee Waiver among the recent decisions", async () => {
+  it("Jordan waits on Cash Back v3 round 2, and sees its round 1 and Annual Fee Waiver among the recent decisions", async () => {
     as("jordan");
     const queue = await getReviewQueue("coral-offers");
     expect(queue.waiting).toEqual([
@@ -78,6 +81,7 @@ describe("getReviewQueue", () => {
         teamName: "Coral Offers",
         versionId: expect.any(String),
         versionNumber: 3,
+        round: 2,
         state: "in_review",
         author: { id: "maya", name: "Maya Chen", initials: "MC", hue: expect.any(Number) },
         submittedAt: expect.stringMatching(ISO),
@@ -86,10 +90,20 @@ describe("getReviewQueue", () => {
       },
     ]);
     expect(queue.submitted).toEqual([]);
+    // Each round is a row: Cash Back v3's round 1, sent back 2.6 days ago, then the waiver's at 3.9.
     expect(queue.decided).toEqual([
+      expect.objectContaining({
+        templateId: ids["cash-back"],
+        versionNumber: 3,
+        round: 1,
+        state: "changes_requested",
+        breaking: true,
+        decision: { kind: "changes_requested", by: expect.objectContaining({ id: "jordan" }), at: expect.stringMatching(ISO) },
+      }),
       expect.objectContaining({
         templateId: ids["annual-fee-waiver"],
         versionNumber: 1,
+        round: 1,
         state: "changes_requested",
         breaking: false,
         stage: { position: 0, name: "Team approver", count: 1 },
@@ -103,7 +117,7 @@ describe("getReviewQueue", () => {
     as("maya");
     const queue = await getReviewQueue("coral-offers");
     expect(queue.waiting).toEqual([]);
-    expect(queue.submitted.map((r) => [r.templateId, r.versionNumber])).toEqual([[ids["cash-back"], 3]]);
+    expect(queue.submitted.map((r) => [r.templateId, r.versionNumber, r.round])).toEqual([[ids["cash-back"], 3, 2]]);
     expect(await getReviewBadgeCount("coral-offers")).toBe(0);
   });
 
@@ -129,9 +143,9 @@ describe("getReviewQueue", () => {
 // ── Review screen ─────────────────────────────────────────────
 
 describe("getReviewScreen", () => {
-  it("shows Cash Back v3 against the Active v2, with the stepper, the contract and Coral's usage", async () => {
+  it("shows Cash Back v3 (its head, round 2) against the Active v2, with the stepper, the contract and Coral's usage", async () => {
     as("jordan");
-    const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+    const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
     expect(screen.template).toEqual({
       id: ids["cash-back"],
       teamId: "coral-offers",
@@ -140,6 +154,7 @@ describe("getReviewScreen", () => {
     });
     expect(screen.version).toMatchObject({
       number: 3,
+      round: 2,
       state: "in_review",
       name: "Cash Back Welcome Bonus — Terms",
       submittedBy: expect.objectContaining({ id: "maya" }),
@@ -162,7 +177,7 @@ describe("getReviewScreen", () => {
 
   it("explains why Maya, a viewer, or anyone on a decided version can't decide", async () => {
     as("maya");
-    const own = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+    const own = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
     expect(own.can).toEqual({
       approve: { ok: false, ...REASONS.ownVersion },
       requestChanges: { ok: false, ...REASONS.ownVersion },
@@ -170,12 +185,12 @@ describe("getReviewScreen", () => {
     });
 
     as("sam");
-    const viewer = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+    const viewer = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
     expect(viewer.can.approve).toEqual({ ok: false, ...REASONS.generic });
     expect(viewer.can.comment).toEqual({ ok: false, ...REASONS.generic });
 
     as("jordan");
-    const active = await getReviewScreen("coral-offers", ids["cash-back"]!, 2);
+    const active = await getReviewScreen("coral-offers", ids["cash-back"]!, 2, null);
     expect(active.baseline).toBeNull(); // the Active version is this one
     expect(active.previousNumber).toBeNull();
     expect(active.can.approve).toEqual({ ok: false, ...REFUSALS.notInReview });
@@ -195,14 +210,12 @@ describe("getReviewScreen", () => {
       memberships: priya.memberships.map((m) => (m.teamId === "coral-offers" ? { ...m, roles: ["author", "approver"] } : m)),
     };
     as("priya");
-    const v3 = (await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, 3)),
-    }))!;
+    const v3 = (await findRound(db, ids["cash-back"]!, 3))!;
     expect((await getReviewQueue("coral-offers")).waiting.map((r) => r.versionNumber), "an approver who wrote none of it").toEqual([3]);
 
     await db.update(versions).set({ writers: ["maya", "priya"] }).where(eq(versions.id, v3.id));
     try {
-      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
       expect(screen.can).toEqual({
         approve: { ok: false, ...REASONS.wroteVersion },
         requestChanges: { ok: false, ...REASONS.wroteVersion },
@@ -214,7 +227,7 @@ describe("getReviewScreen", () => {
       expect(await getReviewBadgeCount("coral-offers")).toBe(0);
 
       as("jordan");
-      expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3)).can.approve).toEqual({ ok: true });
+      expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).can.approve).toEqual({ ok: true });
     } finally {
       await db.update(versions).set({ writers: v3.writers }).where(eq(versions.id, v3.id));
     }
@@ -222,11 +235,76 @@ describe("getReviewScreen", () => {
 
   it("is a 404 from another team's space, for a missing version, or for someone who can't see the team", async () => {
     as("jordan");
-    await expect(getReviewScreen("deposits", ids["cash-back"]!, 3)).rejects.toThrow();
-    await expect(getReviewScreen("coral-offers", ids["cash-back"]!, 99)).rejects.toThrow(NOT_FOUND);
-    await expect(getReviewScreen("coral-offers", "UC-ZZZZZZ", 1)).rejects.toThrow(NOT_FOUND);
+    await expect(getReviewScreen("deposits", ids["cash-back"]!, 3, null)).rejects.toThrow();
+    await expect(getReviewScreen("coral-offers", ids["cash-back"]!, 99, null)).rejects.toThrow(NOT_FOUND);
+    await expect(getReviewScreen("coral-offers", "UC-ZZZZZZ", 1, null)).rejects.toThrow(NOT_FOUND);
+    await expect(getReviewScreen("coral-offers", ids["cash-back"]!, 3, 3), "a round that doesn't exist").rejects.toThrow(NOT_FOUND);
     as("riley");
-    await expect(getReviewScreen("all", ids["cash-back"]!, 3)).resolves.toMatchObject({ version: { number: 3 } });
+    await expect(getReviewScreen("all", ids["cash-back"]!, 3, null)).resolves.toMatchObject({ version: { number: 3 } });
+  });
+
+  it("opens a round by `?round=`: Cash Back v3's round 1 is the record Jordan sent back", async () => {
+    as("jordan");
+    const round1 = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, 1);
+    expect(round1.version).toMatchObject({ number: 3, round: 1, state: "changes_requested" });
+    expect(round1.can.approve).toEqual({ ok: false, ...REFUSALS.notInReview });
+    expect(round1.steps).toEqual([
+      expect.objectContaining({ status: "returned", decidedBy: expect.objectContaining({ id: "jordan" }) }),
+    ]);
+    // Its change request, the thread about the whole version, is on its record.
+    expect(round1.threads.map((t) => [t.blockId, t.originLabel, t.status])).toEqual([[DOCUMENT_THREAD, "v3 · Round 1", "resolved"]]);
+    expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, 2)).version.id).toBe(
+      (await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).version.id,
+    );
+  });
+
+  it("links a sent-back round on to where its work went: the next round, the release, or nothing while only a draft follows", async () => {
+    as("jordan");
+    const cashBack = ids["cash-back"]!;
+    expect((await getReviewScreen("coral-offers", cashBack, 3, 1)).replacedBy, "round 2 is in review").toEqual({
+      number: 3,
+      round: 2,
+      state: "in_review",
+      label: "v3, round 2",
+    });
+    expect((await getReviewScreen("coral-offers", cashBack, 3, null)).replacedBy, "round 2 is the head").toBeNull();
+    // Annual Fee Waiver v1 was sent back, and Maya hasn't resubmitted: her draft has no number yet.
+    const waiver = await getReviewScreen("coral-offers", ids["annual-fee-waiver"]!, 1, null);
+    expect([waiver.version.state, waiver.replacedBy]).toEqual(["changes_requested", null]);
+
+    // High-Yield Savings v2 was approved on round 3: its sent-back rounds link to v2, its bare page.
+    as("eli");
+    const highYield = ids["high-yield-savings"]!;
+    for (const round of [1, 2]) {
+      const screen = await getReviewScreen("deposits", highYield, 2, round);
+      expect(screen.replacedBy, `round ${round}`).toEqual({ number: 2, round: 3, state: "active", label: "v2" });
+      expect(screen.steps, "the stepper says who sent it back").toEqual([
+        expect.objectContaining({ status: "returned", decidedBy: expect.objectContaining({ id: "naomi" }), decidedAt: expect.stringMatching(ISO) }),
+      ]);
+    }
+    expect((await getReviewScreen("deposits", highYield, 2, null)).replacedBy, "the release itself").toBeNull();
+  });
+
+  it("compares a round sent back before its number went live with the version it was drafted from, not its own release", async () => {
+    // High-Yield Savings: v1 Superseded, v2 approved on round 3 after two send-backs.
+    as("eli");
+    const highYield = ids["high-yield-savings"]!;
+    const v1 = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, highYield), eq(versions.number, 1)) }))!;
+    await db.update(versions).set({ name: "High-Yield Savings — 2025 Rates" }).where(eq(versions.id, v1.id));
+    try {
+      for (const round of [1, 2]) {
+        const screen = await getReviewScreen("deposits", highYield, 2, round);
+        expect(screen.version).toMatchObject({ number: 2, round, state: "changes_requested" });
+        expect(screen.baseline, `round ${round}: vs v1`).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
+        expect(screen.previousNumber, "it would replace nothing: v2 is its own release").toBeNull();
+        expect(screen.liveName, "renamed from what it was drafted from").toBe("High-Yield Savings — 2025 Rates");
+      }
+      // The release itself is the live version: nothing to compare it with.
+      const live = await getReviewScreen("deposits", highYield, 2, null);
+      expect([live.version.round, live.baseline, live.previousNumber, live.liveName]).toEqual([3, null, null, null]);
+    } finally {
+      await db.update(versions).set({ name: v1.name }).where(eq(versions.id, v1.id));
+    }
   });
 
   it("shows a rename against what still renders when the Active version was revoked, and none on the live version itself", async () => {
@@ -237,22 +315,27 @@ describe("getReviewScreen", () => {
     await db.update(versions).set({ name: "Cash Back Welcome Bonus — 2025 Terms" }).where(versionOf(1));
     await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
     try {
-      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+      const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
       expect(screen.liveName, "v1 still renders").toBe("Cash Back Welcome Bonus — 2025 Terms");
     } finally {
       await db.update(versions).set({ state: v2.state, revoke: v2.revoke }).where(versionOf(2));
       await db.update(versions).set({ name: v1.name }).where(versionOf(1));
     }
-    expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 2)).liveName, "v2 is the live one").toBeNull();
+    expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 2, null)).liveName, "v2 is the live one").toBeNull();
   });
 
   describe("the redline's baseline when nothing is Active", () => {
-    // Cash Back: v1 Superseded (it still renders), v2 Active, v3 In review based on v2. Each test revokes v2.
-    const versionOf = (number: number) => and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, number));
+    // The walk goes back through the round sent back to the revoked version (decision 0031).
+    // Cash Back: v1 Superseded (it still renders), v2 Active, v3 In review on round 2, based on round 1 (sent
+    // back), based on v2. Each test revokes v2.
+    const versionOf = (number: number, round = 1) =>
+      and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, number), eq(versions.round, round));
     const revoke = { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() };
 
     async function withV2Revoked(change: () => Promise<unknown>, check: () => Promise<void>) {
-      const [v1, v2, v3] = await Promise.all([1, 2, 3].map((n) => db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!)));
+      const [v1, v2, v3] = await Promise.all(
+        [versionOf(1), versionOf(2), versionOf(3, 2)].map((where) => db.query.versions.findFirst({ where }).then((v) => v!)),
+      );
       await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
       try {
         await change();
@@ -260,7 +343,7 @@ describe("getReviewScreen", () => {
       } finally {
         await db.update(versions).set({ state: v1.state, sunsetAt: v1.sunsetAt }).where(versionOf(1));
         await db.update(versions).set({ state: v2.state, revoke: v2.revoke }).where(versionOf(2));
-        await db.update(versions).set({ basedOnVersionId: v3.basedOnVersionId }).where(versionOf(3));
+        await db.update(versions).set({ basedOnVersionId: v3.basedOnVersionId }).where(versionOf(3, 2));
       }
     }
 
@@ -270,7 +353,7 @@ describe("getReviewScreen", () => {
       await withV2Revoked(
         async () => {},
         async () => {
-          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
           expect(screen.baseline).toEqual({ id: v2.id, number: 2, state: "revoked", body: v2.body, variables: v2.variables });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
         },
@@ -281,15 +364,15 @@ describe("getReviewScreen", () => {
       as("jordan");
       const v1 = (await db.query.versions.findFirst({ where: versionOf(1) }))!;
       await withV2Revoked(
-        () => db.update(versions).set({ basedOnVersionId: null }).where(versionOf(3)),
+        () => db.update(versions).set({ basedOnVersionId: null }).where(versionOf(3, 2)),
         async () => {
-          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3);
+          const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
           expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
           expect(screen.previousNumber).toBeNull();
 
           // v1's sunset passes too: nothing renders, so nothing to compare with, as for a first version.
           await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - 1000) }).where(versionOf(1));
-          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3)).baseline).toBeNull();
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).baseline).toBeNull();
         },
       );
     });
@@ -379,6 +462,70 @@ describe("getVersions", () => {
     expect(v3.contractItems).toContainEqual({ text: "v3 adds required `annual_fee` (Currency).", breaking: true });
   });
 
+  it("shows a number once, as its head, with every round in its review history", async () => {
+    as("eli");
+    const highYield = await getVersions("deposits", ids["high-yield-savings"]!);
+    expect(highYield.items.map((i) => [i.number, i.round, i.label, i.state, i.approvedOnRound])).toEqual([
+      [2, 3, "v2", "active", "Approved on round 3"],
+      [1, 1, "v1", "superseded", null],
+    ]);
+    const [v2, v1] = highYield.items;
+    expect(v1!.rounds, "one round: no history").toBeNull();
+    expect(v2!.decisions).toEqual([expect.objectContaining({ kind: "approved", by: expect.objectContaining({ id: "naomi" }) })]);
+    expect(v2!.rounds).toEqual([
+      expect.objectContaining({
+        round: 3,
+        state: "active",
+        submittedBy: expect.objectContaining({ id: "eli" }),
+        decision: expect.objectContaining({ kind: "approved", by: expect.objectContaining({ id: "naomi" }), stageName: "Team approver" }),
+      }),
+      expect.objectContaining({
+        round: 2,
+        state: "changes_requested",
+        decision: expect.objectContaining({ kind: "changes_requested", reason: expect.stringContaining("preheader") }),
+      }),
+      expect.objectContaining({
+        round: 1,
+        state: "changes_requested",
+        decision: expect.objectContaining({ kind: "changes_requested", reason: expect.stringContaining("withdrawal limit") }),
+      }),
+    ]);
+    // Compare offers every row, the rounds included, newest first.
+    // Compare opens on the heads (one per number); the other rounds are there to pick.
+    expect(highYield.compareOptions.map((o) => [o.label, o.state, o.head])).toEqual([
+      ["v2 · Round 3", "active", true],
+      ["v2 · Round 2", "changes_requested", false],
+      ["v2 · Round 1", "changes_requested", false],
+      ["v1", "superseded", true],
+    ]);
+
+    as("maya");
+    const cashBack = await getVersions("coral-offers", ids["cash-back"]!);
+    expect(cashBack.items.map((i) => [i.number, i.round, i.label, i.state])).toEqual([
+      [3, 2, "v3 · Round 2", "in_review"],
+      [2, 1, "v2", "active"],
+      [1, 1, "v1", "superseded"],
+    ]);
+    // A round in review has no closing decision yet.
+    expect(cashBack.items[0]!.rounds?.map((r) => [r.round, r.state, r.decision?.kind ?? null])).toEqual([
+      [2, "in_review", null],
+      [1, "changes_requested", "changes_requested"],
+    ]);
+    expect(cashBack.compareOptions.map((o) => [o.label, o.head])).toEqual([
+      ["v3 · Round 2", true],
+      ["v3 · Round 1", false],
+      ["v2", true],
+      ["v1", true],
+    ]);
+
+    const waiver = await getVersions("coral-offers", ids["annual-fee-waiver"]!);
+    expect(waiver.items.map((i) => i.label)).toEqual([null, "v1 · Round 1"]);
+    expect(waiver.compareOptions.map((o) => [o.label, o.head])).toEqual([
+      ["Draft", true],
+      ["v1 · Round 1", true],
+    ]);
+  });
+
   it("puts the open draft first, and reads a revoke with its people", async () => {
     as("jordan");
     const waiver = await getVersions("coral-offers", ids["annual-fee-waiver"]!);
@@ -436,12 +583,12 @@ describe("getActivity", () => {
     const items = await getActivity("coral-offers", ids["balance-transfer"]!);
     const times = items.map((i) => i.at);
     expect(times).toEqual([...times].sort().reverse());
-    expect(items.at(-1)).toMatchObject({ action: "template.created", versionNumber: null });
+    expect(items.at(-1)).toMatchObject({ action: "template.created", versionLabel: null });
     expect(items.some((i) => i.action === "draft.edited")).toBe(true);
     const sunset = items.find((i) => i.action === "version.sunset_set")!;
-    expect(sunset).toMatchObject({ actor: expect.objectContaining({ id: "jordan" }), versionNumber: 1 });
+    expect(sunset).toMatchObject({ actor: expect.objectContaining({ id: "jordan" }), versionLabel: "v1" });
     expect(sunset.summary).toMatch(/^Jordan Ellis set v1 to sunset on /);
-    const activated = items.find((i) => i.action === "version.activated" && i.versionNumber === 2)!;
+    const activated = items.find((i) => i.action === "version.activated" && i.versionLabel === "v2")!;
     expect(activated.actor).toBeNull();
     expect(activated.summary).toBe("v2 became Active, replacing v1.");
   });
@@ -450,7 +597,7 @@ describe("getActivity", () => {
 // ── Threads ───────────────────────────────────────────────────
 
 describe("threads", () => {
-  it("anchors the Annual Fee Waiver threads against the open draft, in block order", async () => {
+  it("shows the Annual Fee Waiver threads on the open draft: the change request first, then by block", async () => {
     as("maya");
     const threads = await getThreads("coral-offers", ids["annual-fee-waiver"]!);
     expect(threads).toHaveLength(2);
@@ -462,7 +609,10 @@ describe("threads", () => {
       resolvedAt: expect.stringMatching(ISO),
     });
     expect(resolved.comments.map((c) => c.author.id)).toEqual(["jordan", "maya"]);
+    // The change request that sent v1 back: about the whole version, open until the draft is submitted.
     const open = threads.find((t) => t.status === "open")!;
+    expect(threads[0]).toBe(open);
+    expect(open).toMatchObject({ blockId: DOCUMENT_THREAD, quote: null });
     expect(open.resolvedBy).toBeUndefined();
     expect(open.comments[0]).toMatchObject({ kind: "change_request", createdAt: expect.stringMatching(ISO) });
 
@@ -487,9 +637,10 @@ describe("threads", () => {
     try {
       as("jordan");
       const threads = await getThreads("coral-offers", templateId, v1.id);
-      expect(threads.map((t) => [t.id.startsWith("th_test") ? t.id : "seeded", t.orphaned])).toEqual([
+      // Document threads oldest first (the seeded change request, then this one), then by block.
+      expect(threads.map((t) => [t.id.startsWith("th_test") ? t.id : t.blockId === DOCUMENT_THREAD ? "seeded doc" : "seeded", t.orphaned])).toEqual([
+        ["seeded doc", false],
         ["th_test_doc", false],
-        ["seeded", false],
         ["seeded", false],
         ["th_test_gone", true],
       ]);
@@ -505,10 +656,12 @@ describe("threads", () => {
 describe("threads on a submitted version", () => {
   const stamp = (n: number) => new Date(BASE.getTime() - n * 1000);
 
-  async function versionId(templateId: string, number: number | null) {
-    const row = await db.query.versions.findFirst({
-      where: number === null ? and(eq(versions.templateId, templateId), eq(versions.state, "draft")) : and(eq(versions.templateId, templateId), eq(versions.number, number)),
-    });
+  /** The draft (null), or a number's round: the given one, else its head. */
+  async function versionId(templateId: string, number: number | null, round?: number) {
+    const row =
+      number === null
+        ? await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) })
+        : await findRound(db, templateId, number, round);
     return row!.id;
   }
 
@@ -537,7 +690,7 @@ describe("threads on a submitted version", () => {
     ]);
     try {
       as("jordan");
-      const screen = async (n: number) => (await getReviewScreen("coral-offers", templateId, n)).threads;
+      const screen = async (n: number) => (await getReviewScreen("coral-offers", templateId, n, null)).threads;
       expect(mine(await screen(1))).toEqual(["th_f3a_v1"]);
       expect(mine(await screen(2))).toEqual(["th_f3a_v1"]);
       expect(mine(await screen(3))).toEqual(["th_f3a_v1", "th_f3a_v3"]);
@@ -551,7 +704,7 @@ describe("threads on a submitted version", () => {
     }
   });
 
-  it("a thread that began in the open draft counts as the next version: not on v1's record, but in the draft's margin", async () => {
+  it("a thread that began in the open draft counts as the next round (v1 round 2): not on round 1's record, but in the draft's margin", async () => {
     const templateId = ids["annual-fee-waiver"]!;
     const draft = await versionId(templateId, null);
     const cleanup = await addThreads(templateId, [
@@ -560,7 +713,7 @@ describe("threads on a submitted version", () => {
     ]);
     try {
       as("jordan");
-      expect(mine((await getReviewScreen("coral-offers", templateId, 1)).threads)).toEqual(["th_f3a_v1"]);
+      expect(mine((await getReviewScreen("coral-offers", templateId, 1, null)).threads)).toEqual(["th_f3a_v1"]);
       expect(mine(await getThreads("coral-offers", templateId, await versionId(templateId, 1)))).toEqual(["th_f3a_v1"]);
       // The draft itself, and the workspace's default (the open draft), show them all.
       expect(mine(await getThreads("coral-offers", templateId, draft))).toEqual(["th_f3a_draft", "th_f3a_v1"]);
@@ -571,14 +724,43 @@ describe("threads on a submitted version", () => {
   });
 });
 
+describe("threads across the rounds of one number", () => {
+  it("round 2's screen shows round 1's threads; round 1's record leaves out the ones begun in round 2", async () => {
+    const templateId = ids["cash-back"]!;
+    const [round1, round2] = await Promise.all([findRound(db, templateId, 3, 1), findRound(db, templateId, 3, 2)]);
+    const rows = [
+      { id: "th_rounds_r1", origin: round1!.id },
+      { id: "th_rounds_r2", origin: round2!.id },
+    ];
+    await db.insert(commentThreads).values(
+      rows.map((r) => ({ id: r.id, templateId, originVersionId: r.origin, blockId: DOCUMENT_THREAD, quote: null, status: "open" as const, createdAt: BASE })),
+    );
+    try {
+      as("jordan");
+      const ours = (threads: { id: string }[]) => threads.map((t) => t.id).filter((id) => id.startsWith("th_rounds")).sort();
+      expect(ours((await getReviewScreen("coral-offers", templateId, 3, 1)).threads)).toEqual(["th_rounds_r1"]);
+      const onRound2 = (await getReviewScreen("coral-offers", templateId, 3, 2)).threads;
+      expect(ours(onRound2)).toEqual(["th_rounds_r1", "th_rounds_r2"]);
+      expect(onRound2.filter((t) => t.id.startsWith("th_rounds")).map((t) => [t.originRound, t.originLabel])).toEqual(
+        expect.arrayContaining([
+          [1, "v3 · Round 1"],
+          [2, "v3 · Round 2"],
+        ]),
+      );
+    } finally {
+      await db.delete(commentThreads).where(inArray(commentThreads.id, rows.map((r) => r.id)));
+    }
+  });
+});
+
 describe("the review screen's version", () => {
   it("carries the sunset day of a Superseded version (and null without one)", async () => {
     as("jordan");
-    const superseded = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 1);
+    const superseded = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 1, null);
     expect(superseded.version.state).toBe("superseded");
     expect(superseded.version.sunsetDay).toBe("2026-10-25");
     expect(superseded.sunsetCalendar).toEqual({ zone: "America/New_York", today: "2026-10-04" });
-    const active = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 2);
+    const active = await getReviewScreen("coral-offers", ids["balance-transfer"]!, 2, null);
     expect(active.version.sunsetDay).toBeNull();
   });
 });

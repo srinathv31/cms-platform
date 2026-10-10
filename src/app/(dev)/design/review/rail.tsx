@@ -450,6 +450,8 @@ function Comments({
         quote: composer.quote ?? null,
         status: "open",
         originVersionNumber: 3,
+        originRound: 1,
+        originLabel: "v3",
         comments: [],
         orphaned: false,
       }

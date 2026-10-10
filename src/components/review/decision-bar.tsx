@@ -2,7 +2,7 @@
 
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
-import type { DecisionAccess } from "./decision-model";
+import type { DecisionAccess, DecisionRow } from "./decision-model";
 import { RV } from "./review-grid";
 
 // The stacked layout's decision bar. Below 53rem the decision rail sits under the whole document, so
@@ -15,25 +15,25 @@ import { RV } from "./review-grid";
 
 export function DecisionBar({
   access,
-  line,
+  row,
   decidedHere,
   onApprove,
   onRequest,
 }: {
   access: DecisionAccess;
-  /** The version has been decided, or isn't in review: there is nothing to press. */
-  line: string | null;
+  /** Anything but buttons: the version has been decided, or isn't in review, and there is nothing to press. */
+  row: DecisionRow;
   /** The viewer made the decision on this screen: the bar confirms it. */
   decidedHere: boolean;
   onApprove: (opener: HTMLElement) => void;
   onRequest: (opener: HTMLElement) => void;
 }) {
-  if (line !== null) {
+  if (row.kind !== "buttons") {
     // The rail's line is the status (it is announced and takes focus); this one only shows it.
-    return decidedHere ? (
+    return decidedHere && row.kind === "line" ? (
       <div data-slot="decision-bar" className={RV.bar}>
         <p aria-hidden className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
-          {line}
+          {row.text}
         </p>
       </div>
     ) : null;

@@ -72,6 +72,7 @@ async function insertV1(spring: SpringFixture): Promise<string> {
     ...v2,
     id,
     number: 1,
+    round: 1,
     state: "superseded",
     variables: JSON.stringify(variables),
     created_at: live - 20 * DAY,
