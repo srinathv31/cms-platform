@@ -21,7 +21,7 @@ vi.stubGlobal(
   }),
 );
 
-const { default: ComparePanel } = await import("./compare-panel");
+const { default: ComparePanel, openingPair } = await import("./compare-panel");
 
 const doc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
 const version = (id: string, number: number, text: string, name = "Rate notice"): CompareVersion => ({
@@ -34,8 +34,8 @@ const version = (id: string, number: number, text: string, name = "Rate notice")
   variables: [],
 });
 const OPTIONS: CompareOption[] = [
-  { id: "v_2", label: "v2", state: "active" },
-  { id: "v_1", label: "v1", state: "superseded" },
+  { id: "v_2", label: "v2", state: "active", head: true },
+  { id: "v_1", label: "v1", state: "superseded", head: true },
 ];
 
 let root: Root;
@@ -81,6 +81,29 @@ describe("ComparePanel", () => {
     expect(compareRoute).toHaveBeenCalledTimes(2);
     expect(text()).not.toContain("Couldn't load these versions.");
     expect(text()).toContain("Rates are high.");
+  });
+
+  it("opens on the two newest versions, not the last two rounds of one", async () => {
+    // Cash Back: v3 sent back on round 1 and in review on round 2.
+    const options: CompareOption[] = [
+      { id: "v_3r2", label: "v3 · Round 2", state: "in_review", head: true },
+      { id: "v_3r1", label: "v3 · Round 1", state: "changes_requested", head: false },
+      { id: "v_2", label: "v2", state: "active", head: true },
+      { id: "v_1", label: "v1", state: "superseded", head: true },
+    ];
+    compareRoute.mockResolvedValue({ ok: true, from: version("v_2", 2, "Rates were low."), to: version("v_3r2", 3, "Rates are high.") });
+    await act(async () => root.render(<ComparePanel templateId="UC-ABC123" options={options} />));
+    await tick();
+    expect(compareRoute).toHaveBeenCalledWith("/api/templates/UC-ABC123/compare?from=v_2&to=v_3r2");
+    expect(openingPair(options)).toEqual({ fromId: "v_2", toId: "v_3r2" });
+    // A draft is a version of its own; a first version on its second round has only its rounds.
+    expect(openingPair([{ id: "d", label: "Draft", state: "draft", head: true }, ...options.slice(2, 3)])).toEqual({ fromId: "v_2", toId: "d" });
+    expect(
+      openingPair([
+        { id: "v_1r2", label: "v1 · Round 2", state: "in_review", head: true },
+        { id: "v_1r1", label: "v1 · Round 1", state: "changes_requested", head: false },
+      ]),
+    ).toEqual({ fromId: "v_1r1", toId: "v_1r2" });
   });
 
   it("says it couldn't load them when the request fails", async () => {

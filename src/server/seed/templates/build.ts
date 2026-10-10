@@ -88,6 +88,24 @@ function checkRounds(spec: SeedTemplate) {
   }
 }
 
+/**
+ * Fails the reset early if a send-back isn't shaped as `requestChanges` writes it: every changes-requested
+ * decision has a whole-version thread on that round whose first comment is the reason, a change request by
+ * the approver at the moment they decided.
+ */
+function checkSendBacks(spec: SeedTemplate) {
+  for (const v of spec.versions) {
+    for (const a of v.approvals ?? []) {
+      if (a.decision !== "changes_requested") continue;
+      const thread = (spec.threads ?? []).find((t) => t.origin === v.ref && t.block === DOCUMENT_THREAD);
+      const first = thread?.comments[0];
+      if (!first || first.kind !== "change_request" || first.author !== a.actor || first.body !== a.reason || first.at !== a.at) {
+        throw new Error(`Seed: ${spec.key}/${v.ref} was sent back without a whole-version thread holding the reason`);
+      }
+    }
+  }
+}
+
 /** The most recent moment (smallest "days ago") anything happened to a version. */
 function lastTouched(v: SeedVersion): number {
   if (v.updatedAt !== undefined) return v.updatedAt;
@@ -115,6 +133,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     versions: {},
   };
   checkRounds(spec);
+  checkSendBacks(spec);
   for (const v of spec.versions) {
     ref.versions[v.ref] = {
       id: ctx.id("v"),
@@ -143,16 +162,19 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     return [...new Set([...inherited, v.createdBy, ...(v.submittedBy ? [v.submittedBy] : [])])];
   };
 
-  const audit = (e: {
-    at: number;
-    actor: string | null;
-    action: string;
-    version?: VersionRef;
-    details?: Record<string, unknown>;
-    sessionKey?: string;
-  }) => {
+  const audit = (
+    e: {
+      at: number;
+      actor: string | null;
+      action: string;
+      version?: VersionRef;
+      details?: Record<string, unknown>;
+      sessionKey?: string;
+    },
+    newId: (prefix: string) => string = ctx.id,
+  ) => {
     sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: newId("ae"),
       at: ctx.at(e.at),
       actorId: e.actor,
       teamId: spec.teamId,
@@ -399,8 +421,9 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
       }
     }
     const anchored = (originSpec.body.content ?? []).find((b) => b.attrs?.id === id);
+    const newId = thread.keyedIds ? (prefix: string) => ctx.keyedId(`${spec.key}:${thread.origin}:${id}`, prefix) : ctx.id;
 
-    const threadId = ctx.id("th");
+    const threadId = newId("th");
     const first = thread.comments[0];
     sink.commentThreads.push({
       id: threadId,
@@ -415,7 +438,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     });
     for (const c of thread.comments) {
       sink.comments.push({
-        id: ctx.id("cm"),
+        id: newId("cm"),
         threadId,
         authorId: c.author,
         body: c.body,
@@ -423,35 +446,47 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
         createdAt: ctx.at(c.at),
       });
       if ((c.kind ?? "comment") === "comment") {
-        audit({
-          at: c.at,
-          actor: c.author,
-          action: "comment.added",
-          version: origin,
-          details: { threadId, blockId: id, author: userName(c.author) },
-        });
+        audit(
+          {
+            at: c.at,
+            actor: c.author,
+            action: "comment.added",
+            version: origin,
+            details: { threadId, blockId: id, author: userName(c.author) },
+          },
+          newId,
+        );
       }
     }
     if (thread.resolved && whole) {
       // Answered by submitting the next round, as `submitVersion` resolves it: the round that answered it.
       const answer = spec.versions.find((s) => s.basedOn === thread.origin && s.number !== null);
       if (!answer) throw new Error(`Seed: ${spec.key}/${thread.origin} has a resolved change request but no next round`);
+      if (thread.resolved.by !== answer.submittedBy || thread.resolved.at !== answer.submittedAt) {
+        throw new Error(`Seed: ${spec.key}/${thread.origin}'s change request is resolved by ${answer.ref}'s submit, so by its submitter then`);
+      }
       const next = versionOf(answer.ref);
-      audit({
-        at: thread.resolved.at,
-        actor: thread.resolved.by,
-        action: "thread.resolved",
-        version: origin,
-        details: { threadId, blockId: id, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
-      });
+      audit(
+        {
+          at: thread.resolved.at,
+          actor: thread.resolved.by,
+          action: "thread.resolved",
+          version: origin,
+          details: { threadId, blockId: id, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
+        },
+        newId,
+      );
     } else if (thread.resolved) {
-      audit({
-        at: thread.resolved.at,
-        actor: thread.resolved.by,
-        action: "comment.resolved",
-        version: origin,
-        details: { threadId, blockId: id },
-      });
+      audit(
+        {
+          at: thread.resolved.at,
+          actor: thread.resolved.by,
+          action: "comment.resolved",
+          version: origin,
+          details: { threadId, blockId: id },
+        },
+        newId,
+      );
     }
   }
 

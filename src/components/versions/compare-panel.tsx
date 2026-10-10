@@ -19,8 +19,8 @@ import type { CompareVersion } from "@/server/queries/compare";
 
 // The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline.
 // The pickers only offer pairs that read forward in time (From is the older one, always), so the
-// diff never runs backwards and no combination is empty. Each pair is read from
-// GET /api/templates/[templateId]/compare.
+// diff never runs backwards and no combination is empty. They list every round, and open on the two
+// newest versions (`openingPair`). Each pair is read from GET /api/templates/[templateId]/compare.
 
 type Loaded = { key: string; ok: true; from: CompareVersion; to: CompareVersion } | { key: string; ok: false };
 
@@ -67,10 +67,21 @@ function VersionSelect({
   );
 }
 
+/**
+ * The pair the panel opens on: the two newest versions, each number as its head (`CompareOption.head`, the
+ * draft included), so a version's sent-back rounds aren't what it compares first. With fewer than two
+ * heads (a first version on its second round), the two newest rows.
+ */
+export function openingPair(options: readonly CompareOption[]): { fromId: string; toId: string } {
+  const heads = options.filter((o) => o.head);
+  const [to, from] = heads.length >= 2 ? heads : options;
+  return { fromId: from!.id, toId: to!.id };
+}
+
 export default function ComparePanel({ templateId, options }: { templateId: string; options: CompareOption[] }) {
   // `options` is newest first: index 0 is the newest, so "older" means a higher index.
-  const [fromId, setFromId] = useState(options[1].id);
-  const [toId, setToId] = useState(options[0].id);
+  const [fromId, setFromId] = useState(() => openingPair(options).fromId);
+  const [toId, setToId] = useState(() => openingPair(options).toId);
   const [changesOnly, setChangesOnly] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);

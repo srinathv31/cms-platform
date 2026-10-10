@@ -22,10 +22,12 @@ Convention only (nothing checks these):
 - Colors, radii, fonts, and motion come from tokens and presets (see below). Links take typed routes (`as Route`).
 - A version's label and its review link come from [src/domain/rounds.ts](../domain/rounds.ts): `versionLabel`
   ("v3 · Round 2" where it stands alone, `{ style: "sentence" }` for "v3, round 2" in a title, button or line) and
-  `reviewPath`, which adds `?round=` exactly when the label shows the round. Rounds appear only where approval is the
-  subject: the review queue and screen, the workspace header while in review, the submit dialog, comment threads,
-  notifications, the audit log, Activity and the Versions tab. The Library, Usage, consumers and the integration
-  panel speak released numbers only (`v${n}`).
+  `reviewPath`, which adds `?round=` exactly when the label shows the round. Rounds appear wherever a version's review,
+  or a round it sent back, is on screen: the review queue and screen, the workspace header (a sent-back round, a round
+  in review, and "Based on v1 · Round 1" on the draft a send-back opened, with its "Reverted to v1, round 1"), the
+  submit dialog, comment threads, notifications, the audit log, Activity, the Versions tab and its review history,
+  the Compare dialog, and the footer of a round's PDF preview. The Library, Usage, consumers and the integration panel
+  speak released numbers only (`v${n}`).
 - The screen-level UI rules (one black primary button per screen, one segmented style, one tab idiom, 32px
   controls in rails, skeletons with the real geometry, focus return, zero console errors) live in
   [docs/reference/ui-checklist.md](../../docs/reference/ui-checklist.md). Read it before you build a screen.
@@ -60,7 +62,7 @@ Feature folders:
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
-| `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
+| `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round, opening on the two newest versions), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
 | `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`), autosave, session store, Copilot prompt, save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks

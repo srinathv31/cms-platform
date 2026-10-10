@@ -8,6 +8,7 @@ import {
   nextRound,
   parseRoundParam,
   reviewHistoryLabel,
+  reviewHistoryName,
   reviewLink,
   reviewPath,
   roundLabel,
@@ -56,6 +57,8 @@ describe("labels", () => {
     expect(approvedOnRound(v(2, 2, "in_review")), "not approved yet").toBeNull();
     expect(reviewHistoryLabel(3)).toBe("Review history (3 rounds)");
     expect(reviewHistoryLabel(1)).toBe("Review history (1 round)");
+    // Its accessible name says whose history it is.
+    expect(reviewHistoryName(2, 3)).toBe("v2 review history (3 rounds)");
   });
 });
 

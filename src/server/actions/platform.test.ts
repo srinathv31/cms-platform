@@ -24,7 +24,7 @@ import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
 import { createTeam, saveApprovalChain, setBusinessZone, setChannelRule, updateContentType } from "./platform";
-import { approveVersion, submitVersion } from "./review";
+import { approveVersion, requestChanges, submitVersion } from "./review";
 
 // Platform settings and the two-stage approval they enable, end to end against a temporary database
 // filled by the real seed. Only the database handle, the demo clock, the persona and Next's cache
@@ -922,6 +922,61 @@ describe("editing the chain while versions are in review: each version keeps the
     expect((await notificationsAt(at)).filter((n) => n.href?.includes(templateId)).map((n) => n.userId)).toEqual(["naomi"]);
     as("naomi");
     expect(await approve(templateId)).toEqual({ ok: true, wentLive: true, number: 1, round: 1 });
+  });
+});
+
+// ── A stage reviewer's stored link after a send-back ──────────
+
+describe("a bare review link a stage reviewer outside the team was sent before a send-back", () => {
+  const team = { id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE };
+  const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
+
+  beforeAll(async () => {
+    await resetChain();
+    as("riley");
+    expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, { name: "Legal reviewer", rule: { kind: "user", userId: "naomi" } }] })).toEqual({
+      ok: true,
+    });
+  });
+  afterAll(resetChain);
+
+  it("opens the round Naomi sent back while the next round waits on a stage that doesn't name her; the team gets the head", async () => {
+    const templateId = await submitted("coral-offers", "maya");
+    const asked = as("jordan");
+    expect(await approve(templateId)).toEqual({ ok: true, wentLive: false, number: 1, round: 1 });
+    // Naomi isn't on Coral Offers: her link is bare (round 1 shows no round) and opens in her own space.
+    const told = (await notificationsAt(asked)).filter((n) => n.userId === "naomi" && n.href?.includes(templateId));
+    expect(told.map((n) => [n.kind, n.href])).toEqual([["review_requested", `/deposits/review/${templateId}/1`]]);
+
+    as("naomi");
+    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Name the governing law." })).toEqual({ ok: true });
+    as("maya");
+    expect(await submitVersion({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
+
+    // Round 2 waits on the team's approvers, so the stored link opens round 1, which she decided.
+    as("naomi");
+    const screen = await getReviewScreen("deposits", templateId, 1, null);
+    expect(screen.version).toMatchObject({ number: 1, round: 1, state: "changes_requested" });
+    expect(screen.can.approve.ok).toBe(false);
+    // Access is no wider: round 2 is still a 404 for her, and the bare link for someone who decided no round.
+    await expect(getReviewScreen("deposits", templateId, 1, 2)).rejects.toThrow(NOT_FOUND);
+    as("eli");
+    await expect(getReviewScreen("deposits", templateId, 1, null)).rejects.toThrow(NOT_FOUND);
+    // The team's link is the number's head.
+    as("jordan");
+    expect((await getReviewScreen("coral-offers", templateId, 1, null)).version).toMatchObject({ round: 2, state: "in_review" });
+
+    // Once round 2 waits on her stage, the same link opens it.
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: ["typical"] })).toEqual({
+      ok: true,
+      wentLive: false,
+      number: 1,
+      round: 2,
+    });
+    as("naomi");
+    const next = await getReviewScreen("deposits", templateId, 1, null);
+    expect(next.version).toMatchObject({ number: 1, round: 2, state: "in_review" });
+    expect(next.can.approve).toEqual({ ok: true });
   });
 });
 

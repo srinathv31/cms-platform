@@ -6,7 +6,7 @@ import type { Channel, Variable, VersionState } from "@/domain/types";
 import type * as ucomp from "@/server/db/schema/ucomp";
 import type * as sim from "@/server/db/schema/sim";
 import { seededId, seededTemplateId } from "@/server/ids";
-import { mulberry32, SEED, type Rng } from "./rng";
+import { fnv1a, mulberry32, SEED, type Rng } from "./rng";
 import { VariableKit } from "./variables";
 
 export { DAY, HOUR } from "./time";
@@ -101,8 +101,15 @@ export interface SeedCtx {
   templates: Map<string, TemplateRef>;
   /** A Date `days` before base (negative = in the future). */
   at(days: number): Date;
-  /** Unique seeded id, e.g. `m_k3f9a2x7q1`. */
+  /** Unique seeded id, e.g. `m_k3f9a2x7q1`, the next from the one sequence the whole seed shares. */
   id(prefix: string): string;
+  /**
+   * Unique seeded id from a sequence of its own, keyed by `key` (as content.ts keys block ids), so it
+   * draws nothing from the shared one. For rows added once the seed's ids were in use: e2e specs and
+   * screenshots name template and version ids, and one more draw from the shared sequence would move
+   * every id after it.
+   */
+  keyedId(key: string, prefix: string): string;
   /** Unique seeded template id, e.g. `UC-4F7K2Q`. */
   templateId(): string;
   template(key: string): TemplateRef;
@@ -120,6 +127,14 @@ export function createContext(base: number): SeedCtx {
       }
     }
   };
+  const keyed = new Map<string, Rng>();
+  const sequence = (key: string) => {
+    const existing = keyed.get(key);
+    if (existing) return existing;
+    const created = mulberry32(fnv1a(key));
+    keyed.set(key, created);
+    return created;
+  };
   const templates = new Map<string, TemplateRef>();
   return {
     base,
@@ -129,6 +144,7 @@ export function createContext(base: number): SeedCtx {
     templates,
     at: (days) => new Date(base - days * DAY),
     id: (prefix) => unique(() => seededId(rng, prefix)),
+    keyedId: (key, prefix) => unique(() => seededId(sequence(key), prefix)),
     templateId: () => unique(() => seededTemplateId(rng)),
     template(key) {
       const t = templates.get(key);

@@ -144,7 +144,7 @@ describe("describeActivity: one sentence per audit action", () => {
         { state: "changes_requested" },
       ),
       MAYA,
-      "Maya Chen answered the change request on v1, round 1 with round 2.",
+      "Maya Chen answered the change request on v1, round 1 by resubmitting.",
     ],
     [
       "thread.resolved, answered by resubmitting before rounds: the next number",

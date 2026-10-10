@@ -81,7 +81,8 @@ export type AuditEffect = {
 /**
  * Where a notification links to. The server turns it into an href with the team slug. A review link
  * names its round exactly when the round's label shows it (`reviewLink` in rounds.ts): without one, the
- * review screen is the number's head.
+ * review screen is the number's head, or for a stage reviewer outside the team who can't open the head
+ * (the next round waits on another stage), the newest round of the number they decided.
  */
 export type NotificationLink =
   | { to: "review"; templateId: string; versionNumber: number; round?: number }
@@ -342,20 +343,24 @@ export interface ReviewScreenData {
   /**
    * What the redline, its "vs vN" label and the change count compare with (`reviewBaseline`): the Active
    * version; with none Active (after a revoke), the released version the draft was based on, then the
-   * newest version that still renders. Null for a first version, or when that would be this version.
-   * `state` is for the label ("vs v3 (revoked)"). The contract changes come from submit (`contractBaseline`).
+   * newest version that still renders. Never a round's own number: a round sent back before its number
+   * went live compares with the released version it was drafted from. Null for a first version, or when
+   * that would be this version. `state` is for the label ("vs v3 (revoked)"). The contract changes come
+   * from submit (`contractBaseline`).
    */
   baseline: { id: string; number: number; state: VersionState; body: JSONContent; variables: Variable[] } | null;
   /**
    * The Active version this one would replace, for the Approve dialog's consequences and its sunset
-   * offer. Null when nothing is Active, or this is the Active version. Not `baseline`: after a revoke the
-   * redline compares with the revoked version, which approving replaces nothing of.
+   * offer. Null when nothing is Active, or the Active version is this one or its number's release. Not
+   * `baseline`: after a revoke the redline compares with the revoked version, which approving replaces
+   * nothing of.
    */
   previousNumber: number | null;
   /**
    * The name customers get today, which the rail shows a rename against: the Active version's or, with
-   * none Active, the newest version that still renders (`contractBaseline`). Null when nothing else
-   * renders, or that is this version.
+   * none Active, the newest version that still renders (`renameBaseline`). For a round sent back before
+   * its number went live, the name of the version it was drafted from. Null when nothing else renders,
+   * or that is this version.
    */
   liveName: string | null;
   steps: StepView[];
@@ -429,6 +434,11 @@ export interface CompareOption {
   /** "Draft" for the open draft, else `versionLabel` (chrome, with history): "v2", "v3 · Round 1". */
   label: string;
   state: VersionState;
+  /**
+   * The row the Versions timeline shows for its number (its head: the released row, else the latest
+   * round), or the open draft. Compare opens on the two newest of these; the other rounds stay selectable.
+   */
+  head: boolean;
 }
 
 export interface VersionsData {

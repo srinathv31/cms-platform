@@ -1,3 +1,4 @@
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { SeedCtx } from "../context";
 import { callout, disclosure, inlineDoc, ol, p, table, ul } from "../content";
 import { buildTemplate } from "./build";
@@ -8,6 +9,10 @@ import type { SeedTemplate } from "./types";
 const FDIC =
   "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category.";
 const STATE_TERMS = "Account terms for {home_state} residents are in your deposit account agreement.";
+
+// Naomi's two send-backs of High-Yield Savings v2.
+const SAVINGS_ROUND_1_REASON = "The withdrawal limit isn't stated. Add the six-per-statement-cycle rule before this goes out.";
+const SAVINGS_ROUND_2_REASON = "The email preheader still says 'rate change'. This is a rate disclosure.";
 
 /** `withdrawals: false` is v2's first round, sent back for leaving out the excess withdrawal limit. */
 function savingsBody(version: 1 | 2, { withdrawals = version === 2 }: { withdrawals?: boolean } = {}) {
@@ -155,15 +160,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submittedBy: "eli",
           submittedAt: 77,
           submitNote: "Adds an email version.",
-          approvals: [
-            {
-              actor: "naomi",
-              decision: "changes_requested",
-              reason: "The withdrawal limit isn't stated. Add the six-per-statement-cycle rule before this goes out.",
-              at: 76.4,
-              seen: ["typical"],
-            },
-          ],
+          approvals: [{ actor: "naomi", decision: "changes_requested", reason: SAVINGS_ROUND_1_REASON, at: 76.4, seen: ["typical"] }],
         },
         {
           ref: "v2r2",
@@ -183,13 +180,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submittedAt: 75.5,
           submitNote: "Adds the excess withdrawal limit.",
           approvals: [
-            {
-              actor: "naomi",
-              decision: "changes_requested",
-              reason: "The email preheader still says 'rate change'. This is a rate disclosure.",
-              at: 75.2,
-              seen: ["typical", "long"],
-            },
+            { actor: "naomi", decision: "changes_requested", reason: SAVINGS_ROUND_2_REASON, at: 75.2, seen: ["typical", "long"] },
           ],
         },
         {
@@ -211,6 +202,24 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submitNote: "Adds the excess withdrawal limit and an email version.",
           approvals: [{ actor: "naomi", decision: "approved", at: 70, seen: ["typical", "long"] }],
           activatedAt: 70,
+        },
+      ],
+      // Each send-back's reason, answered by Eli's next submit. Added after the seed's ids were in use,
+      // so they draw their own (`keyedIds`).
+      threads: [
+        {
+          origin: "v2r1",
+          block: DOCUMENT_THREAD,
+          comments: [{ author: "naomi", kind: "change_request", body: SAVINGS_ROUND_1_REASON, at: 76.4 }],
+          resolved: { by: "eli", at: 75.5 },
+          keyedIds: true,
+        },
+        {
+          origin: "v2r2",
+          block: DOCUMENT_THREAD,
+          comments: [{ author: "naomi", kind: "change_request", body: SAVINGS_ROUND_2_REASON, at: 75.2 }],
+          resolved: { by: "eli", at: 74 },
+          keyedIds: true,
         },
       ],
     },

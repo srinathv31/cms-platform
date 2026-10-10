@@ -34,10 +34,15 @@ an immutable round of the version it will become.
   "approved v2 on round 3"; sunset and revoke events stay "v2". `versionLabel` in rounds.ts writes every label.
 - **The Versions tab has one entry per number**, its head: the released row, else the highest round. A version
   released after send-backs says "Approved on round 3", and its rounds sit in a folded "Review history (3 rounds)",
-  each with its decision and reason. Compare offers every round.
+  each with its decision and reason. Compare offers every round, and opens on the two newest versions (each
+  number's head).
 - **Links.** `/[team]/review/[templateId]/[version]` opens the number's head, and `?round=N` opens that round; a
   round that doesn't exist is a 404. Generated links (notifications, the review queue, the Versions tab) carry
-  `?round=` exactly when the label shows the round. Otherwise the bare URL already reaches that row.
+  `?round=` exactly when the label shows the round. Otherwise the bare URL already reaches that row. One exception:
+  a stage reviewer outside the template's team may open only the round waiting on their stage and the rounds they
+  decided, so when the head is closed to them, the bare URL opens the newest round of that number they may open
+  (`requireReviewVersion`). The team always gets the head, and nobody reaches a round they couldn't open by its
+  `?round=`.
 - **Consumers never see a round.** `/api/v1`, notices, the Library, Usage and the integration panel speak of released
   numbers only. A consumer's number means its head: the released version renders (or answers 410), and an unreleased
   head answers 409 without naming a round. `X-Stencil-Version` is the number. A CMS preview may send `round` to render
@@ -77,9 +82,13 @@ an immutable round of the version it will become.
 - Code that finds a version by number has to say which row it means: the head, one round, or released rows only.
   Usage reads released rows only, so an unreleased round never stands in for a released number.
 - A link written before a send-back has no `?round=`, so afterwards it opens the number's latest round. That is
-  intended: the live round is the one that needs attention, and the review history links to every round.
+  intended: the live round is the one that needs attention, and the review history links to every round. A stage
+  reviewer outside the team can't open the latest round until it reaches their stage, so until then their stored
+  link opens the round they decided rather than a 404.
 - The review screen's redline still compares with the Active version (or the review baseline), not with the previous
-  round. Compare covers that; a "changes since round 1" view on the review screen is an open question.
+  round. Compare covers that; a "changes since round 1" view on the review screen is an open question. A round is
+  never compared with its own number: once v2 goes live, its sent-back rounds compare with the released version they
+  were drafted from (`reviewBaseline`), and show a rename against that version's name.
 - `round` is one more CMS-only field on the shared render endpoint, beside `version: "draft"`, and `src/contracts`
   and Coral don't know it. It moves with them when CMS preview gets its own route
   ([A1](../handoff-review.md#a1--high-the-public-consumer-endpoint-also-serves-cms-previews)).

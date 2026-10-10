@@ -258,6 +258,28 @@ describe("getReviewScreen", () => {
     );
   });
 
+  it("compares a round sent back before its number went live with the version it was drafted from, not its own release", async () => {
+    // High-Yield Savings: v1 Superseded, v2 approved on round 3 after two send-backs.
+    as("eli");
+    const highYield = ids["high-yield-savings"]!;
+    const v1 = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, highYield), eq(versions.number, 1)) }))!;
+    await db.update(versions).set({ name: "High-Yield Savings — 2025 Rates" }).where(eq(versions.id, v1.id));
+    try {
+      for (const round of [1, 2]) {
+        const screen = await getReviewScreen("deposits", highYield, 2, round);
+        expect(screen.version).toMatchObject({ number: 2, round, state: "changes_requested" });
+        expect(screen.baseline, `round ${round}: vs v1`).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
+        expect(screen.previousNumber, "it would replace nothing: v2 is its own release").toBeNull();
+        expect(screen.liveName, "renamed from what it was drafted from").toBe("High-Yield Savings — 2025 Rates");
+      }
+      // The release itself is the live version: nothing to compare it with.
+      const live = await getReviewScreen("deposits", highYield, 2, null);
+      expect([live.version.round, live.baseline, live.previousNumber, live.liveName]).toEqual([3, null, null, null]);
+    } finally {
+      await db.update(versions).set({ name: v1.name }).where(eq(versions.id, v1.id));
+    }
+  });
+
   it("shows a rename against what still renders when the Active version was revoked, and none on the live version itself", async () => {
     as("jordan");
     const versionOf = (number: number) => and(eq(versions.templateId, ids["cash-back"]!), eq(versions.number, number));
@@ -442,11 +464,12 @@ describe("getVersions", () => {
       }),
     ]);
     // Compare offers every row, the rounds included, newest first.
-    expect(highYield.compareOptions.map((o) => [o.label, o.state])).toEqual([
-      ["v2 · Round 3", "active"],
-      ["v2 · Round 2", "changes_requested"],
-      ["v2 · Round 1", "changes_requested"],
-      ["v1", "superseded"],
+    // Compare opens on the heads (one per number); the other rounds are there to pick.
+    expect(highYield.compareOptions.map((o) => [o.label, o.state, o.head])).toEqual([
+      ["v2 · Round 3", "active", true],
+      ["v2 · Round 2", "changes_requested", false],
+      ["v2 · Round 1", "changes_requested", false],
+      ["v1", "superseded", true],
     ]);
 
     as("maya");
@@ -461,11 +484,19 @@ describe("getVersions", () => {
       [2, "in_review", null],
       [1, "changes_requested", "changes_requested"],
     ]);
-    expect(cashBack.compareOptions.map((o) => o.label)).toEqual(["v3 · Round 2", "v3 · Round 1", "v2", "v1"]);
+    expect(cashBack.compareOptions.map((o) => [o.label, o.head])).toEqual([
+      ["v3 · Round 2", true],
+      ["v3 · Round 1", false],
+      ["v2", true],
+      ["v1", true],
+    ]);
 
     const waiver = await getVersions("coral-offers", ids["annual-fee-waiver"]!);
     expect(waiver.items.map((i) => i.label)).toEqual([null, "v1 · Round 1"]);
-    expect(waiver.compareOptions.map((o) => o.label)).toEqual(["Draft", "v1 · Round 1"]);
+    expect(waiver.compareOptions.map((o) => [o.label, o.head])).toEqual([
+      ["Draft", true],
+      ["v1 · Round 1", true],
+    ]);
   });
 
   it("puts the open draft first, and reads a revoke with its people", async () => {
@@ -539,7 +570,7 @@ describe("getActivity", () => {
 // ── Threads ───────────────────────────────────────────────────
 
 describe("threads", () => {
-  it("anchors the Annual Fee Waiver threads against the open draft, in block order", async () => {
+  it("shows the Annual Fee Waiver threads on the open draft: the change request first, then by block", async () => {
     as("maya");
     const threads = await getThreads("coral-offers", ids["annual-fee-waiver"]!);
     expect(threads).toHaveLength(2);
@@ -551,7 +582,10 @@ describe("threads", () => {
       resolvedAt: expect.stringMatching(ISO),
     });
     expect(resolved.comments.map((c) => c.author.id)).toEqual(["jordan", "maya"]);
+    // The change request that sent v1 back: about the whole version, open until the draft is submitted.
     const open = threads.find((t) => t.status === "open")!;
+    expect(threads[0]).toBe(open);
+    expect(open).toMatchObject({ blockId: DOCUMENT_THREAD, quote: null });
     expect(open.resolvedBy).toBeUndefined();
     expect(open.comments[0]).toMatchObject({ kind: "change_request", createdAt: expect.stringMatching(ISO) });
 
@@ -576,9 +610,10 @@ describe("threads", () => {
     try {
       as("jordan");
       const threads = await getThreads("coral-offers", templateId, v1.id);
-      expect(threads.map((t) => [t.id.startsWith("th_test") ? t.id : "seeded", t.orphaned])).toEqual([
+      // Document threads oldest first (the seeded change request, then this one), then by block.
+      expect(threads.map((t) => [t.id.startsWith("th_test") ? t.id : t.blockId === DOCUMENT_THREAD ? "seeded doc" : "seeded", t.orphaned])).toEqual([
+        ["seeded doc", false],
         ["th_test_doc", false],
-        ["seeded", false],
         ["seeded", false],
         ["th_test_gone", true],
       ]);

@@ -16,6 +16,7 @@ import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
 import { TEMPLATE_ID_PATTERN, newId, newTemplateId, seededId, seededTemplateId } from "@/server/ids";
+import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
 import { mulberry32 } from "./rng";
 
@@ -131,6 +132,34 @@ describe("ids", () => {
     expect(templates.length).toBe(11);
     for (const t of templates) expect(t.id).toMatch(TEMPLATE_ID_PATTERN);
     expect(new Set(templates.map((t) => t.id)).size).toBe(templates.length);
+  });
+
+  it("keeps the template ids e2e specs, golden files and screenshots name", () => {
+    // One more draw from the shared sequence before a template moves its id and every id after it. A row
+    // added to the seed draws from its own sequence instead (`ctx.keyedId`, `keyedIds` on a thread).
+    expect(result.templates).toEqual({
+      "balance-transfer": "UC-D6KSGY",
+      "cash-back": "UC-J530DX",
+      "annual-fee-waiver": "UC-NYP7F0",
+      "holiday-points": "UC-WGGRJH",
+      "rate-change-notice": "UC-PAS9A0",
+      "high-yield-savings": "UC-ZKZSRZ",
+      "checking-fees": "UC-A4S1YT",
+      "overdraft-protection": "UC-DNF479",
+      "statement-rate-change": "UC-8Y49K2",
+      "statement-paperless": "UC-7W726J",
+      "statement-privacy": "UC-SZZS5Y",
+    });
+  });
+
+  it("draws a keyed id from a sequence of its own: the shared sequence goes on as if it hadn't", () => {
+    const plain = createContext(0);
+    const keyed = createContext(0);
+    const first = keyed.keyedId("high-yield-savings:v2r1:doc", "th");
+    expect(first).toBe(createContext(0).keyedId("high-yield-savings:v2r1:doc", "th"));
+    expect(keyed.keyedId("high-yield-savings:v2r1:doc", "cm")).toMatch(/^cm_/);
+    expect(keyed.keyedId("high-yield-savings:v2r2:doc", "th")).not.toBe(first);
+    expect([keyed.id("v"), keyed.templateId()]).toEqual([plain.id("v"), plain.templateId()]);
   });
 });
 
@@ -429,6 +458,52 @@ describe("comments", () => {
         expect(blocks(draft)).toContain(t.blockId);
       }
     }
+  });
+
+  it("gives every send-back a whole-version thread holding its reason, answered by the next round's submit", async () => {
+    const threads = await db.select().from(ucomp.commentThreads);
+    const comments = await db.select().from(ucomp.comments);
+    const events = await db.select().from(ucomp.auditEvents);
+    const sentBack = (await db.select().from(ucomp.approvals)).filter((a) => a.decision === "changes_requested");
+    expect(sentBack.length).toBeGreaterThanOrEqual(4);
+    for (const a of sentBack) {
+      const round = versions.find((v) => v.id === a.versionId)!;
+      const thread = threads.find((t) => t.originVersionId === round.id && t.blockId === DOCUMENT_THREAD);
+      expect(thread, `${round.templateId} v${round.number} round ${round.round}`).toBeDefined();
+      const first = comments.filter((c) => c.threadId === thread!.id).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())[0];
+      expect(first).toMatchObject({ authorId: a.actorId, kind: "change_request", body: a.reason, createdAt: a.decidedAt });
+
+      // As submit resolves it: by the next round's submitter, then, naming the round that answered it.
+      const next = versions.find((v) => v.basedOnVersionId === round.id && v.number !== null);
+      if (!next) {
+        expect(thread!.status).toBe("open");
+        continue;
+      }
+      expect(thread).toMatchObject({ status: "resolved", resolvedBy: next.submittedBy, resolvedAt: next.submittedAt });
+      const resolved = events.filter((e) => e.action === "thread.resolved" && (e.details as { threadId?: string }).threadId === thread!.id);
+      expect(resolved.map((e) => [e.actorId, e.versionId, e.at.getTime(), e.details])).toEqual([
+        [
+          next.submittedBy,
+          round.id,
+          next.submittedAt!.getTime(),
+          { threadId: thread!.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
+        ],
+      ]);
+    }
+  });
+
+  it("gives High-Yield Savings v2 rounds 1 and 2 Naomi's reasons, each resolved by Eli submitting the next round", async () => {
+    const ids = versionsOf("high-yield-savings").filter((v) => v.number === 2).sort((a, b) => a.round! - b.round!).map((v) => v.id);
+    const threads = (await db.select().from(ucomp.commentThreads)).filter((t) => t.templateId === tpl("high-yield-savings"));
+    expect(threads.map((t) => [ids.indexOf(t.originVersionId) + 1, t.blockId, t.status, t.resolvedBy]).sort()).toEqual([
+      [1, DOCUMENT_THREAD, "resolved", "eli"],
+      [2, DOCUMENT_THREAD, "resolved", "eli"],
+    ]);
+    const answered = (await db.select().from(ucomp.auditEvents))
+      .filter((e) => e.templateId === tpl("high-yield-savings") && e.action === "thread.resolved")
+      .map((e) => (e.details as { resolvedWithRound: number }).resolvedWithRound)
+      .sort();
+    expect(answered).toEqual([2, 3]);
   });
 
   it("gives Annual Fee Waiver one resolved and one open thread, with Jordan's change request", async () => {

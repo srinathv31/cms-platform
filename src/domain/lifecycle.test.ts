@@ -15,6 +15,7 @@ import {
   isAfterToday,
   planDraftStart,
   requestChanges,
+  renameBaseline,
   reviewBaseline,
   revokePending,
   setSunset,
@@ -395,6 +396,30 @@ describe("contractBaseline", () => {
   });
 });
 
+describe("renameBaseline", () => {
+  const v = (id: string, state: VersionState, number: number | null, basedOnVersionId: string | null = null) => ({
+    id,
+    state,
+    number,
+    sunsetAt: null,
+    basedOnVersionId,
+  });
+
+  it("is what customers get today, and nothing on the version they get", () => {
+    const list = [v("v1", "superseded", 1), v("v2", "active", 2, "v1"), v("v3", "in_review", 3, "v2")];
+    expect(renameBaseline(list, "v3", NOW)?.id).toBe("v2");
+    expect(renameBaseline(list, "v1", NOW)?.id).toBe("v2");
+    expect(renameBaseline(list, "v2", NOW)).toBeNull();
+    expect(renameBaseline([v("v1", "in_review", 1)], "v1", NOW)).toBeNull();
+  });
+
+  it("for a round sent back before its number went live, is what the round was drafted from", () => {
+    const list = [v("v1", "superseded", 1), v("v2r1", "changes_requested", 2, "v1"), v("v2r2", "active", 2, "v2r1")];
+    expect(renameBaseline(list, "v2r1", NOW)?.id).toBe("v1");
+    expect(renameBaseline([v("v1r1", "changes_requested", 1), v("v1r2", "active", 1, "v1r1")], "v1r1", NOW)).toBeNull();
+  });
+});
+
 describe("reviewBaseline", () => {
   const DAY = 86_400_000;
   const v = (id: string, state: VersionState, number: number | null, basedOnVersionId: string | null = null, sunsetAt: Date | null = null) => ({
@@ -437,6 +462,24 @@ describe("reviewBaseline", () => {
     expect(reviewBaseline([superseded, v("v2", "revoked", 2), v("v3", "in_review", 3)], "v3", NOW)?.id, "no based-on version").toBe("v1");
     expect(reviewBaseline([superseded, v("v3", "in_review", 3, "v_gone")], "v3", NOW)?.id, "a based-on row that's gone").toBe("v1");
     expect(reviewBaseline([superseded, v("v3", "in_review", 3, "v3")], "v3", NOW)?.id, "never the version itself").toBe("v1");
+  });
+
+  it("compares a round sent back before its number went live with what it was drafted from, never its own release", () => {
+    // High-Yield Savings: v1 Superseded; v2 sent back twice, then approved on round 3.
+    const list = [
+      v("v1", "superseded", 1),
+      v("v2r1", "changes_requested", 2, "v1"),
+      v("v2r2", "changes_requested", 2, "v2r1"),
+      v("v2r3", "active", 2, "v2r2"),
+    ];
+    expect(reviewBaseline(list, "v2r1", NOW)?.id).toBe("v1");
+    expect(reviewBaseline(list, "v2r2", NOW)?.id).toBe("v1");
+    expect(reviewBaseline(list, "v2r3", NOW)).toBeNull();
+    // A first version approved on round 2: its round 1 has nothing before it.
+    expect(reviewBaseline([v("v1r1", "changes_requested", 1), v("v1r2", "active", 1, "v1r1")], "v1r1", NOW)).toBeNull();
+    // Once a later version is Active, an old round compares with it, as every older record does.
+    const later = [...list.slice(0, 3), v("v2r3", "superseded", 2, "v2r2"), v("v3", "active", 3, "v2r3")];
+    expect(reviewBaseline(later, "v2r1", NOW)?.id).toBe("v3");
   });
 
   it("is null for a first version, a change-request round of one, or when nothing renders", () => {

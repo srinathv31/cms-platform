@@ -119,13 +119,14 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       return `${who} commented on ${v}.`;
     case "thread.resolved":
     case "comment.resolved": {
-      // Submitting the next round resolves the change request that sent this one back. A row from before
-      // rounds names the next version instead.
+      // Submitting the next round resolves the change request that sent this one back: the round already
+      // says which, so the sentence names it once. A row from before rounds names the next version instead.
       const answeredBy = numberOr(d.resolvedWith);
       if (d.auto === true && answeredBy !== null) {
-        const round = numberOr(d.resolvedWithRound);
-        const next = round !== null && answeredBy === version?.number ? `round ${round}` : `v${answeredBy}`;
-        return `${who} answered the change request on ${v} with ${next}.`;
+        const sameVersion = numberOr(d.resolvedWithRound) !== null && answeredBy === version?.number;
+        return sameVersion
+          ? `${who} answered the change request on ${v} by resubmitting.`
+          : `${who} answered the change request on ${v} with v${answeredBy}.`;
       }
       return `${who} resolved a comment on ${v}.`;
     }

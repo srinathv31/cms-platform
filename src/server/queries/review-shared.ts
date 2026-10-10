@@ -8,6 +8,7 @@ import { REFUSALS } from "@/domain/lifecycle";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
+import { roundsOf } from "@/domain/rounds";
 import type { JSONContent, PermissionResult, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
@@ -96,6 +97,11 @@ export type ReviewVersionRow = typeof versions.$inferSelect;
  * from outside the template's team (Phase 6, a stage that names a person): someone named on the stage a
  * version waits on opens it from their own space, in any team, and keeps seeing it once they decided it.
  * Any other version of that template stays a 404 for them. A round that doesn't exist is a 404.
+ *
+ * A bare link stored before a send-back (the notification that asked them, a comment's link) names no
+ * round. Once the next round is in review at a stage that doesn't name them, the head is closed to them,
+ * so for them the bare link opens the newest round of the number they may open (`roundsOf`), the one
+ * they decided. The template's own team always gets the head.
  */
 export const requireReviewVersion = cache(
   async (
@@ -112,6 +118,16 @@ export const requireReviewVersion = cache(
     if (!version || version.number === null) notFound();
     if (seesInSpace(space, template)) return { space, template, version };
     if (await namedOnVersion(space.viewer, template, version)) return { space, template, version };
+    if (round === null) {
+      const rows = await db
+        .select()
+        .from(versions)
+        .where(and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)));
+      for (const earlier of roundsOf(rows, versionNumber)) {
+        if (earlier.id === version.id) continue;
+        if (await namedOnVersion(space.viewer, template, earlier)) return { space, template, version: earlier };
+      }
+    }
     notFound();
   },
 );

@@ -34,6 +34,12 @@ export interface SeedThread {
   quote?: string;
   comments: SeedComment[];
   resolved?: { by: string; at: number };
+  /**
+   * Draw the thread's ids (the thread, its comments, its audit rows) from a sequence keyed by the
+   * template, origin and block (`ctx.keyedId`) instead of the shared one. Set on a thread added after
+   * the seed's ids were in use, so adding it moves no other template's or version's id.
+   */
+  keyedIds?: boolean;
 }
 
 export interface SeedVersion {

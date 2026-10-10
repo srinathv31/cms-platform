@@ -345,11 +345,16 @@ export interface BaselineFacts {
  * the newest version that still renders (`contractBaseline`); null when nothing does, as for a first
  * version (decision 0031).
  *
+ * A round is never compared with its own number: a round sent back before its number went live (High-Yield
+ * v2, round 1, now that v2 is Active) takes the same walk, to the released version it was drafted from.
+ *
  * Not the Approve dialog's previous version: that is the Active one only.
  */
 export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], versionId: string, now: Date): V | null {
+  const own = ownNumber(versions, versionId);
   const active = versions.find((v) => v.state === "active");
-  if (active) return active.id === versionId ? null : active;
+  if (active?.id === versionId) return null;
+  if (active && !own(active)) return active;
 
   const byId = new Map(versions.map((v) => [v.id, v]));
   const seen = new Set([versionId]);
@@ -363,7 +368,25 @@ export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], 
   }
 
   const live = contractBaseline(versions, now);
-  return live && live.id !== versionId ? live : null;
+  return live && !own(live) ? live : null;
+}
+
+/**
+ * The version whose name the review screen shows a rename against: what customers get today
+ * (`contractBaseline`). For a round sent back before its number went live, that is its own number's
+ * release, so it is what the round was drafted from instead (`reviewBaseline`). Null when what customers
+ * get is this version, or nothing renders.
+ */
+export function renameBaseline<V extends BaselineFacts>(versions: readonly V[], versionId: string, now: Date): V | null {
+  const live = contractBaseline(versions, now);
+  if (!live || live.id === versionId) return null;
+  return ownNumber(versions, versionId)(live) ? reviewBaseline(versions, versionId, now) : live;
+}
+
+/** Whether a row is the version `versionId` or another round of its number. */
+function ownNumber<V extends BaselineFacts>(versions: readonly V[], versionId: string): (v: V) => boolean {
+  const number = versions.find((v) => v.id === versionId)?.number ?? null;
+  return (v) => v.id === versionId || (number !== null && v.number === number);
 }
 
 // ── Submit for review ─────────────────────────────────────────

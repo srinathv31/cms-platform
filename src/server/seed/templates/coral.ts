@@ -23,6 +23,9 @@ const addedEndDate: ContractChange = {
 
 /** Cash Back v3's change request: round 1 said a fee applies, not when it starts. */
 const CASH_BACK_V3_REASON = "Say when the annual fee starts. \"An annual fee applies\" isn't enough.";
+/** Annual Fee Waiver v1's change request. */
+const WAIVER_V1_REASON =
+  "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.";
 
 // ── Bodies ────────────────────────────────────────────────────
 
@@ -404,16 +407,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 4.5,
           submitNote: "Waiver for new accounts, first year only.",
-          approvals: [
-            {
-              actor: "jordan",
-              decision: "changes_requested",
-              reason:
-                "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.",
-              at: 3.9,
-              seen: ["typical"],
-            },
-          ],
+          approvals: [{ actor: "jordan", decision: "changes_requested", reason: WAIVER_V1_REASON, at: 3.9, seen: ["typical"] }],
         },
         {
           ref: "draft",
@@ -446,16 +440,11 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           resolved: { by: "maya", at: 3.4 },
         },
         {
+          // The change request that sent v1 back, still open: the draft hasn't been submitted.
           origin: "v1",
-          block: "waiver_terms",
-          quote: "The waiver is automatic.",
+          block: DOCUMENT_THREAD,
           comments: [
-            {
-              author: "jordan",
-              kind: "change_request",
-              body: "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.",
-              at: 3.9,
-            },
+            { author: "jordan", kind: "change_request", body: WAIVER_V1_REASON, at: 3.9 },
             {
               author: "maya",
               body: "Understood. I'm rewording the eligibility rule and will resubmit once Product confirms the 30-day window.",

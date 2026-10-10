@@ -11,7 +11,8 @@ type Reader = Pick<Db, "select">;
  * number's head, as `headOf` in domain/rounds.ts picks it: its released row (Active, Superseded or
  * Revoked; there is at most one), else its latest round. The review screen, the review actions and the
  * render pipeline look a version up through it, so a bare `/review/{id}/{n}` and a consumer's pinned
- * number mean the same row.
+ * number mean the same row. (The review screen's one exception, for a stage reviewer outside the team
+ * the head is closed to, is in `requireReviewVersion`.)
  */
 export async function findRound(
   reader: Reader,

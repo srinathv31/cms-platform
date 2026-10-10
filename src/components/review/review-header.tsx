@@ -95,7 +95,7 @@ export function ReviewHeader({
         >
           <StatusBadge state={state} sunsetDay={sunsetDay} now={nowIso} />
         </m.span>
-        <span className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
+        <span data-slot="byline" className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
           {versionLabel(shown)} by {author.name} · {formatAgo(submittedAt, nowIso)}
           {approvedOn ? ` · ${approvedOn}` : null}
         </span>

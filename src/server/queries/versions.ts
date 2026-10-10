@@ -137,12 +137,14 @@ export const getVersions = cache(async (spaceSlug: string, templateId: string): 
 
   // Newest first, the open draft on top: every row for Compare, one head per number for the timeline.
   const newest = [...rows].sort((a, b) => compareRounds(b, a));
+  const isHead = (v: (typeof rows)[number]) => v.number === null || headOf(rows, v.number) === v;
   const compareOptions: CompareOption[] = newest.map((v) => ({
     id: v.id,
     label: v.number === null ? "Draft" : versionLabel(asNumbered(v), { history: true }),
     state: v.state,
+    head: isHead(v),
   }));
-  const shown = newest.filter((v) => v.number === null || headOf(rows, v.number) === v);
+  const shown = newest.filter(isHead);
 
   /** A round as the review history lists it, with its closing decision (its last approvals row) once decided. */
   const roundItem = (v: (typeof rows)[number]): RoundHistoryItem => {

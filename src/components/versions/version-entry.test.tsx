@@ -159,6 +159,7 @@ describe("VersionEntry: rounds", () => {
   it("folds the review history until it is opened", async () => {
     await render(APPROVED_ON_3);
     expect(trigger()?.textContent).toBe("Review history (3 rounds)");
+    expect(trigger()?.getAttribute("aria-label"), "whose history it is").toBe("v2 review history (3 rounds)");
     expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
     expect(rows()).toEqual([]);
   });
@@ -170,6 +171,8 @@ describe("VersionEntry: rounds", () => {
 
     const shown = rows();
     expect(shown.map((row) => rowLink(row).textContent)).toEqual(["Round 3", "Round 2", "Round 1"]);
+    // A screen reader lists the links out of their rows: each names its version.
+    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(["v2, round 3", "v2, round 2", "v2, round 1"]);
     expect(shown.map((row) => row.querySelector("[data-status]")?.getAttribute("data-status"))).toEqual([
       "active",
       "changes_requested",
@@ -191,9 +194,11 @@ describe("VersionEntry: rounds", () => {
     expect(heading()).toBe("v3 · Round 2");
     expect(container.querySelector('[data-slot="approved-on-round"]')).toBeNull();
     expect(trigger()?.textContent).toBe("Review history (2 rounds)");
+    expect(trigger()?.getAttribute("aria-label")).toBe("v3 review history (2 rounds)");
 
     await act(async () => trigger()!.click());
     const shown = rows();
+    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(["v3, round 2", "v3, round 1"]);
     expect(shown.map((row) => rowLink(row).getAttribute("href"))).toEqual([
       "/deposits/review/UC-ABC123/3?round=2",
       "/deposits/review/UC-ABC123/3?round=1",

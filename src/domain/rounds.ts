@@ -147,12 +147,21 @@ export function reviewHistoryLabel(count: number): string {
   return `Review history (${plural(count, "round")})`;
 }
 
+/**
+ * The review history's accessible name, which says whose history it is (two entries can both have two
+ * rounds): "v2 review history (3 rounds)". It keeps the visible label's words.
+ */
+export function reviewHistoryName(number: number, count: number): string {
+  return `v${number} ${reviewHistoryLabel(count).toLowerCase()}`;
+}
+
 // ── Review links ──────────────────────────────────────────────
 
 /**
  * The round's review screen. The bare URL is the number's head (its released row, else its latest
  * round), so `?round=` is added exactly when the label shows the round: otherwise the bare URL is
- * already this row.
+ * already this row. (For a stage reviewer outside the team the head is closed to, the bare URL opens
+ * the newest round they may open instead: `requireReviewVersion` on the server.)
  */
 export function reviewPath(space: string, templateId: string, v: NumberedRound): string {
   const path = `/${space}/review/${templateId}/${v.number}`;

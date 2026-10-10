@@ -19,7 +19,7 @@ import type { VersionState } from "@/domain/types";
 import { formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
 import type { RoundHistoryItem, VersionTimelineItem } from "@/domain/review-types";
-import { reviewHistoryLabel, reviewPath, roundLabel } from "@/domain/rounds";
+import { reviewHistoryLabel, reviewHistoryName, reviewPath, roundLabel, versionLabel } from "@/domain/rounds";
 import { formatLastRender } from "@/components/usage/format";
 import { entryHeadingId } from "./entry-ids";
 import { codeSegments } from "./format";
@@ -158,7 +158,11 @@ function ReviewHistory({
 }) {
   return (
     <Collapsible data-slot="review-history" className="mt-2">
-      <CollapsibleTrigger className="group/history -ml-2 flex h-8 items-center gap-2.5 rounded-lg px-2 text-[14px] leading-6 text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring data-panel-open:text-text">
+      <CollapsibleTrigger
+        // Two entries can both read "Review history (2 rounds)": the name says whose it is.
+        aria-label={reviewHistoryName(number, rounds.length)}
+        className="group/history -ml-2 flex h-8 items-center gap-2.5 rounded-lg px-2 text-[14px] leading-6 text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring data-panel-open:text-text"
+      >
         <ChevronRight
           aria-hidden
           strokeWidth={1.75}
@@ -168,27 +172,32 @@ function ReviewHistory({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ol className="mt-1.5 mb-1 ml-[26px] grid grid-cols-[auto_auto_minmax(0,1fr)] gap-x-4 gap-y-2.5">
-          {rounds.map((round) => (
-            <li
-              key={round.id}
-              data-round={round.round}
-              data-state={round.state}
-              className="col-span-3 grid grid-cols-subgrid items-start text-[14px] leading-6"
-            >
-              <Link
-                href={reviewPath(space, templateId, { number, round: round.round, state: round.state }) as Route}
-                className="w-fit rounded-sm font-medium whitespace-nowrap text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          {rounds.map((round) => {
+            const shown = { number, round: round.round, state: round.state };
+            return (
+              <li
+                key={round.id}
+                data-round={round.round}
+                data-state={round.state}
+                className="col-span-3 grid grid-cols-subgrid items-start text-[14px] leading-6"
               >
-                {roundLabel(round.round)}
-              </Link>
-              <span className="flex h-6 items-center">
-                <StatusBadge state={round.state} />
-              </span>
-              <p className="min-w-0 break-words text-text-muted">
-                <RoundDecision round={round} now={now} />
-              </p>
-            </li>
-          ))}
+                <Link
+                  href={reviewPath(space, templateId, shown) as Route}
+                  // "Round 3" on screen; "v2, round 3" for a screen reader, which lists links out of their rows.
+                  aria-label={versionLabel(shown, { style: "sentence", history: true })}
+                  className="w-fit rounded-sm font-medium whitespace-nowrap text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {roundLabel(round.round)}
+                </Link>
+                <span className="flex h-6 items-center">
+                  <StatusBadge state={round.state} />
+                </span>
+                <p className="min-w-0 break-words text-text-muted">
+                  <RoundDecision round={round} now={now} />
+                </p>
+              </li>
+            );
+          })}
         </ol>
       </CollapsibleContent>
     </Collapsible>

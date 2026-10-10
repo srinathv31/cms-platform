@@ -6,7 +6,7 @@ import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS, contractBaseline, reviewBaseline } from "@/domain/lifecycle";
+import { REFUSALS, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
@@ -286,10 +286,12 @@ export const getReviewScreen = cache(
     const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
     const contractChanges = version.contractChanges ?? [];
     // What a rename is shown against: the name customers get today, the Active version's or, with none
-    // Active, the newest that still renders (as submit's contract changes compare). Not this version's own.
-    const live = contractBaseline(others, nowDate);
+    // Active, the newest that still renders (as submit's contract changes compare). Not this version's own:
+    // a round sent back before its number went live shows it against what it was drafted from.
+    const renamedFrom = renameBaseline(others, version.id, nowDate);
     // What the redline compares with: the Active version or, after a revoke, the revoked text the draft
-    // corrects (decision 0031). The Approve dialog's previous version stays the Active one.
+    // corrects (decision 0031); never a round's own number. The Approve dialog's previous version stays
+    // the Active one, unless that is this version's own release.
     const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
     const active = others.find((v) => v.state === "active");
 
@@ -320,8 +322,8 @@ export const getReviewScreen = cache(
         contractLines: describeChanges(contractChanges, number),
       },
       baseline,
-      previousNumber: active && active.id !== version.id ? active.number : null,
-      liveName: live && live.id !== version.id ? live.name : null,
+      previousNumber: active && active.number !== number ? active.number : null,
+      liveName: renamedFrom?.name ?? null,
       steps: stepperState(
         own,
         decisionRows.map((d) => ({

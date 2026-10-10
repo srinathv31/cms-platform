@@ -40,7 +40,7 @@ beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
   ids = (await seedDatabase(db, { base: BASE })).templates;
-  for (const id of ["maya", "riley"]) people[id] = await loadPersona(db, id);
+  for (const id of ["maya", "riley", "eli"]) people[id] = await loadPersona(db, id);
 }, 60_000);
 
 afterAll(() => {
@@ -337,6 +337,23 @@ describe("getTemplateUsage", () => {
     expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
     expect(v1.consumers.map((c) => [c.name, c.renders30d])).toEqual([["Coral", 0]]);
     expect(u.stillOn).toEqual([]);
+  });
+
+  it("High-Yield Savings: v2, sent back twice before its release, is its released row, never a sent-back round", async () => {
+    as("eli");
+    const templateId = ids["high-yield-savings"]!;
+    const u = await getTemplateUsage("deposits", templateId);
+    expect(u.versions.map((v) => [v.number, v.state])).toEqual([
+      [2, "active"],
+      [1, "superseded"],
+    ]);
+    const released = await libsql.execute({
+      sql: "select activated_at from versions where template_id = ? and number = 2 and state = 'active'",
+      args: [templateId],
+    });
+    expect(u.versions[0]!.activatedAt).toBe(new Date(Number(released.rows[0]!.activated_at)).toISOString());
+    expect(u.versions[0]!.consumers.map((c) => c.name)).toEqual(["Deposits Online"]);
+    expect(new Set(u.rows.filter((r) => r.versionNumber === 2).map((r) => r.versionState))).toEqual(new Set(["active"]));
   });
 
   it("one denominator: a template whose only render failed reads 1 render, 0% succeeded, 1 failed; with no renders there is no rate", async () => {
