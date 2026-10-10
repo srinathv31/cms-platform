@@ -1,0 +1,9 @@
+{
+  "code": "push_payload_too_large",
+  "message": "The push is 5,046 bytes on iPhone. It can be at most 4,096 bytes.",
+  "details": {
+    "platform": "ios",
+    "payloadBytes": 5046,
+    "maxBytes": 4096
+  }
+}

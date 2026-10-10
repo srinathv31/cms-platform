@@ -1,0 +1,9 @@
+{
+  "code": "push_payload_too_large",
+  "message": "The push is 5,057 bytes on Android. It can be at most 4,096 bytes.",
+  "details": {
+    "platform": "android",
+    "payloadBytes": 5057,
+    "maxBytes": 4096
+  }
+}

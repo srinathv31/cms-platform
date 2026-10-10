@@ -1,0 +1,56 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "160 septets: one part",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "code",
+      "label": "Code",
+      "type": "text",
+      "required": true,
+      "sample": "A1B2C"
+    }
+  ],
+  "values": {
+    "code": "A1B2C"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "code"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ]
+}

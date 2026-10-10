@@ -680,6 +680,130 @@ function pagination(): FocusedCase {
   return make("pagination", "Cardmember Agreement", { body: doc(...blocks) });
 }
 
+// ── Messages: Push and SMS ───────────────────────────────────────────────────
+//
+// A message renders its own fields and never its body, so each case's body is an empty document. A
+// push renders once per platform (`push.ios.json`, `push.android.json`), an SMS once (`sms.json`). The
+// counts are the point of the SMS cases: GSM-7 septets (an extension character costs 2), UCS-2 code
+// units (an emoji costs 2), 160 or 70 in one part and 153 or 67 in each part once split
+// (docs/render-spec.md §10, src/domain/messages/gsm7.ts).
+
+/** The Alert content type's footer, as the seed sets it. */
+const FOOTER = "Coral Offers: Reply STOP to opt out, HELP for help.";
+const NO_BODY = doc(p());
+const amount = variable("amount_due", "Amount due", "currency", true, "35");
+const dueDate = variable("due_date", "Due date", "date", true, "2026-11-03");
+const code = variable("code", "Code", "text", true, "A1B2C");
+
+/** A message case: Push, SMS or both, no body. */
+function message(slug: string, templateName: string, parts: Omit<Parameters<typeof make>[2], "body"> & { channels: Channel[] }): FocusedCase {
+  return make(slug, templateName, { ...parts, body: NO_BODY });
+}
+
+const alertBoth = message("alert-push-and-sms", "Payment due", {
+  channels: ["push", "sms"],
+  smsFooter: FOOTER,
+  variables: [first, amount, dueDate],
+  values: { first_name: "Maya", amount_due: "35.00", due_date: "2027-03-04" },
+  channelFields: {
+    push: {
+      title: line(t("Payment due "), v("due_date")),
+      body: line(t("Hi "), v("first_name"), t(", your minimum payment of "), v("amount_due"), t(" is due "), v("due_date"), t(".")),
+    },
+    sms: { text: line(t("Coral Offers: your payment of "), v("amount_due"), t(" is due "), v("due_date"), t("."), br, t("Pay at coral.example/pay")) },
+  },
+});
+
+const pushSubtitle = message("push-subtitle-ios-only", "Card used abroad", {
+  channels: ["push"],
+  variables: [first, variable("merchant", "Merchant", "text", true, "Café Zoë"), variable("card_last4", "Card ending", "text", false, "4417")],
+  values: { first_name: "Zoë", merchant: "Café Zoë — Paris", card_last4: "4417" },
+  channelFields: {
+    push: {
+      title: line(t("Your card was used abroad")),
+      subtitle: line(t("Coral Card ending "), v("card_last4")),
+      // Push text isn't held to GSM-7: the dash and the accents print, and cost their UTF-8 bytes.
+      body: line(t("Hi "), v("first_name"), t(" — a purchase at "), v("merchant"), t(" was approved. Not you? Call us.")),
+    },
+  },
+});
+
+const pushTooLarge = message("push-error-too-large", "Push over 4 KB", {
+  channels: ["push"],
+  variables: [variable("note", "Note", "text", true, "x")],
+  // Five values of 1,000 characters: over 5,000 bytes on both platforms. Refused, never cut.
+  values: { note: "Long note ".repeat(100) },
+  channelFields: { push: { title: line(t("Notice")), body: line(v("note"), v("note"), v("note"), v("note"), v("note"), t(" end.")) } },
+});
+
+const smsPlain = message("sms-gsm7-plain", "Plain GSM-7", {
+  channels: ["sms"],
+  variables: [first, dueDate],
+  values: { first_name: "Maya", due_date: "2027-03-04" },
+  // GSM-7 has these: @ £ $ ¥ è é ù ì ò Ç Ø ø Å å Δ _ Φ Γ Λ Ω Π Ψ Σ Θ Ξ Æ æ ß É ¤ ¡ Ä Ö Ñ Ü § ¿ ä ö ñ ü à.
+  channelFields: {
+    sms: { text: line(t("Hi "), v("first_name"), t(", your café rebate (£5 or ¥700) posts "), v("due_date"), t("."), br, br, t("Questions? Reply HELP.")) },
+  },
+});
+
+const smsExtension = message("sms-gsm7-extension", "GSM-7 extension characters", {
+  channels: ["sms"],
+  smsFooter: FOOTER,
+  variables: [amount],
+  values: { amount_due: "35.00" },
+  // Each of € [ ] { } ~ | ^ \ is an escape plus a code: 2 septets, still GSM-7.
+  channelFields: { sms: { text: line(t("Fee: €5 [waived] {once} ~ | ^ \\ Amount due: "), v("amount_due")) } },
+});
+
+const smsUcs2 = message("sms-ucs2-from-value", "A value switches to UCS-2", {
+  channels: ["sms"],
+  smsFooter: FOOTER,
+  variables: [variable("last_name", "Last name", "text", true, "Chen")],
+  // The author typed GSM-7; the value has á, outside it. It prints as sent and the SMS goes in UCS-2.
+  values: { last_name: "Gómez" },
+  channelFields: { sms: { text: line(t("Coral Offers: Ms. "), v("last_name"), t(", your new card has shipped.")) } },
+});
+
+/** An SMS of exactly `septets` GSM-7 septets: letters, then a 5-character code. */
+const sized = (slug: string, septets: number, note: string) =>
+  message(slug, note, {
+    channels: ["sms"],
+    variables: [code],
+    values: { code: "A1B2C" },
+    channelFields: { sms: { text: line(t("x".repeat(septets - 5)), v("code")) } },
+  });
+
+const sms160 = sized("sms-boundary-160", 160, "160 septets: one part");
+const sms161 = sized("sms-boundary-161", 161, "161 septets: two parts of 153 at most");
+const sms306 = sized("sms-boundary-306", 306, "306 septets: two full parts");
+const sms307 = sized("sms-boundary-307", 307, "307 septets: three parts");
+
+const smsEmojiBoundary = message("sms-emoji-at-part-boundary", "An emoji at a part boundary", {
+  channels: ["sms"],
+  variables: [variable("reaction", "Reaction", "text", true, "👍")],
+  values: { reaction: "😀" },
+  // UCS-2 (the emoji), 134 units: two parts of 67 if the emoji could be cut, but it can't. 66 units, then
+  // its 2 don't fit in 67, so the second part starts with it, and the last unit makes a third part.
+  channelFields: { sms: { text: line(t("y".repeat(66)), v("reaction"), t("y".repeat(66))) } },
+});
+
+const smsFooter = message("sms-footer", "The footer counts", {
+  channels: ["sms"],
+  smsFooter: FOOTER,
+  variables: [],
+  values: {},
+  // 108 characters, a line break and the 51 of the footer: 160, one part. One more character and it's two.
+  channelFields: { sms: { text: line(t("z".repeat(108))) } },
+});
+
+const smsTooLong = message("sms-error-too-long", "SMS over 10 parts", {
+  channels: ["sms"],
+  smsFooter: FOOTER,
+  variables: [variable("note", "Note", "text", true, "x")],
+  values: { note: "Long note ".repeat(100) },
+  channelFields: { sms: { text: line(v("note"), v("note")) } },
+});
+
 export const FOCUSED_CASES: FocusedCase[] = [
   listsDefault,
   listsStyles,
@@ -717,4 +841,17 @@ export const FOCUSED_CASES: FocusedCase[] = [
   errorCellListHeading,
   ordinaryStructures,
   pagination(),
+  alertBoth,
+  pushSubtitle,
+  pushTooLarge,
+  smsPlain,
+  smsExtension,
+  smsUcs2,
+  sms160,
+  sms161,
+  sms306,
+  sms307,
+  smsEmojiBoundary,
+  smsFooter,
+  smsTooLong,
 ];

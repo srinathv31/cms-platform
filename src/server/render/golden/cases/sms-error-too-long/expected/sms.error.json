@@ -1,0 +1,10 @@
+{
+  "code": "sms_too_long",
+  "message": "The SMS is 14 parts in GSM-7. It can be at most 10 parts.",
+  "details": {
+    "parts": 14,
+    "maxParts": 10,
+    "encoding": "GSM-7",
+    "characters": 2050
+  }
+}

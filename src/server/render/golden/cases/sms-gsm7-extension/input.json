@@ -1,0 +1,57 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "GSM-7 extension characters",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "amount_due",
+      "label": "Amount due",
+      "type": "currency",
+      "required": true,
+      "sample": "35"
+    }
+  ],
+  "values": {
+    "amount_due": "35.00"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Fee: €5 [waived] {once} ~ | ^ \\ Amount due: "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "amount_due"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "sms"
+  ],
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."
+}

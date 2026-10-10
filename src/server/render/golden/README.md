@@ -196,7 +196,10 @@ A hand-built case pins one rule or group of rules:
    `link`, `v` for a variable chip, `variable(...)` for its definition), and wrap it in
    `make(slug, templateName, { body, variables, values, channelFields })`, where `channelFields` is
    `{ email: { subject: line(…), preheader: line(…) } }` for a case about the email's own fields. A
-   case renders PDF, web and email unless it says otherwise (`channels`).
+   case renders PDF, web and email unless it says otherwise (`channels`). A push or SMS case uses
+   `message(slug, templateName, { channels: ["push"] | ["sms"] | ["push", "sms"], channelFields, smsFooter? })`,
+   with no body: `channelFields` is `{ push: { title, subtitle?, body }, sms: { text } }`, each a `line(…)`
+   (an SMS's line breaks are `br`).
 2. Values go in as a request sends them: strings for text, `num("21.90")` for a JSON number written
    exactly as typed.
 3. Add the case to `FOCUSED_CASES`.

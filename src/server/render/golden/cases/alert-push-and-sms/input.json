@@ -1,0 +1,161 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Payment due",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "amount_due",
+      "label": "Amount due",
+      "type": "currency",
+      "required": true,
+      "sample": "35"
+    },
+    {
+      "key": "due_date",
+      "label": "Due date",
+      "type": "date",
+      "required": true,
+      "sample": "2026-11-03"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "amount_due": "35.00",
+    "due_date": "2027-03-04"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {
+    "push": {
+      "title": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Payment due "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "due_date"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "body": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "first_name"
+                }
+              },
+              {
+                "type": "text",
+                "text": ", your minimum payment of "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "amount_due"
+                }
+              },
+              {
+                "type": "text",
+                "text": " is due "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "due_date"
+                }
+              },
+              {
+                "type": "text",
+                "text": "."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "sms": {
+      "text": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Coral Offers: your payment of "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "amount_due"
+                }
+              },
+              {
+                "type": "text",
+                "text": " is due "
+              },
+              {
+                "type": "variable",
+                "attrs": {
+                  "key": "due_date"
+                }
+              },
+              {
+                "type": "text",
+                "text": "."
+              },
+              {
+                "type": "hardBreak"
+              },
+              {
+                "type": "text",
+                "text": "Pay at coral.example/pay"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "channels": [
+    "push",
+    "sms"
+  ],
+  "smsFooter": "Coral Offers: Reply STOP to opt out, HELP for help."
+}
