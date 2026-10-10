@@ -42,7 +42,7 @@ Feature folders:
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
 | `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
-| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's phone next |
+| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
 | `library/` | Library view and browser, New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |

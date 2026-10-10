@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { m } from "motion/react";
 import { ArrowLeft, EllipsisVertical, ImagePlus, Mic, Phone, Plus, Smile, Video } from "lucide-react";
 import { fadeRise } from "@/components/motion/presets";
@@ -7,13 +8,15 @@ import { pt } from "../geometry";
 import { linkRuns } from "../links";
 import { Silhouette } from "../silhouette";
 import { HomeIndicator, STATUS_BAR_HEIGHT, StatusBar } from "../status-bar";
+import { showsStamp, threadMessages, useOpenOnNewest } from "../thread";
 import type { DeviceClock, DeviceSettings, SmsContent } from "../types";
 import { androidText } from "./type";
 
 // A text in the current Google Messages style, drawn generically (no app icon, no logo): the sender as a
 // number in the top bar on a solid tinted background, the thread in a container with rounded top corners,
 // "Text message" and the time above a grey incoming bubble with tighter corners than iOS, and a composer
-// that is only drawn. Links show as plain underlined text. The text is never cut; a long one scrolls.
+// that is only drawn. Earlier texts sit above, each under its own time when that changes, and the thread
+// opens on the newest. Links show as plain underlined text. The text is never cut; a long one scrolls.
 
 export function AndroidMessagesThread({
   content,
@@ -27,6 +30,10 @@ export function AndroidMessagesThread({
   const message = androidText("message", settings.textSize);
   const label = androidText("label", settings.textSize);
   const icon = { width: pt(24), height: pt(24) };
+  const messages = threadMessages(content);
+  const scroller = useRef<HTMLDivElement>(null);
+  const newest = useRef<HTMLDivElement>(null);
+  useOpenOnNewest(scroller, newest, messages.length);
   return (
     <div className="absolute inset-0 flex flex-col bg-(--device-m3-surface-container) text-(--device-m3-on-surface)">
       <StatusBar platform="android" time={clock.time} ink="app" />
@@ -54,32 +61,39 @@ export function AndroidMessagesThread({
       <div className="flex min-h-0 flex-1 flex-col bg-(--device-m3-surface)" style={{ borderRadius: `${pt(28)} ${pt(28)} 0 0` }}>
         <m.div
           {...fadeRise}
+          ref={scroller}
           tabIndex={0}
           data-slot="messages-thread"
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none]"
           style={{ padding: `${pt(18)} ${pt(16)} ${pt(12)}` }}
         >
-          <p className="text-center text-(--device-m3-on-surface-variant)" style={label}>
-            <span className="block font-medium">Text message</span>
-            <span className="block tabular-nums">
-              {content.day ?? "Today"} • {content.time}
-            </span>
-          </p>
-          <div
-            data-slot="sms-bubble"
-            className="w-fit max-w-[80%] bg-(--device-m3-bubble-in) whitespace-pre-wrap [overflow-wrap:anywhere]"
-            style={{ ...message, marginTop: pt(14), borderRadius: `${pt(18)} ${pt(18)} ${pt(18)} ${pt(4)}`, padding: `${pt(10)} ${pt(14)}` }}
-          >
-            {linkRuns(content.text).map((run, i) =>
-              run.link ? (
-                <span key={i} className="underline decoration-from-font underline-offset-2">
-                  {run.text}
-                </span>
-              ) : (
-                run.text
-              ),
-            )}
-          </div>
+          {messages.map((sms, i) => (
+            <div key={i} ref={i === messages.length - 1 ? newest : undefined} data-slot="sms-message" style={{ marginTop: i === 0 ? 0 : pt(showsStamp(messages, i) ? 18 : 4) }}>
+              {showsStamp(messages, i) ? (
+                <p className="text-center text-(--device-m3-on-surface-variant)" style={{ ...label, marginBottom: pt(14) }}>
+                  {i === 0 ? <span className="block font-medium">Text message</span> : null}
+                  <span className="block tabular-nums">
+                    {sms.day ?? "Today"} • {sms.time}
+                  </span>
+                </p>
+              ) : null}
+              <div
+                data-slot="sms-bubble"
+                className="w-fit max-w-[80%] bg-(--device-m3-bubble-in) whitespace-pre-wrap [overflow-wrap:anywhere]"
+                style={{ ...message, borderRadius: `${pt(18)} ${pt(18)} ${pt(18)} ${pt(4)}`, padding: `${pt(10)} ${pt(14)}` }}
+              >
+                {linkRuns(sms.text).map((run, j) =>
+                  run.link ? (
+                    <span key={j} className="underline decoration-from-font underline-offset-2">
+                      {run.text}
+                    </span>
+                  ) : (
+                    run.text
+                  ),
+                )}
+              </div>
+            </div>
+          ))}
         </m.div>
 
         <div aria-hidden className="flex shrink-0 items-center" style={{ gap: pt(8), padding: `${pt(8)} ${pt(12)} ${pt(30)}` }}>
