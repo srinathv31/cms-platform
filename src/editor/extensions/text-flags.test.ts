@@ -129,6 +129,16 @@ describe("the popover", () => {
     expect(store.getState().index).toBeNull();
   });
 
+  it("says its sentence in a polite live region, since it never takes focus", () => {
+    const { editor, store } = setup(field(text("ab’cd")));
+    const live = editor.view.dom.parentElement?.querySelector('[role="status"][aria-live="polite"]');
+    expect(live?.textContent).toBe("");
+    store.getState().open(0);
+    expect(live?.textContent).toBe("’ isn't in the SMS character set.");
+    store.getState().close();
+    expect(live?.textContent).toBe("");
+  });
+
   it("closes on an edit, even one that leaves the caret on a flag", () => {
     const { editor, store } = setup(field(text("ab’cd")));
     editor.view.focus();

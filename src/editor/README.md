@@ -273,7 +273,8 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
   sentence, and the fix when there is one ("Replace with '", "Replace with a space", or "Remove" for
   an empty replacement). It opens on a click on the flag, or when the caret is moved onto it without
   typing; an edit, the caret leaving, Esc and blur close it. It never takes focus on its own: Tab
-  from the field moves into it, and Tab or Esc there goes back to the field.
+  from the field moves into it, and Tab or Esc there goes back to the field. Its sentence is also
+  said in a polite live region beside the field, so a screen reader hears it as the caret arrives.
 - **The fix is one transaction** (`applyFlagFix`): the text replaced, or removed for "". ⌘Z puts it
   back. Read-only, the popover explains and offers no fix.
 

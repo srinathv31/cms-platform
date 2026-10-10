@@ -214,24 +214,45 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
           },
         },
 
-        view: () => ({
-          update: (view, previous) => {
-            const open = popup();
-            if (!open) return;
-            if (view.state.doc !== previous.doc) {
-              // Typing closes it, and the flags it pointed at are new.
-              open.close();
-              return;
-            }
-            if (view.state.selection.eq(previous.selection)) return;
-            // The caret moved without an edit: onto a flag opens it, off one closes it.
-            const { selection } = view.state;
-            const index = selection.empty ? flagAt(flagsOf(view.state), selection.head) : null;
-            if (index === null) open.close();
-            else if (view.hasFocus()) open.open(index);
-          },
-          destroy: () => popup()?.close(),
-        }),
+        view: (editorView) => {
+          // The popover never takes focus, so a screen reader hears its sentence from a polite live region
+          // instead, present from the start (as the required-section note's is).
+          const host = editorView.dom.parentElement;
+          const live = host ? editorView.dom.ownerDocument.createElement("div") : null;
+          if (live && host) {
+            live.className = "sr-only";
+            live.setAttribute("role", "status");
+            live.setAttribute("aria-live", "polite");
+            host.appendChild(live);
+          }
+          const unsubscribe = store?.subscribe((state, before) => {
+            if (!live) return;
+            if (state.index === null) live.textContent = "";
+            else if (state.index !== before.index) live.textContent = flagsOf(editorView.state)[state.index]?.message ?? "";
+          });
+          return {
+            update: (view, previous) => {
+              const open = popup();
+              if (!open) return;
+              if (view.state.doc !== previous.doc) {
+                // Typing closes it, and the flags it pointed at are new.
+                open.close();
+                return;
+              }
+              if (view.state.selection.eq(previous.selection)) return;
+              // The caret moved without an edit: onto a flag opens it, off one closes it.
+              const { selection } = view.state;
+              const index = selection.empty ? flagAt(flagsOf(view.state), selection.head) : null;
+              if (index === null) open.close();
+              else if (view.hasFocus()) open.open(index);
+            },
+            destroy: () => {
+              popup()?.close();
+              unsubscribe?.();
+              live?.remove();
+            },
+          };
+        },
       }),
     ];
   },
