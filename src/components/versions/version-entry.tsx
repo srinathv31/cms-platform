@@ -1,19 +1,38 @@
 import { Fragment } from "react";
-import { Activity, Braces, Check, CornerUpLeft, MessageSquareText, TriangleAlert, type LucideIcon } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
+import {
+  Activity,
+  Braces,
+  Check,
+  ChevronRight,
+  CornerUpLeft,
+  MessageSquareText,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { StatusBadge } from "@/components/primitives/status-badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { VersionState } from "@/domain/types";
 import { formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
-import type { VersionTimelineItem } from "@/domain/review-types";
+import type { RoundHistoryItem, VersionTimelineItem } from "@/domain/review-types";
+import { reviewHistoryLabel, reviewPath, roundLabel } from "@/domain/rounds";
 import { formatLastRender } from "@/components/usage/format";
 import { entryHeadingId } from "./entry-ids";
 import { codeSegments } from "./format";
 import { EntryActions, RevokeBlockActions, type VersionContext } from "./version-actions";
 
 // One version on the timeline (a server component): the dates and sentences are made here, every
-// absolute date in UTC (`@/domain/dates`), and the only client parts are the action islands.
+// absolute date in UTC (`@/domain/dates`), and the only client parts are the action islands and the
+// review history's disclosure.
+//
+// A version is one entry however many rounds of review it took (domain/rounds.ts): the heading is its
+// label ("v2", or "v3 · Round 2" while a round after a send-back is in review), a released version
+// approved after send-backs says "Approved on round 3" beside its badge, and every round sits in a
+// folded "Review history (3 rounds)" under the entry, each linking to its review screen.
 
 /**
  * The geometry every entry shares, so the skeleton can draw it exactly. The heading row is always the
@@ -84,7 +103,97 @@ function Quoted({ children }: { children: string }) {
   return <span className="whitespace-pre-line">&ldquo;{children}&rdquo;</span>;
 }
 
-const name = (who: string) => <span className="font-medium">{who}</span>;
+const name = (who: string) => <span className="font-medium text-text">{who}</span>;
+
+/** What closed a round, or that it is still in review: one line, the reason quoted. */
+function RoundDecision({ round, now }: { round: RoundHistoryItem; now: Date }) {
+  const d = round.decision;
+  if (!d) {
+    return round.submittedAt ? (
+      <>
+        Submitted by {name(round.submittedBy.name)} on {formatShortDate(round.submittedAt, now)}
+      </>
+    ) : null;
+  }
+  if (d.kind === "approved") {
+    return (
+      <>
+        Approved by {name(d.by.name)} on {formatShortDate(d.at, now)}
+      </>
+    );
+  }
+  return (
+    <>
+      {name(d.by.name)} requested changes on {formatShortDate(d.at, now)}
+      {d.reason ? (
+        <>
+          : <Quoted>{d.reason}</Quoted>
+        </>
+      ) : (
+        "."
+      )}
+    </>
+  );
+}
+
+/**
+ * "Review history (3 rounds)", folded at first paint (so the entry's height is known before anyone
+ * opens it): its trigger is one 32px row, a ghost control whose chevron sits in the facts' icon column
+ * and whose text lines up with theirs. Open, one row per round, newest first: the round (a link to its
+ * review screen), its state and what closed it, in three columns that line up across the rows
+ * (subgrid), the reason wrapping in the last.
+ */
+function ReviewHistory({
+  number,
+  rounds,
+  space,
+  templateId,
+  now,
+}: {
+  number: number;
+  rounds: RoundHistoryItem[];
+  space: string;
+  templateId: string;
+  now: Date;
+}) {
+  return (
+    <Collapsible data-slot="review-history" className="mt-2">
+      <CollapsibleTrigger className="group/history -ml-2 flex h-8 items-center gap-2.5 rounded-lg px-2 text-[14px] leading-6 text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring data-panel-open:text-text">
+        <ChevronRight
+          aria-hidden
+          strokeWidth={1.75}
+          className="size-4 shrink-0 text-text-subtle transition-transform duration-(--dur-fast) group-data-panel-open/history:rotate-90"
+        />
+        {reviewHistoryLabel(rounds.length)}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ol className="mt-1.5 mb-1 ml-[26px] grid grid-cols-[auto_auto_minmax(0,1fr)] gap-x-4 gap-y-2.5">
+          {rounds.map((round) => (
+            <li
+              key={round.id}
+              data-round={round.round}
+              data-state={round.state}
+              className="col-span-3 grid grid-cols-subgrid items-start text-[14px] leading-6"
+            >
+              <Link
+                href={reviewPath(space, templateId, { number, round: round.round, state: round.state }) as Route}
+                className="w-fit rounded-sm font-medium whitespace-nowrap text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {roundLabel(round.round)}
+              </Link>
+              <span className="flex h-6 items-center">
+                <StatusBadge state={round.state} />
+              </span>
+              <p className="min-w-0 break-words text-text-muted">
+                <RoundDecision round={round} now={now} />
+              </p>
+            </li>
+          ))}
+        </ol>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 /** The key dates of the version, in the order they happened. */
 function keyDates(item: VersionTimelineItem, now: Date): string[] {
@@ -101,11 +210,14 @@ function keyDates(item: VersionTimelineItem, now: Date): string[] {
 export function VersionEntry({
   item,
   ctx,
+  space,
   now,
   last,
 }: {
   item: VersionTimelineItem;
   ctx: VersionContext;
+  /** The space the tab is in: the review history links to review screens there. */
+  space: string;
   now: Date;
   last: boolean;
 }) {
@@ -122,6 +234,7 @@ export function VersionEntry({
     <li
       data-slot="version-entry"
       data-version={item.number ?? "draft"}
+      data-round={item.round ?? undefined}
       data-state={item.state}
       className={cn("relative", ENTRY_GEOMETRY.indent, last ? "pb-0" : "pb-9")}
     >
@@ -137,9 +250,14 @@ export function VersionEntry({
         ) : (
           <>
             <h2 id={headingId} tabIndex={-1} className={ENTRY_GEOMETRY.heading}>
-              v{item.number}
+              {item.label}
             </h2>
             {status}
+            {item.approvedOnRound ? (
+              <span data-slot="approved-on-round" className="text-[13px] leading-5 text-text-muted">
+                {item.approvedOnRound}
+              </span>
+            ) : null}
           </>
         )}
         <EntryActions ctx={ctx} item={item} />
@@ -236,6 +354,10 @@ export function VersionEntry({
             </>
           )}
         </div>
+      ) : null}
+
+      {item.rounds && item.number !== null ? (
+        <ReviewHistory number={item.number} rounds={item.rounds} space={space} templateId={ctx.templateId} now={now} />
       ) : null}
     </li>
   );

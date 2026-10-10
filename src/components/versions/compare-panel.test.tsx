@@ -2,9 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ActionResult } from "@/domain/review-types";
+import type { ActionResult, CompareOption } from "@/domain/review-types";
 import type { CompareVersion } from "@/server/queries/compare";
-import type { CompareOption } from "./compare-dialog";
 
 // The Compare dialog's panel reads each pair of versions from GET /api/templates/[templateId]/compare:
 // the redline when both arrive, "Couldn't load these versions." with Try again when they don't.

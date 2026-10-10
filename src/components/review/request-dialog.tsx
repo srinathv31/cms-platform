@@ -4,13 +4,16 @@ import { useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ActionDialog, useActionDialog } from "@/components/versions/action-dialog";
+import { versionLabel } from "@/domain/rounds";
 import { requestChanges } from "@/server/actions/review";
 import { reasonProblem, reasonReady } from "./decision-model";
 
 /**
- * Send a version back to its author: a required reason, which becomes the first comment on the
- * version, and the author's new draft carries the review's comments. Primary: "Request changes".
- * The description is the consequence and nothing else (the field's label says what it is for). A
+ * Send a round back to its author: a required reason, which becomes the first comment on the
+ * version, and the author's new draft carries the review's comments. Title: "Request changes on v3",
+ * or "on v3, round 2" once v3 was sent back (rounds.ts); primary: "Request changes". The description
+ * is the consequence and nothing else (the field's label says what it is for): the draft is of the
+ * version, and its submission is the version's next round. A
  * refusal from the server shows at the button; the dialog closes only on success. A reason that is too
  * long says so at the field as it happens; an empty one isn't nagged and isn't explained: pressing the
  * button marks the field and puts the caret in it.
@@ -44,7 +47,9 @@ export function RequestChangesDialog({
   const problem = reasonProblem(reason);
   // Empty and tried: marked invalid, without a sentence.
   const marked = problem !== null || (tried && !ready);
-  const fieldId = `request-${versionNumber}-reason`;
+  const fieldId = `request-${versionNumber}-${round}-reason`;
+  // The round being sent back is in review: its label stays put while the dialog fades out.
+  const label = versionLabel({ number: versionNumber, round, state: "in_review" }, { style: "sentence" });
   const problemId = `${fieldId}-problem`;
 
   return (
@@ -56,7 +61,7 @@ export function RequestChangesDialog({
         setTried(false);
         setError(null);
       }}
-      title="Request changes"
+      title={`Request changes on ${label}`}
       description={`${authorName} gets a new draft of v${versionNumber} with your reason and the comments.`}
       error={error}
       busy={pending}

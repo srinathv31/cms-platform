@@ -10,6 +10,7 @@ import { formatLong } from "@/components/versions/format";
 import { SunsetCalendarContent, SunsetZone } from "@/components/versions/sunset-calendar";
 import { defaultSunsetDate, validateSunsetDate } from "@/components/versions/validation";
 import type { ConsumerUsage, SunsetCalendar } from "@/domain/review-types";
+import { versionLabel } from "@/domain/rounds";
 import type { ContractChange } from "@/domain/types";
 import { approveVersion } from "@/server/actions/review";
 import { approveLines, type ApprovalStageInfo } from "./decision-model";
@@ -42,8 +43,9 @@ function ConsequenceList({ lines }: { lines: readonly string[] }) {
  * box under it, among them what a breaking change asks of each consumer ("Coral has to map `annual_fee`
  * before it moves to v3.").
  * Only the last stage makes the version Active, so only then is there a previous version to sunset;
- * an earlier stage just moves the version along. Primary: "Approve vN". A refusal from the server
- * shows at the button; the dialog closes only on success.
+ * an earlier stage just moves the version along. Title and primary: "Approve v3", or "Approve v3, round 2"
+ * once v3 was sent back (rounds.ts). A refusal from the server shows at the button; the dialog closes
+ * only on success.
  *
  * The date picker is the Versions tab's sunset dialog's (versions/sunset-calendar.tsx): the same
  * calendar, the same earliest day in the business time zone, the same default (30 days out), and the same
@@ -100,20 +102,24 @@ export function ApproveDialog({
   const check = useRef<HTMLButtonElement>(null);
   const { pending, error, setError, submit } = useActionDialog(() => onOpenChange(false));
 
+  // The round being approved is in review: its label stays put while the dialog fades out after it goes Active.
+  const version = useMemo(() => ({ number: versionNumber, round, state: "in_review" as const }), [versionNumber, round]);
+  const approve = `Approve ${versionLabel(version, { style: "sentence" })}`;
+
   // A sunset date applies to the previous version, when this approval is what makes this one Active.
   const canSunset = stage.final && previousNumber !== null;
   const sunset = canSunset && on ? ymd : null;
   const invalid = sunset ? validateSunsetDate(sunset, today) : null;
 
   const lines = useMemo(
-    () => approveLines({ versionNumber, previousNumber, stage, sunset: invalid ? null : sunset, contractChanges, usage, nowIso }),
-    [versionNumber, previousNumber, stage, sunset, invalid, contractChanges, usage, nowIso],
+    () => approveLines({ version, previousNumber, stage, sunset: invalid ? null : sunset, contractChanges, usage, nowIso }),
+    [version, previousNumber, stage, sunset, invalid, contractChanges, usage, nowIso],
   );
   // What happens is the description; what follows from it (who is affected) is the box.
   const [lead = "", ...rest] = lines;
 
-  const labelId = `approve-${versionNumber}-sunset`;
-  const zoneId = `approve-${versionNumber}-sunset-zone`;
+  const labelId = `approve-${versionNumber}-${round}-sunset`;
+  const zoneId = `approve-${versionNumber}-${round}-sunset-zone`;
 
   return (
     <ActionDialog
@@ -125,7 +131,7 @@ export function ApproveDialog({
         setPickerOpen(false);
         setError(null);
       }}
-      title={`Approve v${versionNumber}`}
+      title={approve}
       description={lead}
       error={error}
       busy={pending}
@@ -134,7 +140,7 @@ export function ApproveDialog({
       focusCancel={!canSunset}
       finalFocus={finalFocus}
       primary={{
-        label: `Approve v${versionNumber}`,
+        label: approve,
         blocked: invalid !== null,
         onClick: () =>
           submit(invalid, async () => {

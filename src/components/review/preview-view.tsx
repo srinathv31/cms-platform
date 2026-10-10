@@ -11,8 +11,9 @@ import { RV } from "./review-grid";
 
 /**
  * The rendered output of the version under review: the Phase 3 preview's own pieces (the channel
- * control, Download PDF or Desktop / Mobile, the output on its tinted well), rendering THIS version
- * by number through the same route a consumer calls, with `preview: true`.
+ * control, Download PDF or Desktop / Mobile, the output on its tinted well), rendering THIS round
+ * by number and round through the same route a consumer calls, with `preview: true` (only a preview
+ * may name a round).
  *
  * Nothing here is saved or edited, so there is nothing to wait for before a request (`flush` is
  * instant) and no save tick. The sample set is chosen in the tab bar; `onSeen` says which sets the
@@ -27,6 +28,7 @@ const NO_SESSION = { flush: () => Promise.resolve() };
 export function PreviewView({
   templateId,
   versionNumber,
+  round,
   teamName,
   channels,
   variables,
@@ -38,6 +40,8 @@ export function PreviewView({
 }: {
   templateId: string;
   versionNumber: number;
+  /** The round on screen. */
+  round: number;
   teamName: string;
   /** The version's channels. Never empty. */
   channels: readonly Channel[];
@@ -59,6 +63,7 @@ export function PreviewView({
   const { slots, rendering, retry } = usePreviewRender({
     templateId,
     version: versionNumber,
+    round,
     channel,
     values,
     variables,

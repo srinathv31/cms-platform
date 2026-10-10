@@ -5,8 +5,8 @@
 //
 // What re-renders it, while `enabled`:
 //   - it turns on (the preview opens, or the rail comes back to its Preview view),
-//   - the channel, the version or the values change (values are debounced: they arrive on every
-//     keystroke in a sample set's editor, and they go in the request, so nothing waits for a save),
+//   - the channel, the version (or its round) or the values change (values are debounced: they arrive
+//     on every keystroke in a sample set's editor, and they go in the request, so nothing waits for a save),
 //   - a save lands (`saveTick`): the route renders the SAVED draft, so the body and the email fields
 //     only reach the output through a save.
 //
@@ -38,6 +38,8 @@ export interface PreviewSlot {
 export interface UsePreviewRenderOptions {
   templateId: string;
   version: "draft" | number;
+  /** Which round of a numbered `version`; null or absent: the number's head. */
+  round?: number | null;
   channel: Channel;
   values: VariableValues;
   /**
@@ -64,6 +66,7 @@ export interface UsePreviewRender {
 export function usePreviewRender({
   templateId,
   version,
+  round = null,
   channel,
   values,
   variables,
@@ -89,7 +92,7 @@ export function usePreviewRender({
     }
 
     // Is it only the values that changed since the last render? Those wait a moment for more typing.
-    const rest = JSON.stringify([templateId, version, channel, saveTick, attempt]);
+    const rest = JSON.stringify([templateId, version, round, channel, saveTick, attempt]);
     const valuesOnly = last.current !== null && last.current.rest === rest && last.current.key !== valuesKey;
     last.current = { key: valuesKey, rest };
 
@@ -114,7 +117,7 @@ export function usePreviewRender({
         await session.flush();
         if (signal.aborted) return;
 
-        const result = await renderPreview({ templateId, version, channel, values: sending, signal });
+        const result = await renderPreview({ templateId, version, round, channel, values: sending, signal });
 
         if (result.kind === "error") {
           setSlots((all) => ({ ...all, [channel]: { output: all[channel]?.output ?? null, error: result.error } }));
@@ -139,7 +142,7 @@ export function usePreviewRender({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, templateId, version, channel, valuesKey, variablesKey, saveTick, attempt, session]);
+  }, [enabled, templateId, version, round, channel, valuesKey, variablesKey, saveTick, attempt, session]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { slots, rendering: enabled && pending, retry };

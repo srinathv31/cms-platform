@@ -14,6 +14,7 @@ import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { nameChange } from "@/domain/redline";
 import type { ActionResult } from "@/domain/review-types";
+import { versionLabel } from "@/domain/rounds";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
 import type { SubmitSummary } from "./types";
 
@@ -81,9 +82,10 @@ export interface SubmitDialogProps {
 }
 
 /**
- * "Submit v{N} for review": what is about to be frozen (channels, sample data sets, and the rename and
- * contract changes against the newest version that still renders), an optional note to the reviewers,
- * and the screen's one black button. A refusal shows its reason at the button and the dialog stays;
+ * "Submit v{N} for review", or "Submit v1, round 2 for review" when the draft continues a version that
+ * was sent back (the label the submission will have, rounds.ts): what is about to be frozen (channels,
+ * sample data sets, and the rename and contract changes against the newest version that still
+ * renders), an optional note to the reviewers, and the screen's one black button. A refusal shows its reason at the button and the dialog stays;
  * success closes it, and the page behind re-renders in place as In review. Focus starts in the note;
  * Enter there is a new line and ⌘Enter (Ctrl+Enter) submits.
  *
@@ -93,7 +95,8 @@ export interface SubmitDialogProps {
  *
  * When the draft changed after this summary was read, the server refuses the submit with the code
  * `summary_stale` (`REFUSALS.summaryStale`): the sentence shows at the button, and the button becomes
- * "Refresh summary", which reads it again. The note is kept, and the button goes back to "Submit v{N}".
+ * "Refresh summary", which reads it again. The note is kept, and the button goes back to "Submit v{N}"
+ * (or "Submit v1, round 2").
  *
  * While the server works, nothing that holds focus is `disabled`: a disabled control drops focus to the
  * page, and the next Tab would leave the dialog for the sidebar. The note is read-only and the buttons
@@ -115,6 +118,8 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
         : null,
     [summary],
   );
+  // What the submission will be: "v3", or "v1, round 2" for the next round of a version sent back.
+  const label = summary ? versionLabel({ number: summary.number, round: summary.round, state: "in_review" }, { style: "sentence" }) : "";
   // A rename goes live with the version, so it is listed with what is about to be frozen.
   const rename = summary ? nameChange(summary.baseline?.name, summary.name) : null;
 
@@ -182,7 +187,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
       >
         {summary ? (
           <>
-            <DialogTitle className="display-lg shrink-0">Submit v{summary.number} for review</DialogTitle>
+            <DialogTitle className="display-lg shrink-0">Submit {label} for review</DialogTitle>
             <DialogDescription className="mt-2 shrink-0 text-[14px] leading-6 text-text-muted">
               The version is frozen as it is and sent to your team&rsquo;s approvers.
             </DialogDescription>
@@ -265,7 +270,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
                 Cancel
               </Button>
               <Button className={cn("relative px-4", PENDING)} onClick={primary} disabled={pending} focusableWhenDisabled>
-                <span className={cn(pending && "invisible")}>{stale ? "Refresh summary" : `Submit v${summary.number}`}</span>
+                <span className={cn(pending && "invisible")}>{stale ? "Refresh summary" : `Submit ${label}`}</span>
                 {pending ? <Spinner aria-label={stale ? "Refreshing" : "Submitting"} className="absolute" /> : null}
               </Button>
             </div>

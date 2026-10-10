@@ -31,7 +31,8 @@ import { ChangeToggles, ViewTabs, type ReviewView } from "./view-tabs";
  *
  * The server's data (`data`) is the truth and arrives anew after every action (the actions refresh the
  * page); what is kept here is what the viewer did on this screen: "You approved v3.", and the moment's
- * own clock.
+ * own clock. The screen is one round of the version (`version.round`): the decisions name it, and the
+ * preview renders it.
  */
 
 /** Scrolls the canvas (the page's own scroll area, not the window) to its top. */
@@ -244,8 +245,7 @@ export function ReviewWorkspace({
   // The decision went through: the buttons the dialog came from are replaced by a line, and focus goes
   // to the place they stood. (The dialog's own return of focus can land on a button just as it goes.)
   const line = decisionLine({
-    state: version.state,
-    number: version.number,
+    version: { number: version.number, round: version.round, state: version.state },
     authorName: version.submittedBy.name,
     local,
     canDecideAgain: can.approve.ok,
@@ -304,6 +304,7 @@ export function ReviewWorkspace({
         templateId={template.id}
         templateName={version.name}
         versionNumber={version.number}
+        round={version.round}
         state={shownState}
         sunsetDay={version.sunsetDay ?? null}
         author={version.submittedBy}
@@ -342,6 +343,7 @@ export function ReviewWorkspace({
           <PreviewView
             templateId={template.id}
             versionNumber={version.number}
+            round={version.round}
             teamName={template.teamName}
             channels={channels}
             variables={version.variables}

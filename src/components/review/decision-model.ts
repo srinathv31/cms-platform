@@ -6,7 +6,8 @@
 import { breakingKeysOf, consequences } from "@/domain/consequences";
 import { formatCount } from "@/domain/numbers";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
-import type { ContractChange, PermissionResult, VersionState } from "@/domain/types";
+import { versionLabel, type NumberedRound } from "@/domain/rounds";
+import type { ContractChange, PermissionResult } from "@/domain/types";
 
 /** The longest reason the server accepts (actions/review.ts). */
 export const REASON_MAX = 2000;
@@ -64,7 +65,8 @@ export function approvalStage(steps: readonly StepView[]): ApprovalStageInfo {
 }
 
 export interface ApproveLinesInput {
-  versionNumber: number;
+  /** The round being approved (in review): an earlier stage names it ("v3, round 2 moves to …"). */
+  version: NumberedRound;
   /** The Active version this one replaces; null when nothing is Active yet. */
   previousNumber: number | null;
   stage: ApprovalStageInfo;
@@ -78,20 +80,20 @@ export interface ApproveLinesInput {
 }
 
 /**
- * The lines under "Approve vN". The last stage says what goes live and who is affected (the domain's
- * `consequences`, from the render log). An earlier stage only moves the version along: nothing goes
- * live, so a sunset date is never part of it.
+ * The lines under "Approve v3, round 2". The last stage says what goes live and who is affected (the
+ * domain's `consequences`, from the render log), in released numbers: consumers never see a round. An
+ * earlier stage only moves the round along: nothing goes live, so a sunset date is never part of it.
  */
-export function approveLines({ versionNumber, previousNumber, stage, sunset, contractChanges = [], usage, nowIso }: ApproveLinesInput): string[] {
-  const v = `v${versionNumber}`;
+export function approveLines({ version, previousNumber, stage, sunset, contractChanges = [], usage, nowIso }: ApproveLinesInput): string[] {
   if (!stage.final) {
     const next = stage.next?.name ?? "the next stage";
+    const v = versionLabel(version, { style: "sentence" });
     return [`${v} moves to ${next} for approval. It isn't Active until the last stage approves.`];
   }
   return consequences(
     {
       kind: "approve",
-      newNumber: versionNumber,
+      newNumber: version.number,
       previousNumber,
       sunsetAt: previousNumber === null ? null : sunset,
       breakingKeys: breakingKeysOf(contractChanges),
@@ -111,24 +113,24 @@ export type LocalDecision =
 
 /**
  * The one line that stands where Approve and Request changes were, or null when the buttons still
- * belong there (the version is in review). A version that isn't in review is a read-only record.
+ * belong there (the round is in review). A round that isn't in review is a read-only record. The
+ * version reads as its label in its state now: "You returned v1, round 1 to Maya Chen.", "v3 is Active."
  */
 export function decisionLine({
-  state,
-  number,
+  version,
   authorName,
   local,
   canDecideAgain,
 }: {
-  state: VersionState;
-  number: number;
+  /** The round on screen, in the state it is in now. */
+  version: NumberedRound;
   authorName: string;
   local: LocalDecision;
   /** The server says this viewer may decide the version's current stage. */
   canDecideAgain: boolean;
 }): string | null {
-  const v = `v${number}`;
-  switch (state) {
+  const v = versionLabel(version, { style: "sentence" });
+  switch (version.state) {
     case "in_review":
       // Approved an earlier stage and has no say on the next: say so instead of a dead pair of buttons.
       if (local?.kind === "approved" && !local.wentLive && !canDecideAgain) {

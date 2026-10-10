@@ -11,12 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { diffDocuments, nameChange } from "@/domain/redline";
-import type { RedlineDoc } from "@/domain/review-types";
+import type { CompareOption, RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
 import { readTemplate } from "@/lib/template-reads";
 import type { CompareVersion } from "@/server/queries/compare";
-import type { CompareOption } from "./compare-dialog";
 
 // The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline.
 // The pickers only offer pairs that read forward in time (From is the older one, always), so the
@@ -52,10 +51,11 @@ function VersionSelect({
   const byId = new Map(options.map((o) => [o.id, o]));
   return (
     <Select value={value} onValueChange={(next) => next && onChange(next)}>
-      <SelectTrigger ref={triggerRef} aria-labelledby={labelId} className="h-8 w-28 shrink-0 bg-surface">
+      {/* Wide enough for a round's label ("v3 · Round 2"); the list is as wide as its longest option. */}
+      <SelectTrigger ref={triggerRef} aria-labelledby={labelId} className="h-8 w-36 shrink-0 bg-surface">
         <SelectValue>{(id: string) => byId.get(id)?.label ?? ""}</SelectValue>
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false} className="min-w-44 p-1">
+      <SelectContent alignItemWithTrigger={false} className="w-auto min-w-44 p-1">
         {options.map((o) => (
           <SelectItem key={o.id} value={o.id}>
             <span className="font-medium">{o.label}</span>

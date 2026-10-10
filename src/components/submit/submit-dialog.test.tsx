@@ -113,6 +113,12 @@ describe("what the dialog lists", () => {
     expect(button(/^Submit v4$/)).toBeTruthy();
   });
 
+  it("names the round when the draft continues a version that was sent back", async () => {
+    await render(summary({ number: 1, round: 2 }));
+    expect(dialog()?.querySelector("[data-slot='dialog-title']")?.textContent).toBe("Submit v1, round 2 for review");
+    expect(button(/^Submit v1, round 2$/)).toBeTruthy();
+  });
+
   it("lists the enabled channels and the sample data sets", async () => {
     await render(summary());
     const text = dialog()!.textContent!;

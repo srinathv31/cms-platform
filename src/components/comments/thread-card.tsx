@@ -260,9 +260,7 @@ export function ThreadCard({
       {isChange ? (
         <div className="mb-3 flex items-center gap-2">
           <StatusBadge state="changes_requested" />
-          {thread.originVersionNumber ? (
-            <span className="text-[13px] text-text-muted">on v{thread.originVersionNumber}</span>
-          ) : null}
+          {thread.originLabel ? <span className="text-[13px] text-text-muted">on {thread.originLabel}</span> : null}
         </div>
       ) : null}
       <Anchor quote={thread.quote} snippet={snippet} onClick={onSelect && selectable ? onSelect : undefined} />

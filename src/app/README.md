@@ -58,7 +58,7 @@ writes the route types and the global `PageProps`, `LayoutProps` and `RouteConte
 | `/[team]` | [[team]/page.tsx](./(product)/[team]/page.tsx) | Redirects to `/[team]/library`. |
 | `/[team]/library` | [library/page.tsx](./(product)/[team]/library/page.tsx) | The Library. |
 | `/[team]/review` | [review/page.tsx](./(product)/[team]/review/page.tsx) | The review queue. |
-| `/[team]/review/[templateId]/[version]` | [review/…/page.tsx](./(product)/[team]/review/[templateId]/[version]/page.tsx) | The review screen for one version. |
+| `/[team]/review/[templateId]/[version]` | [review/…/page.tsx](./(product)/[team]/review/[templateId]/[version]/page.tsx) | The review screen for one round of a version: `?round=N`, or without it the number's released row, else its latest round. A round that doesn't exist (or a malformed `?round=`) is a 404. |
 | `/[team]/templates/[templateId]` | [templates/[templateId]/page.tsx](./(product)/[team]/templates/[templateId]/page.tsx) | Workspace, Content tab: the document and the rail. |
 | `…/versions`, `…/usage`, `…/activity` | [versions](./(product)/[team]/templates/[templateId]/versions/page.tsx), [usage](./(product)/[team]/templates/[templateId]/usage/page.tsx), [activity](./(product)/[team]/templates/[templateId]/activity/page.tsx) | The other workspace tabs. |
 | `/[team]/usage` | [usage/page.tsx](./(product)/[team]/usage/page.tsx) | Usage dashboard (`?tab=consumers`). |

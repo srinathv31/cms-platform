@@ -35,6 +35,43 @@ describe("formatQueueRow", () => {
     expect(view.author).toEqual(maya);
   });
 
+  it("shows no round on a version that was never sent back, and links to the bare review screen", () => {
+    const first = formatQueueRow(row({ round: 1, state: "in_review" }), "coral-offers", NOW);
+    expect(first.versionLabel).toBe("v3");
+    expect(first.href).toBe("/coral-offers/review/UC-4F7K2Q/3");
+  });
+
+  it("names the round once the version was sent back, and links to exactly that round", () => {
+    const waiting = formatQueueRow(row({ round: 2, state: "in_review" }), "coral-offers", NOW);
+    expect(waiting.versionLabel).toBe("v3 · Round 2");
+    expect(waiting.href).toBe("/coral-offers/review/UC-4F7K2Q/3?round=2");
+    // The decided round 1 opens round 1, not the round in review now.
+    const returned = formatQueueRow(
+      row({ round: 1, state: "changes_requested", decision: { kind: "changes_requested", by: jordan, at: ago(2 * DAY) } }),
+      "coral-offers",
+      NOW,
+    );
+    expect(returned.versionLabel).toBe("v3 · Round 1");
+    expect(returned.href).toBe("/coral-offers/review/UC-4F7K2Q/3?round=1");
+  });
+
+  it("says which round a decided version was approved on, and links to the released version", () => {
+    const approved = formatQueueRow(
+      row({ round: 3, state: "active", decision: { kind: "approved", by: jordan, at: ago(DAY) } }),
+      "coral-offers",
+      NOW,
+    );
+    expect(approved.versionLabel).toBe("v3 · Round 3");
+    expect(approved.href).toBe("/coral-offers/review/UC-4F7K2Q/3");
+    // Approved on its first try: no round anywhere.
+    const firstTry = formatQueueRow(
+      row({ round: 1, state: "active", decision: { kind: "approved", by: jordan, at: ago(DAY) } }),
+      "coral-offers",
+      NOW,
+    );
+    expect([firstTry.versionLabel, firstTry.href]).toEqual(["v3", "/coral-offers/review/UC-4F7K2Q/3"]);
+  });
+
   it("words the submit time against the demo clock", () => {
     expect(formatQueueRow(row({ submittedAt: ago(3 * DAY) }), "coral-offers", NOW).submitted).toBe("3 days ago");
     expect(formatQueueRow(row({ submittedAt: ago(10_000) }), "coral-offers", NOW).submitted).toBe("just now");
