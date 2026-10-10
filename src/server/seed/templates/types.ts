@@ -1,6 +1,6 @@
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, ContractChange, JSONContent, Variable, VersionState } from "@/domain/types";
-import type { ConsumerId } from "../platform";
+import type { ConsumerId, SeedContentType } from "../platform";
 import type { TeamId } from "../teams";
 
 // Declarative description of a seeded template. `build.ts` turns it into rows: the template, its
@@ -45,7 +45,7 @@ export interface SeedVersion {
   body: JSONContent;
   variables: Variable[];
   channels: Channel[];
-  /** Each channel's own fields (src/domain/channel-fields.ts): email's subject and preheader. Only for channels it renders. */
+  /** Each channel's own fields (src/domain/channel-fields.ts): email's subject and preheader, an alert's push and SMS. Only for channels it renders. */
   channelFields?: ChannelFields;
   /** Null for a first version; [] when nothing changed. */
   contractChanges?: ContractChange[] | null;
@@ -78,6 +78,8 @@ export interface SeedTemplate {
   /** Local key, e.g. "balance-transfer". Also the scope for block ids. */
   key: string;
   teamId: TeamId;
+  /** Disclosure (a document) unless it says Alert (a message: Push and SMS, no sections). */
+  contentType?: SeedContentType;
   name: string;
   createdBy: string;
   createdAt: number;

@@ -43,10 +43,13 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  disabled,
   className,
 }: SegmentedProps<T> & {
   /** The group's accessible name. */
   label: string;
+  /** While something it would change is busy (New template while a template is being made): greyed, and nothing moves. */
+  disabled?: boolean;
 }) {
   return (
     <ToggleGroup
@@ -57,8 +60,9 @@ export function Segmented<T extends string>({
         // A pressed segment can't be pressed off: there is always one chosen.
         if (picked) onChange(picked);
       }}
+      disabled={disabled}
       spacing={0.5}
-      className={cn(TRACK, className)}
+      className={cn(TRACK, disabled && "opacity-50", className)}
     >
       {options.map((option) => (
         <ToggleGroupItem

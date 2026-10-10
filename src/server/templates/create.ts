@@ -2,15 +2,16 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import {
   newTemplateChannels,
+  newTemplateContentType,
   type DraftFields,
   type LifecycleResult,
   type NewTemplateChanges,
   type StarterContent,
 } from "@/domain/lifecycle";
 import { conformToSections } from "@/domain/platform-config";
-import type { Channel, RequiredSection } from "@/domain/types";
+import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
-import { contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import { templates, versions } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId, newTemplateId } from "@/server/ids";
 
@@ -54,11 +55,14 @@ export async function freshTemplateId(reader: Reader = db): Promise<string> {
   return templateId;
 }
 
-/** The Disclosure content type every new template gets (the prototype has one). */
-export async function disclosureContentType(reader: Reader = db) {
-  const contentType = await reader.query.contentTypes.findFirst({ where: eq(contentTypes.key, "disclosure") });
-  if (!contentType) throw new Error("The Disclosure content type is missing");
-  return contentType;
+/**
+ * The content type a new template of `family` is made on, and keeps for life: the domain chooses it
+ * from the platform's content types (`newTemplateContentType`). A document (New template's Document,
+ * and every import) gets Disclosure as seeded, an alert gets Alert. Refused when no content type is of
+ * that family.
+ */
+export async function newTemplateType(family: ChannelFamily, reader: Reader = db) {
+  return newTemplateContentType(family, await reader.query.contentTypes.findMany());
 }
 
 /**

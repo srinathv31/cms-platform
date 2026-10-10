@@ -44,6 +44,10 @@ const STREAMS: Stream[] = [
   // Statement inserts reach customers through digital banking.
   { tpl: "statement-rate-change", ver: "v1", consumer: "deposits-online", from: 90, to: 0, perDay: 25 },
   { tpl: "statement-paperless", ver: "v1", consumer: "deposits-online", from: 90, to: 0, perDay: 40, ramp: [0.5, 1] },
+
+  // Coral sends the payment reminder as a push and a text (CHANNEL_WEIGHT splits them), more each week
+  // as cards move over to it.
+  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", from: 51.5, to: 0, perDay: 110, ramp: [0.45, 1] },
 ];
 
 /** Previews are authors and reviewers looking at drafts; no consumer, no customer. */
@@ -56,6 +60,9 @@ const PREVIEWS: { tpl: string; ver: string; from: number; to: number; count: num
   { tpl: "overdraft-protection", ver: "draft", from: 12, to: 1.5, count: 6 },
   { tpl: "statement-privacy", ver: "draft", from: 9, to: 2, count: 5 },
   { tpl: "cash-back", ver: "v2", from: 90, to: 88, count: 3 },
+  { tpl: "payment-due-reminder", ver: "v1", from: 58, to: 53, count: 9 },
+  { tpl: "card-used-abroad", ver: "v1", from: 6, to: 1.2, count: 11 },
+  { tpl: "rate-change-heads-up", ver: "draft", from: 2.5, to: 0.4, count: 6 },
 ];
 
 /** A handful of failures, so the Usage page has something honest to show. */
@@ -65,6 +72,7 @@ const ERRORS: { tpl: string; ver: string; consumer: ConsumerId; at: number; coun
   { tpl: "cash-back", ver: "v2", consumer: "coral", at: 14.6, count: 1, code: "channel_not_enabled", channel: "email" },
   { tpl: "rate-change-notice", ver: "v1", consumer: "coral", at: 9.4, count: 1, code: "render_failed", channel: "pdf" },
   { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", at: 18.2, count: 2, code: "missing_variables", channel: "web" },
+  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", at: 12.4, count: 3, code: "missing_variables", channel: "sms" },
 ];
 
 /** The latest render of each Active/Superseded version that Coral or Deposits Online still uses. */
@@ -73,6 +81,7 @@ const LATEST: { tpl: string; ver: string; consumer: ConsumerId; minutesAgo: numb
   { tpl: "balance-transfer", ver: "v2", consumer: "coral", minutesAgo: 12 },
   { tpl: "cash-back", ver: "v2", consumer: "coral", minutesAgo: 4 },
   { tpl: "holiday-points", ver: "v2", consumer: "coral", minutesAgo: 22 },
+  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", minutesAgo: 2 },
 ];
 
 /** How often each channel is asked for, among a version's channels (a version is one family). */

@@ -12,8 +12,9 @@ import { sampleSetValues } from "@/editor/model/sample-sets";
 import { createContext } from "@/server/seed/context";
 import { seedCardStatementsTemplates } from "@/server/seed/templates/card-statements";
 import { seedCoralTemplates } from "@/server/seed/templates/coral";
+import { seedCoralAlerts } from "@/server/seed/templates/coral-alerts";
 import { seedDepositsTemplates } from "@/server/seed/templates/deposits";
-import { STARTER_KEYS, buildStarter } from "@/server/starters";
+import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starters";
 import { normalizeDocument } from "@/editor/model/normalize";
 import { DOCUMENT_MESSAGES, RenderDocumentError, checkDocument, checkField, editorSchema } from "./schema-check";
 
@@ -297,11 +298,16 @@ describe("checkField, a push's fields and an SMS", () => {
 
 // ── Real content ─────────────────────────────────────────────────────────────
 
-describe.each(STARTER_KEYS)("starter %s", (key) => {
+const STARTER_CHOICES: StarterChoice[] = [
+  ...STARTER_KEYS.document.map((starterKey) => ({ family: "document" as const, starterKey })),
+  ...STARTER_KEYS.message.map((starterKey) => ({ family: "message" as const, starterKey })),
+];
+
+describe.each(STARTER_CHOICES)("starter $family/$starterKey", (choice) => {
   it("checks, and resolves with every chip filled from its own sample sets", () => {
-    const starter = buildStarter(key, { scope: "UC-TEST01", now: NOW });
+    const starter = buildStarter(choice, { scope: "UC-TEST01", now: NOW });
     expectRendersFully({
-      name: key,
+      name: `${choice.family}/${choice.starterKey}`,
       body: starter.body,
       variables: starter.variables,
       sampleSets: starter.sampleSets,
@@ -315,6 +321,7 @@ describe("seeded templates", () => {
   seedCoralTemplates(ctx);
   seedDepositsTemplates(ctx);
   seedCardStatementsTemplates(ctx);
+  seedCoralAlerts(ctx);
   const versions = ctx.sink.versions;
 
   it("are all reachable without a database", () => {

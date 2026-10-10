@@ -35,8 +35,11 @@ vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 const CORAL = [
   "Annual Fee Waiver — Terms",
   "Balance Transfer Intro — Terms",
+  "Card Used Abroad",
   "Cash Back Welcome Bonus — Terms",
   "Holiday Points Promo — Terms",
+  "Payment Due Reminder",
+  "Rate Change Heads-up",
   "Rate Change Notice",
 ];
 const DEPOSITS = ["Everyday Checking — Fee Schedule", "High-Yield Savings — Rate Disclosure", "Overdraft Protection — Terms"];
@@ -86,14 +89,20 @@ describe("GET /api/palette/[space]", () => {
     const { status, body } = await search("coral-offers");
     expect(status).toBe(200);
     expect(body).toMatchObject({ ok: true, viewerId: "maya", space: "coral-offers", query: "", canCreate: true, current: false });
-    expect(names(body.recent)).toEqual(["Cash Back Welcome Bonus — Terms", "Annual Fee Waiver — Terms", "Rate Change Notice"]);
-    expect(names(body.templates)).toEqual(["Balance Transfer Intro — Terms", "Holiday Points Promo — Terms"]);
+    expect(names(body.recent)).toEqual([
+      "Cash Back Welcome Bonus — Terms",
+      "Rate Change Heads-up",
+      "Annual Fee Waiver — Terms",
+      "Payment Due Reminder",
+      "Rate Change Notice",
+    ]);
+    expect(names(body.templates)).toEqual(["Balance Transfer Intro — Terms", "Card Used Abroad", "Holiday Points Promo — Terms"]);
     expect(body.recent![0]).toEqual({ id: ids["cash-back"], name: "Cash Back Welcome Bonus — Terms", teamSlug: "coral-offers", teamName: "Coral Offers", status: "in_review" });
   });
 
   it("searches by q: every word, in the name, the team, the id or the status, without Recent", async () => {
     expect(names((await search("coral-offers", "?q=balance")).body.templates)).toEqual(["Balance Transfer Intro — Terms"]);
-    expect(names((await search("coral-offers", "?q=In%20review")).body.templates)).toEqual(["Cash Back Welcome Bonus — Terms"]);
+    expect(names((await search("coral-offers", "?q=In%20review")).body.templates)).toEqual(["Cash Back Welcome Bonus — Terms", "Card Used Abroad"]);
     expect(names((await search("coral-offers", `?q=${ids["holiday-points"]!.toLowerCase()}`)).body.templates)).toEqual(["Holiday Points Promo — Terms"]);
     const terms = await search("coral-offers", "?q=++Terms++Coral");
     expect(terms.body).toMatchObject({ query: "terms coral", recent: [] });
@@ -130,14 +139,14 @@ describe("GET /api/palette/[space]", () => {
     const statements = await search("all", "?q=statement+insert");
     expect(statements.body).toMatchObject({ ok: true, viewerId: "taylor", canCreate: false });
     expect(statements.body.templates!.map((t) => t.teamSlug)).toEqual(["card-statements", "card-statements", "card-statements"]);
-    expect((await search("all")).body.templates).toHaveLength(8); // a first page of the eleven
+    expect((await search("all")).body.templates).toHaveLength(8); // a first page of the fourteen
     expect(names((await search("all", "?q=overdraft")).body.templates)).toEqual(["Overdraft Protection — Terms"]);
   });
 
   it("says whether the template being viewed is the viewer's to see here, and leaves it out of Recent", async () => {
     const onCashBack = await search("coral-offers", `?template=${ids["cash-back"]}`);
     expect(onCashBack.body).toMatchObject({ current: true });
-    expect(names(onCashBack.body.recent)).toEqual(["Annual Fee Waiver — Terms", "Rate Change Notice"]);
+    expect(names(onCashBack.body.recent)).toEqual(["Rate Change Heads-up", "Annual Fee Waiver — Terms", "Payment Due Reminder", "Rate Change Notice"]);
     expect(names(onCashBack.body.templates)).toContain("Cash Back Welcome Bonus — Terms");
 
     expect((await search("coral-offers", "?template=UC-ZZZZZZ")).body).toMatchObject({ ok: true, current: false });

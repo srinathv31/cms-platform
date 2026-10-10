@@ -67,9 +67,10 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 // ── Queue ─────────────────────────────────────────────────────
 
 describe("getReviewQueue", () => {
-  it("Jordan waits on Cash Back v3, and sees Annual Fee Waiver among the recent decisions", async () => {
+  it("Jordan waits on Cash Back v3 and the Card Used Abroad alert, and sees Annual Fee Waiver among the recent decisions", async () => {
     as("jordan");
     const queue = await getReviewQueue("coral-offers");
+    // Newest submitted first: Cash Back v3 went in after the alert.
     expect(queue.waiting).toEqual([
       {
         templateId: ids["cash-back"],
@@ -84,6 +85,19 @@ describe("getReviewQueue", () => {
         stage: { position: 0, name: "Team approver", count: 1 },
         breaking: true,
       },
+      {
+        templateId: ids["card-used-abroad"],
+        templateName: "Card Used Abroad",
+        teamSlug: "coral-offers",
+        teamName: "Coral Offers",
+        versionId: expect.any(String),
+        versionNumber: 1,
+        state: "in_review",
+        author: { id: "priya", name: "Priya Raman", initials: "PR", hue: expect.any(Number) },
+        submittedAt: expect.stringMatching(ISO),
+        stage: { position: 0, name: "Team approver", count: 1 },
+        breaking: false,
+      },
     ]);
     expect(queue.submitted).toEqual([]);
     expect(queue.decided).toEqual([
@@ -96,7 +110,7 @@ describe("getReviewQueue", () => {
         decision: { kind: "changes_requested", by: expect.objectContaining({ id: "jordan" }), at: expect.stringMatching(ISO) },
       }),
     ]);
-    expect(await getReviewBadgeCount("coral-offers")).toBe(1);
+    expect(await getReviewBadgeCount("coral-offers")).toBe(2);
   });
 
   it("Maya submitted it: nothing waits on her", async () => {
@@ -210,7 +224,8 @@ describe("getReviewScreen", () => {
       });
       const queue = await getReviewQueue("coral-offers");
       expect(queue.waiting).toEqual([]);
-      expect(queue.submitted).toEqual([]);
+      // What Priya submitted herself is hers to watch, not to decide: the Card Used Abroad alert.
+      expect(queue.submitted.map((r) => [r.templateId, r.versionNumber])).toEqual([[ids["card-used-abroad"], 1]]);
       expect(await getReviewBadgeCount("coral-offers")).toBe(0);
 
       as("jordan");

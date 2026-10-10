@@ -42,7 +42,7 @@ Convention only (no lint rule):
 | [business-zone.ts](business-zone.ts) | The business time zone sunset dates are read in: `readBusinessZone(reader)` (inside a transaction), `getBusinessZone()` (read models), `countPendingSunsets`. |
 | [reset.ts](reset.ts), [seed/](seed/) | `resetDemo()` and the deterministic demo dataset, simulator rows included. |
 | [templates/create.ts](templates/create.ts) | The write side of "new template plus first draft", shared by New template and Import. |
-| [starters/](starters/) | Starter bodies. [catalog.ts](starters/catalog.ts) has no imports, so the client gallery can read it. |
+| [starters/](starters/) | Starters for each kind of template: document bodies, and alerts' push and SMS ([alerts.ts](starters/alerts.ts)). [catalog.ts](starters/catalog.ts) has only a type import, so the client gallery can read it. |
 | [drafts/](drafts/) | Autosave: patch parsing, the transactional save, the per-session audit merge, the status table. |
 | [documents/prepare.ts](documents/prepare.ts) | The one way a document is made ready for storage: normalized, checked, block ids added. Autosave and import call it. |
 | [render/](render/) | The render pipeline ([render-template.ts](render/render-template.ts)), the engine it runs ([engine.ts](render/engine.ts)), the document check, the render log, [channels/](render/channels/) (web, email, pdf, push, sms), the [golden files](render/golden/README.md), and shared test helpers in [testing/](render/testing/). |
@@ -101,7 +101,7 @@ The result type is `ActionResult<T>` from `@/domain/review-types` (`({ ok: true 
 
 Variations today:
 - [actions/access.ts](actions/access.ts) runs its actions through `accessAction`, the kit plus two things: `runAccessSweep()` and `runSunsetSweep()` run once the check has passed, each in its own transaction, so a refusal doesn't roll a sweep back (and the pages refresh when one changed something, whatever the answer); and a request, membership or review that's gone is refused with its own sentence before the permission check, since a colleague acting first deletes it. Access and platform actions write through `applyMembershipChange` and `writeAccessEffects`; `saveApprovalChain` also calls `writeEffects` with a notification it builds itself.
-- `startDraft` and `createTemplate` answer a refusal (a newer version in review, a viewer who can't edit or create) and redirect on success. `createTemplate` reads the content type and a fresh template id inside its transaction (`disclosureContentType(tx)`, `freshTemplateId(tx)`); Import reads them through `db`.
+- `startDraft` and `createTemplate` answer a refusal (a newer version in review, a viewer who can't edit or create) and redirect on success. `createTemplate` takes the kind the author chose (`family`, Document or Alert) with a starter of that kind, and reads the content type the domain picks for it and a fresh template id inside its transaction (`newTemplateType(family, tx)`, `freshTemplateId(tx)`); Import always makes a document, and reads them through `db`.
 - [actions/demo.ts](actions/demo.ts) and [actions/persona.ts](actions/persona.ts) are demo tools: no permission to check, and the modules they call write in their own transactions, so they don't run on the kit. Input they can't use is answered with `invalid_input`.
 
 ## Anatomy of a read
@@ -160,6 +160,21 @@ workspace's and the review screen's read models carry them and the team's sender
 the message composer and the phone preview, which render in the browser
 ([decision 0035](../../docs/decisions/0035-message-previews-resolve-in-the-browser.md)); the workspace's also says
 which family the template is (`family`), which picks the editor or the composer.
+
+The templates are declared in [seed/templates/](seed/templates/), one `SeedTemplate` each, and `buildTemplate`
+([seed/templates/build.ts](seed/templates/build.ts)) derives every row from it: the template, its versions,
+approvals, comment threads, audit events and consumer notices. A template names its content type (`contentType`,
+Disclosure unless it says Alert), and the build checks each version against it: the required sections in order, and
+only channels the type allows. Coral Offers has five disclosures ([coral.ts](seed/templates/coral.ts)), one in each
+lifecycle state, and three alerts ([coral-alerts.ts](seed/templates/coral-alerts.ts)): Payment Due Reminder (v1
+Active, rendered by Coral as push and SMS every day), Card Used Abroad (v1 waiting for an approver) and Rate Change
+Heads-up (a draft that pairs with the Rate Change Notice letter). An alert's body is one empty paragraph; its push
+and SMS are channel fields, and every seeded alert passes submit's message rules with its own sample sets
+(`seed.test.ts`). Deposits ([deposits.ts](seed/templates/deposits.ts)) and Card Statements
+([card-statements.ts](seed/templates/card-statements.ts)) have three disclosures each. The alerts are built last, so
+the ids seeded before them stay the same. [seed/history.ts](seed/history.ts) writes about 90 days of renders (about
+31,000 rows: daily streams, previews, a few failures and the latest renders), and
+[seed/activity.ts](seed/activity.ts) the notifications, access requests and recertification.
 
 **The `sim` schema** belongs to the simulator ("Coral — simulated"). In this layer only `seed/**` and `reset.ts` may import it (lint). `src/simulator/**` and `src/app/(simulator)/**` may import it and nothing else from `@/server`.
 

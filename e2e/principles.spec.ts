@@ -279,13 +279,15 @@ test.beforeEach(async ({ page }) => {
 
 // Personas: maya (author), jordan (approver), alex (team admin, Coral Offers), dana (viewer, Legal
 // reviewer), priya (author Coral, viewer Deposits), riley (Platform Admin), taylor (Auditor), morgan (no access).
-const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 in review
-const BALANCE = "UC-D6KSGY"; // Balance Transfer Intro: v1 superseded, v2 active
-const FEE_WAIVER = "UC-1NKHEN"; // v1 changes requested
-const HOLIDAY = "UC-H8QY9G"; // v1 revoked, v2 active
-const RATE_CHANGE = "UC-D3R0YG"; // v1 active
-const DEPOSIT = "UC-C20V29"; // Deposits, v1 active
-const STATEMENT = "UC-E0VB9A"; // Card Statements, v1 active
+// The seed's template ids (src/server/seed; `npm run db:reset` prints the same ones every time). A seed change
+// that moves them must move these too: an unknown id opens the not-found page, which passes the screen checks.
+const COLLECT = "UC-DKGV9R"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 in review
+const BALANCE = "UC-RNWQK3"; // Balance Transfer Intro: v1 superseded, v2 active
+const FEE_WAIVER = "UC-Y60S1H"; // v1 changes requested
+const HOLIDAY = "UC-R4PZ0A"; // v1 revoked, v2 active
+const RATE_CHANGE = "UC-KQ0DEZ"; // v1 active
+const DEPOSIT = "UC-3EDEJN"; // Deposits (Everyday Checking), v1 active
+const STATEMENT = "UC-E9NPGR"; // Card Statements (Statement Insert — Rate Change), v1 active
 
 interface Route {
   url: string;

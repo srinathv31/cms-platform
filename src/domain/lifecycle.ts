@@ -6,6 +6,7 @@
 // `effects` are the side records (audit events, notifications, consumer notices) that
 // `server/effects.ts` writes in the same transaction.
 //
+//   newTemplateContentType  the content type a new Document or Alert is made on, for life
 //   createDraft    — → Draft (a new template from a starter)
 //   editLatest     the latest version, Active or Revoked → a new Draft copied from it ("Based on v3")
 //   submit         Draft → In review, numbered, with its contract changes against `contractBaseline`
@@ -71,6 +72,7 @@ import {
   type VersionStage,
 } from "./review-types";
 import {
+  TEMPLATE_KIND_LABELS,
   familyOf,
   type Channel,
   type ChannelFamily,
@@ -206,6 +208,28 @@ export interface NewTemplateChanges {
     createdAt: Date;
   };
   draft: DraftFields;
+}
+
+/** A content type as New template and Import choose one: its name and the channels it allows. */
+export interface NewTemplateType {
+  name: string;
+  allowedChannels: readonly Channel[];
+}
+
+/**
+ * The content type a new template of `family` is made on (the author chose Document or Alert): the
+ * platform's content type of that family, the first by name when there are several. The template keeps
+ * it for life, and so keeps its family: a content type never changes family (decision 0033). Refused,
+ * with the sentence the author reads, when no content type is of that family.
+ */
+export function newTemplateContentType<T extends NewTemplateType>(
+  family: ChannelFamily,
+  contentTypes: readonly T[],
+): Outcome<{ contentType: T }> {
+  const [contentType] = contentTypes
+    .filter((type) => familyOf(type.allowedChannels) === family)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return contentType ? { ok: true, contentType } : refuse(REFUSALS.noContentType(family));
 }
 
 /** The template's first name: Blank is untitled (renamed at once), an example keeps its own name. */
@@ -621,6 +645,11 @@ export type Outcome<T> = Ok<T> | Refused;
  * (maker-checker refusals come from `REASONS`).
  */
 export const REFUSALS = {
+  /** New template (`newTemplateContentType`): "No content type makes alerts yet." */
+  noContentType: refusal(
+    "no_content_type",
+    (family: ChannelFamily) => `No content type makes ${TEMPLATE_KIND_LABELS[family].toLowerCase()}s yet.`,
+  ),
   /** Edit (`planDraftStart`): a newer version is in review, so a draft now would fork the template. */
   newerInReview: refusal("newer_in_review", "A newer version is in review."),
   notEditable: refusal("not_editable", "Only an Active or Revoked template can be edited."),

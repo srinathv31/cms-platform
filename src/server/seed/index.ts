@@ -11,6 +11,7 @@ import { seedSimulator } from "./sim";
 import { seedTeams } from "./teams";
 import { seedCardStatementsTemplates } from "./templates/card-statements";
 import { seedCoralTemplates } from "./templates/coral";
+import { seedCoralAlerts } from "./templates/coral-alerts";
 import { seedDepositsTemplates } from "./templates/deposits";
 
 /** Bump when the shape of the seed changes in a way other code may care about. */
@@ -82,6 +83,8 @@ export async function seedDatabase(db: Db, opts: { base: Date }): Promise<SeedRe
   seedCoralTemplates(ctx);
   seedDepositsTemplates(ctx);
   seedCardStatementsTemplates(ctx);
+  // Last of the templates, so every id seeded before alerts existed stays the same.
+  seedCoralAlerts(ctx);
   seedHistory(ctx);
   seedActivity(ctx);
   seedSimulator(ctx);

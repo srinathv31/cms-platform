@@ -13,6 +13,7 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { createAppClient } from "@/lib/serialized-writes";
 import { seedDatabase } from "@/server/seed";
+import type { StarterChoice } from "@/server/starters";
 import { loadPersona } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { createTemplate } from "./create-template";
@@ -59,12 +60,19 @@ afterAll(() => {
 
 /** Creates a template and returns its first draft (the id comes from the redirect). */
 async function create(starterKey: "card_offer_terms" | "rate_change_notice") {
+  return (await createFrom({ family: "document", starterKey })).draft;
+}
+
+/** Creates a template from any starter, and returns the template row and its first draft. */
+async function createFrom(choice: StarterChoice) {
   vi.mocked(redirect).mockClear();
-  await createTemplate({ teamSlug: "coral-offers", starterKey });
+  expect(await createTemplate({ teamSlug: "coral-offers", ...choice })).toEqual({ ok: true, templateId: expect.any(String) });
   const to = vi.mocked(redirect).mock.calls[0]![0] as string;
   const templateId = to.split("/").pop()!;
-  expect(await db.query.templates.findFirst({ where: eq(templates.id, templateId) })).toBeTruthy();
-  return (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) }))!;
+  const template = (await db.query.templates.findFirst({ where: eq(templates.id, templateId) }))!;
+  expect(template).toBeTruthy();
+  const draft = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) }))!;
+  return { template, draft };
 }
 
 const requiredHeadings = (body: JSONContent) =>
@@ -112,6 +120,49 @@ describe("createTemplate shapes the starter to the content type", () => {
     await db.update(contentTypes).set({ allowedChannels: ["pdf", "web"] }).where(eq(contentTypes.id, CT));
     const draft = await create("rate_change_notice");
     expect(draft.channels).toEqual(["pdf", "web"]);
+  });
+});
+
+// The author chooses Document or Alert, and the kind decides the content type for life (decision 0033).
+describe("createTemplate makes an alert when Alert is chosen", () => {
+  it("on the Alert content type, with Push and SMS on and the starter's fields", async () => {
+    const { template, draft } = await createFrom({ family: "message", starterKey: "payment_reminder" });
+    expect(template).toMatchObject({ contentTypeId: "ct_alert", starterKey: "payment_reminder", createdBy: "maya" });
+    expect(draft).toMatchObject({ name: "Payment reminder", channels: ["push", "sms"], writers: ["maya"], rev: 0 });
+    expect(Object.keys(draft.channelFields).sort()).toEqual(["push", "sms"]);
+    expect(draft.variables.map((v) => v.key)).toEqual(["first_name", "amount_due", "due_date"]);
+    // An alert's body is one empty paragraph: nothing renders from it.
+    expect(draft.body.content).toHaveLength(1);
+    expect(draft.body.content?.[0]?.type).toBe("paragraph");
+  });
+
+  it("from Blank: untitled, no starter key, and nothing written", async () => {
+    const { template, draft } = await createFrom({ family: "message", starterKey: "blank" });
+    expect(template).toMatchObject({ contentTypeId: "ct_alert", starterKey: null });
+    expect(draft).toMatchObject({ name: "Untitled template", channels: ["push", "sms"], channelFields: {}, variables: [] });
+  });
+
+  it("refuses an Alert when no content type makes alerts, and writes nothing", async () => {
+    const before = (await db.select({ id: templates.id }).from(templates)).length;
+    vi.mocked(redirect).mockClear();
+    await db.update(contentTypes).set({ allowedChannels: ["pdf"] }).where(eq(contentTypes.id, "ct_alert"));
+    try {
+      expect(await createTemplate({ teamSlug: "coral-offers", family: "message", starterKey: "card_activity" })).toEqual({
+        ok: false,
+        ...REFUSALS.noContentType("message"),
+      });
+    } finally {
+      await db.update(contentTypes).set({ allowedChannels: ["push", "sms"] }).where(eq(contentTypes.id, "ct_alert"));
+    }
+    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(before);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses a starter of the other kind as input it can't use", async () => {
+    vi.mocked(redirect).mockClear();
+    const mixed = { teamSlug: "coral-offers", family: "message", starterKey: "fee_schedule" } as never;
+    expect(await createTemplate(mixed)).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
+    expect(redirect).not.toHaveBeenCalled();
   });
 });
 
@@ -217,9 +268,9 @@ describe("Edit and New template answer a refusal", () => {
   it("New template on a team the author can't create on, an unknown team, or an unknown starter", async () => {
     vi.mocked(redirect).mockClear();
     const before = (await db.select({ id: templates.id }).from(templates)).length;
-    expect(await createTemplate({ teamSlug: "deposits", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await createTemplate({ teamSlug: "nowhere", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await createTemplate({ teamSlug: "coral-offers", starterKey: "nope" as never })).toEqual({
+    expect(await createTemplate({ teamSlug: "deposits", family: "document", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await createTemplate({ teamSlug: "nowhere", family: "message", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await createTemplate({ teamSlug: "coral-offers", family: "document", starterKey: "nope" as never })).toEqual({
       ok: false,
       ...REQUEST_REFUSALS.invalidInput(),
     });

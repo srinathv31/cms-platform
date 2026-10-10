@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
-import type { StarterKey } from "@/server/starters/catalog";
+import type { StarterChoice, StarterKey } from "@/server/starters/catalog";
 
-// A miniature of each starter's blocks: headings, lines, a variable chip, a list, a table, a notice.
-// Decorative only (the card's name and description say what it is), so it is hidden from assistive tech.
+// A miniature of each starter. A document's is a sheet of its blocks: headings, lines, a variable chip, a
+// list, a table, a notice. An alert's is the top of a phone: its push notification, then its text
+// message in a bubble, with the chips where its variables sit. Decorative only (the card's name and
+// description say what it is), so it is hidden from assistive tech.
 
 type Piece =
   | { kind: "h"; w: string }
@@ -16,7 +18,7 @@ type Piece =
 const h = (w: string): Piece => ({ kind: "h", w });
 const line = (w = "w-full"): Piece => ({ kind: "line", w });
 
-const PIECES: Record<StarterKey, Piece[]> = {
+const PIECES: Record<StarterKey<"document">, Piece[]> = {
   // Only the three required headings, with room to write under each.
   blank: [h("w-[34%]"), { kind: "space" }, h("w-[40%]"), { kind: "space" }, h("w-[30%]")],
   card_offer_terms: [
@@ -51,19 +53,41 @@ const PIECES: Record<StarterKey, Piece[]> = {
   ],
 };
 
+/**
+ * An alert's miniature: the push (a title, an optional subtitle, body lines) and the SMS (its lines,
+ * then the locked footer every SMS ends with). A line is a width, or a chip between two short lines.
+ * Blank has the two frames and nothing written but the footer.
+ */
+type Words = (string | "chip")[];
+interface AlertPieces {
+  title: string | null;
+  subtitle?: string;
+  body: Words;
+  sms: Words;
+}
+
+const ALERT_PIECES: Record<StarterKey<"message">, AlertPieces> = {
+  blank: { title: null, body: [], sms: [] },
+  payment_reminder: { title: "w-[58%]", body: ["chip", "w-[70%]"], sms: ["chip", "w-[64%]"] },
+  card_activity: { title: "w-[62%]", subtitle: "w-[44%]", body: ["chip", "w-[76%]"], sms: ["w-[92%]", "chip"] },
+  statement_ready: { title: "w-[54%]", body: ["w-[94%]", "chip"], sms: ["chip", "w-[52%]"] },
+};
+
 const LINE = "h-[3px] rounded-full bg-hairline-strong";
+const HEADING = "h-[5px] rounded-full bg-text/70";
+const CHIP = "h-[9px] w-[22%] rounded-sm border border-chip-border bg-chip";
 
 function Mini({ piece }: { piece: Piece }) {
   switch (piece.kind) {
     case "h":
-      return <div className={cn("mt-1 h-[5px] rounded-full bg-text/70", piece.w)} />;
+      return <div className={cn("mt-1", HEADING, piece.w)} />;
     case "line":
       return <div className={cn(LINE, piece.w)} />;
     case "chip-line":
       return (
         <div className="flex items-center gap-1">
           <div className={cn(LINE, "w-[26%]")} />
-          <div className="h-[9px] w-[22%] rounded-sm border border-chip-border bg-chip" />
+          <div className={CHIP} />
           <div className={cn(LINE, "w-[30%]")} />
         </div>
       );
@@ -108,16 +132,65 @@ function Mini({ piece }: { piece: Piece }) {
   }
 }
 
-/** A small sheet of paper showing the starter's shape. Fixed height; the bottom fades out. */
-export function StarterPreview({ starter, className }: { starter: StarterKey; className?: string }) {
+/** A line of words: a width, or a chip with short lines either side. */
+function WordsLine({ words }: { words: Words[number] }) {
+  if (words !== "chip") return <div className={cn(LINE, words)} />;
   return (
-    <div aria-hidden className={cn("relative overflow-hidden rounded-xl bg-surface-tinted px-5 pt-4", className)}>
-      <div className="relative h-full overflow-hidden rounded-t-md border border-b-0 border-hairline bg-surface px-3 pt-3">
-        <div className="flex flex-col gap-1.5">
-          {PIECES[starter].map((piece, i) => (
-            <Mini key={i} piece={piece} />
+    <div className="flex items-center gap-1">
+      <div className={cn(LINE, "w-[30%]")} />
+      <div className={CHIP} />
+      <div className={cn(LINE, "w-[24%]")} />
+    </div>
+  );
+}
+
+function AlertMini({ pieces }: { pieces: AlertPieces }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* The push, as a notification: the app's mark, then its title, subtitle and body. */}
+      <div className="flex gap-1.5 rounded-lg border border-hairline bg-surface-tinted p-1.5">
+        <div className="size-3.5 shrink-0 rounded-[4px] bg-text/70" />
+        <div className="flex min-h-7 min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
+          {pieces.title ? <div className={cn("h-[4px] rounded-full bg-text/70", pieces.title)} /> : null}
+          {pieces.subtitle ? <div className={cn(LINE, "bg-text-subtle", pieces.subtitle)} /> : null}
+          {pieces.body.map((words, i) => (
+            <WordsLine key={i} words={words} />
           ))}
         </div>
+      </div>
+      {/* The SMS, as an incoming bubble: its lines, then the footer it always ends with. */}
+      <div className="flex w-[82%] flex-col gap-1.5 rounded-lg rounded-bl-sm bg-surface-tinted px-1.5 py-1.5">
+        {pieces.sms.map((words, i) => (
+          <WordsLine key={i} words={words} />
+        ))}
+        <div className={cn(LINE, "w-[74%] bg-text-subtle/50")} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A small sheet of paper showing a document starter's shape, or the top of a phone showing an alert
+ * starter's push and SMS. Fixed height; the bottom fades out.
+ */
+export function StarterPreview({ starter, className }: { starter: StarterChoice; className?: string }) {
+  return (
+    <div aria-hidden className={cn("relative overflow-hidden rounded-xl bg-surface-tinted px-5 pt-4", className)}>
+      <div
+        className={cn(
+          "relative h-full overflow-hidden border border-b-0 border-hairline bg-surface px-3 pt-3",
+          starter.family === "message" ? "rounded-t-2xl" : "rounded-t-md",
+        )}
+      >
+        {starter.family === "message" ? (
+          <AlertMini pieces={ALERT_PIECES[starter.starterKey]} />
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {PIECES[starter.starterKey].map((piece, i) => (
+              <Mini key={i} piece={piece} />
+            ))}
+          </div>
+        )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-surface to-transparent" />
       </div>
     </div>

@@ -15,8 +15,11 @@ import { asPersona, expect, hydrated, PERSONA_COOKIE, test } from "./helpers/sce
 const CORAL = [
   "Annual Fee Waiver — Terms",
   "Balance Transfer Intro — Terms",
+  "Card Used Abroad",
   "Cash Back Welcome Bonus — Terms",
   "Holiday Points Promo — Terms",
+  "Payment Due Reminder",
+  "Rate Change Heads-up",
   "Rate Change Notice",
 ];
 const DEPOSITS = ["Everyday Checking — Fee Schedule", "High-Yield Savings — Rate Disclosure", "Overdraft Protection — Terms"];

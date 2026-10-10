@@ -22,6 +22,10 @@ nothing stopped a long body from flowing into a text message. The owner confirme
   Since one channel always stays on, a content type's family never changes, and so a template's never does. The
   seed's message content type is **Alert** ("Notifications" is already the bell in the header). An Alert has no
   required sections: editing them is refused (`sectionsRefusal`). A letter plus a text heads-up is two templates.
+- **The author chooses the kind when making a template.** New template opens on Document · Alert, each kind with its
+  own starters. The kind decides the content type (`newTemplateContentType`: the platform's content type of that
+  family, the first by name), which the template keeps for life. Import a file makes documents only, so it shows
+  disabled, with its reason, while Alert is chosen.
 - **A new template's channels come from its family** (`DEFAULT_CHANNELS`, `newTemplateChannels`): PDF and Web for a
   document, Push and SMS for a message.
 - **One registry of channel fields** (`CHANNEL_FIELDS` in `src/domain/channel-fields.ts`): each field's key, label,

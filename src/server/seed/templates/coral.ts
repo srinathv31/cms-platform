@@ -5,7 +5,8 @@ import type { VarKey } from "../variables";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
-// Coral Offers: five templates that put every lifecycle state on screen (build plan, "Seed data").
+// Coral Offers: five disclosures that put every lifecycle state on screen (build plan, "Seed data"). Its
+// alerts are in coral-alerts.ts.
 // Times are days before the reset.
 
 const CUSTOMER_KEYS: VarKey[] = ["first_name", "last_name", "purchase_apr", "home_state"];

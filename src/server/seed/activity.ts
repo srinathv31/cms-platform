@@ -88,6 +88,8 @@ export function seedActivity(ctx: SeedCtx) {
   const waiver = ctx.template("annual-fee-waiver");
   const balanceTransfer = ctx.template("balance-transfer");
   const holiday = ctx.template("holiday-points");
+  const abroad = ctx.template("card-used-abroad");
+  const reminder = ctx.template("payment-due-reminder");
   const waiverReason = sink.approvals.find(
     (a) => a.versionId === waiver.versions.v1.id && a.decision === "changes_requested",
   )?.reason;
@@ -121,6 +123,14 @@ export function seedActivity(ctx: SeedCtx) {
     body: "It adds the required variable annual_fee, a breaking change for consumers.",
     href: `/${coral}/review/${cashBack.id}/3`,
     at: 0.9,
+  });
+  note({
+    user: "jordan",
+    kind: "review_requested",
+    title: `${userName("priya")} submitted ${abroad.name} v1 for review.`,
+    body: "Fraud Operations asked for a push and a text when a card is used outside the US.",
+    href: `/${coral}/review/${abroad.id}/1`,
+    at: 1.2,
   });
   note({
     user: "maya",
@@ -173,6 +183,14 @@ export function seedActivity(ctx: SeedCtx) {
     title: `${cashBack.name} v2 is now Active.`,
     href: `/${coral}/templates/${cashBack.id}`,
     at: 86.5,
+    read: true,
+  });
+  note({
+    user: "maya",
+    kind: "version_live",
+    title: `${reminder.name} v1 is now Active.`,
+    href: `/${coral}/templates/${reminder.id}`,
+    at: 51.5,
     read: true,
   });
   note({
