@@ -2,7 +2,7 @@ import { createClient, type Client, type InValue } from "@libsql/client";
 import { expect, type APIRequestContext, type APIResponse, type PlaywrightWorkerArgs } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
-import path from "node:path";
+import { E2E_DATABASE_URL } from "../storage";
 
 // Shared by the API specs: the database (read for what the seed holds and for render_log; written
 // only through `withTemporarily`, which always puts the row back), the render call, a chunked upload
@@ -10,7 +10,40 @@ import path from "node:path";
 
 // ── The database ─────────────────────────────────────────────────────────────
 
-export const openDb = (): Client => createClient({ url: `file:${path.resolve(process.cwd(), "data", "ucomp.db")}` });
+/** How long SQLite waits for the server's write lock before a statement fails with SQLITE_BUSY. */
+const BUSY_TIMEOUT_MS = 5_000;
+
+const isBusy = (error: unknown) =>
+  /SQLITE_BUSY|database is locked/i.test(`${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`);
+
+/** Runs a statement again, a few times with a growing pause, while the server holds the file's write lock. */
+export async function retryBusy<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= 6 || !isBusy(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt));
+    }
+  }
+}
+
+/**
+ * e2e's own database (`E2E_DATABASE_URL`, the file the server runs on; see e2e/storage.ts). The server
+ * writes to it while a spec reads and writes, so the connection waits out its lock and `execute` and
+ * `batch` retry a SQLITE_BUSY that still gets through.
+ */
+export function openDb(): Client {
+  const client = createClient({ url: E2E_DATABASE_URL, timeout: BUSY_TIMEOUT_MS });
+  return new Proxy(client, {
+    get(target, prop) {
+      const member = Reflect.get(target, prop, target);
+      if (typeof member !== "function") return member;
+      if (prop === "execute" || prop === "batch") return (...args: unknown[]) => retryBusy(() => member.apply(target, args));
+      return member.bind(target);
+    },
+  });
+}
 
 export type Channel = "pdf" | "web" | "email" | "push" | "sms";
 export type VariableType = "text" | "currency" | "percent" | "date" | "number" | "us_state";

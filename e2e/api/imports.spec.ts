@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Client } from "@libsql/client";
 import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { E2E_UPLOADS_DIR } from "../storage";
 import { asPersona, openDb, postChunked } from "./helpers";
 
 // The import API (Phase 7a): POST /api/imports with each kind of file, the refusals, the permission
@@ -42,7 +43,7 @@ test.beforeAll(() => {
 test.afterAll(async () => {
   for (const id of created) {
     const { rows } = await db.execute({ sql: "SELECT id FROM uploads WHERE template_id = ?", args: [id] });
-    for (const row of rows) await rm(path.join(process.cwd(), "data", "uploads", String(row.id)), { recursive: true, force: true });
+    for (const row of rows) await rm(path.join(E2E_UPLOADS_DIR, String(row.id)), { recursive: true, force: true });
     for (const table of ["uploads", "audit_events", "versions"]) {
       await db.execute({ sql: `DELETE FROM ${table} WHERE template_id = ?`, args: [id] });
     }

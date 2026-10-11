@@ -9,7 +9,7 @@ import { ORIGINAL_BASENAME, UPLOADS_SUBDIR, type ImportKind, type ImportReport }
 //   <root>/<uploadId>/report.json               the ImportReport
 //
 // Every path is built from a checked upload id and fixed names: the client's file name never
-// reaches the file system. `root` defaults to ./data/uploads; tests point it at a temp folder.
+// reaches the file system. `root` defaults to `defaultUploadsRoot()`; tests point it at a temp folder.
 
 const UPLOAD_ID = /^up_[0-9a-z]{10}$/;
 const STORED_PATH = /^(up_[0-9a-z]{10})\/original\.(docx|pdf|txt)$/;
@@ -17,8 +17,12 @@ const STORED_PATH = /^(up_[0-9a-z]{10})\/original\.(docx|pdf|txt)$/;
 export const COMPARE_FILE = "compare.html";
 export const REPORT_FILE = "report.json";
 
+/**
+ * The uploads folder: `UPLOADS_DIR` when set (e2e points it at its own folder, beside its own database),
+ * else ./data/uploads. Every read, write and reset of uploads takes it from here.
+ */
 export function defaultUploadsRoot(): string {
-  return path.join(/*turbopackIgnore: true*/ process.cwd(), UPLOADS_SUBDIR);
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.UPLOADS_DIR || UPLOADS_SUBDIR);
 }
 
 function folder(root: string, uploadId: string): string {
