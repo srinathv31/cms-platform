@@ -309,6 +309,14 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 - **Fix:** The owner checks on a real iPhone and a real Pixel: send pushes of known lengths to each screen (lock screen, banner, expanded) at the default and the larger text sizes, and compare the line counts, cut points and type sizes with the previews. Adjust `IOS_LINES`, `ANDROID_LINES` and the ramps where they differ, and note the devices and OS versions in the device kit's README.
 - **Evidence:** not yet measured
 
+#### N27 · Low: Below about 800px wide the always-open sidebar leaves a screen no room, the Usage tab included
+
+- **Status:** Open
+- **Where:** `src/components/app-shell/app-frame.tsx` (`<Sidebar collapsible="none">`, which keeps the shadcn sidebar's mobile sheet from ever opening); `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); [docs/reference/ui-checklist.md](reference/ui-checklist.md) (the 800px floor)
+- **What happens:** The sidebar is 16rem wide at every width and never collapses, so a narrow window gives the page what's left. At 390px the sidebar is 264px and the canvas 112px: a template's Usage tab (`section[data-slot="usage"]`) is 0px wide, its title wraps to four lines in 110px, and the charts and the 728px and 494px tables are clipped or scrolled inside a box with no width. Nothing scrolls the page (`scrollWidth` stays 390; the shell's `overflow-hidden` cuts the rest). The Library and every other screen clip the same way, so this is the shell's, not the Usage tab's, and it was there before the channel split (N22). The checklist asks for "no horizontal overflow at any width from 800px", so the prototype doesn't claim anything narrower. Noticed while fixing N22 (PR #59).
+- **Fix:** Decide whether narrow windows are in scope. If they are, collapse the sidebar off-canvas under the floor (`collapsible="offcanvas"` with a menu button in the top bar, which `ui/sidebar.tsx` already supports below 768px), then check the Usage tab and the other screens at 390px. If not, record 800px as the floor in a decision and in the checklist, and leave it.
+- **Evidence:** measured (390, 600, 768, 900 and 1024px wide, production build on the seeded database: sidebar 264px at every width; canvas 112, 322, 490, 622 and 746px; the Usage section 0, 206, 374, 506 and 630px)
+
 ## Waits for the enterprise work
 
 These findings are real, and several are High, but each one is fixed by building something that's on the way: real sign-in, the Java API or the enterprise font. A fix made in the prototype now would be replaced. They stay Open so that each piece of work starts with them in view, and each table says what that work has to get right.
