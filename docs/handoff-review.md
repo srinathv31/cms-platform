@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 11 | 22 | 36 |
-| Partly fixed | 0 | 4 | 3 | 3 | 10 |
-| Fixed | 1 | 19 | 26 | 9 | 55 |
+| Open | 0 | 3 | 10 | 12 | 25 |
+| Partly fixed | 0 | 4 | 4 | 3 | 11 |
+| Fixed | 1 | 19 | 26 | 24 | 70 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), and PRs #47–#50 (N3, N5, N6, S8, H7, part of H8, and the approver viewing every output before approving).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), and PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
