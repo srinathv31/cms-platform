@@ -2,7 +2,7 @@ import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
-import { channelControl, expectViewed, phoneControl, reviewTabs } from "./helpers/review";
+import { channelControl, expectViewed, phoneControl, reviewPreview, reviewTabs } from "./helpers/review";
 import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 
 // An approver views every output before approving (decision 0037). Approve waits until each output of the
@@ -18,6 +18,10 @@ import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 //   2. An alert (Push and SMS): Push on the iPhone, then SMS, then Push on Android. The phone control checks
 //      each phone, the channel control checks Push once both are, and nothing moves as a check appears.
 //      Approve: v1 is Active, and the audit row says ["push.ios", "push.android", "sms"].
+//   3. An output the route refuses (a PDF with a character its font can't draw): the Preview shows the error,
+//      the PDF is never checked, and Approve says "The PDF can't be shown. Request changes." in the same row.
+//   4. A PDF the route returns but pdf.js can't open: the viewer offers the file, and downloading it counts
+//      the PDF as viewed. Approve: the audit row says ["pdf", "web"].
 //
 // Self-contained: each test copies a seeded round in review into a template of its own (v1, in review,
 // submitted by Maya), and afterAll removes them. Console and page errors fail it.
@@ -28,6 +32,8 @@ test.use({ trace: "off" });
 const TEAM = "coral-offers";
 const DOCUMENT = { id: "UC-E2EVD1", from: "Cash Back Welcome Bonus — Terms", name: "Viewed outputs — Terms" };
 const ALERT = { id: "UC-E2EVA1", from: "Card Used Abroad", name: "Viewed outputs — Alert" };
+const REFUSED = { id: "UC-E2EVD2", from: DOCUMENT.from, name: "Viewed outputs — Refused PDF" };
+const UNDRAWABLE = { id: "UC-E2EVD3", from: DOCUMENT.from, name: "Viewed outputs — Undrawable PDF" };
 
 let db: Client;
 const made: string[] = [];
@@ -35,7 +41,7 @@ const made: string[] = [];
 test.beforeAll(async () => {
   db = openDb();
   // A run that died half way leaves its copies: start clean.
-  for (const id of [DOCUMENT.id, ALERT.id]) await removeTemplate(db, id);
+  for (const id of [DOCUMENT.id, ALERT.id, REFUSED.id, UNDRAWABLE.id]) await removeTemplate(db, id);
 });
 
 test.afterAll(async () => {
@@ -190,5 +196,89 @@ test("an alert: Push counts on each phone, then SMS; the controls check off what
   await test.step("2.4 He approves: v1 is Active, and the audit row records all three outputs", async () => {
     await approve(page);
     expect(await auditedOutputs(ALERT.id)).toEqual(["push.ios", "push.android", "sms"]);
+  });
+});
+
+test("an output the route refuses can't be previewed: Approve says it can't be shown and to request changes", async ({ page, problems }) => {
+  await copyInReview(REFUSED);
+  await page.route(`**/api/v1/templates/${REFUSED.id}/render`, async (route) => {
+    const asked = route.request().postDataJSON() as { channel?: string };
+    if (asked.channel !== "pdf") return route.continue();
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "render_failed",
+          message: "The PDF couldn't be rendered. Its font can't show these characters: U+1F600 (\u{1F600}).",
+          details: { reason: "glyphs", characters: ["U+1F600"] },
+        },
+      }),
+    });
+  });
+  await openReview(page, REFUSED.id);
+  const reasonBefore = await test.step("3.1 Approve waits on both outputs, in one line", async () => {
+    await expectApproveWaits(page, "Preview PDF and Web first.");
+    return (await stageLine(page).boundingBox())!;
+  });
+
+  await test.step("3.2 The Preview opens on PDF and shows the route's error: Approve now says to request changes", async () => {
+    await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
+    await expect(reviewPreview(page).getByRole("alert")).toContainText("Its font can't show these characters");
+    await expectApproveWaits(page, "The PDF can't be shown. Request changes.");
+    const after = (await stageLine(page).boundingBox())!;
+    expect([after.x, after.y, after.height], "the stage's line didn't move or grow").toEqual([reasonBefore.x, reasonBefore.y, reasonBefore.height]);
+    await expect(segment(channelControl(page), "PDF"), "never shown: not viewed").not.toHaveAttribute("data-done", "");
+  });
+
+  await test.step("3.3 Web renders, and Approve still says the PDF can't be shown", async () => {
+    await tap(segment(channelControl(page), "Web"));
+    await expectViewed(segment(channelControl(page), "Web"));
+    await expectApproveWaits(page, "The PDF can't be shown. Request changes.");
+  });
+
+  // The route's refusal is a 500, which Chrome logs: the console errors this test expects.
+  const refusals = problems.filter((p) => /status of 500/.test(p) && p.includes(`/api/v1/templates/${REFUSED.id}/render`));
+  expect(refusals.length).toBeGreaterThan(0);
+  for (const refused of refusals) problems.splice(problems.indexOf(refused), 1);
+});
+
+test("a PDF pdf.js can't open counts as viewed once the approver downloads it from the viewer", async ({ page }) => {
+  await copyInReview(UNDRAWABLE);
+  // Valid response, bytes pdf.js can't open: the viewer falls back to offering the file.
+  await page.route(`**/api/v1/templates/${UNDRAWABLE.id}/render`, async (route) => {
+    const asked = route.request().postDataJSON() as { channel?: string };
+    if (asked.channel !== "pdf") return route.continue();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "content-disposition": `inline; filename="${UNDRAWABLE.id}-v1.pdf"` },
+      body: "this is not a PDF",
+    });
+  });
+  await openReview(page, UNDRAWABLE.id);
+
+  await test.step("4.1 The Preview opens on PDF: the viewer offers the file, and the PDF is not viewed yet", async () => {
+    await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
+    const fallback = reviewPreview(page).getByRole("region", { name: "PDF preview" }).getByRole("button", { name: "Download PDF" });
+    await expect(fallback).toBeVisible({ timeout: 30_000 });
+    await expect(segment(channelControl(page), "PDF")).not.toHaveAttribute("data-done", "");
+    await expectApproveWaits(page, "Preview PDF and Web first.");
+  });
+
+  await test.step("4.2 He downloads the file from the viewer: the PDF is viewed", async () => {
+    const download = page.waitForEvent("download");
+    await tap(reviewPreview(page).getByRole("region", { name: "PDF preview" }).getByRole("button", { name: "Download PDF" }));
+    expect((await download).suggestedFilename()).toBe(`${UNDRAWABLE.id}-v1.pdf`);
+    await expectViewed(segment(channelControl(page), "PDF"));
+    await expectApproveWaits(page, "Preview Web first.");
+  });
+
+  await test.step("4.3 Web renders, and Approve records both", async () => {
+    await tap(segment(channelControl(page), "Web"));
+    await expectViewed(segment(channelControl(page), "Web"));
+    await expect(approveButton(page)).toBeEnabled();
+    await approve(page);
+    expect(await auditedOutputs(UNDRAWABLE.id)).toEqual(["pdf", "web"]);
   });
 });

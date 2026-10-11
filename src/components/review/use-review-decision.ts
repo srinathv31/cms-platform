@@ -20,19 +20,22 @@ import type { GoLiveMoment } from "./use-go-live";
  * The server's data is the truth and arrives anew after every action; what is kept here is what the viewer did
  * on this screen (`local`: "You approved v3."). Approve also waits on the outputs the approver has viewed in
  * the Preview (`viewed`, use-viewed-outputs.ts): `approveBlocked` is why, in the domain's sentence, while one
- * is missing (decision 0037).
+ * is missing or can't be shown (`cannotShow`; decision 0037).
  */
 export function useReviewDecision({
   data,
   team,
   goLive,
   viewed,
+  cannotShow,
 }: {
   data: ReviewScreenData;
   team: string;
   goLive: GoLiveMoment;
   /** The outputs of this round the approver has had on screen in the Preview. */
   viewed: readonly OutputKey[];
+  /** The outputs the Preview saw the render refuse for a reason of the version's own: they can't be viewed. */
+  cannotShow: readonly OutputKey[];
 }) {
   const { template, version, steps, can } = data;
   const stage = useMemo(() => approvalStage(steps), [steps]);
@@ -89,8 +92,8 @@ export function useReviewDecision({
 
   return {
     access,
-    /** Approve alone is blocked, with this sentence: an output not viewed yet. */
-    approveBlocked: approveWaitsOn(access, version, viewed),
+    /** Approve alone is blocked, with this sentence: an output not viewed yet, or one that can't be shown. */
+    approveBlocked: approveWaitsOn(access, version, viewed, cannotShow),
     row,
     next,
     /** The viewer made the decision on this screen. */

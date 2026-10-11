@@ -9,7 +9,7 @@ import { usePreviewRender } from "@/components/preview/use-preview-render";
 import { INITIAL_PHONE, type PreviewDevice } from "@/components/workspace/session/session-store";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
-import { outputKey, type OutputKey } from "@/domain/review-outputs";
+import { outputCannotBeShown, outputKey, type OutputKey } from "@/domain/review-outputs";
 import type { VariableValues } from "@/editor/model/types";
 import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";
 import { RV } from "./review-grid";
@@ -27,9 +27,12 @@ import { RV } from "./review-grid";
  * approver has had on screen, and the approval records them.
  *
  * `onViewed` says which outputs the approver has had on screen (decision 0037): Web, Email, a push on the
- * phone picked and SMS once they rendered, a PDF once pdf.js has drawn it; never a failed render, and never
- * for a tab merely picked. Approve waits on every output. The channel and phone controls check off the
- * ones viewed (`viewed`).
+ * phone picked and SMS once they rendered, a PDF once pdf.js has drawn it (or the approver downloaded its
+ * bytes when pdf.js couldn't); never a failed render, and never for a tab merely picked. Approve waits on
+ * every output. The channel and phone controls check off the ones viewed (`viewed`). `onFailed` says which
+ * output the render refused for a reason of the version's own (a character the PDF font can't draw, a
+ * channel the content type no longer allows), and when it no longer is: that output can't be viewed, and
+ * Approve says to request changes.
  *
  * The well scrolls on its own, so the pane has a height of its own: the canvas's scroll area less
  * the header (124px) and the tab bar (44px), never less than 30rem.
@@ -54,6 +57,7 @@ export function PreviewView({
   onSeen,
   viewed,
   onViewed,
+  onFailed,
   onEditValues,
 }: {
   templateId: string;
@@ -83,6 +87,8 @@ export function PreviewView({
   viewed: readonly OutputKey[];
   /** An output is on screen: a channel, or Push on the phone picked. */
   onViewed: (output: OutputKey) => void;
+  /** An output's render is refused for a reason of the version's own, or no longer is. */
+  onFailed: (output: OutputKey, failed: boolean) => void;
   /** The error state's Edit values: opens the (read-only) sample set's values. */
   onEditValues: () => void;
 }) {
@@ -124,6 +130,13 @@ export function PreviewView({
     if (enabled && onScreen) onViewed(output);
   }, [enabled, onScreen, output, onViewed]);
   const onPdfShown = useCallback(() => onViewed("pdf"), [onViewed]);
+
+  // An output the render refuses for a reason of the version's own can't be viewed by looking again.
+  const error = message ? (message.ok ? null : message.error) : (slot?.error ?? null);
+  const cannotShow = !rendered && error !== null && outputCannotBeShown(error);
+  useEffect(() => {
+    if (enabled) onFailed(output, cannotShow);
+  }, [enabled, cannotShow, output, onFailed]);
 
   return (
     <div

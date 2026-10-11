@@ -60,7 +60,10 @@ export interface PreviewPaneProps {
    * channel and phone controls. Absent in the workspace.
    */
   viewed?: readonly OutputKey[];
-  /** The PDF's pages are on screen (pdf.js has drawn the document the route returned). */
+  /**
+   * The PDF is as good as shown: pdf.js has drawn the document the route returned, or it couldn't and the
+   * approver downloaded the bytes from the viewer's fallback (they are exactly what consumers get).
+   */
   onPdfShown?: () => void;
 }
 
@@ -207,6 +210,7 @@ function Output({
           data={pdf?.bytes ?? null}
           fileName={pdf?.filename ?? ""}
           onLoad={onPdfShown}
+          onFallbackDownload={onPdfShown}
           className="min-h-full bg-transparent"
           contentClassName={WELL_INSET}
         />

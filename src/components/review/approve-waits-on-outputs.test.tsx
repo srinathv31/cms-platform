@@ -31,17 +31,28 @@ afterEach(() => {
 });
 
 /** The rail as the review screen wires it: the viewed set, the domain's answer, the decision row. */
-function Screen({ versionId, channels, seeRef }: { versionId: string; channels: Channel[]; seeRef: RefObject<((o: OutputKey) => void) | null> }) {
-  const { viewed, onViewed } = useViewedOutputs("jordan", versionId, 1);
+function Screen({
+  versionId,
+  channels,
+  seeRef,
+  failRef,
+}: {
+  versionId: string;
+  channels: Channel[];
+  seeRef: RefObject<((o: OutputKey) => void) | null>;
+  failRef: RefObject<((o: OutputKey, failed: boolean) => void) | null>;
+}) {
+  const { viewed, onViewed, failed, onFailed } = useViewedOutputs("jordan", versionId, 1);
   useEffect(() => {
     seeRef.current = onViewed;
-  }, [seeRef, onViewed]);
+    failRef.current = onFailed;
+  }, [seeRef, onViewed, failRef, onFailed]);
   return (
     <DecisionRail
       steps={STEPS}
       nowIso={NOW}
       access={OPEN}
-      approveBlocked={approveWaitsOn(OPEN, { state: "in_review", channels }, viewed)}
+      approveBlocked={approveWaitsOn(OPEN, { state: "in_review", channels }, viewed, failed)}
       row={{ kind: "buttons" }}
       onApprove={() => {}}
       onRequest={() => {}}
@@ -56,10 +67,11 @@ function Screen({ versionId, channels, seeRef }: { versionId: string; channels: 
 
 function mount(versionId: string, channels: Channel[]) {
   const seeRef = createRef<(o: OutputKey) => void>();
+  const failRef = createRef<(o: OutputKey, failed: boolean) => void>();
   const host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  act(() => root!.render(<Screen versionId={versionId} channels={channels} seeRef={seeRef} />));
+  act(() => root!.render(<Screen versionId={versionId} channels={channels} seeRef={seeRef} failRef={failRef} />));
   const button = (name: string) => [...host.querySelectorAll("button")].find((b) => b.textContent === name)!;
   return {
     host,
@@ -67,6 +79,7 @@ function mount(versionId: string, channels: Channel[]) {
     request: () => button("Request changes"),
     stageLine: () => host.querySelector('[data-step="current"]')!.textContent,
     see: (output: OutputKey) => act(() => seeRef.current!(output)),
+    fail: (output: OutputKey, failed = true) => act(() => failRef.current!(output, failed)),
   };
 }
 
@@ -103,6 +116,50 @@ describe("Approve waits on every output", () => {
     expect(region.className).toContain("h-8");
   });
 
+  // The render route refused the output (a character the PDF font can't draw, a channel the content type no
+  // longer allows): the Preview shows its error, and looking again can't help.
+  it("an output the render refused can't be previewed: Approve says so and to request changes, in the same row", () => {
+    const screen = mount("ver_refused", ["pdf", "web"]);
+    const region = screen.host.querySelector("[data-decision]")!;
+    screen.see("web");
+    expect(screen.stageLine()).toContain("Preview PDF first.");
+
+    screen.fail("pdf");
+    expect(blocked(screen.approve())).toBe(true);
+    expect(screen.stageLine()).toContain("The PDF can't be shown. Request changes.");
+    expect(screen.stageLine()).not.toContain("Preview");
+    expect(blocked(screen.request()), "Request changes never waits").toBe(false);
+    expect(region.className).toContain("h-8");
+    // The line is one line, cut short rather than wrapped, and the whole sentence is its tooltip.
+    const line = screen.host.querySelector("#decision-blocked")!;
+    expect(line.className).toContain("truncate");
+    expect(line.getAttribute("title")).toBe("The PDF can't be shown. Request changes.");
+
+    // It renders after all (the sample set changed, or the channel was allowed again): back to previewing it.
+    screen.fail("pdf", false);
+    expect(screen.stageLine()).toContain("Preview PDF first.");
+    screen.fail("pdf");
+    screen.see("pdf");
+    expect(blocked(screen.approve()), "an output viewed is viewed, whatever a later render says").toBe(false);
+  });
+
+  it("names every output that can't be shown, ahead of any still to preview", () => {
+    const screen = mount("ver_refused_two", ["pdf", "web", "email"]);
+    screen.fail("email");
+    screen.fail("pdf");
+    expect(screen.stageLine()).toContain("The PDF and Email can't be shown. Request changes.");
+  });
+
+  it("keeps what was refused in memory only: after a reload the Preview says so again", () => {
+    const first = mount("ver_refused_store", ["pdf"]);
+    first.fail("pdf");
+    expect(window.sessionStorage.getItem("ucomp:viewed-outputs:jordan:ver_refused_store:1")).toBeNull();
+    act(() => root!.unmount());
+    // A reload: the Preview says so again when the output is on screen again.
+    const again = mount("ver_refused_store", ["pdf"]);
+    expect(again.stageLine()).toContain("Preview PDF first.");
+  });
+
   it("keeps what was viewed for the round in this tab's session, so a reload doesn't start over", () => {
     const first = mount("ver_reload", ["pdf"]);
     first.see("pdf");
@@ -134,6 +191,9 @@ describe("approveWaitsOn", () => {
     const facts = { state: "in_review" as const, channels: ["pdf"] as Channel[] };
     expect(approveWaitsOn(OPEN, facts, [])).toBe("Preview PDF first.");
     expect(approveWaitsOn(OPEN, facts, ["pdf"])).toBeNull();
+    expect(approveWaitsOn(OPEN, facts, [], ["pdf"])).toBe("The PDF can't be shown. Request changes.");
+    expect(approveWaitsOn(OPEN, facts, ["pdf"], ["pdf"])).toBeNull();
+    expect(approveWaitsOn({ kind: "blocked", reason: "You submitted this version." }, facts, [], ["pdf"])).toBeNull();
     expect(approveWaitsOn({ kind: "blocked", reason: "You submitted this version." }, facts, [])).toBeNull();
     expect(approveWaitsOn({ kind: "hidden" }, facts, [])).toBeNull();
     expect(approveWaitsOn(OPEN, { ...facts, state: "active" }, [])).toBeNull();

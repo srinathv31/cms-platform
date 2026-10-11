@@ -29,7 +29,21 @@ approve without it, and nothing would show afterwards what the approver saw.
 - **An output counts once it has rendered on screen**, in the Preview, for this round: Web and Email when the
   route's output is shown, a PDF when pdf.js has drawn it, Push on the phone picked and SMS when the browser
   rendered them. Picking a tab doesn't count, and neither does a render that failed. `PreviewView` reports each
-  through `onViewed`.
+  through `onViewed`. A PDF the route returned but pdf.js can't open is shown by the viewer's fallback, a
+  Download PDF button; downloading from it counts the PDF as viewed, since the bytes are exactly what consumers
+  get. Downloading from the Preview's own Download PDF button doesn't count by itself.
+- **An output the route refuses can't be viewed, and the reason says so.** When the render route answers the
+  picked channel with an error that is the version's own (a character the PDF's font can't draw, a document
+  that fails its check, a channel the content type no longer allows: `outputCannotBeShown`), `PreviewView` reports the output as failed (`onFailed`) and withdraws it once the
+  output renders. `outputsRefusal` takes those outputs and, for one still missing, refuses with
+  `output_cannot_show` instead of `output_not_viewed`: "The PDF can't be shown. Request changes." It comes
+  before the outputs still to preview, since looking again won't help. Not counted: an error about the sample
+  set's values (a missing or invalid value: the Preview offers Edit values, and another set may render) and a
+  failure with no reason (the server threw or couldn't be reached: Try again). An output viewed on one sample
+  set stays viewed if another set fails. The set of failed outputs lives in memory only; after a reload the
+  Preview reports it again when the output is on screen. The approve action doesn't take it: the server can't
+  see a render fail on the approver's screen, so the code is the review screen's, in the same table so a second
+  backend keeps both.
 - **The browser keeps the set per viewer, version and round** (`useViewedOutputs`), in sessionStorage with every
   read and write in try/catch, so a reload in the same tab doesn't make the approver start over. The viewer is in
   the key so the demo's persona switch, which keeps the tab, doesn't hand one approver's viewing to the next.
@@ -56,6 +70,8 @@ approve without it, and nothing would show afterwards what the approver saw.
   extra clicks beyond viewing them. A reload keeps the set; a new tab or a new round starts again.
 - The server trusts the client's list: it proves the client said it showed them, not that a person read them.
   With real sign-in, a backend could record views as they happen if that proof is needed.
-- A version whose output fails to render for every sample set can't be approved until it renders; the approver
-  sends it back instead.
+- A version whose output fails to render for every sample set can't be approved until it renders; Approve says
+  the output can't be shown and to request changes, and the approver sends it back. The sentence is one line in
+  the stage's row (and beside the stacked layout's bar), cut short with the whole sentence as its tooltip, so
+  nothing moves when it replaces "Preview PDF first."
 - The e2e specs that approve call `viewEveryOutput` (`e2e/helpers/review.ts`) first.

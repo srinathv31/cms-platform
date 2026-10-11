@@ -21,6 +21,8 @@ export interface PdfViewerProps {
   fileName: string;
   /** Called once the document has loaded. */
   onLoad?: (info: { numPages: number }) => void;
+  /** Called when the fallback's Download PDF is pressed: pdf.js couldn't draw the bytes, and this hands over the file itself. */
+  onFallbackDownload?: () => void;
   className?: string;
   /** Classes for the column that holds the pages. Replaces its default padding (`p-6`) when given, so the host sets the paper's inset (see `WELL_INSET`). */
   contentClassName?: string;
@@ -34,7 +36,7 @@ const LETTER_ASPECT = "612 / 792";
 /** The padding round the pages when the host gives none. */
 const DEFAULT_INSET = "p-6";
 
-export function PdfViewer({ data, fileName, onLoad, className, contentClassName }: PdfViewerProps): JSX.Element {
+export function PdfViewer({ data, fileName, onLoad, onFallbackDownload, className, contentClassName }: PdfViewerProps): JSX.Element {
   const [view, setView] = useState<View>({ kind: "waiting" });
   const [busy, setBusy] = useState(false);
   // No bytes: back to the skeleton (state adjusted during render, so there is no stale frame).
@@ -86,7 +88,7 @@ export function PdfViewer({ data, fileName, onLoad, className, contentClassName 
             <PdfPage key={index} index={index} count={view.doc.numPages} size={size} register={register} />
           ))
         ) : view.kind === "failed" && data ? (
-          <Fallback data={data} fileName={fileName} />
+          <Fallback data={data} fileName={fileName} onDownload={onFallbackDownload} />
         ) : (
           <PageSkeleton />
         )}
@@ -116,7 +118,7 @@ function PageSkeleton() {
 }
 
 /** When pdf.js can't show the file: the file itself, one click away. */
-function Fallback({ data, fileName }: { data: Uint8Array; fileName: string }) {
+function Fallback({ data, fileName, onDownload }: { data: Uint8Array; fileName: string; onDownload?: () => void }) {
   return (
     <div className="flex w-full flex-col items-center justify-center gap-4 px-6" style={{ aspectRatio: LETTER_ASPECT }}>
       <FileText className="size-8 text-text-subtle" strokeWidth={1.5} aria-hidden />
@@ -124,7 +126,14 @@ function Fallback({ data, fileName }: { data: Uint8Array; fileName: string }) {
         <span className="sr-only">Preview unavailable. </span>
         {fileName}
       </p>
-      <Button variant="outline" className="bg-surface" onClick={() => downloadPdf(data, fileName)}>
+      <Button
+        variant="outline"
+        className="bg-surface"
+        onClick={() => {
+          downloadPdf(data, fileName);
+          onDownload?.();
+        }}
+      >
         <Download strokeWidth={1.75} aria-hidden />
         Download PDF
       </Button>

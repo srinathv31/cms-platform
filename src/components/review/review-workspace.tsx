@@ -65,7 +65,7 @@ export function ReviewWorkspace({
   const comments = useReviewComments({ threads: data.threads, version, showDocument: views.showDocument });
   const goLive = useGoLive(version.state);
   const outputs = useViewedOutputs(viewer.id, version.id, version.round);
-  const decision = useReviewDecision({ data, team, goLive, viewed: outputs.viewed });
+  const decision = useReviewDecision({ data, team, goLive, viewed: outputs.viewed, cannotShow: outputs.failed });
   const { rename } = changes;
   const canComment = can.comment.ok;
 
@@ -160,6 +160,7 @@ export function ReviewWorkspace({
             onSeen={onSeen}
             viewed={outputs.viewed}
             onViewed={outputs.onViewed}
+            onFailed={outputs.onFailed}
             onEditValues={() => switcher.current?.openEditor()}
           />
         </Activity>

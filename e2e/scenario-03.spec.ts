@@ -292,7 +292,8 @@ async function selectPhrase(page: Page, target: Locator, phrase: string) {
 
 // ── The spec ─────────────────────────────────────────────────────────────────
 
-// Nothing here opens a preview frame, but the trace would still be heavy for a run this long.
+// Jordan's approval opens the Preview (`viewEveryOutput`), whose frames are sandboxed: the trace's injected
+// scripts are blocked in them ("Blocked script execution"), and it would be heavy for a run this long anyway.
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
 test.describe("scenario 3: the review loop", () => {

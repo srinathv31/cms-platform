@@ -80,9 +80,12 @@ export function ApproveDialog({
   round: number;
   /** The Active version this one will replace; null when nothing is Active yet. */
   previousNumber: number | null;
-  /** With nothing Active (after a revoke): the newest version that still renders, which consumers move from. */
-  stillRenders: { number: number; sunsetDay: string | null } | null;
-  /** The version's contract changes: the breaking ones are what the consumers have to map. */
+  /**
+   * With nothing Active (after a revoke): the newest version that still renders, which consumers move from, and
+   * this version's contract changes against it (the breaking ones are what they have to map).
+   */
+  stillRenders: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
+  /** The version's contract changes against the Active version it replaces: the breaking ones are what its consumers have to map. */
   contractChanges: readonly ContractChange[];
   stage: ApprovalStageInfo;
   usage: readonly ConsumerUsage[];

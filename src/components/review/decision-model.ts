@@ -49,17 +49,19 @@ export function decisionAccess(approve: PermissionResult, requestChanges: Permis
 
 /**
  * Why Approve alone isn't available yet: an output of the round the viewer hasn't had on screen in the
- * Preview (decision 0037), in the domain's sentence, the one the server refuses with. Only while the pair
- * is otherwise theirs to press and the round is in review; Request changes never waits on it. Null once
- * every output has been viewed.
+ * Preview (decision 0037), in the domain's sentence, the one the server refuses with; or, for an output
+ * the Preview saw the render refuse (`cannotShow`), that it can't be shown and the version needs changes.
+ * Only while the pair is otherwise theirs to press and the round is in review; Request changes never
+ * waits on it. Null once every output has been viewed.
  */
 export function approveWaitsOn(
   access: DecisionAccess,
   version: { state: VersionState; channels: readonly Channel[] },
   viewed: readonly string[],
+  cannotShow: readonly string[] = [],
 ): string | null {
   if (access.kind !== "open" || version.state !== "in_review") return null;
-  return outputsRefusal(version.channels, viewed)?.reason ?? null;
+  return outputsRefusal(version.channels, viewed, cannotShow)?.reason ?? null;
 }
 
 // ── Approving ────────────────────────────────────────────────────────────────
@@ -87,13 +89,16 @@ export interface ApproveLinesInput {
   previousNumber: number | null;
   /**
    * With nothing Active (after a revoke), the newest version that still renders, which consumers move from
-   * (`ReviewScreenData.stillRenders`). Null for a first version.
+   * (`ReviewScreenData.stillRenders`), with the version's contract changes against it. Null for a first version.
    */
-  stillRenders?: { number: number; sunsetDay: string | null } | null;
+  stillRenders?: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
   stage: ApprovalStageInfo;
   /** YYYY-MM-DD: the sunset date chosen for the previous version, or null (it keeps rendering until relinked). */
   sunset: string | null;
-  /** The version's contract changes against the version consumers move from: the breaking ones say what they have to map. */
+  /**
+   * The version's contract changes as submit stored them, against the Active version it replaces: the
+   * breaking ones say what its consumers have to map. With nothing Active they are `stillRenders`' own.
+   */
   contractChanges?: readonly ContractChange[];
   usage: readonly ConsumerUsage[];
   /** The demo clock's instant. */
@@ -120,14 +125,17 @@ export function approveLines({
     const v = versionLabel(version, { style: "sentence" });
     return [`${v} moves to ${next} for approval. It isn't Active until the last stage approves.`];
   }
+  // With nothing Active the consumers move from the version that still renders, so what they have to map is
+  // this version's changes against it, not the ones submit stored against a version revoked since.
+  const from = previousNumber === null ? stillRenders : null;
   return consequences(
     {
       kind: "approve",
       newNumber: version.number,
       previousNumber,
       sunsetAt: previousNumber === null ? null : sunset,
-      stillRenders: previousNumber === null && stillRenders ? { number: stillRenders.number, sunsetAt: stillRenders.sunsetDay } : null,
-      breakingKeys: breakingKeysOf(contractChanges),
+      stillRenders: from ? { number: from.number, sunsetAt: from.sunsetDay } : null,
+      breakingKeys: breakingKeysOf(from ? from.contractChanges : contractChanges),
     },
     usage,
     new Date(nowIso),

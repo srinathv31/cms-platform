@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { isOutputKey, type OutputKey } from "@/domain/review-outputs";
 
 /**
@@ -14,6 +14,10 @@ import { isOutputKey, type OutputKey } from "@/domain/review-outputs";
  * starts empty. Storage can be off or full: every read and write is in try/catch, and the set is also held
  * in memory for the page's life, so viewing still works without it.
  * The server renders with nothing viewed (Approve blocked); the stored set arrives as the page hydrates.
+ *
+ * Beside it, the outputs whose render the route refused for a reason of the version's own (`failed`): the
+ * Preview reports each as it shows its error and withdraws it once the output renders. They live in memory
+ * only: the Preview says so again when the output is on screen again, and nothing is recorded.
  */
 
 const PREFIX = "ucomp:viewed-outputs:";
@@ -68,5 +72,18 @@ export function useViewedOutputs(viewerId: string, versionId: string, round: num
   );
   /** An output rendered on screen. */
   const onViewed = useCallback((output: OutputKey) => add(key, output), [key]);
-  return { viewed, onViewed };
+
+  const [refused, setRefused] = useState<{ key: string; outputs: readonly OutputKey[] }>({ key, outputs: NONE });
+  const failed = refused.key === key ? refused.outputs : NONE;
+  /** An output's render is refused (`failed`), or no longer is. */
+  const onFailed = useCallback(
+    (output: OutputKey, isFailed: boolean) =>
+      setRefused((now) => {
+        const before = now.key === key ? now.outputs : NONE;
+        if (before.includes(output) === isFailed) return now;
+        return { key, outputs: isFailed ? [...before, output] : before.filter((o) => o !== output) };
+      }),
+    [key],
+  );
+  return { viewed, onViewed, failed, onFailed };
 }

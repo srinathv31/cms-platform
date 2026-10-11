@@ -210,7 +210,7 @@ describe("ApproveDialog", () => {
   const open = (
     over: {
       previousNumber?: number | null;
-      stillRenders?: { number: number; sunsetDay: string | null } | null;
+      stillRenders?: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
       stage?: typeof ONE;
       sampleSetsSeen?: string[];
       contractChanges?: ContractChange[];
@@ -314,8 +314,9 @@ describe("ApproveDialog", () => {
   it("after a revoke, names who still renders the older version and what they have to map, with nothing to sunset", async () => {
     await open({
       previousNumber: null,
-      stillRenders: { number: 1, sunsetDay: null },
-      contractChanges: [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }],
+      // What submit stored was against a version revoked since; the dialog reads the changes against v1.
+      stillRenders: { number: 1, sunsetDay: null, contractChanges: [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }] },
+      contractChanges: [{ kind: "added", key: "stale_key", breaking: true, type: "text", required: true }],
     });
     expect(description()).toBe("v2 becomes Active.");
     expect(boxLines()).toEqual(["Coral keeps rendering v1 until it relinks.", "Coral has to map annual_fee before it moves to v2."]);

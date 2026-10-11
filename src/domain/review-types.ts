@@ -295,7 +295,7 @@ export type ConsequenceAction =
       sunsetAt: string | null;
       /**
        * With nothing Active (after a revoke), the newest version that still renders (`contractBaseline`):
-       * its consumers move from it to the new one, and the contract changes were worked out against it.
+       * its consumers move from it to the new one, and `breakingKeys` are the new version's changes against it.
        * Nothing becomes Superseded. `sunsetAt` is its own sunset day (YYYY-MM-DD), or null. Read only
        * when `previousNumber` is null; null or absent for a first version.
        */
@@ -408,10 +408,12 @@ export interface ReviewScreenData {
   /**
    * With nothing Active (after a revoke), the newest version that still renders (`contractBaseline`): the
    * version its consumers move from, which the Approve dialog's consequences name (N3), with its sunset day
-   * in the business time zone when it has one. Null when a version is Active, when nothing renders, and
-   * when it is this version's own number.
+   * in the business time zone when it has one. `contractChanges` are this version's against it, worked out
+   * when the screen loads with `diffVariables` (what submit stores is against whatever was Active at
+   * submit, which may be a version revoked during review): the breaking ones are what its consumers have
+   * to map. Null when a version is Active, when nothing renders, and when it is this version's own number.
    */
-  stillRenders: { number: number; sunsetDay: string | null } | null;
+  stillRenders: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
   /**
    * Where this round's work went (`replacedBy`), when it is a sent-back round that was resubmitted: its
    * number's head, a later round or the release, with its label ("v3, round 2", or "v3" once released).
