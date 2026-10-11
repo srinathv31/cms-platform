@@ -38,3 +38,5 @@ for the recording ([T7](../handoff-review.md#t7--medium-slow-and-brittle-test-ha
   `--project=demo` before a demo, or when a change touches several scenarios' screens.
 - A functional test clicks with no delay: no helper in `e2e/helpers/` pauses, and the demo project is the only place
   that does.
+- The demo script no longer resets the demo data in the middle of a run. Every spec that changes demo data puts it
+  back, or resets it in `afterAll`, so the specs after it start from the seed.

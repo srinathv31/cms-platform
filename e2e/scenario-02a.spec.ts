@@ -24,6 +24,7 @@ import {
   requiredHeading,
   test,
 } from "./helpers/scenario";
+import { resetDemoData } from "./helpers/access";
 import { reactReady } from "./helpers/golive";
 import { settled } from "./helpers/settled";
 
@@ -231,6 +232,13 @@ async function createCardOfferTerms(page: Page) {
 // ───────────────────────────────────────────────────────────────────────────
 // The mouse run
 // ───────────────────────────────────────────────────────────────────────────
+
+// Each run creates a template and leaves it (a draft): put the seed back when the file is done, so the specs after it
+// start from it.
+test.afterAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
+});
 
 test.describe("scenario 2, steps 1–3: Create", () => {
   test("mouse run: two clicks to a selected name, rename, write, drag, {{ and inline Create, the guard, undo and redo", async ({ page }) => {

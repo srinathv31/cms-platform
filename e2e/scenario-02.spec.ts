@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
 import { allVersions, correlation, expectError, openDb, preview, render, validValues } from "./api/helpers";
+import { resetDemoData } from "./helpers/access";
 import {
   NAME,
   asPersona,
@@ -375,6 +376,13 @@ const emailFrame = (page: Page) => page.locator('iframe[title="Email preview"]')
 // has none. So this file runs without a trace (a failure keeps a screenshot), and a real blocked
 // script in a preview frame still fails it.
 test.use({ trace: "off", screenshot: "only-on-failure" });
+
+// The story creates a template and submits it (v1, In review), and leaves it: put the seed back when the file is done,
+// so the specs after it start from it.
+test.afterAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
+});
 
 test.describe("scenario 2: create, preview, submit", () => {
   test("Maya writes Spring Travel Rewards, previews PDF, Web and Email with two sample sets, and submits v1", async ({

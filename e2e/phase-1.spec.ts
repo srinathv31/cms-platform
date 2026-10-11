@@ -1,4 +1,5 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { resetDemoData } from "./helpers/access";
 import { settled } from "./helpers/settled";
 
 // Phase 1 gate: shell, personas, library, workspace header (SHARE ring), editor first look.
@@ -282,6 +283,13 @@ async function dragSelect(page: Page, block: Locator) {
 // ───────────────────────────────────────────────────────────────────────────
 // Per-persona shell and library
 // ───────────────────────────────────────────────────────────────────────────
+
+// The workspace tests type into the editor, and the autosave keeps what they type (Annual Fee Waiver's draft): put the
+// seed back when the file is done, so the specs after it start from it.
+test.afterAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
+});
 
 test.describe("shell and library, per persona", () => {
   for (const spec of PERSONAS) {
