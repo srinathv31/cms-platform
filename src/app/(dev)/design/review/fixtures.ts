@@ -14,7 +14,7 @@ import type {
   StepView,
   ThreadView,
 } from "@/domain/review-types";
-import { listSets } from "@/components/preview/sample-sets";
+import { listSets } from "@/editor/model/sample-sets";
 import { CORAL_VARIABLES } from "../workspace/fixtures";
 import type { StageCount } from "./types";
 

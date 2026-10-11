@@ -12,6 +12,7 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { SampleSet, Variable, VariableType } from "@/editor/model/types";
+import { isDefaultSet } from "@/editor/model/sample-sets";
 import { formatValue } from "@/editor/model/variables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,6 @@ import { FIELD_FOCUS_RING, FOCUS_RING } from "./classes";
 import {
   MAX_SET_NAME_LENGTH,
   commitInput,
-  isDefaultSet,
   isEdited,
   renameSet,
   resolveSetValues,

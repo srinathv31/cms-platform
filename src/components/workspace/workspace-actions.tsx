@@ -13,7 +13,7 @@ import { useActionRun } from "@/components/primitives/use-action-run";
 import { startDraft } from "@/server/actions/templates";
 import { submitVersion } from "@/server/actions/review";
 import { SubmitDialog } from "@/components/submit/submit-dialog";
-import type { SubmitSummary } from "@/components/submit/types";
+import type { SubmitSummary } from "@/domain/submit-types";
 import type { ActionResult } from "@/domain/review-types";
 import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";

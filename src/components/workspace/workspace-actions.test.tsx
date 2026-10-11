@@ -6,7 +6,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SubmitSummary } from "@/components/submit/types";
+import type { SubmitSummary } from "@/domain/submit-types";
 import { REFUSALS } from "@/domain/lifecycle";
 import type { ActionResult } from "@/domain/review-types";
 import type { SaveFields } from "./autosave/autosave-scheduler";

@@ -1,10 +1,10 @@
 import type { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
+import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
 import { IMPORT_LIMITS, IMPORT_REFUSALS, JUST_IMPORTED_COOKIE, type ImportResponse } from "@/domain/import-types";
 import { importPermission, importStatus, importTemplate } from "@/server/import/create";
-import { readBodyCapped } from "@/server/import/read-body";
+import { readBodyCapped } from "@/server/api/read-body";
 import { getViewer } from "@/server/viewer";
 
 // Import a file: POST /api/imports?team=<slug>, multipart/form-data { file } → ImportResponse. A

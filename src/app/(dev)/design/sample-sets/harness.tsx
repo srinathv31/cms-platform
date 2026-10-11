@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { listSets } from "@/editor/model/sample-sets";
 import type { SampleSet, Variable } from "@/editor/model/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { SampleSetSwitcher, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
+import { SampleSetSwitcher, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
 
 const TODAY = "2026-10-04";
 

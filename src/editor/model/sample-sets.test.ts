@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SAMPLE_SETS, defaultSampleSets, sampleSetValues } from "./sample-sets";
+import { DEFAULT_SAMPLE_SETS, defaultSampleSets, isDefaultSet, listSets, sampleSetValues } from "./sample-sets";
 import type { SampleSet, Variable, VariableType } from "./types";
 import { US_STATES, formatValue, validateValue } from "./variables";
 
@@ -259,5 +259,46 @@ describe("sampleSetValues", () => {
   it("needs a valid day only when it has to fill something", () => {
     const set: SampleSet = { id: "typical", name: "Typical", values: { a: "x" } };
     expect(sampleSetValues(set, [v("a", "text")], "not a day")).toEqual({ a: "x" });
+  });
+});
+
+describe("isDefaultSet", () => {
+  it("is true for the three defaults only", () => {
+    expect(["typical", "long", "minimum"].every(isDefaultSet)).toBe(true);
+    expect(isDefaultSet("a")).toBe(false);
+    expect(isDefaultSet("")).toBe(false);
+  });
+});
+
+describe("listSets", () => {
+  const custom = (id: string, name: string): SampleSet => ({ id, name, values: {} });
+
+  it("makes the three default sets from an empty list, in order", () => {
+    const sets = listSets([], VARIABLES, TODAY);
+    expect(sets.map((s) => s.id)).toEqual(["typical", "long", "minimum"]);
+    expect(sets.map((s) => s.name)).toEqual(["Typical customer", "Long name and maximum values", "Minimum values"]);
+    expect(sets).toEqual(defaultSampleSets(VARIABLES, TODAY));
+  });
+
+  it("puts the defaults first and keeps custom sets in stored order", () => {
+    const stored = [custom("b", "Beta"), { ...defaultSampleSets(VARIABLES, TODAY)[2] }, custom("a", "Alpha")];
+    const sets = listSets(stored, VARIABLES, TODAY);
+    expect(sets.map((s) => s.id)).toEqual(["typical", "long", "minimum", "b", "a"]);
+  });
+
+  it("keeps a stored default's own values and generates only the missing ones", () => {
+    const edited: SampleSet = { id: "long", name: "Long name and maximum values", values: { first_name: "Zed" } };
+    const sets = listSets([edited], VARIABLES, TODAY);
+    expect(sets[1]).toBe(edited);
+    expect(sets[0]).toEqual(defaultSampleSets(VARIABLES, TODAY)[0]);
+    expect(sets[2]).toEqual(defaultSampleSets(VARIABLES, TODAY)[2]);
+  });
+
+  it("doesn't change its input", () => {
+    const stored = [custom("a", "Alpha")];
+    const before = JSON.stringify(stored);
+    listSets(stored, VARIABLES, TODAY);
+    expect(JSON.stringify(stored)).toBe(before);
+    expect(stored).toHaveLength(1);
   });
 });

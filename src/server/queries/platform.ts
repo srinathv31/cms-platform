@@ -16,6 +16,7 @@ import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
 import {
   approverProblem,
+  cannotBeFirstTeamAdmin,
   channelRuleRefusal,
   ruleLabel,
   sectionsRefusal,
@@ -109,9 +110,9 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
         smsSender: t.smsSender,
       };
     }),
-    // The first Team Admin: anyone but an Auditor, who is read-only everywhere.
+    // The first Team Admin: whoever the domain lets be one (not an Auditor).
     people: userRows
-      .filter((u) => u.platformRole !== "auditor")
+      .filter((u) => !cannotBeFirstTeamAdmin(u))
       .map((u) => ({ ...personOf(people, u.id), title: u.title }))
       .sort(byName),
     icons: TEAM_ICONS,

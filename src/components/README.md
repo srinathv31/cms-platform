@@ -305,7 +305,7 @@ submit, and a footer that changed between the two versions struck and inserted (
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
 | Run an action from a button | `EditButton` in [workspace/workspace-actions.tsx](workspace/workspace-actions.tsx) on [primitives/use-action-run.ts](primitives/use-action-run.ts) | `run(action, { onOk, onRefused })`; `pending` while it runs, `error` the refusal's sentence. |
-| Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain constant, as `access/request-access.tsx` does with `ACCESS_REASON_MAX`. |
+| Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain check, as `access/request-access.tsx` does with `validateAccessReason`. |
 | Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*` and `m.consequences.*`; `rows.tsx` renders refusals and strips. |
 | Show an action the viewer can't take, with why | `BlockedButton` in [review/decision-rail.tsx](review/decision-rail.tsx) | Greyed and focusable; `describedBy` points at a visible reason when there is one. |
 | Make a chart readable without a pointer | `StackedBars` in [usage/charts.tsx](usage/charts.tsx) | `markProps` on each hit area inside `ChartKeys`, then a `ChartTable`. |
@@ -328,9 +328,6 @@ submit, and a footer that changed between the two versions struck and inserted (
   once, as `formatLastRender` in `usage/format.ts` does for a render's time); it never counts days itself.
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`. Have the
   query return the result.
-- **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
-  and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
-  `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.
 - **Dead or off-contract.** `app-shell/page-placeholder.tsx` has no importers. `workspace/save-status.tsx` imports
   `@/editor/lib/platform`, which is not in the editor's public API.
 

@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { SampleSet, Variable } from "@/editor/model/types";
-import { defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
+import { isDefaultSet, listSets, sampleSetValues } from "@/editor/model/sample-sets";
 import {
   addSet,
   commitInput,
   createSet,
   findSet,
-  isDefaultSet,
   isEdited,
-  listSets,
   newSetId,
   nextSetName,
   removeSet,
@@ -40,37 +38,6 @@ const VARIABLES: Variable[] = [
 
 const custom = (id: string, name: string, values: SampleSet["values"] = {}): SampleSet => ({ id, name, values });
 
-describe("listSets", () => {
-  it("makes the three default sets from an empty list, in order", () => {
-    const sets = listSets([], VARIABLES, TODAY);
-    expect(sets.map((s) => s.id)).toEqual(["typical", "long", "minimum"]);
-    expect(sets.map((s) => s.name)).toEqual(["Typical customer", "Long name and maximum values", "Minimum values"]);
-    expect(sets).toEqual(defaultSampleSets(VARIABLES, TODAY));
-  });
-
-  it("puts the defaults first and keeps custom sets in stored order", () => {
-    const stored = [custom("b", "Beta"), { ...defaultSampleSets(VARIABLES, TODAY)[2] }, custom("a", "Alpha")];
-    const sets = listSets(stored, VARIABLES, TODAY);
-    expect(sets.map((s) => s.id)).toEqual(["typical", "long", "minimum", "b", "a"]);
-  });
-
-  it("keeps a stored default's own values and generates only the missing ones", () => {
-    const edited: SampleSet = { id: "long", name: "Long name and maximum values", values: { first_name: "Zed" } };
-    const sets = listSets([edited], VARIABLES, TODAY);
-    expect(sets[1]).toBe(edited);
-    expect(sets[0]).toEqual(defaultSampleSets(VARIABLES, TODAY)[0]);
-    expect(sets[2]).toEqual(defaultSampleSets(VARIABLES, TODAY)[2]);
-  });
-
-  it("doesn't change its input", () => {
-    const stored = [custom("a", "Alpha")];
-    const before = JSON.stringify(stored);
-    listSets(stored, VARIABLES, TODAY);
-    expect(JSON.stringify(stored)).toBe(before);
-    expect(stored).toHaveLength(1);
-  });
-});
-
 describe("findSet", () => {
   const sets = listSets([custom("a", "Alpha")], VARIABLES, TODAY);
   it("finds a set by id", () => {
@@ -79,13 +46,6 @@ describe("findSet", () => {
   });
   it("returns undefined for an unknown id", () => {
     expect(findSet(sets, "nope")).toBeUndefined();
-  });
-});
-
-describe("isDefaultSet", () => {
-  it("is true for the three defaults only", () => {
-    expect(["typical", "long", "minimum"].every(isDefaultSet)).toBe(true);
-    expect(isDefaultSet("a")).toBe(false);
   });
 });
 

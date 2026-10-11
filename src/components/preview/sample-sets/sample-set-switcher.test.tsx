@@ -5,7 +5,8 @@ import { act, useState, type Ref } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SampleSet, Variable } from "@/editor/model/types";
-import { listSets, resolveSetValues } from "./model";
+import { listSets } from "@/editor/model/sample-sets";
+import { resolveSetValues } from "./model";
 import { SampleSetSwitcher, type SampleSetSwitcherHandle } from "./sample-set-switcher";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

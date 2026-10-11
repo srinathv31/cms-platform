@@ -41,12 +41,15 @@ keep both open, which mostly means: rules in `src/domain`, database access only 
   src/editor/model       (the editor itself: react, TipTap, @/components/ui only; no next/*, no app code)
 
   src/app/(product), src/app/api, src/components  -->  server, domain, editor, lib, contracts   (never simulator data)
-  src/server                                     -->  domain, editor modules (not bare @/editor), lib   (never simulator data)
+  src/server                                     -->  domain, editor modules (not bare @/editor), lib   (never simulator data, never @/components)
   src/server/seed, src/server/reset.ts           -->  may also write the simulator's tables
 ```
 
 Every rule above is lint-enforced in [eslint.config.mjs](../eslint.config.mjs). Flat config replaces the rule per
 file, so its blocks cover disjoint globs; when you add a rule, list everything that applies to those files.
+
+What a screen and the server both need lives below them both: types and constants (the `ucomp_created` cookie, `SubmitSummary`)
+in `src/domain`, pure helpers (`listSets`) in `@/editor/model/*`.
 
 Conventions that nothing enforces yet, and where the code already breaks them:
 
@@ -55,8 +58,6 @@ Conventions that nothing enforces yet, and where the code already breaks them:
   Boot backend would replace.
 - **New business rules go in `src/domain`.** About a dozen live in actions, queries, and components today; the
   [domain README](../src/domain/README.md#rules-that-live-outside-srcdomain) lists them.
-- **`src/server` doesn't import `src/components`.** Two files do (`queries/submit-summary.ts`,
-  `actions/create-template.ts`).
 - **Components get permissions decided.** Read models carry `can` results; a few components still call `can()`
   themselves.
 

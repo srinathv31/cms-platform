@@ -679,7 +679,7 @@ export interface PlatformConfigDomain {
     name: string;
     description: string;
     icon: string;
-    admin: Named;
+    admin: Named & { platformRole: PlatformRole | null };
     actor: Named;
     now: Date;
     existing: { slug: string; name: string }[];

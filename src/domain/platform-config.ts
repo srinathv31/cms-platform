@@ -54,6 +54,7 @@ import {
   type Channel,
   type ChannelFamily,
   type JSONContent,
+  type PlatformRole,
   type RequiredSection,
   type TeamRole,
 } from "./types";
@@ -235,12 +236,21 @@ export function newTeamConsequences(name: string, adminName: string): string[] {
   return [`${adminName} becomes Team Admin of ${name} and approves its access requests.`, `${name} starts with no templates.`];
 }
 
+/**
+ * Why `person` can't be a new team's first Team Admin, or null: the Auditor is read-only everywhere.
+ * `createTeam` refuses with it, and the Create team form's picker offers only the people it returns
+ * null for.
+ */
+export function cannotBeFirstTeamAdmin(person: Named & { platformRole: PlatformRole | null }): Refusal | null {
+  return person.platformRole === "auditor" ? PLATFORM_REFUSALS.auditorCantBeAdmin(person.name) : null;
+}
+
 /** Creates a team (id = slug, the seed contract) with `admin` as its first Team Admin. */
 export function createTeam(input: {
   name: string;
   description: string;
   icon: string;
-  admin: Named;
+  admin: Named & { platformRole: PlatformRole | null };
   actor: Named;
   now: Date;
   existing: { slug: string; name: string }[];
@@ -251,10 +261,12 @@ export function createTeam(input: {
       effects: AccessEffect[];
     }>
   | Refused {
+  const { admin, actor, now } = input;
+  const barred = cannotBeFirstTeamAdmin(admin);
+  if (barred) return refuse(barred);
   const { name, description, slug, problem } = validateNewTeam(input);
   if (problem) return refuse(problem);
 
-  const { admin, actor, now } = input;
   const team = { id: slug, slug, name, description, icon: input.icon, createdAt: now };
   return {
     ok: true,

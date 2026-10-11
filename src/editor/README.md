@@ -36,7 +36,7 @@ route compiles only the parts of the editor it uses. The entry modules:
 | `@/editor/model/types` | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`. |
 | `@/editor/model/contract` | `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking` |
 | `@/editor/model/variables` | `formatValue`, `validateValue`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types |
-| `@/editor/model/sample-sets` | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `DefaultSampleSetId` |
+| `@/editor/model/sample-sets` | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `isDefaultSet`, `listSets`, `DefaultSampleSetId` |
 | `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
 | `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
 | `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
