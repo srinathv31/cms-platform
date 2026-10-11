@@ -10,7 +10,7 @@ import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { statusLabel } from "@/domain/status";
-import { VERSION_STATES, type VersionState } from "@/domain/types";
+import { TEMPLATE_KIND_LABELS, VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
 import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn, type StatusBadgeWidth } from "./columns";
@@ -62,6 +62,7 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
           </span>
           <span className="mt-0.5 block truncate text-xs leading-4 text-text-muted">
             <span className="font-mono">{row.id}</span>
+            <span data-kind={row.family}> · {TEMPLATE_KIND_LABELS[row.family]}</span>
             {showTeam ? <span className={TEAM_IN_SUBLINE}> · {row.teamName}</span> : null}
           </span>
         </span>

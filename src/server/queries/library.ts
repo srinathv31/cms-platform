@@ -4,11 +4,11 @@ import { desc, eq } from "drizzle-orm";
 import { sunsetDay } from "@/domain/business-zone";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
-import { teams, templates, users, versions } from "@/server/db/schema/ucomp";
+import { contentTypes, teams, templates, users, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { ALL_SPACE } from "@/domain/permissions";
 import { compareRounds, type RoundRow } from "@/domain/rounds";
-import type { VersionState } from "@/domain/types";
+import { contentTypeFamily, type ChannelFamily, type VersionState } from "@/domain/types";
 import { formatAgo } from "@/domain/dates";
 import { sunsetPassed } from "@/domain/lifecycle";
 
@@ -16,6 +16,11 @@ export interface LibraryRow {
   id: string;
   /** The latest version's name (`pickLatest`): the open draft's, otherwise the newest version's. */
   name: string;
+  /**
+   * Document or Alert: the template's kind, from its content type's channels (`contentTypeFamily`). It is
+   * fixed for the template's life, so it is never read from a version.
+   */
+  family: ChannelFamily;
   teamSlug: string;
   teamName: string;
   /** State of the template's latest version (a draft counts as latest). */
@@ -49,6 +54,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
   const templateRows = await db
     .select({
       id: templates.id,
+      allowedChannels: contentTypes.allowedChannels,
       teamSlug: teams.slug,
       teamName: teams.name,
       ownerName: users.name,
@@ -57,6 +63,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
     })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
+    .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
     .innerJoin(users, eq(users.id, templates.createdBy))
     .where(spaceSlug === ALL_SPACE ? undefined : eq(teams.slug, spaceSlug));
 
@@ -95,6 +102,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
       row: {
         id: t.id,
         name: latest?.name ?? t.id,
+        family: contentTypeFamily(t.allowedChannels),
         teamSlug: t.teamSlug,
         teamName: t.teamName,
         status: latest?.state ?? ("draft" as VersionState),

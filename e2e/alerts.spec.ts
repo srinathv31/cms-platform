@@ -9,6 +9,8 @@ import { viewEveryOutput } from "./helpers/review";
 // submit until its SMS is in GSM-7, approved, changed, reviewed with its fields redlined, commented on at a
 // field, approved again, and compared.
 //
+//   0. The Library says which kind each template is: Coral's three seeded alerts read Alert, its disclosures
+//      Document.
 //   1. Maya: New template → Alert → Statement ready. The gallery has Alert's own starters, and Import a
 //      file stays, greyed, with its reason. The composer opens on the push and the text message; Copilot
 //      prompt is greyed with its reason.
@@ -136,6 +138,17 @@ test.describe("alerts", () => {
 
     await asPersona(page, "maya");
     await openLibrary(page, TEAM);
+
+    await test.step("0. The Library names each template's kind beside its ID: the seeded alerts are Alerts, a disclosure is a Document", async () => {
+      const kindOf = (name: string) =>
+        page.locator("main ul > li > a[href*='/templates/']").filter({ hasText: name }).locator("[data-kind]");
+      for (const alert of ["Payment Due Reminder", "Card Used Abroad", "Rate Change Heads-up"]) {
+        await expect(kindOf(alert), `${alert} is an alert`).toHaveText(/Alert$/);
+        await expect(kindOf(alert)).toHaveAttribute("data-kind", "message");
+      }
+      await expect(kindOf("Rate Change Notice"), "a disclosure is a document").toHaveText(/Document$/);
+      await expect(kindOf("Rate Change Notice")).toHaveAttribute("data-kind", "document");
+    });
 
     await test.step("1. New template → Alert → Statement ready: Alert's own starters, Import greyed, the composer", async () => {
       await tap(page.getByRole("button", { name: "New template" }));

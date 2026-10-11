@@ -1,5 +1,5 @@
-> **History.** Calls made while the prototype was built, in October 2026. Some have been superseded by later code,
-> and this log isn't updated anymore. New decisions are numbered records in this folder: see [README.md](README.md).
+> **History.** Calls made while the prototype was built, in October 2026. Later records in this folder may supersede
+> them, and so may the code. Only factual errors are corrected here; new decisions are numbered records: see [README.md](README.md).
 
 # Decisions log (Phases 5–7)
 
@@ -13,13 +13,13 @@ Branch `track/golive`. Report: `archive/tracks/a-report.md`.
 
 ### Contracts (accepted from the Phase 5 brief)
 - **Simulator calls UCOMP server-side** from its own origin (via `headers()`; superseded at integration, see "Integration: adversarial review fixes"), so the browser never logs the intended 4xx/410 failures. Keeps "zero console errors" true during failure scenarios.
-- **Consumer GET endpoints require `X-Consumer-Id`.** Same header as render; unknown consumer → `consumer_not_found`.
+- **Consumer GET endpoints require `X-Consumer-Id`.** Same header as render; a missing header → `consumer_required` (400), an unregistered one → `unknown_consumer` (403). `consumer_not_found` (404) is for a path that names an unregistered consumer.
 - **"Renders this month" is a rolling 30 days vs. the 30 before**, labelled "Renders · 30 days". Calendar months make the demo clock jumps look wrong.
 - **A link can be saved with unmapped required variables.** Send is then disabled and names the missing ones (explain only when blocked).
 - **A send renders every linked channel** for each chosen customer.
 - **The integration panel loads via a server action when opened**, so neither header file changes.
 - **The Demo pill is mounted in the simulator layout** too, so scenario 5 can advance the clock without leaving Coral.
-- **The simulator palette lives in `src/simulator/theme.css`**, the one place outside `tokens.css` with raw colours. It follows the recorded "deliberately foreign" decision (Q7).
+- **The simulator palette lives in `src/simulator/theme.css`**, the one place outside `tokens.css` with raw colours, apart from `UserAvatar` (`src/components/app-shell/user-avatar.tsx`), whose `oklch()` fills follow each person's hue. It follows the recorded "deliberately foreign" decision (Q7).
 - **The contract is split** into `src/contracts/api-v1.ts` (wire shapes, import-free, lint-enforced), `src/domain/golive-types.ts` (UCOMP side), `src/simulator/types.ts` (Coral side), because the simulator boundary forbids importing `@/domain`.
 
 ### Simulator look: **A (Ops console)** with two borrowings from B
@@ -119,7 +119,7 @@ Mocks: `/design/settings?v=a|b|c`, `/design/audit?v=a|b|c` (in the `archive/desi
 - **Audit filters are multi-select** (comma lists): values within a field are ORed, fields are ANDed; facet counts are computed under every other filter.
 - **The Person filter matches the actor or the subject**, so "Person: Sam" shows his lapse. Events with no actor show as "UCOMP".
 - **An approver's activation reads "Approved"**; with no actor, "Became Active".
-- **CSV export**: When (ISO, demo clock), Who, Team, Template ("Name (UC-…)"), Version, Action, Details; BOM; all matching rows; fields starting with `= + - @` get a leading apostrophe (formula-injection guard). 403 without `audit.view`.
+- **CSV export**: When (ISO, demo clock), Who, Team, Template ("Name (UC-…)"), Version, Action, Details; BOM; all matching rows; fields starting with `= + - @`, a tab or a CR get a leading apostrophe (formula-injection guard). 403 without `audit.view`.
 - **Notifications** list the newest 30 plus the unread count; only the owner can mark one read.
 
 ### Team settings UI (U1)
