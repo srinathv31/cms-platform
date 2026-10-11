@@ -287,7 +287,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N24 · Low: The Library doesn't say which templates are alerts and which are documents
 
-- **Status:** Open
+- **Status:** Fixed. `getLibraryRows` joins the content type and returns each row's `family` (`contentTypeFamily`), and a Library row prints its `TEMPLATE_KIND_LABELS` word (Document or Alert) after the ID on its second line, with the skeleton's line sized to match. No kind filter: the toolbar already fills a line in a team with every status, so a second `Segmented` would wrap it.
 - **Where:** `src/server/queries/library.ts` (`LibraryRow`, `getLibraryRows`); `src/components/library/library-browser.tsx` (`TemplateRow`); `src/domain/types.ts` (`contentTypeFamily`, `TEMPLATE_KIND_LABELS`)
 - **What happens:** New template asks for a kind first, Document or Alert (`TEMPLATE_KIND_LABELS`), and a template keeps it for life (`contentTypeFamily`, from its content type's channels). A Library row shows the name, ID, status, active version, last edited and owner. `getLibraryRows` doesn't read the content type, so nothing tells a Push and SMS alert from a PDF, Web and Email document, and neither the search nor the status filter can narrow to one kind. The two are written, reviewed and rendered differently, so a team with both opens each template to find out which it is. Noticed while building push and SMS (PR #46).
 - **Fix:** Add the family to `LibraryRow` (`getLibraryRows` joins the content type and asks `contentTypeFamily`), print its `TEMPLATE_KIND_LABELS` word in the row's second line beside the ID, and, if the list wants it, add a second `Segmented` (All, Documents, Alerts) next to the status filter. Keep the row's height and columns as they are.
@@ -909,7 +909,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T6 · Medium: shadcn is a runtime dependency
 
-- **Status:** Open
+- **Status:** Fixed. `shadcn` is a devDependency (its CSS import resolves at build time) and `next-themes` is gone; `npm audit --omit=dev` went from 10 findings (7 high, 3 moderate) to 3 moderate, all in `mammoth`'s tree. `@expo-google-fonts/newsreader` stays: `pdf-fonts.ts` reads its font files at render time.
 - **Where:** `package.json` line 51
 - **What happens:** Its only use is a CSS import, but as a dependency it brings 7 high `npm audit` findings into the production tree. `next-themes` is never imported.
 - **Fix:** Move `shadcn` to devDependencies and remove `next-themes`.
@@ -983,7 +983,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### G6 · Low: decisions.md is wrong in three places
 
-- **Status:** Open
+- **Status:** Fixed. The three lines in `docs/decisions/prototype-log.md` are corrected in place (the unknown-consumer code, the raw colors in `UserAvatar`, the formula guard's tab and CR), and its history banner now says later records and code may supersede it.
 - **Where:** `docs/decisions/prototype-log.md`
 - **What happens:** An unregistered consumer gets `unknown_consumer` (403), not `consumer_not_found`. Raw colors also appear in `user-avatar.tsx`. The formula guard also covers tab and CR.
 - **Fix:** Correct the three lines and add a history banner.
