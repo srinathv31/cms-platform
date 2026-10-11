@@ -5,7 +5,7 @@
 import { act, createRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ActionResult } from "@/domain/review-types";
 import type { Variable } from "@/domain/types";
 import type { SubmitSummary } from "@/domain/submit-types";

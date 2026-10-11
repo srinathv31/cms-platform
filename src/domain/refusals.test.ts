@@ -1,13 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ACCESS_REFUSALS } from "./access";
+import { ACCESS_REFUSALS } from "./access/refusals";
 import { STAGE_REFUSALS } from "./approval-chain";
 import { COMMENT_REFUSALS } from "./comments";
 import { IMPORT_REFUSALS } from "./import-types";
-import { REFUSALS } from "./lifecycle";
+import { REFUSALS } from "./lifecycle/refusals";
 import { REASONS } from "./permissions";
-import { PLATFORM_REFUSALS } from "./platform-config";
+import { PLATFORM_REFUSALS } from "./platform-config/refusals";
 import { REQUEST_REFUSALS, refusal, refuse, type RefusalCode } from "./refusals";
 import { OUTPUT_REFUSALS } from "./review-outputs";
 

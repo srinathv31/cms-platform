@@ -10,7 +10,7 @@
 
 import { channelFieldsFrom, type ChannelFieldValues } from "@/domain/channel-fields";
 import { smsLength, type SmsEncoding } from "@/domain/messages/gsm7";
-import type { MessageTypeRules } from "@/domain/platform-config";
+import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import { plural } from "@/domain/plural";
 import { longSampleValues, resolveMessage } from "@/domain/render/message";
 import type { CanonicalValues } from "@/domain/render/types";

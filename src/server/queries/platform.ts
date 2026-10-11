@@ -14,15 +14,12 @@ import type {
 import { versionsNeeding } from "@/domain/approval-chain";
 import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
-import {
-  approverProblem,
-  cannotBeFirstTeamAdmin,
-  channelRuleRefusal,
-  ruleLabel,
-  sectionsRefusal,
-  TEAM_ICONS,
-  zoneChangeConsequences,
-} from "@/domain/platform-config";
+import { approverProblem, ruleLabel } from "@/domain/platform-config/approval-chains";
+import { cannotBeFirstTeamAdmin } from "@/domain/platform-config/teams";
+import { channelRuleRefusal } from "@/domain/platform-config/channels";
+import { sectionsRefusal } from "@/domain/platform-config/sections";
+import { TEAM_ICONS } from "@/domain/platform-config/limits";
+import { zoneChangeConsequences } from "@/domain/platform-config/time-zone";
 import { refuse, type Refusal } from "@/domain/refusals";
 import { CHANNELS, contentTypeFamily, type Channel, type PermissionResult } from "@/domain/types";
 import { db } from "@/server/db/client";
@@ -43,7 +40,7 @@ import { getPeople, iso, personOf } from "./review-shared";
 
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
 // Approval chains and Time zone. Read models: domain/access-types.ts. The consequences the UI shows before a change
-// is committed come from the pure functions in domain/platform-config.ts, fed by these models:
+// is committed come from the pure functions in domain/platform-config/, fed by these models:
 //   - a new team: `validateNewTeam({ name, description, icon, existing: section.teams })` as the
 //     admin types, and `newTeamConsequences(name, admin)`;
 //   - a content type's sections: `describeSectionsChange({ contentTypeName, current, next })`, the

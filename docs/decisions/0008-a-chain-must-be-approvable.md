@@ -15,7 +15,7 @@ a re-save kept a person who had lost access since.
 
 ## Decision
 
-- One pure domain function, `validateChain` in [platform-config.ts](../../src/domain/platform-config.ts), decides
+- One pure domain function, `validateChain` in [platform-config/approval-chains.ts](../../src/domain/platform-config/approval-chains.ts), decides
   whether a chain can be saved, and returns each problem with the stage and field it's about. `saveApprovalChain`
   refuses with the first; the chain editor runs the same function as the admin edits.
 - A `team_role` stage may name only the Approver role. The action's input schema accepts nothing else, and

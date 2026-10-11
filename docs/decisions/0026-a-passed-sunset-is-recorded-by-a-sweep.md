@@ -15,7 +15,7 @@ instant a sunset passes: the render rule reads the clock when a consumer asks.
 
 ## Decision
 
-- **One predicate.** `sunsetPassed(version, now)` in [lifecycle.ts](../../src/domain/lifecycle.ts) (`sunsetAt <= now`)
+- **One predicate.** `sunsetPassed(version, now)` in [lifecycle/sunset.ts](../../src/domain/lifecycle/sunset.ts) (`sunsetAt <= now`)
   is the only test of a passed sunset. The render rule, the consumer API, the Versions and Usage screens, the zone
   change's count of pending sunsets and the sweep all call it.
 - **A sweep records it.** `sweepSunsets` (domain) finds each version whose sunset has passed and has no

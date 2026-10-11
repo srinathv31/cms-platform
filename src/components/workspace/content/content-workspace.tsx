@@ -17,7 +17,7 @@ import {
 } from "@/domain/channel-fields";
 import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
 import type { Person } from "@/domain/review-types";
 import type { Channel, ChannelFamily, JSONContent, SampleSet, Variable } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";

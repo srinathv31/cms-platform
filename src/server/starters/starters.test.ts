@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALL_CHANNEL_FIELDS, channelFieldValue, normalizeAndCheckChannelField } from "@/domain/channel-fields";
-import { createDraft } from "@/domain/lifecycle";
-import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config";
+import { createDraft } from "@/domain/lifecycle/drafts";
+import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config/limits";
 import { resolveMessage } from "@/domain/render/message";
 import { validateValues } from "@/domain/render/validate";
 import { smsLength } from "@/domain/messages/gsm7";

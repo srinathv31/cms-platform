@@ -208,7 +208,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 #### N14 · Low: A chain change repeats a line for a person named on two stages
 
 - **Status:** Fixed. `describeChainChange` keeps the people it has already announced, so a person newly named on two stages gets the line once; a test names one person on two new stages.
-- **Where:** `src/domain/platform-config.ts` (`describeChainChange`)
+- **Where:** `src/domain/platform-config/approval-chains.ts` (`describeChainChange`)
 - **What happens:** It adds "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of." once per stage that names a new person, so a person newly named on two stages gets the line twice. `validateChain` refuses a person on two stages, and the chain editor shows no lines while Save is blocked, so nobody sees it today; a caller that shows the lines without validating first would. Noticed while fixing D4 (PR #14).
 - **Fix:** Add each person's line once.
 - **Evidence:** traced
@@ -223,7 +223,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N16 · Low: Two refusal rules still live outside the domain
 
-- **Status:** Fixed. `validateAccessReason` (`src/domain/access.ts`) is the one reason check: the request form and `requestAccess` both use it. The domain's `createTeam` refuses an Auditor as the first Team Admin (`cannotBeFirstTeamAdmin` in `src/domain/platform-config.ts`), the `createTeam` action relies on it, and the platform read model's picker asks the same function. Every code and sentence is unchanged.
+- **Status:** Fixed. `validateAccessReason` (`src/domain/access/requests.ts`) is the one reason check: the request form and `requestAccess` both use it. The domain's `createTeam` refuses an Auditor as the first Team Admin (`cannotBeFirstTeamAdmin` in `src/domain/platform-config/teams.ts`), the `createTeam` action relies on it, and the platform read model's picker asks the same function. Every code and sentence is unchanged.
 - **Where:** `src/components/access/request-access.tsx` (the reason check); `src/server/actions/platform.ts` (`createTeam`); `src/server/queries/platform.ts`
 - **What happens:** H2 moved the settings screens' checks into the domain; two rules outside them are still copies. Request access checks the reason itself (empty, then longer than `ACCESS_REASON_MAX`), repeating the ladder of the domain's `requestAccess`, and H2's test covers settings components only. And "an Auditor can't be a team's first Team Admin" is written twice in `src/server`: the `createTeam` action refuses it, and the platform read model leaves Auditors out of the picker. The domain's `createTeam` doesn't know it, so a port would miss it. Noticed while fixing H2 (PR #28).
 - **Fix:** Export one domain check for the request's reason and use it in the form and in `requestAccess`; move the Auditor rule into the domain's `createTeam` and have the read model ask it. Both shrink [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain).
@@ -394,7 +394,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S3 · High: Maker-checker only stops the submitter, not the author
 
 - **Status:** Fixed. Each version records its writers (`versions.writers`: who started the draft, saved an edit, or submitted it, carried across change requests), and `can()`, `approve` and `requestChanges` refuse all of them ([decision 0007](decisions/0007-maker-checker-covers-every-writer.md)).
-- **Where:** `src/domain/permissions.ts` line 84; `src/domain/lifecycle.ts` line 565
+- **Where:** `src/domain/permissions.ts` line 84; `src/domain/lifecycle/approve.ts` (`approve`)
 - **What happens:** The guard compares the approver with `submittedBy`. Holding Author and Approver on one team is normal (approving an access request adds the role). Maya writes a draft, Priya clicks Submit, and Maya approves her own content. Found independently by two reviewers.
 - **Fix:** Decide the rule (anyone who created or edited the version can't decide it), record authors from `versions.createdBy` plus `draft.edited` actors, and guard on that in both `can()` and the transition. Or forbid Author plus Approver on one team.
 - **Evidence:** traced
@@ -460,7 +460,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D1 · High: Revoking the live version freezes the template for good
 
 - **Status:** Fixed. When the latest version is Revoked, Edit starts the corrected draft from its content, and contract changes compare with the newest version that still renders (`contractBaseline`), or none when nothing does ([decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md)).
-- **Where:** `src/domain/lifecycle.ts` line 198; `src/domain/lifecycle.test.ts` line 203
+- **Where:** `src/domain/lifecycle/drafts.ts` (`planDraftStart`); `src/domain/lifecycle/drafts.test.ts` (`planDraftStart`)
 - **What happens:** Revoke is allowed on the Active version, the emergency case for wrong legal text. Afterwards `planDraftStart` finds the latest version revoked and refuses with "Only an Active template can be edited." Nobody can make the corrected draft. A test asserts this behavior; the demo only revokes Superseded versions, so it never shows.
 - **Fix:** Product call needed: allow a new draft from the revoked or latest released content, using the newest version that still renders as the contract baseline. Update the test.
 - **Evidence:** verified
@@ -468,7 +468,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D2 · High: Setting a new sunset brings a sunset version back to life
 
 - **Status:** Fixed. `setSunset` refuses once the current sunset has passed (the new domain predicate `sunsetPassed`), and the Versions screen shows Change sunset disabled with the reason ([decision 0002](decisions/0002-a-passed-sunset-is-final.md)); the `sunset_passed` audit transition and the other copies of the test stay with D7.
-- **Where:** `src/domain/lifecycle.ts` line 723
+- **Where:** `src/domain/lifecycle/sunset.ts` (`setSunset`)
 - **What happens:** `setSunset` checks only that the version is Superseded and the new date is after today. It never checks that the old sunset already passed. v1 sunset October 1 stops rendering; setting December 1 makes it render again. The Versions screen offers this.
 - **Fix:** Refuse when the current `sunsetAt` is in the past, and add the `sunsetPassed` transition the plan lists (see D7).
 - **Evidence:** verified
@@ -476,7 +476,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D3 · High: Editing the approval chain mid-review stalls or skips stages
 
 - **Status:** Fixed. A version records its stages (ids and names) at submit and goes through them whatever the chain becomes, reading each stage's rule live by id; decisions record the stage id and the stepper matches by it; whoever approved any stage of the version still can't approve another; and a stage an in-review version still needs can't be removed ([decision 0015](decisions/0015-a-version-keeps-the-stages-it-was-submitted-with.md)).
-- **Where:** `src/domain/platform-config.ts` line 486; `src/domain/approval-chain.ts` line 68
+- **Where:** `src/domain/platform-config/approval-chains.ts` (`saveApprovalChain`); `src/domain/approval-chain.ts` line 68
 - **What happens:** Chain [Legal (Dana), Team]: Dana approves Legal, the chain is reordered to [Team, Legal], Jordan approves Team, the version waits on Legal again and Dana is refused as having approved an earlier stage. It's stuck for good. Adding a stage before the current one lets waiting versions skip it. The stepper reads past decisions against today's chain by position, so Jordan's old approval shows as "Legal: done by Jordan". `versions.current_stage` is a position, not a stage id.
 - **Fix:** Snapshot the chain (stage ids and names) on each version at submit and match decisions by stage id.
 - **Evidence:** reproduced
@@ -484,7 +484,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D4 · High: The chain editor saves chains nobody can approve
 
 - **Status:** Fixed. One domain `validateChain` refuses a person on two stages, any role but Approver, an Auditor and anyone without an active team role for every named person on every save, and an admin naming themselves on a stage that didn't already name them; `saveApprovalChain` and the chain editor both run it, and the editor shows each reason at its stage with Save disabled ([decision 0008](decisions/0008-a-chain-must-be-approvable.md)).
-- **Where:** `src/domain/platform-config.ts` line 437; `src/server/actions/platform.ts` line 262
+- **Where:** `src/domain/platform-config/approval-chains.ts` (`validateChain`); `src/server/actions/platform.ts` line 262
 - **What happens:** Naming the same person on two stages only adds a warning line; the save succeeds and every submission stalls. A `team_role` stage may name viewer, author or team_admin, none of which can decide. The rules against naming yourself, an Auditor or someone without access exist only in the server action.
 - **Fix:** A domain `validateChain` that refuses all of these; allow only `team_role: "approver"`.
 - **Evidence:** reproduced
@@ -500,7 +500,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D6 · Medium: A sunset date means midnight UTC
 
 - **Status:** Fixed. A sunset date now ends at 00:00 on that day in a Platform business time zone (`America/New_York` by default, Settings > Platform > Time zone), with the rule in `src/domain/business-zone.ts`, existing sunsets migrated, and the picker naming the zone ([decision 0017](decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
-- **Where:** `src/domain/lifecycle.ts` line 933; `src/domain/render/version-rules.ts` line 31
+- **Where:** `src/domain/lifecycle/sunset.ts` (`setSunset`); `src/domain/render/version-rules.ts` line 31
 - **What happens:** "Sunset on March 1" stops renders at 7 PM Eastern on February 28. The port needs an explicit rule.
 - **Fix:** Store a calendar date plus a business time zone, or an instant chosen in the UI, and document which.
 - **Evidence:** traced
@@ -508,7 +508,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D7 · Medium: Nothing records when a sunset passes
 
 - **Status:** Fixed. `sunsetPassed` is the one test of a passed sunset everywhere, and a sweep (`sweepSunsets`, `runSunsetSweep`) writes one `version.sunset_passed` audit row per passed sunset, dated at the sunset and naming its day in the business time zone, and in the same transaction one `sunset_passed` notice to each of the template's consumers, with the instant, the day and zone, and the Active version to move to, on Advance clock, a persona switch and access actions; its scheduled trigger comes with [S4](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep) ([decision 0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md), [decision 0032](decisions/0032-consumers-are-told-when-a-sunset-passes.md)).
-- **Where:** `src/domain/lifecycle.ts` line 712
+- **Where:** `src/domain/lifecycle/sunset.ts` (`sweepSunsets`)
 - **What happens:** The build plan's audit list includes "sunset set or passed" and the implementation plan lists a `sunsetPassed` transition. Neither exists, so the audit never shows when a version stopped rendering. The "sunset passed" test is also written out four times (`usage.ts`, `versions.ts`, `consumer-api.ts`, `version-rules.ts`).
 - **Fix:** One domain predicate and a sweep, like `sweepAccess`, that writes `version.sunset_passed`.
 - **Evidence:** traced
@@ -516,7 +516,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### D8 · Medium: Variable renames are lost between the panel and submit
 
 - **Status:** Fixed. A variable keeps its identity across key renames as an optional `id` saved with the variable list, so submit stores a rename as one `key_renamed` (old and new key) that the review screen, the submit dialog, consumer notices and the `/api/v1` diffs show, and `ContractChange` and `ApiContractChange` are unions with one member per kind ([decision 0022](decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
-- **Where:** `src/domain/lifecycle.ts` line 297; `src/components/submit/contract-lines.ts` line 34
+- **Where:** `src/domain/lifecycle/submit.ts` (`submit`); `src/components/submit/contract-lines.ts` line 34
 - **What happens:** The variables panel diffs with renames; submit, review and notices don't, so a rename is stored as removed plus added and `key_renamed` is never saved. `ContractChange` is one type with optional fields rather than a union per kind, which is why callers need `?? change.key` fallbacks.
 - **Fix:** A discriminated union per change kind, and keep rename information through submit.
 - **Evidence:** traced
@@ -844,7 +844,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### B3 · Medium: Invariants rely on SQLite's single writer
 
 - **Status:** Open
-- **Where:** `src/domain/access.ts` line 364; `src/lib/serialized-writes.ts` line 1
+- **Where:** `src/domain/access/members.ts` (`losesLastAdmin`), `src/domain/access/requests.ts` (`requestAccess`); `src/lib/serialized-writes.ts` line 1
 - **What happens:** The last Team Admin, one open recertification per team, one pending request per user and team, and chain edits are read-check-write with no constraint behind them. On Postgres (READ COMMITTED) or several instances, two admins demoting each other leave a team with no admin. Missing indexes include `approvals(version_id)`, `comments(thread_id)`, `consumer_notices(consumer_id, created_at)` and `memberships(team_id)`; there are no CHECK constraints on state, status or role.
 - **Fix:** Partial unique indexes and row locks (or Spring equivalents), documented as part of the port.
 - **Evidence:** traced
@@ -1057,7 +1057,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines; the other oversized files and the store choice remain.
+- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines. The four domain files (`lifecycle.ts`, `access.ts`, `platform-config.ts`, `redline.ts`) are split by concern into folders ([decision 0043](decisions/0043-split-files-by-concern-not-by-line-count.md)), the other long files stay under that rule, and the workspace session store's library is still to be decided by the owner.
 - **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.

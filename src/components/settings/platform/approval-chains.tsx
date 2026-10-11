@@ -3,16 +3,16 @@
 import { Fragment, useId, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, Plus } from "lucide-react";
 import type { ApprovalChainView, ApprovalChainsSection } from "@/domain/access-types";
-import { ROLE_LABEL } from "@/domain/access";
+import { ROLE_LABEL } from "@/domain/access/roles";
+import { STAGE_NAME_MAX } from "@/domain/platform-config/limits";
 import {
-  STAGE_NAME_MAX,
   describeChainChange,
   removeStageRefusal,
   ruleLabel,
   validateChain,
   type ChainCardStage,
   type StageProblem,
-} from "@/domain/platform-config";
+} from "@/domain/platform-config/approval-chains";
 import type { ApproverRule } from "@/domain/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/primitives/status-badge";

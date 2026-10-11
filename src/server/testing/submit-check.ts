@@ -1,6 +1,7 @@
 import type { ChannelFields } from "@/domain/channel-fields";
-import { DEFAULT_CHANNELS, submit, type SubmitResult } from "@/domain/lifecycle";
-import type { MessageTypeRules } from "@/domain/platform-config";
+import { DEFAULT_CHANNELS } from "@/domain/lifecycle/drafts";
+import { submit, type SubmitResult } from "@/domain/lifecycle/submit";
+import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import type { Channel, JSONContent, SampleSet, Variable } from "@/domain/types";
 
 // For tests of content the app ships (starters, the seed): would the domain's submit take this content

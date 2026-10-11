@@ -8,10 +8,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { sunsetInstant } from "@/domain/business-zone";
 import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { OUTPUT_KEYS } from "@/domain/review-outputs";
-import { diffChannelFields } from "@/domain/redline";
+import { diffChannelFields } from "@/domain/redline/channel-fields";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { JSONContent, Variable, Viewer } from "@/domain/types";

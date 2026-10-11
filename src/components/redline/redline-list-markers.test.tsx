@@ -10,7 +10,7 @@
 import type { JSONContent } from "@tiptap/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
-import { diffDocuments } from "@/domain/redline";
+import { diffDocuments } from "@/domain/redline/document";
 import { resolveDocument } from "@/domain/render/resolve";
 import type { RenderBlock } from "@/domain/render/types";
 import { StaticDocument } from "@/editor/components/static-document";

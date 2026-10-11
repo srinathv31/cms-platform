@@ -12,7 +12,7 @@
 // Nothing is ever truncated or transliterated: a value prints exactly as sent, even when it switches an
 // SMS to UCS-2. What can't be delivered at all is refused: a push over PUSH_MAX_BYTES on its platform,
 // an SMS over SMS_MAX_PARTS. The tighter checks (the content type's part budget, the SMS character set,
-// public link shorteners) are submit's (lifecycle.ts), against the "long" sample set.
+// public link shorteners) are submit's (lifecycle/submit.ts), against the "long" sample set.
 //
 // Values come in canonical, as `validateValues` returns them: the engine validates first (stage 6), and
 // a browser caller runs `validateValues(variables, sampleValues)` before calling this.
@@ -140,7 +140,7 @@ export function withFooter(message: string, footer: string | null): string {
 }
 
 /**
- * The "long" sample values that submit measures a message with (`submit` in lifecycle.ts) and the
+ * The "long" sample values that submit measures a message with (`submit` in lifecycle/submit.ts) and the
  * composer's "Long values" line shows, canonical, one for every variable: the version's "long" set, its
  * gaps filled from the defaults (`sampleSetValues`), or the generated set when it has none. A stored
  * value that doesn't validate (the set was edited while `amount` was text, and `amount` is a currency

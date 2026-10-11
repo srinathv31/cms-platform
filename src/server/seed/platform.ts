@@ -1,4 +1,4 @@
-import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config";
+import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config/limits";
 import type { Channel } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { REQUIRED_SECTIONS } from "./content";

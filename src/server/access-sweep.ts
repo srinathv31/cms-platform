@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, inArray, isNull, type SQL } from "drizzle-orm";
-import { sortRoles, sweepAccess } from "@/domain/access";
+import { sortRoles } from "@/domain/access/roles";
+import { sweepAccess } from "@/domain/access/sweep";
 import type {
   AccessRequestFacts,
   MembershipFacts,
@@ -24,7 +25,7 @@ import {
 import { applyMembershipChange, writeAccessEffects } from "./access-effects";
 import { inTransaction, type Tx } from "./effects";
 
-// The clock-driven access sweep (domain/access.ts `sweepAccess`) and the fact readers the access
+// The clock-driven access sweep (domain/access/sweep.ts `sweepAccess`) and the fact readers the access
 // actions and queries share. The sweep runs on "Advance clock" and on a persona switch (the demo's
 // sign-in), never on a timer: it applies every deadline the demo clock has crossed since the last
 // run, backdated to the instant each was crossed, in ONE transaction. Running it twice changes

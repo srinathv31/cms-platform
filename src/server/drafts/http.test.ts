@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { DRAFT_SAVE_STATUS, statusOf } from "./http";
 
 describe("statusOf", () => {

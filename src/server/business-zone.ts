@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DEFAULT_BUSINESS_ZONE, isBusinessZone, type BusinessZone } from "@/domain/business-zone";
-import { sunsetPassed } from "@/domain/lifecycle";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { db, type Db } from "./db/client";
 import { settings, versions } from "./db/schema/ucomp";
 import type { Tx } from "./effects";

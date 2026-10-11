@@ -1,6 +1,7 @@
 "use client";
 
-import { ROLE_LABEL, validateDecisionNote } from "@/domain/access";
+import { ROLE_LABEL } from "@/domain/access/roles";
+import { validateDecisionNote } from "@/domain/access/requests";
 import { DECISION_NOTE_MAX, type AccessRequestRow, type AccessRequestsSection } from "@/domain/access-types";
 import { decideAccessRequest } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";

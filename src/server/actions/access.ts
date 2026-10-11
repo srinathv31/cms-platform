@@ -3,18 +3,19 @@
 import { refresh, revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { ACCESS_REFUSALS } from "@/domain/access/refusals";
 import {
-  ACCESS_REFUSALS,
   changeRoles,
-  decideAccessRequest as decideRequestTransition,
-  decideRecertItem as decideRecertTransition,
   keepInactive as keepTransition,
   reinstate as reinstateTransition,
   removeMember as removeTransition,
-  requestAccess as requestTransition,
-  startRecert,
   suspendInactive as suspendTransition,
-} from "@/domain/access";
+} from "@/domain/access/members";
+import {
+  decideAccessRequest as decideRequestTransition,
+  requestAccess as requestTransition,
+} from "@/domain/access/requests";
+import { decideRecertItem as decideRecertTransition, startRecert } from "@/domain/access/recertification";
 import {
   ACCESS_REASON_MAX,
   DECISION_NOTE_MAX,

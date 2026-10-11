@@ -2,7 +2,7 @@
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ActionResult } from "@/domain/review-types";
 
 // The one way the browser runs a server action (handoff review H1): in a transition, one at a time, with

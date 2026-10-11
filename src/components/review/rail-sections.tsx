@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { codeSegments } from "@/components/versions/format";
-import type { NameChange } from "@/domain/redline";
+import type { NameChange } from "@/domain/redline/document";
 import type { Person } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 

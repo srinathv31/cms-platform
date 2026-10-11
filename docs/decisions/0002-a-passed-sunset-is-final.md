@@ -18,7 +18,7 @@ product for regulated content, that brings withdrawn content back without review
 ## Decision
 
 - Once a version's sunset has passed, nothing sets, moves or clears it. `setSunset` in
-  [lifecycle.ts](../../src/domain/lifecycle.ts) refuses with `REFUSALS.sunsetPassed`: "This version's sunset has
+  [lifecycle/sunset.ts](../../src/domain/lifecycle/sunset.ts) refuses with `REFUSALS.sunsetPassed`: "This version's sunset has
   passed. It can't render again." There is no path that clears a sunset.
 - "Passed" is one domain predicate, `sunsetPassed` (`sunsetAt <= now`, on the demo clock): the same instant test the
   render rule uses, so the Versions screen calls a sunset passed exactly when renders start failing.

@@ -8,7 +8,7 @@ import { contractDiff } from "@/domain/golive/contract-diff";
 import { contractJsonSchema, exampleOf } from "@/domain/golive/json-schema";
 import { CONSUMER_ERRORS, integrationSamples, renderPathOf, RESPONSE_FORMATS } from "@/domain/golive/samples";
 import type { IntegrationPanelData } from "@/domain/golive-types";
-import { sunsetPassed } from "@/domain/lifecycle";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { can } from "@/domain/permissions";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";

@@ -3,7 +3,7 @@
 
 import type { DeviceClock } from "@/components/device";
 import { formatPhoneDate } from "@/domain/dates";
-import type { TeamSenders } from "@/domain/platform-config";
+import type { TeamSenders } from "@/domain/platform-config/limits";
 import type { VariableValues } from "@/editor/model/types";
 import type { PhoneSenders } from "./phone-output";
 

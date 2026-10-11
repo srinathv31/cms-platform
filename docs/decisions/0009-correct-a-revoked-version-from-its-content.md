@@ -15,7 +15,7 @@ when nothing is Active.
 ## Decision
 
 - **Edit is offered when the template's latest version is Revoked**, as it is when the latest is Active.
-  `planDraftStart` in [lifecycle.ts](../../src/domain/lifecycle.ts) plans a new draft from it, and the workspace
+  `planDraftStart` in [lifecycle/drafts.ts](../../src/domain/lifecycle/drafts.ts) plans a new draft from it, and the workspace
   shows Edit from the same plan. Nothing else changes: an open draft is still continued, a newer version in review
   still blocks Edit, and a revoke that's only pending leaves the version Active.
 - **The corrected draft starts from the revoked version's content**: the body with its block ids (so comment threads

@@ -1,5 +1,5 @@
 // What the message composer underlines in a channel field's text, and why: the two submit rules that
-// hold for the text the author typed, whatever the values (`messageRefusal` in lifecycle.ts, rules 1
+// hold for the text the author typed, whatever the values (`messageRefusal` in lifecycle/submit.ts, rules 1
 // and 3), found where they sit so the author can fix them in place.
 //
 //   - A character outside GSM-7 in an SMS field. Submit refuses it. When it has an obvious GSM-7

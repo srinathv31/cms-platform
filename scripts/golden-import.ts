@@ -22,7 +22,7 @@ import { createClient } from "@libsql/client";
 import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
-import { smsFooterOf } from "@/domain/lifecycle";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { contentTypeFamily, familyChannels } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";

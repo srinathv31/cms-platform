@@ -1,7 +1,7 @@
 "use client";
 
 import { SegmentedRadio } from "@/components/primitives/segmented";
-import { ROLE_LABEL } from "@/domain/access";
+import { ROLE_LABEL } from "@/domain/access/roles";
 import type { RequestableRole } from "@/domain/access-types";
 
 /** Viewer, Author or Approver: the app's segmented control, as a radio group. There is always one chosen. */

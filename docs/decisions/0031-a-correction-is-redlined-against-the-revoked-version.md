@@ -30,7 +30,7 @@ useful comparison is against the text being corrected.
   as for a first version.
 - **The label names the version's state when it isn't Active**: "vs v3 (revoked)", or "vs v1 (superseded)" for
   the fallback. Against the Active version it stays "vs v2".
-- `reviewBaseline` in [lifecycle.ts](../../src/domain/lifecycle.ts) decides it, and `getReviewScreen` returns it
+- `reviewBaseline` in [lifecycle/baselines.ts](../../src/domain/lifecycle/baselines.ts) decides it, and `getReviewScreen` returns it
   as `baseline` with its state.
 
 ## Alternatives considered

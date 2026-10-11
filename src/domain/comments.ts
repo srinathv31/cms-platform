@@ -20,7 +20,7 @@
 // either. Someone the waiting stage names acts from any team, but only on the version in review and the
 // threads its screen shows (docs/decisions/0010-comments-are-answered-where-they-show.md).
 
-import type { Outcome } from "./lifecycle";
+import type { Outcome } from "./lifecycle/types";
 import { formatCount } from "./numbers";
 import { can } from "./permissions";
 import { refusal, refuse } from "./refusals";

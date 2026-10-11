@@ -6,7 +6,7 @@ import { monogramOf } from "@/components/preview/phone-output";
 import { channelFieldsFrom, channelFieldsOf, type ChannelFieldValues } from "@/domain/channel-fields";
 import { PUSH_PLATFORMS, type PushPlatform } from "@/domain/messages/push";
 import type { LockScreenFit } from "@/domain/messages/truncation";
-import type { MessageTypeRules } from "@/domain/platform-config";
+import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import { resolveMessage } from "@/domain/render/message";
 import { validateValues } from "@/domain/render/validate";
 import type { Variable, VariableValues } from "@/domain/types";

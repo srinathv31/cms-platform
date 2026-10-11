@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { ACCESS_REFUSALS } from "@/domain/access";
+import { ACCESS_REFUSALS } from "@/domain/access/refusals";
 import { PermissionError, REASONS } from "@/domain/permissions";
 import type { Db } from "@/server/db/client";
 import { seedDatabase } from "@/server/seed";

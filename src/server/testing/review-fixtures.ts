@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
-import { createDraft } from "@/domain/lifecycle";
+import { createDraft } from "@/domain/lifecycle/drafts";
 import type { TeamRole, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";

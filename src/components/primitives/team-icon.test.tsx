@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { TEAM_ICONS } from "@/domain/platform-config";
+import { TEAM_ICONS } from "@/domain/platform-config/limits";
 import { TeamIcon, teamIconLabel } from "./team-icon";
 
 // A team's icon from its stored Lucide key, and the name the icon picker reads out.

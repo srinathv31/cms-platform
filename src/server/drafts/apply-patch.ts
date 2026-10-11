@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { ALL_CHANNEL_FIELDS, withChannelFieldValues, type ChannelFieldsPatch } from "@/domain/channel-fields";
-import { draftChannelsRefusal, withWriter } from "@/domain/lifecycle";
+import { draftChannelsRefusal, withWriter } from "@/domain/lifecycle/drafts";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS, refuse, type Refusal } from "@/domain/refusals";
 import type { DraftPatch, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
