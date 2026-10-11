@@ -43,6 +43,7 @@ const TOP: Record<string, number> = { "email.subject": 100, "email.preheader": 1
 let root: Root;
 let container: HTMLElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
     const top = TOP[this.getAttribute("data-block-id") ?? ""];
     return top === undefined ? rect(0, 0) : rect(top, 50);
@@ -58,6 +59,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 interface Handlers {
@@ -91,7 +93,7 @@ async function mount(threads: ThreadView[], over: { activeBlockId?: string | nul
     ),
   );
   await act(async () => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 60));
+    await vi.advanceTimersByTimeAsync(60);
   });
   return { handleRef, ...handlers };
 }

@@ -61,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 
 const base: Omit<ThreadListProps, "threads"> = {
@@ -399,7 +400,7 @@ const esc = (el: HTMLElement) =>
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
   });
 /** Animation frames, for the focus a list returns after a host has had its turn. */
-const frames = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 80)));
+const frames = () => act(async () => void (await vi.advanceTimersByTimeAsync(80)));
 const replyOf = (id: string) => card(id).querySelector<HTMLElement>('[data-slot="reply"]')!;
 const OPEN = THREADS.filter((t) => t.status === "open");
 
@@ -443,6 +444,10 @@ function Page({
 }
 
 describe("ThreadList: focus never falls to the page", () => {
+  beforeEach(() => {
+    vi.useFakeTimers(); // `frames()` runs the animation frames and timers a focus return waits on
+  });
+
   /** The server's list after it resolved a thread. */
   const resolvedIn = (list: ThreadView[], id: string) =>
     list.map((t) => (t.id === id ? { ...t, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW } : t));

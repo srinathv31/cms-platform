@@ -5,7 +5,7 @@
 import { Editor } from "@tiptap/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { editorExtensions } from "../schema";
 import { createVariableStore } from "../state/variable-store";
 import { doc, p } from "../testing/editor";
@@ -14,10 +14,14 @@ import { TableMenu } from "./table-menu";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 afterEach(() => {
   cleanup?.();
   cleanup = null;
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 const TABLE = {
@@ -78,7 +82,7 @@ describe("TableMenu", () => {
       trigger(frame)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     });
     // TipTap focuses on the next frame.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.advanceTimersByTimeAsync(50);
     expect(document.activeElement).toBe(editor.view.dom);
   });
 
@@ -102,7 +106,7 @@ describe("TableMenu", () => {
     });
     await act(async () => {
       trigger(frame)!.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await vi.advanceTimersByTimeAsync(0);
     });
     const item = (label: string) => [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes(label));
     for (const label of ["Insert column left", "Insert column right"]) {
@@ -121,7 +125,7 @@ describe("TableMenu", () => {
     });
     await act(async () => {
       trigger(frame)!.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await vi.advanceTimersByTimeAsync(0);
     });
     const insert = [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes("Insert column right"));
     expect(insert?.hasAttribute("data-disabled")).toBe(false);

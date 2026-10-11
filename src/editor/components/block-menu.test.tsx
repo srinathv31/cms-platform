@@ -8,7 +8,7 @@ import type { JSONContent } from "@tiptap/core";
 import { Editor } from "@tiptap/react";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listItemMarkers } from "../extensions/list-markers";
 import { editorExtensions } from "../schema";
 import { createVariableStore } from "../state/variable-store";
@@ -18,10 +18,14 @@ import { GripBlockMenu, GripTrigger, KeyboardBlockMenu, NO_NUMBERING_REASON, STA
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 afterEach(() => {
   cleanup?.();
   cleanup = null;
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 const p = (text: string): JSONContent => ({ type: "paragraph", content: [{ type: "text", text }] });
@@ -31,7 +35,7 @@ const DOC: JSONContent = {
   content: [p("Intro"), { type: "orderedList", attrs: { start: 1 }, content: [li("One", { type: "orderedList", content: [li("Inner")] }), li("Two")] }],
 };
 
-const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms = 0) => vi.advanceTimersByTimeAsync(ms);
 
 /** The grip and its menu, as the block handle wires them (a click while it closes is ignored). */
 function Grip({ editor, blockPos, onClosed }: { editor: Editor; blockPos: number; onClosed: () => void }) {
