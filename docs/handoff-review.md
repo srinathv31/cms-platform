@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 8 | 8 | 19 |
+| Open | 0 | 3 | 8 | 6 | 17 |
 | Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 29 | 30 | 79 |
+| Fixed | 1 | 19 | 29 | 32 | 81 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), and PRs #63–#65 (H8, and G4 apart from the git history).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), and PR #66 (N26 and N27).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -311,7 +311,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N27 · Low: Below about 800px wide the always-open sidebar leaves a screen no room, the Usage tab included
 
-- **Status:** Partly fixed. Below 800px the sidebar is the shadcn sidebar's sheet behind an "Open navigation" button in the top bar, and the Library, a template's tabs, the review queue and screen, the usage and audit screens, Settings and Coral reflow to 320px (decision [0045](decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md), `e2e/reflow.spec.ts` for the Library, the Usage tab and the review screen); not yet checked at 320px are the workspace and review dialogs other than Settings, New template and Share, axe on Coral and Settings, and the editor's block handle.
+- **Status:** Fixed. Below 800px the sidebar is the shadcn sidebar's sheet behind an "Open navigation" button in the top bar, and every screen and dialog reflows to 320px wide without a page-level sideways scroll (decision [0045](decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)): the Library, a template's tabs, the review queue and screen (its header wraps and its decision bar leaves the document room), Usage, Audit, Settings and Coral, the action dialogs, Compare and the sunset calendar, and the editor's block handle. Tables, the document canvas, charts and phone previews scroll inside a labelled `ScrollRegion` that takes a Tab stop only when it scrolls. Nothing changes from 800px up, and `e2e/reflow*.spec.ts` checks it.
 - **Where:** `src/components/app-shell/app-frame.tsx` (`<Sidebar collapsible="none">`, which keeps the shadcn sidebar's mobile sheet from ever opening); `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); [docs/reference/ui-checklist.md](reference/ui-checklist.md) (the 800px floor)
 - **What happens:** The sidebar is 16rem wide at every width and never collapses, so a narrow window gives the page what's left. At 390px the sidebar is 264px and the canvas 112px: a template's Usage tab (`section[data-slot="usage"]`) is 0px wide, its title wraps to four lines in 110px, and the charts and the 728px and 494px tables are clipped or scrolled inside a box with no width. Nothing scrolls the page (`scrollWidth` stays 390; the shell's `overflow-hidden` cuts the rest). The Library and every other screen clip the same way, so this is the shell's, not the Usage tab's, and it was there before the channel split (N22). The checklist asks for "no horizontal overflow at any width from 800px", so the prototype doesn't claim anything narrower. Noticed while fixing N22 (PR #59).
 - **Fix:** Decide whether narrow windows are in scope. If they are, collapse the sidebar off-canvas under the floor (`collapsible="offcanvas"` with a menu button in the top bar, which `ui/sidebar.tsx` already supports below 768px), then check the Usage tab and the other screens at 390px. If not, record 800px as the floor in a decision and in the checklist, and leave it.
