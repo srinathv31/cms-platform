@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 8 | 6 | 17 |
-| Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 29 | 32 | 81 |
+| Open | 0 | 2 | 6 | 5 | 13 |
+| Partly fixed | 0 | 3 | 3 | 2 | 8 |
+| Fixed | 1 | 21 | 31 | 33 | 86 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), and PR #66 (N26 and N27).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -924,7 +924,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T7 · Medium: Slow and brittle test habits
 
-- **Status:** Fixed. The 2.1-second unit-test sleep runs on fake timers (the submit dialog's two 50 ms sleeps wait on focus), every e2e spec waits on its condition (a web-first assertion, `expect.poll`, or `settled()` in `e2e/helpers/settled.ts` for fonts, animations and layout at rest) instead of `waitForTimeout` except the two prefetch tests' named 3-second counting window, and the helpers' pacing, the recording branches and `demo-script` moved in the sibling e2e PRs; the 25 to 80 ms waits left in component tests are `act` flushes of a frame or bounded polling loops, not fixed delays that hide a race.
+- **Status:** Fixed. Unit tests that slept in real time run on Vitest's fake timers (14 files, the 2.1-second `required-sections` wait among them); every e2e spec waits on its condition (a web-first assertion, `expect.poll`, or `settled()` in `e2e/helpers/settled.ts` for fonts, animations and layout at rest) instead of `waitForTimeout`, except the two prefetch tests' named 3-second counting window; the helpers click, type and drag at test speed with the recording pacing in `e2e/media/`; and `demo-script.spec.ts` runs only in the opt-in demo project ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)). Waits left on purpose: a real SQLite lock and child process, one animation frame, and timing assertions that measure speed.
 - **Where:** `src/editor/extensions/required-sections.test.ts` line 230; `e2e/demo-script.spec.ts` line 1
 - **What happens:** A real 2.1-second sleep and several 25 to 80 ms sleeps in unit tests; 38 `waitForTimeout` calls in e2e; a 90 ms pacing delay on every click; demo-recording branches inside functional helpers; a 1,318-line `demo-script` test duplicating the scenarios. The selector ratio is good (832 role-based against 283 locators).
 - **Fix:** Fake timers; web-first assertions; move recording pacing out of the functional helpers; retire or merge `demo-script.spec.ts`.
