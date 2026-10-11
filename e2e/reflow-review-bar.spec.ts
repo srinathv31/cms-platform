@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settled } from "./helpers/settled";
 
 // Reflow (WCAG 2.1 SC 1.4.10, decision 0045): at 320px wide the review screen's decision bar (Approve, Request changes)
 // wraps to a few lines and sticks to the bottom of the main pane, resting over the last rows of the document's cell.
@@ -23,7 +24,7 @@ async function open(page: Page) {
     const el = document.querySelector("button[aria-label$='profile and persona']");
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
   });
-  await page.waitForTimeout(800);
+  await settled(page);
 }
 
 /** Scrolls the canvas until the document's cell ends at the canvas's bottom edge (the bar is at its resting place), then measures. */

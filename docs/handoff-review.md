@@ -255,7 +255,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N20 · Low: Five e2e specs fail now and then when runs share a machine
 
-- **Status:** Open
+- **Status:** Fixed. scenario-02a's keyboard run waits for the New template button to hydrate and for the caret to land after each arrow key, scenario-08 for the sidebar's Settings link to be hydrated and still before it presses it, focus-targets for the caret to be at the end of the name before it types, comment-policy for the review screen to stop moving under its clicks, and the database helper retries `SQLITE_BUSY` (sibling PR); the four specs pass ten times each (`--repeat-each=10`) on a machine under load.
 - **Where:** `e2e/comment-policy.spec.ts`; `e2e/scenario-08.spec.ts`; `e2e/demo-script.spec.ts`; `e2e/scenario-02a.spec.ts`; `e2e/focus-targets.spec.ts`
 - **What happens:** While several e2e runs shared one machine, each of these failed in some run and passed when run alone: comment-policy (`SQLITE_BUSY` on its own database access), scenario-08 (its Settings link), demo-script at step 8.3, scenario-02a's keyboard-only run, and focus-targets' first test, which typed " (edited)" into the middle of the template name. A gate that fails at random gets rerun until it passes, and a real failure hides among the reruns. Seen in the e2e runs of the Fix first PRs.
 - **Fix:** Find what each one races and wait for that with a web-first assertion, retry `SQLITE_BUSY` in the specs' own database access, and check each under load with `--repeat-each`. Relates to [T7](#t7--medium-slow-and-brittle-test-habits) and [T5](#t5--medium-e2e-cant-be-pointed-at-its-own-database).
@@ -925,7 +925,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T7 · Medium: Slow and brittle test habits
 
-- **Status:** Open
+- **Status:** Fixed. The 2.1-second unit-test sleep runs on fake timers (the submit dialog's two 50 ms sleeps wait on focus), every e2e spec waits on its condition (a web-first assertion, `expect.poll`, or `settled()` in `e2e/helpers/settled.ts` for fonts, animations and layout at rest) instead of `waitForTimeout` except the two prefetch tests' named 3-second counting window, and the helpers' pacing, the recording branches and `demo-script` moved in the sibling e2e PRs; the 25 to 80 ms waits left in component tests are `act` flushes of a frame or bounded polling loops, not fixed delays that hide a race.
 - **Where:** `src/editor/extensions/required-sections.test.ts` line 230; `e2e/demo-script.spec.ts` line 1
 - **What happens:** A real 2.1-second sleep and several 25 to 80 ms sleeps in unit tests; 38 `waitForTimeout` calls in e2e; a 90 ms pacing delay on every click; demo-recording branches inside functional helpers; a 1,318-line `demo-script` test duplicating the scenarios. The selector ratio is good (832 role-based against 283 locators).
 - **Fix:** Fake timers; web-first assertions; move recording pacing out of the functional helpers; retire or merge `demo-script.spec.ts`.

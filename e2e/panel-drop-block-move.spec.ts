@@ -85,10 +85,10 @@ async function dragBlockTo(page: Page, block: Locator, target: { x: number; y: n
   const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await page.mouse.move(from.x, from.y, { steps: 4 });
   await page.mouse.down();
-  await page.waitForTimeout(60);
   await page.mouse.move(from.x + 8, from.y + 4, { steps: 3 });
   await page.mouse.move(target.x, target.y, { steps: 12 });
-  await page.waitForTimeout(80);
+  // The editor has taken the drag in and marks where the block would land; only then let go.
+  await expect(page.locator(".ucomp-dropcursor")).toBeVisible();
   await page.mouse.up();
 }
 

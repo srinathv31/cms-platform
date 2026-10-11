@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { settled } from "./helpers/settled";
 
 // Reflow (WCAG 2.1 SC 1.4.10, decision 0045): Chrome at 400% on a 1280px laptop is a 320 CSS px window, and nothing
 // may need a horizontal scroll there except what scrolls inside its own box (a table, a chart, a tab strip).
@@ -34,7 +35,7 @@ async function open(page: Page, url: string, persona: string) {
     const el = document.querySelector("button[aria-label$='profile and persona']");
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
   });
-  await page.waitForTimeout(800);
+  await settled(page);
 }
 
 /** What the canvas (the shell's scroll area) and the page hold sideways, and how wide the canvas is. */
@@ -98,7 +99,7 @@ test.describe("320px wide", () => {
     expect(box?.x, "the drawer opens from the left edge").toBeLessThanOrEqual(1);
     expect(box?.width, "and leaves some of the page showing").toBeLessThan(320);
 
-    await page.waitForTimeout(500); // the sheet fades in: axe reads its contrast once it has
+    await settled(page); // the sheet has faded in: axe reads its contrast from the colours it finds
     const serious = (await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze()).violations.filter(
       (v) => v.impact === "serious" || v.impact === "critical",
     );

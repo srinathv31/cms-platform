@@ -168,9 +168,9 @@ describe("what the dialog lists", () => {
 
   it("starts with focus in the note, which is labelled for reviewers", async () => {
     await render(summary());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    // Base UI applies the dialog's initial focus a frame after it opens.
+    await vi.waitFor(() => expect(document.activeElement).toBe(note()));
     expect(note().labels?.[0]?.textContent).toBe("Note to reviewers");
-    expect(document.activeElement).toBe(note());
   });
 });
 
@@ -245,8 +245,7 @@ describe("focus while the server works", () => {
   it("leaves focus in the note after a refusal from ⌘Enter", async () => {
     onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
     await render(summary());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
-    note().focus();
+    await vi.waitFor(() => expect(document.activeElement).toBe(note()));
     await press(note(), { key: "Enter", metaKey: true });
     expect(dialog()!.querySelector("[role='alert']")).not.toBeNull();
     expect(document.activeElement).toBe(note());

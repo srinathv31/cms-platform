@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { viewEveryOutput } from "./helpers/review";
+import { settled } from "./helpers/settled";
 
 // Reflow of the dialogs (WCAG 2.1 SC 1.4.10, decision 0045): at 320 CSS px wide (Chrome at 400% on a 1280px
 // laptop) each dialog opens inside the window, holds nothing past its own edge, keeps its actions on screen, and the
@@ -26,7 +27,7 @@ async function open(page: Page, url: string, persona: string) {
     const el = document.querySelector("button[aria-label$='profile and persona']");
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
   });
-  await page.waitForTimeout(800);
+  await settled(page);
 }
 
 /** The review screen's Approve and Request changes (the decision bar and the rail both carry them: this is the bar's). */
@@ -35,7 +36,7 @@ const decide = (page: Page) => page.getByRole("group", { name: "Decide" });
 const AXE_EXCLUDES = ["nextjs-portal", "[data-base-ui-focus-guard]"];
 
 async function expectNoSeriousAxe(page: Page, what: string) {
-  await page.waitForTimeout(400); // the dialog fades in: axe reads its contrast once it has
+  await settled(page); // the dialog has faded in: axe reads its contrast from the colours it finds
   let builder = new AxeBuilder({ page });
   for (const selector of AXE_EXCLUDES) builder = builder.exclude(selector);
   const serious = (await builder.analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
@@ -95,13 +96,14 @@ async function expectActions(page: Page, dialog: Locator, names: (string | RegEx
 /** Fits at 320 x 720, then at 320 x 256 with the actions still showing. */
 async function expectDialogReflows(page: Page, dialog: Locator, actions: (string | RegExp)[], what: string) {
   await expect(dialog).toBeVisible({ timeout: 20_000 });
-  await page.waitForTimeout(300);
+  await settled(page);
   await expectFits(page, dialog, what);
   await expectActions(page, dialog, actions, what);
   await expectNoSeriousAxe(page, what);
 
   await page.setViewportSize({ width: 320, height: 256 });
-  await page.waitForTimeout(200);
+  await expect.poll(() => page.evaluate(() => window.innerHeight)).toBe(256);
+  await settled(page);
   expectInWindow(page, await dialog.boundingBox(), `${what} dialog at 256px tall`);
   await expectActions(page, dialog, actions, `${what} at 256px tall`);
   await page.setViewportSize({ width: 320, height: 720 });
@@ -127,7 +129,7 @@ test.describe("on the review screen", () => {
     await dialog.getByRole("button", { name: /^Sunset date, / }).click();
     const calendar = page.locator('[data-slot="calendar"]');
     await expect(calendar).toBeVisible();
-    await page.waitForTimeout(300);
+    await settled(page);
     expectInWindow(page, await calendar.boundingBox(), "Approve: the calendar");
     await expectFits(page, dialog, "Approve with the calendar open");
     await page.keyboard.press("Escape");
@@ -171,7 +173,7 @@ test.describe("on the Versions tab", () => {
     await dialog.getByRole("button", { name: /Sunset date/ }).click();
     const calendar = page.locator('[data-slot="calendar"]');
     await expect(calendar).toBeVisible();
-    await page.waitForTimeout(300);
+    await settled(page);
     expectInWindow(page, await calendar.boundingBox(), "Change sunset: the calendar");
     await expectNoSeriousAxe(page, "Change sunset with the calendar open");
     await page.keyboard.press("Escape");
