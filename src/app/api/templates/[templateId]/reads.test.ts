@@ -1,14 +1,10 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { NextRequest } from "next/server";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { versions } from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { GET as baseVersion } from "./base-version/route";
 import { GET as compare } from "./compare/route";
@@ -25,33 +21,24 @@ import { GET as submitSummary } from "./submit-summary/route";
 // from it; Cash Back has v1 Superseded, v2 Active, v3 In review; Balance Transfer has v2 Active. Maya is
 // an Author on Coral Offers, Sam a Viewer there, Eli an Author on Deposits only; Morgan has no team.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-template-reads-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-template-reads-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers({ host: "localhost:3000" })) }));
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: env.now })).templates;
-  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+const ids = seededDatabasePerTest({ base: env.now });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
 });
 
 beforeEach(() => as("maya"));

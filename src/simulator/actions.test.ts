@@ -1,7 +1,6 @@
-import { rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { freshDatabasePerTest } from "@/lib/fresh-database";
 import type { ApiContract, ApiNotice, ApiNoticeList, ApiTemplateDetail, ApiVariable } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
 import type { UcompApi } from "./ucomp-api";
@@ -10,26 +9,20 @@ import type { UcompApi } from "./ucomp-api";
 // fetch. The fake answers like /api/v1: one template, v2 Active (v3 can go Active with a new required
 // annual_fee; v2 can pass its sunset), Coral's notices, and the render route's errors.
 
-const env = vi.hoisted(() => {
+vi.hoisted(() => {
   process.env.UCOMP_API_ORIGIN = "http://ucomp.test";
-  return { dir: "" };
 });
 
 vi.mock("@/simulator/db", async () => {
-  const { mkdtempSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const { createClient } = await import("@libsql/client");
-  const { drizzle } = await import("drizzle-orm/libsql");
+  const { tempDatabase } = await import("@/lib/fresh-database");
   const sim = await import("@/server/db/schema/sim");
-  env.dir = mkdtempSync(join(tmpdir(), "ucomp-sim-actions-"));
-  const simLibsql = createClient({ url: `file:${join(env.dir, "test.db")}` });
-  return { simLibsql, simDb: drizzle(simLibsql, { schema: sim }), withBusyRetry: <T>(write: () => Promise<T>) => write() };
+  const temp = tempDatabase("ucomp-sim-actions-", sim);
+  return { simLibsql: temp.libsql, simDb: temp.db, withBusyRetry: <T>(write: () => Promise<T>) => write(), __files: temp.__files };
 });
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("next/server", () => ({ connection: vi.fn(async () => {}) }));
 
-const { simDb, simLibsql } = await import("@/simulator/db");
+const { simDb } = await import("@/simulator/db");
 const actions = await import("./actions");
 const queries = await import("./queries");
 const { refresh } = await import("next/cache");
@@ -218,37 +211,63 @@ async function fakeUcomp(input: RequestInfo | URL, init: RequestInit = {}): Prom
 
 const LONG = { first: "Maximiliano-Bartholomew", last: "Featherstonehaugh-Villiers-Montgomery" };
 
-beforeAll(async () => {
+beforeAll(() => {
   vi.stubGlobal("fetch", vi.fn(fakeUcomp));
-  await migrate(simDb, { migrationsFolder: "./src/server/db/migrations" });
-  await simDb.insert(simOffers).values([
-    { id: "offer_spring_travel", name: "Spring Travel Rewards", headline: "Spend $1,000 in 3 months, get $200 back", terms: { spend: 1000, bonus: 200, months: 3, annualFee: 95, endsOn: "2027-06-30" } },
-    { id: "offer_cash_back", name: "Cash Back Welcome Bonus", headline: "Earn $200", terms: { spend: 1000, bonus: 200, months: 3 } },
-    { id: "alert_card_abroad", kind: "alert", name: "Card used abroad", headline: "A card is used outside the US", terms: null },
-  ]);
-  const card = { statement: null, lastPurchase: null };
-  await simDb.insert(simCustomers).values([
-    { id: "cust_01", firstName: "Olivia", lastName: "Bennett", email: "olivia.bennett@example.com", homeState: "NJ", purchaseApr: "21.99", annualFee: "95", phone: "+12015550142", platform: "ios", cardLast4: "3417", ...card },
-    { id: "cust_02", firstName: "Marcus", lastName: "Delgado", email: "marcus.delgado@example.com", homeState: "CA", purchaseApr: "24.49", annualFee: "0", phone: "+14155550118", platform: "android", cardLast4: "9052", ...card },
-    { id: "cust_10", firstName: LONG.first, lastName: LONG.last, email: "long@example.com", homeState: "NC", purchaseApr: "29.99", annualFee: "695", phone: "+17045550185", platform: "android", cardLast4: "6670", ...card },
-  ]);
 });
 
 afterAll(() => {
   vi.unstubAllGlobals();
-  simLibsql.close();
-  rmSync(env.dir, { recursive: true, force: true });
+});
+
+// Coral's offers and customers, in the database every test starts from.
+freshDatabasePerTest<typeof simDb>({
+  client: () => import("@/simulator/db"),
+  build: async (built) => {
+    await built.insert(simOffers).values([
+      { id: "offer_spring_travel", name: "Spring Travel Rewards", headline: "Spend $1,000 in 3 months, get $200 back", terms: { spend: 1000, bonus: 200, months: 3, annualFee: 95, endsOn: "2027-06-30" } },
+      { id: "offer_cash_back", name: "Cash Back Welcome Bonus", headline: "Earn $200", terms: { spend: 1000, bonus: 200, months: 3 } },
+      { id: "alert_card_abroad", kind: "alert", name: "Card used abroad", headline: "A card is used outside the US", terms: null },
+    ]);
+    const card = { statement: null, lastPurchase: null };
+    await built.insert(simCustomers).values([
+      { id: "cust_01", firstName: "Olivia", lastName: "Bennett", email: "olivia.bennett@example.com", homeState: "NJ", purchaseApr: "21.99", annualFee: "95", phone: "+12015550142", platform: "ios", cardLast4: "3417", ...card },
+      { id: "cust_02", firstName: "Marcus", lastName: "Delgado", email: "marcus.delgado@example.com", homeState: "CA", purchaseApr: "24.49", annualFee: "0", phone: "+14155550118", platform: "android", cardLast4: "9052", ...card },
+      { id: "cust_10", firstName: LONG.first, lastName: LONG.last, email: "long@example.com", homeState: "NC", purchaseApr: "29.99", annualFee: "695", phone: "+17045550185", platform: "android", cardLast4: "6670", ...card },
+    ]);
+  },
 });
 
 beforeEach(() => {
   vi.mocked(refresh).mockClear();
-  ucomp.renders = [];
-  ucomp.maxInFlight = 0;
+  Object.assign(ucomp, { active: 2, v2Sunset: false, rename: false, renders: [], maxInFlight: 0 });
 });
 
 const V2_MAPPING = { first_name: "customer.firstName", last_name: "customer.lastName", purchase_apr: "customer.purchaseApr", home_state: "customer.homeState" } as const;
 
-// ── Tests (in order: link → send → upgrade → sunset → relink) ────────────────
+// ── Tests. The story runs link → send → upgrade → sunset → relink; each test builds the steps before it. ─
+
+/** Coral links the Spring Travel offer to v2 on all three channels. */
+async function linkSpring() {
+  expect(
+    await actions.linkTemplate({
+      offerId: "offer_spring_travel",
+      templateId: TPL,
+      version: 2,
+      channels: ["email", "pdf", "web"],
+      mapping: { ...V2_MAPPING, offer_end_date: null, retired: "customer.email", home_state: "customer.homeState" },
+    }),
+  ).toEqual({ ok: true });
+  vi.mocked(refresh).mockClear();
+}
+
+/** ...and sends it to the long-named customer and to Olivia. */
+async function sendSpring() {
+  await linkSpring();
+  const result = await actions.sendToCustomers({ offerId: "offer_spring_travel", customerIds: ["cust_10", "cust_01"] });
+  if (!result.ok) throw new Error(result.reason);
+  vi.mocked(refresh).mockClear();
+  ucomp.renders = [];
+}
 
 describe("actions.ts", () => {
   // Every export of a "use server" file is a public POST endpoint queued with the page's other actions, so
@@ -305,6 +324,7 @@ describe("linkTemplate", () => {
 
 describe("sendToCustomers", () => {
   it("sends every linked channel per customer, as Coral, at most 3 in flight, and keeps the outputs", async () => {
+    await linkSpring();
     const result = await actions.sendToCustomers({ offerId: "offer_spring_travel", customerIds: ["cust_10", "cust_01"] });
     if (!result.ok) throw new Error(result.reason);
     const { batch } = result;
@@ -332,6 +352,7 @@ describe("sendToCustomers", () => {
   });
 
   it("serves a delivery's file and its customer view", async () => {
+    await sendSpring();
     const page = await queries.getSimOfferPage("offer_spring_travel");
     const [pdf, web, email] = page!.lastBatch!.rows[1].results;
     const file = await queries.loadDeliveryFile(pdf.deliveryId);
@@ -356,6 +377,7 @@ describe("sendToCustomers", () => {
   });
 
   it("refuses with nothing to send", async () => {
+    await linkSpring();
     expect(await actions.sendToCustomers({ offerId: "offer_spring_travel", customerIds: [] })).toEqual({ ok: false, reason: "Choose customers to send to." });
     expect(await actions.sendToCustomers({ offerId: "offer_cash_back", customerIds: ["cust_01"] })).toEqual({ ok: false, reason: "Link a template to send." });
     expect(ucomp.renders).toHaveLength(0);
@@ -364,6 +386,7 @@ describe("sendToCustomers", () => {
 
 describe("upgrade, sunset and relink", () => {
   it("shows v3 available with the diff and still sends on v2", async () => {
+    await sendSpring();
     ucomp.active = 3;
     const home = await queries.getSimHome();
     const card = home.offers.find((o) => o.id === "offer_spring_travel")!;
@@ -381,6 +404,8 @@ describe("upgrade, sunset and relink", () => {
   });
 
   it("stores the API's exact error when the pinned version has passed its sunset", async () => {
+    await linkSpring();
+    ucomp.active = 3;
     ucomp.v2Sunset = true;
     const result = await actions.sendToCustomers({ offerId: "offer_spring_travel", customerIds: ["cust_01", "cust_02"] });
     if (!result.ok) throw new Error(result.reason);
@@ -398,6 +423,9 @@ describe("upgrade, sunset and relink", () => {
   });
 
   it("relinks to v3: the flow asks for annual_fee, an unmapped save blocks Send, and mapping it sends", async () => {
+    await linkSpring();
+    ucomp.active = 3;
+    ucomp.v2Sunset = true;
     const flow = await queries.getSimLinkFlow("offer_spring_travel", TPL);
     expect(flow?.apiError).toBeNull();
     expect(flow?.candidate).toMatchObject({ version: 3, diff: { newRequired: ["annual_fee"] }, mapping: { ...V2_MAPPING } });
@@ -426,6 +454,7 @@ describe("upgrade, sunset and relink", () => {
 
   it("carries a mapping across a renamed variable when relinking", async () => {
     // A second offer pinned to v2 and mapped by v2's keys; v3 sends `home_state` as `state`, one key_renamed change.
+    ucomp.active = 3;
     await simDb.insert(simLinks).values({
       id: "lnk_rename",
       offerId: "offer_cash_back",
@@ -459,6 +488,7 @@ describe("upgrade, sunset and relink", () => {
 
 describe("notices", () => {
   it("lists Coral's notices with read state and linked offers, and marks them read", async () => {
+    await linkSpring();
     noticeCalls.length = 0;
     const before = await queries.getSimHome();
     // Every page, followed by nextCursor until hasMore is false; shown newest first.
@@ -481,6 +511,8 @@ describe("notices", () => {
 
 describe("notices: a sunset that passed", () => {
   it("shows the sunset_passed notice as Stencil sent it, unread, linked to the offer on that template", async () => {
+    await linkSpring();
+    expect(await actions.markNoticesRead({ noticeIds: ["ntc_2"] })).toEqual({ ok: true }); // read in the list above
     NOTICES.push(SUNSET_PASSED);
     try {
       const home = await queries.getSimHome();
@@ -516,6 +548,20 @@ describe("alerts: push and SMS to the customers' phones", () => {
     return result.batch;
   };
 
+  /** Coral links the alert on Push and SMS. */
+  const linkAlert = async () => {
+    expect(
+      await actions.linkTemplate({
+        offerId: "alert_card_abroad",
+        templateId: ALERT,
+        version: 1,
+        channels: ["sms", "push"],
+        mapping: { first_name: "customer.firstName", card_last4: "card.last4" },
+      }),
+    ).toEqual({ ok: true });
+    vi.mocked(refresh).mockClear();
+  };
+
   it("links an alert on Push and SMS only", async () => {
     const base = { offerId: "alert_card_abroad", templateId: ALERT, version: 1, mapping: { first_name: "customer.firstName", card_last4: "card.last4" } } as const;
     expect(await actions.linkTemplate({ ...base, channels: ["pdf"] })).toEqual({ ok: false, reason: "Coral sends alerts as Push and SMS." });
@@ -529,6 +575,7 @@ describe("alerts: push and SMS to the customers' phones", () => {
   });
 
   it("asks for each customer's push on their platform, and keeps what Stencil said: the platform, the encoding and the parts", async () => {
+    await linkAlert();
     const batch = await sendAlert(["cust_01", "cust_02"]);
     expect(batch).toMatchObject({ channels: ["push", "sms"], counts: { delivered: 4, failed: 0 } });
     const pushes = ucomp.renders.filter((r) => r.body.channel === "push").map((r) => [r.body.values, r.body.platform]);
@@ -559,6 +606,8 @@ describe("alerts: push and SMS to the customers' phones", () => {
   });
 
   it("shows a customer's texts as one thread, oldest first, up to the one viewed", async () => {
+    await linkAlert();
+    await sendAlert(["cust_01", "cust_02"]);
     const first = await queries.getSimOfferPage("alert_card_abroad");
     const second = await sendAlert(["cust_01"]);
     const smsOf = (b: typeof second) => b.rows.find((r) => r.customerId === "cust_01")!.results.find((r) => r.channel === "sms")!.deliveryId;
@@ -604,6 +653,7 @@ describe("alerts: push and SMS to the customers' phones", () => {
   });
 
   it("stores a refused push or text with the API's error, as any failed render", async () => {
+    await linkAlert();
     const batch = await sendAlert(["cust_10"]);
     expect(batch.counts).toEqual({ delivered: 0, failed: 2 });
     expect(batch.rows[0].results.map((r) => [r.channel, r.platform, r.error])).toEqual([
@@ -614,6 +664,7 @@ describe("alerts: push and SMS to the customers' phones", () => {
   });
 
   it("lists the alert apart from the offers", async () => {
+    await linkAlert();
     const home = await queries.getSimHome();
     expect(home.offers.filter((o) => o.kind === "alert").map((o) => [o.id, o.link?.channels])).toEqual([["alert_card_abroad", ["push", "sms"]]]);
   });

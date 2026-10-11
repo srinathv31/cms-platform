@@ -20,6 +20,12 @@ let container: HTMLElement;
 const openText = () => container.querySelector('[data-testid="open"]')?.textContent;
 const sidebarCookie = () => document.cookie.split("; ").find((c) => c.startsWith("sidebar_state="));
 
+// Dated in the past: with `max-age=0` the cookie expires at this very millisecond, and a test that runs
+// straight after the one that set it can still read it.
+const clearCookie = () => {
+  document.cookie = "sidebar_state=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+};
+
 function press(target: EventTarget, init: KeyboardEventInit) {
   const event = new KeyboardEvent("keydown", { key: "b", bubbles: true, cancelable: true, ...init });
   act(() => {
@@ -29,7 +35,7 @@ function press(target: EventTarget, init: KeyboardEventInit) {
 }
 
 beforeEach(() => {
-  document.cookie = "sidebar_state=; path=/; max-age=0";
+  clearCookie();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -45,7 +51,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  document.cookie = "sidebar_state=; path=/; max-age=0";
+  clearCookie();
 });
 
 describe("SidebarProvider keyboard", () => {

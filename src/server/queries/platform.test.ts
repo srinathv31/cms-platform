@@ -1,11 +1,7 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
 import type { Db } from "@/server/db/client";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { setChannelRule } from "@/server/actions/platform";
 import { getChannelRulesSection, getContentTypesSection, getTeamsSection } from "./platform";
@@ -13,13 +9,11 @@ import { getChannelRulesSection, getContentTypesSection, getTeamsSection } from 
 // The Platform read models against a temporary database filled by the real seed: what a screen may do
 // comes decided, so the screens never work a rule out themselves.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-platform-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-platform-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -28,18 +22,12 @@ vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
+
+seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
+  ({ db } = await import("@/server/db/client"));
   vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, "riley"));
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 describe("platform read models", () => {

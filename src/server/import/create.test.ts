@@ -1,11 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Client } from "@libsql/client";
 import { eq } from "drizzle-orm";
 import JSZip from "jszip";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { IMPORT_LIMITS, IMPORT_REFUSALS, type ImportResponse } from "@/domain/import-types";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
@@ -14,41 +12,40 @@ import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { getImportOriginalFile, getImportOriginalRef, getImportOriginalView } from "@/server/queries/import";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { importStatus, importTemplate } from "./create";
 
 // importTemplate and the import queries end to end against a temporary database filled by the real
 // seed, with uploads written to a temporary folder. Only the database handle and the clock are swapped.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-import-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-import-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
 const { auditEvents, contentTypes, templates, uploads, versions } = schema;
 
 let db: Db;
-let libsql: Client;
 let root: string;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: env.now });
-  for (const id of ["maya", "taylor", "morgan", "sam"]) people[id] = await loadPersona(db, id);
-  root = mkdtempSync(join(tmpdir(), "ucomp-uploads-"));
-}, 60_000);
+seededDatabasePerTest({ base: env.now });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "taylor", "morgan", "sam"]) people[id] = await loadPersona(db, id);
+});
+
+// Each test's uploads go to a folder of its own, like its database.
+beforeEach(() => {
+  env.now = new Date("2026-10-04T12:00:00.000Z");
+  root = mkdtempSync(join(tmpdir(), "ucomp-uploads-"));
+});
+
+afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -208,19 +205,23 @@ describe("importTemplate", () => {
 });
 
 describe("import queries", () => {
-  let docx: string;
-  let pdf: string;
-  let txt: string;
   const uploadOf = async (templateId: string) => (await getImportOriginalRef(templateId))!.uploadId;
-
-  beforeAll(async () => {
+  // Maya imports a file an hour after the seed; each test imports the files it reads.
+  const importDocx = async () => {
     env.now = new Date("2026-10-04T13:00:00.000Z");
-    docx = ok(await run("maya", { name: "Spring offer.docx", bytes: fixture("spring-offer.docx") })).templateId;
-    pdf = ok(await run("maya", { name: "rate-change-notice.pdf", bytes: fixture("rate-change-notice.pdf") })).templateId;
-    txt = ok(await run("maya", { name: "notes.txt", bytes: fixture("spring_offer_notes.txt") })).templateId;
-  });
+    return ok(await run("maya", { name: "Spring offer.docx", bytes: fixture("spring-offer.docx") })).templateId;
+  };
+  const importPdf = async () => {
+    env.now = new Date("2026-10-04T13:00:00.000Z");
+    return ok(await run("maya", { name: "rate-change-notice.pdf", bytes: fixture("rate-change-notice.pdf") })).templateId;
+  };
+  const importTxt = async () => {
+    env.now = new Date("2026-10-04T13:00:00.000Z");
+    return ok(await run("maya", { name: "notes.txt", bytes: fixture("spring_offer_notes.txt") })).templateId;
+  };
 
   it("getImportOriginalRef: the cheap ref for the workspace, null for a template that wasn't imported", async () => {
+    const docx = await importDocx();
     expect(await getImportOriginalRef(docx)).toEqual({
       uploadId: expect.stringMatching(/^up_/),
       filename: "Spring offer.docx",
@@ -235,6 +236,7 @@ describe("import queries", () => {
 
   it("getImportOriginalView: the source for each kind, the report and its lines", async () => {
     const maya = people.maya!;
+    const [docx, pdf, txt] = [await importDocx(), await importPdf(), await importTxt()];
     const d = await getImportOriginalView(maya, await uploadOf(docx), root);
     expect(d?.source.kind).toBe("docx");
     expect(d?.source.kind === "docx" && d.source.html.startsWith("<h1>Spring Balance Transfer Offer</h1>")).toBe(true);
@@ -249,13 +251,14 @@ describe("import queries", () => {
   });
 
   it("getImportOriginalFile: the bytes as uploaded", async () => {
+    const pdf = await importPdf();
     const file = await getImportOriginalFile(people.maya!, await uploadOf(pdf), root);
     expect(file?.ref.kind).toBe("pdf");
     expect(Buffer.from(file!.bytes).equals(Buffer.from(fixture("rate-change-notice.pdf")))).toBe(true);
   });
 
   it("nothing for a viewer who can't see the team, an unknown id, or a malformed one", async () => {
-    const id = await uploadOf(docx);
+    const id = await uploadOf(await importDocx());
     expect(await getImportOriginalView(people.morgan!, id, root)).toBeNull();
     expect(await getImportOriginalFile(people.morgan!, id, root)).toBeNull();
     expect(await getImportOriginalView(people.taylor!, id, root)).not.toBeNull(); // the auditor sees every team
@@ -264,7 +267,7 @@ describe("import queries", () => {
   });
 
   it("an upload whose files are gone reads as missing, not as an error", async () => {
-    const id = await uploadOf(txt);
+    const id = await uploadOf(await importTxt());
     rmSync(join(root, id), { recursive: true });
     expect(existsSync(join(root, id))).toBe(false);
     expect(await getImportOriginalView(people.maya!, id, root)).toBeNull();

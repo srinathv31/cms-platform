@@ -16,20 +16,18 @@ import { seedPeople } from "@/server/seed/people";
 import { seedPlatform } from "@/server/seed/platform";
 import { seedTeams } from "@/server/seed/teams";
 import { buildStarter } from "@/server/starters";
-import { draftRev, loadPersona } from "@/server/testing/review-fixtures";
+import { draftRev, loadPersona, freshDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 
 // Migration 0008 (review rounds) on a database as it stood before it: migrated through 0007, with
 // versions numbered the old way, where every submission took the next number and a send-back kept its
 // number as a record. Then 0008 runs the way `npm run db:migrate` runs it, and the app submits on top.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-rounds-migration-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-rounds-migration-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -151,10 +149,11 @@ const rowsOf = (templateId: string) =>
     .where(eq(versions.templateId, templateId))
     .orderBy(asc(versions.createdAt));
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
+// The database every test starts from: migrated to 0007, filled the old way, then migrated on to now.
+freshDatabasePerTest(async (built) => {
+  libsql = built.$client;
   before = migrationsThrough0007();
-  await migrate(db, { migrationsFolder: before });
+  await migrate(built, { migrationsFolder: before });
 
   // The people, teams and chain, from the seed (none of these tables changed in 0008; later migrations add
   // columns to teams and content types, which these rows go in without).
@@ -181,13 +180,15 @@ beforeAll(async () => {
     { number: 2, state: "active" },
   ]);
 
-  await migrate(db, { migrationsFolder: MIGRATIONS });
+  await migrate(built, { migrationsFolder: MIGRATIONS });
+}, { migrate: false });
+
+beforeAll(async () => {
+  ({ db, libsql } = await import("@/server/db/client"));
   maya = await loadPersona(db, "maya");
-}, 60_000);
+});
 
 afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
   if (before) rmSync(before, { recursive: true, force: true });
 });
 

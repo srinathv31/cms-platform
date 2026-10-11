@@ -368,6 +368,7 @@ submit, and a footer that changed between the two versions struck and inserted (
   side of the on-demand template reads (see [Server and client](#server-and-client)).
 - [src/lib/serialized-writes.ts](../lib/serialized-writes.ts): not UI. A per-process write lock for the local
   SQLite file, used by `src/server/db/client.ts` and `src/simulator/db.ts`. It imports `node:fs`: server only.
+- [src/lib/fresh-database.ts](../lib/fresh-database.ts): not UI, and only test files import it. A database for every test: copies a seeded SQLite file for each one. How to use it: [src/server/README.md](../server/README.md#testing).
 - [src/styles/tokens.css](../styles/tokens.css) (imported by `globals.css`) and [src/styles/fonts.ts](../styles/fonts.ts)
   (`next/font`; `fontVariables` goes on `<html>` in the root layout). Rebranding means editing these two files.
 

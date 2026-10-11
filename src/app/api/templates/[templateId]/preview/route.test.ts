@@ -1,20 +1,16 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { NextRequest } from "next/server";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_BODY_BYTES, type EmailResponseBody, type RenderErrorBody } from "@/domain/render/types";
 import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { contentTypes, renderLog, templates, versions } from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { POST } from "./route";
 
 // Stencil's own preview route end to end: HTTP in, the session's person, the real pipeline and adapters
-// against a temporary database filled by the real seed, HTTP out. Only the database handle, the demo
+// against a temporary database filled by the real seed (a copy of its own for every test), HTTP out. Only the database handle, the demo
 // clock and the persona (`getViewer`) are swapped. The same engine answers the consumer API, which
 // serves consumers only (../../../v1/templates/[templateId]/render/route.test.ts).
 //
@@ -22,35 +18,25 @@ import { POST } from "./route";
 // team. Annual Fee Waiver (Coral Offers) has an open draft; Cash Back has v1 Superseded, v2 Active, v3
 // In review; Balance Transfer has v2 Active.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-preview-route-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-preview-route-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
+const ids = seededDatabasePerTest({ base: env.now });
 const people: Record<string, Viewer> = {};
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: env.now })).templates;
-  for (const id of ["maya", "eli", "morgan"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  for (const id of ["maya", "eli", "morgan"]) people[id] = await loadPersona(db, id);
   vi.mocked(getViewer).mockReset().mockResolvedValue(people.maya!);
 });
 
@@ -230,7 +216,7 @@ describe("POST …/preview: push and SMS", () => {
   const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
   const VALUES = { first_name: "Maya", amount_due: "35.00" };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // An alert with an Active version and an open draft, made from a seeded version's row: the seed has no alert yet.
     const [base] = await db.select().from(versions).where(and(eq(versions.templateId, ids["balance-transfer"]!), eq(versions.number, 2)));
     await db.insert(templates).values({ id: ALERT_ID, teamId: "coral-offers", contentTypeId: "ct_alert", createdBy: "maya", createdAt: env.now, starterKey: null });

@@ -1,40 +1,23 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { NextRequest } from "next/server";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ApiErrorBody, ApiTemplateSearch } from "@/domain/golive-types";
-import { seedDatabase } from "@/server/seed";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { GET } from "./route";
 
 // GET /api/v1/templates end to end: HTTP in, the real query against a temporary seeded database, HTTP
 // out. Only the database handle and the demo clock are swapped. Search semantics are covered in
 // src/server/queries/consumer-api.test.ts; this file covers the HTTP contract and every error row.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-search-route-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-search-route-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
-let libsql: Client;
-let ids: Record<string, string>;
+const ids = seededDatabasePerTest({ base: env.now });
 
-beforeAll(async () => {
-  const client = await import("@/server/db/client");
-  libsql = client.libsql;
-  await migrate(client.db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(client.db, { base: env.now })).templates;
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
-});
 
 const CORAL = { "X-Consumer-Id": "coral" };
 

@@ -1,16 +1,12 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq, isNull } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh, revalidatePath } from "next/cache";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_REFUSALS } from "@/domain/access/refusals";
 import { REASONS } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import {
   changeMemberRoles,
@@ -29,13 +25,11 @@ import {
 // Coral Offers' only Team Admin; Chris has a pending Author request on Coral; the Coral review is open
 // and covers Dana, Devon, Jordan, Maya, Priya and Sam; Devon is flagged (95 days without a sign-in).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-access-actions-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-access-actions-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -47,17 +41,11 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 
 let db: Db;
-let libsql: Client;
+
+seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 // Every step happens a minute after the last, as a persona read fresh from the database.
@@ -90,17 +78,55 @@ const requestCount = async () => (await db.select().from(accessRequests)).length
 const coralRecert = async () =>
   (await db.query.recertifications.findFirst({ where: eq(recertifications.teamId, "coral-offers") }))!;
 
+/** Morgan has asked for Author on Coral Offers, and the request waits for Alex. Returns its id. */
+async function morganAsks() {
+  await as("morgan");
+  const result = await requestAccess({ teamId: "coral-offers", role: "author", reason: "  Drafting the spring offers.  " });
+  if (!result.ok) throw new Error(`Morgan's request was refused: ${result.code}`);
+  vi.mocked(refresh).mockClear();
+  vi.mocked(revalidatePath).mockClear();
+  return result.requestId;
+}
+
+/** Alex has approved Morgan's request: Morgan is an Author on Coral Offers. Returns the request's id. */
+async function morganJoins() {
+  const requestId = await morganAsks();
+  await as("alex");
+  expect(await decideAccessRequest({ requestId, decision: "approve" })).toEqual({ ok: true });
+  return requestId;
+}
+
+/** Alex has kept Dana, Devon, Jordan and Maya and removed Priya; only Sam is left to decide. */
+async function reviewAllButSam() {
+  const recert = await coralRecert();
+  for (const userId of ["dana", "devon", "jordan", "maya"]) {
+    await as("alex");
+    expect(await decideRecertItem({ recertId: recert.id, userId, decision: "keep" })).toEqual({ ok: true });
+  }
+  await as("alex");
+  expect(await decideRecertItem({ recertId: recert.id, userId: "priya", decision: "remove" })).toEqual({ ok: true });
+  return recert;
+}
+
+/** Alex has decided everyone: the review is closed. */
+async function closeReview() {
+  const recert = await reviewAllButSam();
+  await as("alex");
+  expect(await decideRecertItem({ recertId: recert.id, userId: "sam", decision: "keep" })).toEqual({ ok: true });
+  vi.mocked(refresh).mockClear();
+  vi.mocked(revalidatePath).mockClear();
+  return recert;
+}
+
 // ── Requesting and deciding access (scenario 8) ──────────────
 
 describe("requesting and deciding access", () => {
-  let morganRequest: string;
-
   it("Morgan asks for Author on Coral Offers; Alex (the Team Admin) is told", async () => {
     const at = await as("morgan");
     const result = await requestAccess({ teamId: "coral-offers", role: "author", reason: "  Drafting the spring offers.  " });
     expect(result).toEqual({ ok: true, requestId: expect.stringMatching(/^ar_/) });
     if (!result.ok) return;
-    morganRequest = result.requestId;
+    const morganRequest = result.requestId;
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
     expect(refresh).toHaveBeenCalledTimes(1);
 
@@ -126,6 +152,7 @@ describe("requesting and deciding access", () => {
   });
 
   it("refuses a second pending request, an empty reason, Team Admin, a role already held and an unknown team", async () => {
+    await morganAsks();
     const before = await requestCount();
     await as("morgan");
     expect(await requestAccess({ teamId: "coral-offers", role: "viewer", reason: "Also this." })).toEqual({
@@ -154,6 +181,7 @@ describe("requesting and deciding access", () => {
   });
 
   it("refuses a decision from someone who isn't the team's Team Admin, and on your own request", async () => {
+    const morganRequest = await morganAsks();
     await as("jordan");
     expect(await decideAccessRequest({ requestId: morganRequest, decision: "approve" })).toEqual({
       ok: false,
@@ -198,6 +226,7 @@ describe("requesting and deciding access", () => {
   });
 
   it("Alex approves Morgan: a membership with the role, and Morgan is told", async () => {
+    const morganRequest = await morganAsks();
     const at = await as("alex");
     expect(await decideAccessRequest({ requestId: morganRequest, decision: "approve" })).toEqual({ ok: true });
     expect(await membershipOf("morgan")).toMatchObject({
@@ -289,6 +318,7 @@ describe("members", () => {
   });
 
   it("changes a member's roles, and the member is told", async () => {
+    await morganJoins();
     const at = await as("alex");
     expect(await changeMemberRoles({ membershipId: await membershipId("morgan"), roles: ["approver", "author"] })).toEqual({
       ok: true,
@@ -323,7 +353,7 @@ describe("members", () => {
       ...ACCESS_REFUSALS.lastAdmin("Coral Offers"),
     });
 
-    // Put the seed back: Alex is the only Team Admin again.
+    // Back to one Team Admin: Alex.
     await as("jordan");
     expect(
       await changeMemberRoles({ membershipId: await membershipId("alex"), roles: ["approver", "team_admin"] }),
@@ -334,6 +364,7 @@ describe("members", () => {
   });
 
   it("removes a member: the membership is gone, and they're told", async () => {
+    await morganJoins();
     const at = await as("alex");
     expect(await removeMember({ membershipId: await membershipId("morgan") })).toEqual({ ok: true });
     expect(await membershipOf("morgan")).toBeNull();
@@ -454,7 +485,7 @@ describe("recertification", () => {
   });
 
   it("the last decision closes the review early; then nothing more can be decided", async () => {
-    const recert = await coralRecert();
+    const recert = await reviewAllButSam();
     const at = await as("alex");
     expect(await decideRecertItem({ recertId: recert.id, userId: "sam", decision: "keep" })).toEqual({ ok: true });
     expect((await coralRecert()).completedAt).toEqual(at);
@@ -468,6 +499,7 @@ describe("recertification", () => {
   });
 
   it("starts a new review over the current members, due in 30 days; only one at a time", async () => {
+    await closeReview();
     const at = await as("alex");
     const result = await startRecertification({ teamId: "coral-offers" });
     expect(result).toEqual({ ok: true, recertId: expect.stringMatching(/^rc_/) });
@@ -493,6 +525,9 @@ describe("recertification", () => {
   });
 
   it("runs the sweep first: a past-due review is closed, with its lapses, before a new one starts", async () => {
+    await closeReview();
+    await as("alex");
+    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({ ok: true, recertId: expect.stringMatching(/^rc_/) });
     const open = await db.query.recertifications.findFirst({
       where: and(eq(recertifications.teamId, "coral-offers"), isNull(recertifications.completedAt)),
     });

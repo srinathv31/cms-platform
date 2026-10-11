@@ -1,50 +1,31 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import type { NextRequest } from "next/server";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_BODY_BYTES, MAX_VALUE_LENGTH, type Base64ResponseBody, type EmailResponseBody, type RenderErrorBody } from "@/domain/render/types";
 import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { contentTypes, renderLog, versions } from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { POST } from "./route";
 
 // The route end to end: HTTP in, the real pipeline and adapters, a temporary database filled by the
 // real seed, HTTP out. Only the database handle, the demo clock and the persona are swapped.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
-  const { mkdtempSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const { createClient } = await import("@libsql/client");
-  const { drizzle } = await import("drizzle-orm/libsql");
-  const schema = await import("@/server/db/schema/ucomp");
-  env.dir = mkdtempSync(join(tmpdir(), "ucomp-render-route-"));
-  const url = `file:${join(env.dir, "route.db")}`;
-  const libsql = createClient({ url });
-  return { DATABASE_URL: url, libsql, db: drizzle(libsql, { schema }) };
+  const { tempDatabase } = await import("@/server/testing/review-fixtures");
+  return tempDatabase("ucomp-render-route-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
+const ids = seededDatabasePerTest({ base: env.now });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: env.now })).templates;
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 const persona = (userId: string, teamIds: string[]): Viewer => ({
@@ -470,7 +451,7 @@ describe("POST …/render: push and SMS", () => {
   const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
   const VALUES = { first_name: "Maya", amount_due: "35.00" };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // An Active Alert version, made from a seeded version's row: the seed has no alert yet.
     const [base] = await db.select().from(versions).where(and(eq(versions.templateId, ids["balance-transfer"]!), eq(versions.number, 2)));
     const { templates: templatesTable } = await import("@/server/db/schema/ucomp");
@@ -651,6 +632,16 @@ describe("POST …/render: push and SMS", () => {
   });
 
   it("an SMS over 10 parts is 422, never cut", async () => {
+    // The version's SMS is the first name alone, so the value sets its length.
+    await db
+      .update(versions)
+      .set({
+        channelFields: {
+          push: { title: field(chip("first_name")), body: field(chip("first_name"), chip("first_name"), chip("first_name"), chip("first_name")) },
+          sms: { text: field(chip("first_name")) },
+        },
+      })
+      .where(eq(versions.id, "v_alert_1"));
     const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "é".repeat(699) + "😀" } });
     await expectError(res, 422, "sms_too_long", "The SMS is 12 parts in UCS-2. It can be at most 10 parts.");
   });

@@ -1,23 +1,18 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getLibraryRows } from "./library";
 
 // The Library's read model against a temporary database filled by the real seed: each row says which kind of
 // template it is, a Document or an Alert, from the template's content type.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-library-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-library-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
@@ -25,18 +20,11 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 const ALERTS = ["payment-due-reminder", "card-used-abroad", "rate-change-heads-up"];
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
+
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 describe("Library rows: the template's kind", () => {

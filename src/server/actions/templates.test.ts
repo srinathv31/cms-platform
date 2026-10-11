@@ -1,10 +1,6 @@
-import { rmSync } from "node:fs";
-import { join } from "node:path";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { redirect } from "next/navigation";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
@@ -12,9 +8,8 @@ import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { createAppClient } from "@/lib/serialized-writes";
-import { seedDatabase } from "@/server/seed";
 import type { StarterChoice } from "@/server/starters";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { createTemplate } from "./create-template";
 import { startDraft } from "./templates";
@@ -23,13 +18,11 @@ import { startDraft } from "./templates";
 // its allowed channels. Against a temporary database filled by the real seed; only the database, the
 // clock, the persona and Next's request APIs are swapped.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-template-actions-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-template-actions-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -41,22 +34,14 @@ const { contentTypes, templates, versions } = schema;
 const CT = "ct_disclosure";
 
 let db: Db;
-let libsql: Client;
 let maya: Viewer;
-let ids: Record<string, string>;
+const ids = seededDatabasePerTest({ base: env.now });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: env.now })).templates;
+  ({ db } = await import("@/server/db/client"));
   maya = await loadPersona(db, "maya");
   vi.mocked(getViewer).mockResolvedValue(maya);
 }, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
-});
 
 /** Creates a template and returns its first draft (the id comes from the redirect). */
 async function create(starterKey: "card_offer_terms" | "rate_change_notice") {
@@ -186,7 +171,7 @@ describe("startDraft while another write holds the file", () => {
 
     // A write on the simulator's client (its own pool on the same file, as `src/simulator/db.ts` opens
     // it), holding the file across an await as a real action's transaction does.
-    const sim = createAppClient({ url: `file:${join(env.dir, "test.db")}` });
+    const sim = createAppClient({ url: (await import("@/server/db/client")).DATABASE_URL });
     let holding!: () => void;
     const held = new Promise<void>((resolve) => (holding = resolve));
     const other = (async () => {

@@ -1,9 +1,6 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
-import { and, eq, inArray } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
+import { and, eq } from "drizzle-orm";
 import { refresh } from "next/cache";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMMENT_REFUSALS } from "@/domain/comments";
 import { editLatest } from "@/domain/lifecycle/drafts";
 import { REASONS } from "@/domain/permissions";
@@ -11,9 +8,8 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
 import { draftRow } from "@/server/templates/create";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { findRound } from "@/server/queries/find-round";
 import { getViewer } from "@/server/viewer";
 import { addComment, reopenThread, reply, resolveThread } from "./comments";
@@ -21,13 +17,11 @@ import { addComment, reopenThread, reply, resolveThread } from "./comments";
 // The comment actions against a temporary database filled by the real seed. Cash Back v3 is in
 // review (submitted by Maya); Annual Fee Waiver has an open draft.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-comments-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-comments-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -37,20 +31,12 @@ const { approvalStages, auditEvents, commentThreads, comments, notifications, ve
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
+  ({ db } = await import("@/server/db/client"));
   for (const id of ["maya", "jordan", "alex", "sam", "eli", "naomi"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 let minute = 0;
@@ -83,9 +69,23 @@ async function versionOf(template: string, number: number | null) {
 const blockAt = (body: { content?: { attrs?: Record<string, unknown> }[] }, n: number) =>
   String(body.content?.[n]?.attrs?.id);
 
-describe("addComment", () => {
-  let threadId: string;
+/** Jordan has commented on a block of Cash Back v3 (round 2): an open thread to reply to, resolve and reopen. */
+async function threadOnCashBack() {
+  const v3 = await versionOf("cash-back", 3);
+  as("jordan");
+  const result = await addComment({
+    templateId: ids["cash-back"]!,
+    versionId: v3.id,
+    blockId: blockAt(v3.body, 1),
+    quote: "  spend $1,000  ",
+    body: "  Is the $1,000 threshold still right?  ",
+  });
+  if (!result.ok) throw new Error(`could not start the thread: ${result.code}`);
+  vi.mocked(refresh).mockClear();
+  return result.threadId;
+}
 
+describe("addComment", () => {
   it("Jordan comments on a block of Cash Back v3 (round 2); Maya, its author, is notified", async () => {
     const v3 = await versionOf("cash-back", 3);
     const blockId = blockAt(v3.body, 1);
@@ -99,7 +99,7 @@ describe("addComment", () => {
     });
     expect(result).toEqual({ ok: true, threadId: expect.stringMatching(/^th_/) });
     if (!result.ok) return;
-    threadId = result.threadId;
+    const threadId = result.threadId;
     expect(refresh).toHaveBeenCalledTimes(1);
 
     expect(await threadRow(threadId)).toMatchObject({
@@ -131,6 +131,7 @@ describe("addComment", () => {
   });
 
   it("Maya replies; Jordan is notified and Maya isn't", async () => {
+    const threadId = await threadOnCashBack();
     const at = as("maya");
     expect(await reply({ threadId, body: "Yes, confirmed with Product." })).toEqual({ ok: true });
     expect(await db.select().from(comments).where(eq(comments.threadId, threadId))).toHaveLength(2);
@@ -143,6 +144,7 @@ describe("addComment", () => {
   });
 
   it("Maya resolves the thread; a second resolve writes nothing; reopening clears who resolved it", async () => {
+    const threadId = await threadOnCashBack();
     const at = as("maya");
     expect(await resolveThread({ threadId })).toEqual({ ok: true });
     expect(await threadRow(threadId)).toMatchObject({ status: "resolved", resolvedBy: "maya", resolvedAt: at });
@@ -207,7 +209,7 @@ describe("addComment", () => {
   });
 });
 
-/** An open draft of the template, made from its Active version as Edit makes it. Returns a way to remove it. */
+/** An open draft of the template, made from its Active version as Edit makes it. */
 async function openDraftOf(template: string, createdBy: string, id: string) {
   if (await versionOf(template, null)) throw new Error(`${template} already has an open draft`);
   const live = (await db.query.versions.findFirst({
@@ -218,34 +220,23 @@ async function openDraftOf(template: string, createdBy: string, id: string) {
   return id;
 }
 
-/** Removes threads (with their comments) and a draft this file added. */
-async function remove(threadIds: string[], draftId?: string) {
-  await db.delete(comments).where(inArray(comments.threadId, threadIds));
-  await db.delete(commentThreads).where(inArray(commentThreads.id, threadIds));
-  if (draftId) await db.delete(versions).where(eq(versions.id, draftId));
-}
-
 describe("reply notifications outside the team", () => {
   it("a stage reviewer from another team who wrote in a decided version's thread gets its review screen in their own space", async () => {
     // Balance Transfer v2 is Active (no longer in review), and Maya has started its next draft, whose margin
     // shows v2's threads. Naomi (Deposits only) commented on v2 as a named stage reviewer.
-    const draftId = await openDraftOf("balance-transfer", "maya", "v_test_bt_draft");
+    await openDraftOf("balance-transfer", "maya", "v_test_bt_draft");
     const v2 = await versionOf("balance-transfer", 2);
     const threadId = "th_outside_reply";
     await db.insert(commentThreads).values({ id: threadId, templateId: ids["balance-transfer"]!, originVersionId: v2.id, blockId: DOCUMENT_THREAD, createdAt: BASE });
     await db.insert(comments).values({ id: "cm_outside_reply", threadId, authorId: "naomi", body: "Legal note.", createdAt: BASE });
 
-    try {
-      const at = as("maya");
-      expect(await reply({ threadId, body: "Thanks, fixed in the draft." })).toEqual({ ok: true });
-      const hrefs = Object.fromEntries((await notificationsAt(at)).map((n) => [n.userId, n.href]));
-      expect(hrefs.naomi).toBe(`/deposits/review/${ids["balance-transfer"]}/2`);
-      // Everyone on the team still goes to the template.
-      for (const [userId, href] of Object.entries(hrefs)) {
-        if (userId !== "naomi") expect(href).toBe(`/coral-offers/templates/${ids["balance-transfer"]}`);
-      }
-    } finally {
-      await remove([threadId], draftId);
+    const at = as("maya");
+    expect(await reply({ threadId, body: "Thanks, fixed in the draft." })).toEqual({ ok: true });
+    const hrefs = Object.fromEntries((await notificationsAt(at)).map((n) => [n.userId, n.href]));
+    expect(hrefs.naomi).toBe(`/deposits/review/${ids["balance-transfer"]}/2`);
+    // Everyone on the team still goes to the template.
+    for (const [userId, href] of Object.entries(hrefs)) {
+      if (userId !== "naomi") expect(href).toBe(`/coral-offers/templates/${ids["balance-transfer"]}`);
     }
   });
 });
@@ -299,32 +290,24 @@ describe("which versions take comments", () => {
       { id: resolved, templateId: ids["balance-transfer"]!, originVersionId: v2.id, blockId: DOCUMENT_THREAD, status: "resolved", resolvedBy: "jordan", resolvedAt: BASE, createdAt: BASE },
     ]);
     await db.insert(comments).values({ id: "cm_test_record", threadId: open, authorId: "jordan", body: "Noted.", createdAt: BASE });
-    try {
-      const at = as("maya");
-      expect(await reply({ threadId: open, body: "x" })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
-      expect(await resolveThread({ threadId: open })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
-      expect(await reopenThread({ threadId: resolved })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
-      expect(await writtenAt(at)).toEqual(nothing);
-      expect(await threadRow(open)).toMatchObject({ status: "open" });
-      expect(await threadRow(resolved)).toMatchObject({ status: "resolved", resolvedBy: "jordan" });
-      expect(await db.select().from(comments).where(eq(comments.threadId, open))).toHaveLength(1);
-    } finally {
-      await remove([open, resolved]);
-    }
+    const at = as("maya");
+    expect(await reply({ threadId: open, body: "x" })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+    expect(await resolveThread({ threadId: open })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+    expect(await reopenThread({ threadId: resolved })).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+    expect(await writtenAt(at)).toEqual(nothing);
+    expect(await threadRow(open)).toMatchObject({ status: "open" });
+    expect(await threadRow(resolved)).toMatchObject({ status: "resolved", resolvedBy: "jordan" });
+    expect(await db.select().from(comments).where(eq(comments.threadId, open))).toHaveLength(1);
   });
 
   it("refuses a comment once the version has been decided, though it was in review when the page loaded", async () => {
     const v3 = await versionOf("cash-back", 3);
     await db.update(versions).set({ state: "changes_requested" }).where(eq(versions.id, v3.id));
-    try {
-      const at = as("jordan");
-      expect(
-        await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "Late." }),
-      ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
-      expect(await writtenAt(at)).toEqual(nothing);
-    } finally {
-      await db.update(versions).set({ state: "in_review" }).where(eq(versions.id, v3.id));
-    }
+    const at = as("jordan");
+    expect(
+      await addComment({ templateId: ids["cash-back"]!, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "Late." }),
+    ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
+    expect(await writtenAt(at)).toEqual(nothing);
   });
 });
 
@@ -337,9 +320,8 @@ describe("a stage reviewer from another team", () => {
   const ON_DRAFT = "th_test_draft_only";
   const ON_V3 = "th_test_on_v3";
   const ON_V2 = "th_test_on_v2";
-  let v3Stages: { stages: typeof versions.$inferSelect.stages; currentStage: number } = { stages: null, currentStage: 0 };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     await db.insert(approvalStages).values({
       id: "stage_test_outside",
       contentTypeId: "ct_disclosure",
@@ -349,7 +331,6 @@ describe("a stage reviewer from another team", () => {
     });
     // As if v3 had been submitted under the two-stage chain and passed its first stage.
     const v3 = await versionOf("cash-back", 3);
-    v3Stages = { stages: v3.stages, currentStage: v3.currentStage };
     const twoStages = [...(v3.stages ?? []), { id: "stage_test_outside", name: "Legal reviewer" }];
     await db.update(versions).set({ stages: twoStages, currentStage: 1 }).where(eq(versions.id, v3.id));
     await openDraftOf("cash-back", "maya", DRAFT);
@@ -365,12 +346,6 @@ describe("a stage reviewer from another team", () => {
     await db.insert(comments).values(
       threads.map((t) => ({ id: `cm_${t.id}`, threadId: t.id, authorId: "maya", body: "A note.", createdAt: BASE })),
     );
-  });
-
-  afterAll(async () => {
-    await remove([ON_DRAFT, ON_V3, ON_V2], DRAFT);
-    await db.update(versions).set(v3Stages).where(eq(versions.id, (await versionOf("cash-back", 3)).id));
-    await db.delete(approvalStages).where(eq(approvalStages.id, "stage_test_outside"));
   });
 
   it("can't reply to, resolve or reopen a thread begun in the open draft, and nothing is written", async () => {

@@ -49,7 +49,7 @@ Convention only (no lint rule):
 | [render/](render/) | The render pipeline ([render-template.ts](render/render-template.ts)), the engine it runs ([engine.ts](render/engine.ts)), the document check, the render log, [channels/](render/channels/) (web, email, pdf, push, sms), the [golden files](render/golden/README.md), and shared test helpers in [testing/](render/testing/). |
 | [import/](import/) | File import: sniffing, converters, worker isolation, zip limits, capped body reads, upload storage. |
 | [api/http.ts](api/http.ts), [api/render-http.ts](api/render-http.ts), [api/reads.ts](api/reads.ts), [api/read-body.ts](api/read-body.ts) | Response helpers for the `/api/v1` route handlers; `readRenderRequest` and `renderSuccessResponse`, which the consumer render route and Stencil's preview route share; `ReadResult` and `readResponse` for the on-demand read routes; `readBodyCapped`, the byte-capped body reader the import, autosave and render routes share. |
-| [testing/review-fixtures.ts](testing/review-fixtures.ts) | `tempDatabase`, `loadPersona`, `createTemplateWithDraft` for tests. |
+| [testing/review-fixtures.ts](testing/review-fixtures.ts) | Test support: `tempDatabase`, `seededDatabasePerTest` (a database of its own for every test), `loadPersona`, `createTemplateWithDraft`. See [Testing](#testing). |
 
 ## Anatomy of a mutation
 
@@ -227,7 +227,7 @@ These stand in for things a production deployment would have. None is gated by e
 | Insert inside the caller's transaction | `insertNewTemplate()` in [templates/create.ts](templates/create.ts) | Shared by New template and Import. |
 | Add an `/api/v1` handler | `src/app/api/v1/templates/route.ts` with [api/http.ts](api/http.ts) | Headers first, `withDemoDate`, contract errors. |
 | Read a request body in a route handler | `readBodyCapped()` ([api/read-body.ts](api/read-body.ts)) as `src/app/api/imports/route.ts`, `src/app/api/drafts/[versionId]/route.ts` and the two render routes (through `readRenderRequest`) use it | Permission before the body. Never `request.text()` or `.json()`: they buffer a chunked body whole. |
-| Test an action end to end | [actions/review.test.ts](actions/review.test.ts) | Temp database, real seed, mocked clock and viewer. |
+| Test an action end to end | [actions/review.test.ts](actions/review.test.ts) | `seededDatabasePerTest()`: a copy of the seeded database for every test, mocked clock and viewer. Build the state a test needs in the test, with a small helper. |
 
 ## Don't copy
 
@@ -241,24 +241,33 @@ These stand in for things a production deployment would have. None is gated by e
 
 Tests sit beside the code as `*.test.ts`. Run them with `npx vitest run src/server`; the whole layer takes a few seconds and never touches `data/ucomp.db`. The environment is `node`; the web and email channel tests opt into happy-dom with a `// @vitest-environment happy-dom` comment. [vitest.config.mts](../../vitest.config.mts) aliases `server-only` to `scripts/empty.ts`, so tests import server modules directly.
 
-Two ways to get a database:
-- **Code that imports `db`** (actions, queries, import): mock the client module with a temp file, then migrate and seed it. Also mock the clock, the viewer, and `next/cache` (`refresh()` works only inside a real server action). From [actions/review.test.ts](actions/review.test.ts):
+Tests run in a random order: [vitest.config.mts](../../vitest.config.mts) shuffles the tests inside each file, and a failing run prints its seed and the command that replays it (`npx vitest run --sequence.seed=<seed>`). A test that needs another to run first fails at once, and so does one run alone with `-t`.
+
+**A database per test.** A test that touches the database gets a database of its own. The file's database is migrated and seeded once, and every test (and every `beforeEach`) starts from a fresh copy of it, so no test sees another's writes and none needs to clean up. A test that needs more than the seed builds it itself, with a small helper (`submitted()`, `sentBack()`, `approved()`: each calls the one before it), never by relying on what an earlier test left. Don't write a file as a story where each test builds on the last.
+
+Two ways to get one:
+- **Code that imports `db`** (actions, queries, import): mock the client module with `tempDatabase()`, and call `seededDatabasePerTest()` once at the top of the file. Also mock the clock, the viewer, and `next/cache` (`refresh()` works only inside a real server action). From [actions/review.test.ts](actions/review.test.ts):
 
   ```ts
   vi.mock("@/server/db/client", async () => {
     const { tempDatabase } = await import("@/server/testing/review-fixtures");
-    const temp = tempDatabase("ucomp-review-actions-");
-    env.dir = temp.dir;
-    return temp;
+    return tempDatabase("ucomp-review-actions-");
   });
   vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
   vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
   vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
-  // beforeAll: migrate(db, { migrationsFolder: "./src/server/db/migrations" }); seedDatabase(db, { base: BASE });
+
+  const ids = seededDatabasePerTest({ base: BASE }); // the seed's template ids by key
+  beforeAll(async () => {
+    ({ db } = await import("@/server/db/client")); // follows each test's copy: keep it in a variable
+    people.maya = await loadPersona(db, "maya"); // the seed is the same in every copy
+  });
   ```
 
-  `loadPersona(db, id)` builds a `Viewer` the way `getViewer()` does, and `createTemplateWithDraft()` adds a fresh template.
-- **Code that takes `db` as an argument** (`writeEffects`, `applyDraftPatch`, `runRender`, the seed): open a temp file and pass the handle, as [effects.test.ts](effects.test.ts) does. These tests use a raw `createClient`; `tempDatabase()` uses `createAppClient`, as the app does.
+  `loadPersona(db, id)` builds a `Viewer` the way `getViewer()` does, and `createTemplateWithDraft()` adds a fresh template. A file that needs rows beyond the seed in every test calls `freshDatabasePerTest(build)` with a `build(db)` that adds them, as [sunset-sweep.test.ts](sunset-sweep.test.ts) does; `build` gets the build database itself, which only it should use. [db/review-rounds-migration.test.ts](db/review-rounds-migration.test.ts) builds a database as it stood before a migration (`{ migrate: false }`).
+- **Code that takes `db` as an argument** (`writeEffects`, `applyDraftPatch`, `runRender`): `const { db, ids } = standaloneDatabasePerTest({ base })` at the top of the file, as [effects.test.ts](effects.test.ts) does. The `db` it returns follows the test's copy.
+
+[src/lib/fresh-database.ts](../lib/fresh-database.ts) is the mechanism, for a database that isn't UCOMP's (the simulator's [actions.test.ts](../simulator/actions.test.ts) uses it on the `sim` schema without importing anything from `src/server`): the exported `db` and `libsql` are stand-ins that follow whichever copy the current test runs on, and each copy is a clone of the seeded file ([decision 0048](../../docs/decisions/0048-every-database-test-gets-its-own-database.md)). `tempDatabase()` opens files the way the app does (`createAppClient`).
 
 **Golden files.** [render/golden/](render/golden/README.md) freezes every channel's output for a set of documents, and checks that web, email, and PDF all show the `RenderDoc`'s content. A change that moves one byte of output fails `npm test` until someone regenerates the files with `npm run golden:update` and reads the diff. That README covers adding a case and reviewing a diff. [render/testing/](render/testing/) holds the shared fixture shape, small TipTap JSON builders, and `fresh-process.ts`, which renders in a new Node process for the determinism test.
 

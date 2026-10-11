@@ -52,6 +52,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0045](0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md) | Stencil supports desktop Chrome on work laptops, and its UI reflows down to 320 CSS px for zoom (WCAG 1.4.10), with named exceptions; below 800px the sidebar is a drawer; there is no separate mobile design | Accepted |
 | [0046](0046-phone-previews-are-approximations.md) | The phone previews are approximations of a customer's phone: the text is exact, the layout follows each platform's published conventions, and exact line breaks and type sizes on every device are not promised | Accepted |
 | [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md) | Stencil's preview is its own route, `POST /api/templates/{id}/preview`, which reads the session; `/api/v1` serves consumers only and never a draft or a version in review | Accepted |
+| [0048](0048-every-database-test-gets-its-own-database.md) | Every database-backed test gets its own database, copied from one seeded file; tests run in a random order; the mechanism is in `src/lib` so the simulator can use it | Accepted |
 | [0049](0049-the-demo-script-runs-only-in-the-demo-project.md) | The whole-demo script runs only in the opt-in `demo` project, and recording pacing lives in `e2e/media/`, not in the functional helpers | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:

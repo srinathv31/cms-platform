@@ -1,27 +1,63 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { and, eq, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
 import { createDraft } from "@/domain/lifecycle/drafts";
 import type { TeamRole, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { createAppClient } from "@/lib/serialized-writes";
+import { tempDatabase as tempDatabaseOn, freshDatabasePerTest as freshDatabasePerTestOn } from "@/lib/fresh-database";
 import { newId, newTemplateId } from "@/server/ids";
+import { seedDatabase } from "@/server/seed";
 import { buildStarter } from "@/server/starters";
 
-// Test support for the review server layer (actions and queries). Not a test file itself: the test
-// files stub `@/server/db/client` with `tempDatabase()` (inside their `vi.mock` factory), migrate and
-// seed it, and build personas from it the way `server/viewer.ts` does.
+// Test support for the server layer (actions, queries, sweeps). Not a test file itself.
+//
+// A test file stubs `@/server/db/client` with `tempDatabase()` (inside its `vi.mock` factory) and calls
+// `seededDatabasePerTest()` once at its top level. The database is migrated and seeded once per file, and
+// every test then runs on its own copy of that file: no test sees another's writes, tests run in any
+// order, and one test runs alone (`@/lib/fresh-database` is the mechanism). Personas are built from the
+// database the way `server/viewer.ts` does.
 
 /** A fresh libSQL file in the temp folder, shaped like `@/server/db/client`'s exports. */
 export function tempDatabase(prefix: string) {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  const url = `file:${join(dir, "test.db")}`;
-  // As the app opens it (writes take turns, other connections' locks are waited out).
-  const libsql = createAppClient({ url });
-  return { DATABASE_URL: url, libsql, db: drizzle(libsql, { schema }), dir };
+  return tempDatabaseOn(prefix, schema);
+}
+
+/**
+ * Gives every test its own database, built once per file, for the `@/server/db/client` mock. The database
+ * is migrated, then `build` fills it (`build` gets the build database itself, which only it should use;
+ * tests read through the `db` the mocked client exports). Pass `{ migrate: false }` when `build` migrates
+ * by itself.
+ */
+export function freshDatabasePerTest(build?: (db: Db) => Promise<void>, opts: { migrate?: boolean } = {}): void {
+  freshDatabasePerTestOn<Db>({ client: () => import("@/server/db/client"), build, migrate: opts.migrate });
+}
+
+/**
+ * For a test that hands `db` to the code under test (`writeEffects`, `runRender`, `applyDraftPatch`) instead
+ * of mocking `@/server/db/client`: the real seed built on `base`, one copy per test. Returns the live `db`
+ * and `libsql` (they follow the test's copy) and the seed's template ids by key.
+ */
+export function standaloneDatabasePerTest(opts: { base: Date }) {
+  const temp = tempDatabase("ucomp-test-");
+  const ids: Record<string, string> = {};
+  freshDatabasePerTestOn<Db>({
+    client: async () => temp,
+    build: async (db) => {
+      Object.assign(ids, (await seedDatabase(db, { base: opts.base })).templates);
+    },
+  });
+  return { db: temp.db as Db, libsql: temp.libsql, ids };
+}
+
+/**
+ * `freshDatabasePerTest()` with the real seed built on `base`. Returns the seed's template ids by key
+ * (`ids["balance-transfer"]`); the object is filled in before the first test runs.
+ */
+export function seededDatabasePerTest(opts: { base: Date }): Record<string, string> {
+  const templates: Record<string, string> = {};
+  freshDatabasePerTest(async (db) => {
+    Object.assign(templates, (await seedDatabase(db, { base: opts.base })).templates);
+  });
+  return templates;
 }
 
 /** The persona as `getViewer()` would build it from the database. */
