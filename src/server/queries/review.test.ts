@@ -5,6 +5,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
 import { COMMENT_REFUSALS } from "@/domain/comments";
+import { diffVariables } from "@/domain/contract";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
@@ -180,6 +181,7 @@ describe("getReviewScreen", () => {
     });
     expect(screen.baseline).toMatchObject({ number: 2, state: "active" });
     expect(screen.previousNumber, "approving v3 replaces the Active v2").toBe(2);
+    expect(screen.stillRenders, "only read with nothing Active").toBeNull();
     expect(screen.liveName).toBe("Cash Back Welcome Bonus — Terms");
     expect(screen.steps).toEqual([{ position: 0, name: "Team approver", status: "current" }]);
     expect(screen.can).toEqual({ approve: { ok: true }, requestChanges: { ok: true }, comment: { ok: true } });
@@ -383,6 +385,49 @@ describe("getReviewScreen", () => {
             smsFooter: null,
           });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
+          // N3: what consumers move from is the newest version that still renders, so the dialog names its consumers.
+          // Against v1, which also lacks the optional offer_end_date that v2 added (submit compared with v2).
+          expect(screen.stillRenders).toEqual({
+            number: 1,
+            sunsetDay: null,
+            contractChanges: [
+              { kind: "added", key: "offer_end_date", breaking: false, type: "date", required: false },
+              { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+            ],
+          });
+        },
+      );
+    });
+
+    // N3: v3 was submitted while v2 was Active, so the changes stored on it are against v2. v2 was revoked
+    // during review, so what v1's consumers (who keep rendering) have to map is v3 against v1.
+    it("works out the contract changes against the version that still renders, not the one Active at submit", async () => {
+      as("jordan");
+      const [v1, v3] = await Promise.all([versionOf(1), versionOf(3, 2)].map((where) => db.query.versions.findFirst({ where }).then((v) => v!)));
+      const stored = [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }];
+      expect(v3.contractChanges, "stored at submit, against v2").toEqual(stored);
+
+      await withV2Revoked(
+        async () => {},
+        async () => {
+          // As seeded, v1 lacks the optional offer_end_date that v2 added: v3 against v1 has it too, and what
+          // submit stored (against v2) doesn't.
+          const seeded = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
+          expect(seeded.stillRenders?.contractChanges).toEqual(diffVariables(v1.variables, v3.variables));
+          expect(seeded.stillRenders?.contractChanges.map((c) => c.key)).toEqual(["offer_end_date", "annual_fee"]);
+          expect(seeded.version.contractChanges, "the submit record is unchanged").toEqual(stored);
+
+          // v1 already had annual_fee as a required variable: v1's consumers have nothing new to map, though
+          // what submit stored (against v2) still says annual_fee was added. The stored changes stay as the
+          // submit record; the Approve dialog reads the ones against v1.
+          await db.update(versions).set({ variables: v3.variables }).where(versionOf(1));
+          try {
+            const screen = await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null);
+            expect(screen.stillRenders).toEqual({ number: 1, sunsetDay: null, contractChanges: [] });
+            expect(screen.version.contractChanges).toEqual(stored);
+          } finally {
+            await db.update(versions).set({ variables: v1.variables }).where(versionOf(1));
+          }
         },
       );
     });
@@ -397,9 +442,14 @@ describe("getReviewScreen", () => {
           expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
           expect(screen.previousNumber).toBeNull();
 
+          const later = new Date(BASE.getTime() + 40 * 86_400_000);
+          await db.update(versions).set({ sunsetAt: later }).where(versionOf(1));
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).stillRenders, "with its own sunset day").toMatchObject({ number: 1, sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+
           // v1's sunset passes too: nothing renders, so nothing to compare with, as for a first version.
           await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - 1000) }).where(versionOf(1));
           expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).baseline).toBeNull();
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).stillRenders, "nothing renders: a first version").toBeNull();
         },
       );
     });

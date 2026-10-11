@@ -11,6 +11,7 @@ import { SunsetCalendarContent, SunsetZone } from "@/components/versions/sunset-
 import { defaultSunsetDate, validateSunsetDate } from "@/components/versions/validation";
 import type { ConsumerUsage, SunsetCalendar } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
+import type { OutputKey } from "@/domain/review-outputs";
 import type { ContractChange } from "@/domain/types";
 import { approveVersion } from "@/server/actions/review";
 import { approveLines, type ApprovalStageInfo } from "./decision-model";
@@ -58,12 +59,14 @@ export function ApproveDialog({
   versionNumber,
   round,
   previousNumber,
+  stillRenders,
   contractChanges,
   stage,
   usage,
   sunsetCalendar,
   nowIso,
   sampleSetsSeen,
+  outputsViewed,
   onBegin,
   onApproved,
   onFailed,
@@ -77,7 +80,12 @@ export function ApproveDialog({
   round: number;
   /** The Active version this one will replace; null when nothing is Active yet. */
   previousNumber: number | null;
-  /** The version's contract changes: the breaking ones are what the consumers have to map. */
+  /**
+   * With nothing Active (after a revoke): the newest version that still renders, which consumers move from, and
+   * this version's contract changes against it (the breaking ones are what they have to map).
+   */
+  stillRenders: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
+  /** The version's contract changes against the Active version it replaces: the breaking ones are what its consumers have to map. */
   contractChanges: readonly ContractChange[];
   stage: ApprovalStageInfo;
   usage: readonly ConsumerUsage[];
@@ -87,6 +95,8 @@ export function ApproveDialog({
   nowIso: string;
   /** The sample sets the approver looked at in Preview; the approval records them. */
   sampleSetsSeen: readonly string[];
+  /** The outputs the approver had rendered on screen in Preview (decision 0037); the server checks and records them. */
+  outputsViewed: readonly OutputKey[];
   /** The request is about to be sent. */
   onBegin?: () => void;
   /** The approval went through (called before the dialog closes). */
@@ -112,8 +122,8 @@ export function ApproveDialog({
   const invalid = sunset ? validateSunsetDate(sunset, today) : null;
 
   const lines = useMemo(
-    () => approveLines({ version, previousNumber, stage, sunset: invalid ? null : sunset, contractChanges, usage, nowIso }),
-    [version, previousNumber, stage, sunset, invalid, contractChanges, usage, nowIso],
+    () => approveLines({ version, previousNumber, stillRenders, stage, sunset: invalid ? null : sunset, contractChanges, usage, nowIso }),
+    [version, previousNumber, stillRenders, stage, sunset, invalid, contractChanges, usage, nowIso],
   );
   // What happens is the description; what follows from it (who is affected) is the box.
   const [lead = "", ...rest] = lines;
@@ -153,6 +163,7 @@ export function ApproveDialog({
                 round,
                 sunsetPrevious: sunset,
                 sampleSetsSeen: [...sampleSetsSeen],
+                outputsViewed: [...outputsViewed],
               });
               ok = result.ok;
               if (result.ok) onApproved({ wentLive: result.wentLive });

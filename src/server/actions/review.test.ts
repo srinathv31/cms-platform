@@ -10,6 +10,7 @@ import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
+import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { diffChannelFields } from "@/domain/redline";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { ChannelFields } from "@/domain/channel-fields";
@@ -170,7 +171,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("Maya can't approve or request changes on her own version", async () => {
     as("maya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REASONS.ownVersion,
     });
@@ -259,7 +260,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("approving round 1 after round 2 exists is refused: it isn't in review", async () => {
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
@@ -273,15 +274,40 @@ describe("the review loop (scenario 3)", () => {
 
   it("a round that doesn't exist is refused like a forbidden one", async () => {
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 3, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 3, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REASONS.generic,
     });
   });
 
+  // Decision 0037: the server works out the outputs from the round's own channels (PDF and Web here).
+  it("approving before every output was viewed is refused with its code, and nothing is written", async () => {
+    const at = as("jordan");
+    const before = (await version(templateId, 1, 2))!;
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["pdf"], sampleSetsSeen: ["typical"] })).toEqual({
+      ok: false,
+      code: "output_not_viewed",
+      reason: "Preview Web first.",
+    });
+    // An output of another channel doesn't stand in for one of this round's.
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["email", "sms"], sampleSetsSeen: [] })).toMatchObject({
+      ok: false,
+      code: "output_not_viewed",
+    });
+    // A key that isn't an output doesn't parse.
+    expect(
+      await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["push"] as unknown as typeof OUTPUT_KEYS, sampleSetsSeen: [] }),
+    ).toMatchObject({ ok: false, code: "invalid_input" });
+    expect(await version(templateId, 1, 2)).toEqual(before);
+    expect(await db.select().from(approvals).where(eq(approvals.versionId, before.id))).toEqual([]);
+    expect(await auditAt(at)).toEqual([]);
+    expect(await notificationsAt(at)).toEqual([]);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it("Jordan approves v1, round 2: it goes live as v1 and Maya hears about it", async () => {
     const at = as("jordan");
-    const result = await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: ["typical", "long", "typical"] });
+    const result = await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["web", "pdf", "web"], sampleSetsSeen: ["typical", "long", "typical"] });
     expect(result).toEqual({ ok: true, wentLive: true, number: 1, round: 2 });
     expect(refresh).toHaveBeenCalledTimes(1);
 
@@ -291,7 +317,7 @@ describe("the review loop (scenario 3)", () => {
       expect.objectContaining({ decision: "approved", actorId: "jordan", sampleSetsSeen: ["typical", "long"] }),
     ]);
     expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
-      ["version.activated", { number: 1, round: 2, supersedes: null, stage: "Team approver" }],
+      ["version.activated", { number: 1, round: 2, supersedes: null, stage: "Team approver", outputsViewed: ["pdf", "web"] }],
     ]);
     expect(await notificationsAt(at)).toEqual([
       expect.objectContaining({ userId: "maya", kind: "version_live", title: "Spring Travel Rewards — Terms v1 is now Active." }),
@@ -302,7 +328,7 @@ describe("the review loop (scenario 3)", () => {
 
   it("a second approve is refused", async () => {
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
@@ -432,7 +458,7 @@ describe("approveVersion over an Active version", () => {
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
 
     // The seed's v3 is in review on round 2, after round 1 was sent back.
-    const result = await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] });
+    const result = await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] });
     expect(result).toEqual({ ok: true, wentLive: true, number: 3, round: 2 });
 
     expect(await version(templateId, 3)).toMatchObject({ round: 2, state: "active", activatedAt: at });
@@ -467,13 +493,13 @@ describe("approveVersion over an Active version", () => {
     await submitNow(templateId);
     const at = as("jordan");
     const today = at.toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: "2026-02-30", sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: "2026-02-30", outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       code: "invalid_date",
       reason: "Pick a valid date.",
     });
     // No Active version to sunset here, but the date is still checked.
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: today, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: today, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       ...REFUSALS.sunsetAfterToday,
     });
@@ -503,7 +529,7 @@ describe("a two-stage chain", () => {
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
 
     const first = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
       ok: true,
       wentLive: false,
       number: 1,
@@ -517,14 +543,14 @@ describe("a two-stage chain", () => {
     ]);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
       code: "waiting_on_stage",
       reason: "Waiting on Legal.",
     });
 
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
@@ -597,7 +623,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     ]);
 
     const at = as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
     expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Mine to fix." })).toEqual(wrote);
     expect(await version(templateId, 1)).toMatchObject({ state: "in_review" });
     expect(await decisionsOn(templateId, 1)).toEqual([]);
@@ -605,7 +631,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
     // Jordan wrote none of it.
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
@@ -630,11 +656,11 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     expect((await version(templateId, 1, 2))?.writers).toEqual(["maya", "priya"]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
     expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
   });
 
   it("whoever submitted round one stays barred from round two, even without editing it", async () => {
@@ -652,7 +678,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual(["alex", "jordan"]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
     expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
   });
 
@@ -697,7 +723,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
   });
 });
 
@@ -920,14 +946,14 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
 
     as("maya");
     await startDraft({ templateId });
     await saveVariables("maya", (variables) => [...variables, PROMO]);
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
 
     const v2 = (await version(templateId, 2))!;
     await db.insert(renderLog).values({
@@ -1018,7 +1044,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     const at = as("jordan");
     // There's no previous Active version for a sunset to land on: the date is ignored.
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
       ok: true,
       wentLive: true,
       number: 3,
@@ -1029,7 +1055,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(await version(templateId, 2)).toEqual(v2Before);
     expect(await version(templateId, 1)).toEqual(v1Before);
     expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
-      ["version.activated", { number: 3, round: 1, supersedes: null, stage: "Team approver" }],
+      ["version.activated", { number: 3, round: 1, supersedes: null, stage: "Team approver", outputsViewed: ["pdf", "web"] }],
     ]);
 
     const notices = await noticesAt(at);
@@ -1094,7 +1120,7 @@ describe("a variable renamed in a draft", () => {
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
     const v1 = (await version(templateId, 1))!;
     expect(v1.variables.map((v) => v.key)).toContain("first_name");
     await db.insert(renderLog).values({
@@ -1140,7 +1166,7 @@ describe("a variable renamed in a draft", () => {
 
   it("approved, the consumer notice carries the rename for Coral to map", async () => {
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
     const [notice] = (await noticesAt(at)).filter((n) => n.kind === "new_version");
     expect(notice).toMatchObject({ consumerId: "coral", templateId });
     expect(notice!.payload).toMatchObject({
@@ -1385,7 +1411,7 @@ describe("submitting an alert", () => {
       as("maya");
       expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
       as("jordan");
-      expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+      expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
       const v1 = (await version(templateId, 1))!;
 
       // v2, round 1: a new title, submitted under a new footer; Jordan sends it back.

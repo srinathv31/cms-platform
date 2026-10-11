@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveField, nameField, openLibrary, tap, test, typeSlowly, untilUncovered } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Alerts end to end (decision 0034): an alert is made, written with its phone live beside it, held at
 // submit until its SMS is in GSM-7, approved, changed, reviewed with its fields redlined, commented on at a
@@ -111,6 +112,7 @@ async function submit(page: Page, n: number) {
 
 /** Approve → Approve vN, as the decision rail offers it: the version goes Active. */
 async function approve(page: Page, n: number) {
+  await viewEveryOutput(page);
   await tap(decision(page).getByRole("button", { name: "Approve", exact: true }));
   const dialog = page.getByRole("dialog", { name: `Approve v${n}` });
   await expect(dialog).toBeVisible();

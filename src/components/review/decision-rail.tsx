@@ -133,7 +133,8 @@ export interface NextRound {
 
 /**
  * The decision row, under the stepper: 32px for everyone. What stands in it is the model's `DecisionRow`.
- * - Open: Approve and Request changes.
+ * - Open: Approve and Request changes. Until every output has been viewed in the Preview (decision 0037),
+ *   Approve alone is blocked: greyed and focusable, its reason (`approveBlocked`) the stage's line above it.
  * - Blocked (the viewer wrote this version, or is an approver the stage doesn't wait on): the same two,
  *   greyed but still focusable, so a keyboard user reaches them. The reason is the current stage's own
  *   line above them (the stepper), which describes both; each also shows it as a tooltip.
@@ -147,6 +148,7 @@ export interface NextRound {
  */
 function Decision({
   access,
+  approveBlocked,
   row,
   next,
   describedBy,
@@ -157,6 +159,8 @@ function Decision({
   regionRef,
 }: {
   access: DecisionAccess;
+  /** Approve alone waits: an output not viewed yet. */
+  approveBlocked: string | null;
   row: DecisionRow;
   /** A sent-back round's: where its work went. */
   next: NextRound | null;
@@ -195,9 +199,15 @@ function Decision({
         ) : null
       ) : access.kind === "open" ? (
         <div className="flex w-full gap-2">
-          <Button ref={approveRef} className="flex-1" onClick={onApprove}>
-            Approve
-          </Button>
+          {approveBlocked ? (
+            <BlockedButton ref={approveRef} variant="default" className="flex-1" reason={approveBlocked} describedBy={describedBy}>
+              Approve
+            </BlockedButton>
+          ) : (
+            <Button ref={approveRef} className="flex-1" onClick={onApprove}>
+              Approve
+            </Button>
+          )}
           <Button ref={requestRef} variant="outline" className="flex-1 bg-surface" onClick={onRequest}>
             Request changes
           </Button>
@@ -222,6 +232,7 @@ export function DecisionRail({
   steps,
   nowIso,
   access,
+  approveBlocked = null,
   row,
   next = null,
   onApprove,
@@ -234,6 +245,8 @@ export function DecisionRail({
   steps: readonly StepView[];
   nowIso: string;
   access: DecisionAccess;
+  /** Approve alone waits, with this reason: an output of the round not viewed yet in the Preview. */
+  approveBlocked?: string | null;
   row: DecisionRow;
   /** A sent-back round that was resubmitted: the round its work went on to, linked in the row. */
   next?: NextRound | null;
@@ -245,14 +258,17 @@ export function DecisionRail({
   /** The scrolling part: the note, the contract, the comments. */
   children: ReactNode;
 }) {
-  // A blocked pair's reason stands on the stage the version waits at, and the two buttons point to it.
-  const reason = access.kind === "blocked" && row.kind === "buttons" && steps.some((s) => s.status === "current") ? access.reason : null;
+  // A blocked pair's reason stands on the stage the version waits at, and the two buttons point to it; so
+  // does a blocked Approve's, while it waits on the outputs.
+  const blocked = access.kind === "blocked" ? access.reason : access.kind === "open" ? approveBlocked : null;
+  const reason = blocked !== null && row.kind === "buttons" && steps.some((s) => s.status === "current") ? blocked : null;
   return (
     <aside aria-label="Decision" data-slot="rail" className={RV.rail}>
       <div data-rail-head="" className={RV.railHead}>
         <Approval steps={steps} now={new Date(nowIso)} blocked={reason} />
         <Decision
           access={access}
+          approveBlocked={access.kind === "open" ? approveBlocked : null}
           row={row}
           next={row.kind === "sentBack" ? next : null}
           describedBy={reason === null ? undefined : BLOCKED_ID}

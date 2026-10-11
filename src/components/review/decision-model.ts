@@ -5,9 +5,10 @@
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
 import { formatCount } from "@/domain/numbers";
+import { outputsRefusal } from "@/domain/review-outputs";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import { versionLabel, type NumberedRound } from "@/domain/rounds";
-import type { ContractChange, PermissionResult } from "@/domain/types";
+import type { Channel, ContractChange, PermissionResult, VersionState } from "@/domain/types";
 
 /** The longest reason the server accepts (actions/review.ts). */
 export const REASON_MAX = 2000;
@@ -46,6 +47,23 @@ export function decisionAccess(approve: PermissionResult, requestChanges: Permis
   return refused.code === "generic" ? { kind: "hidden" } : { kind: "blocked", reason: refused.reason };
 }
 
+/**
+ * Why Approve alone isn't available yet: an output of the round the viewer hasn't had on screen in the
+ * Preview (decision 0037), in the domain's sentence, the one the server refuses with; or, for an output
+ * the Preview saw the render refuse (`cannotShow`), that it can't be shown and the version needs changes.
+ * Only while the pair is otherwise theirs to press and the round is in review; Request changes never
+ * waits on it. Null once every output has been viewed.
+ */
+export function approveWaitsOn(
+  access: DecisionAccess,
+  version: { state: VersionState; channels: readonly Channel[] },
+  viewed: readonly string[],
+  cannotShow: readonly string[] = [],
+): string | null {
+  if (access.kind !== "open" || version.state !== "in_review") return null;
+  return outputsRefusal(version.channels, viewed, cannotShow)?.reason ?? null;
+}
+
 // ── Approving ────────────────────────────────────────────────────────────────
 
 export interface ApprovalStageInfo {
@@ -69,10 +87,18 @@ export interface ApproveLinesInput {
   version: NumberedRound;
   /** The Active version this one replaces; null when nothing is Active yet. */
   previousNumber: number | null;
+  /**
+   * With nothing Active (after a revoke), the newest version that still renders, which consumers move from
+   * (`ReviewScreenData.stillRenders`), with the version's contract changes against it. Null for a first version.
+   */
+  stillRenders?: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
   stage: ApprovalStageInfo;
   /** YYYY-MM-DD: the sunset date chosen for the previous version, or null (it keeps rendering until relinked). */
   sunset: string | null;
-  /** The version's contract changes against the Active one: the breaking ones say what its consumers have to map. */
+  /**
+   * The version's contract changes as submit stored them, against the Active version it replaces: the
+   * breaking ones say what its consumers have to map. With nothing Active they are `stillRenders`' own.
+   */
   contractChanges?: readonly ContractChange[];
   usage: readonly ConsumerUsage[];
   /** The demo clock's instant. */
@@ -84,19 +110,32 @@ export interface ApproveLinesInput {
  * domain's `consequences`, from the render log), in released numbers: consumers never see a round. An
  * earlier stage only moves the round along: nothing goes live, so a sunset date is never part of it.
  */
-export function approveLines({ version, previousNumber, stage, sunset, contractChanges = [], usage, nowIso }: ApproveLinesInput): string[] {
+export function approveLines({
+  version,
+  previousNumber,
+  stillRenders = null,
+  stage,
+  sunset,
+  contractChanges = [],
+  usage,
+  nowIso,
+}: ApproveLinesInput): string[] {
   if (!stage.final) {
     const next = stage.next?.name ?? "the next stage";
     const v = versionLabel(version, { style: "sentence" });
     return [`${v} moves to ${next} for approval. It isn't Active until the last stage approves.`];
   }
+  // With nothing Active the consumers move from the version that still renders, so what they have to map is
+  // this version's changes against it, not the ones submit stored against a version revoked since.
+  const from = previousNumber === null ? stillRenders : null;
   return consequences(
     {
       kind: "approve",
       newNumber: version.number,
       previousNumber,
       sunsetAt: previousNumber === null ? null : sunset,
-      breakingKeys: breakingKeysOf(contractChanges),
+      stillRenders: from ? { number: from.number, sunsetAt: from.sunsetDay } : null,
+      breakingKeys: breakingKeysOf(from ? from.contractChanges : contractChanges),
     },
     usage,
     new Date(nowIso),

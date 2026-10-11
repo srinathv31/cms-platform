@@ -140,6 +140,31 @@ describe("approveLines", () => {
     expect(lines({ contractChanges: [{ kind: "removed", key: "old", breaking: true, type: "text", required: false }] })).toEqual(lines());
   });
 
+  // N3, revoked during review: v3 was submitted while v2 was Active, so its stored changes are against v2.
+  // v2 was revoked since, v1 still renders, and what v1's consumers have to map is v3 against v1.
+  it("with nothing Active, names what the consumers of the version that still renders have to map, not what submit stored", () => {
+    const storedAgainstV2 = [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }] as const;
+    const againstV1 = [
+      { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+      { kind: "key_renamed", key: "apr", breaking: true, from: "rate", to: "apr" },
+      { kind: "label_changed", key: "first_name", breaking: false, from: "Name", to: "First name" },
+    ] as const;
+    const v1 = { number: 1, sunsetDay: null, contractChanges: againstV1 };
+    const usage: ConsumerUsage[] = [{ ...USAGE[0]!, versionNumber: 1 }];
+    expect(lines({ previousNumber: null, stillRenders: v1, contractChanges: storedAgainstV2, usage })).toEqual([
+      "v3 becomes Active.",
+      "Coral keeps rendering v1 until it relinks.",
+      "Coral has to map `annual_fee` and `apr` before it moves to v3.",
+    ]);
+    // v1 already has what v2 lacked: nothing to map, whatever submit stored.
+    expect(lines({ previousNumber: null, stillRenders: { ...v1, contractChanges: [] }, contractChanges: storedAgainstV2, usage })).toEqual([
+      "v3 becomes Active.",
+      "Coral keeps rendering v1 until it relinks.",
+    ]);
+    // Something Active: the stored changes, against the Active version it replaces.
+    expect(lines({ stillRenders: v1, contractChanges: storedAgainstV2 })).toEqual(lines({ contractChanges: storedAgainstV2 }));
+  });
+
   it("is one line when nothing is Active yet, and a sunset date has nothing to apply to", () => {
     expect(lines({ previousNumber: null })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);
     expect(lines({ previousNumber: null, sunset: "2027-03-01" })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
+import { viewEveryOutput } from "./helpers/review";
 
 // Phase 7 principle checks, on every route, as the persona(s) that can see it:
 //
@@ -567,6 +568,7 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
   test("Approve and Request changes dialogs (review screen, Jordan)", async ({ page }) => {
     await open(page, `/coral-offers/review/${COLLECT}/3`, "jordan");
     const decision = page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+    await viewEveryOutput(page);
     await click(decision.getByRole("button", { name: "Approve", exact: true }));
     await expect(page.getByRole("dialog", { name: /^Approve v3/ })).toBeVisible();
     await checkOpened(page, "Approve dialog as jordan");

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { PlatformActions } from "@/domain/access-types";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
+import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { PLATFORM_REFUSALS, describeZoneChange, validateChain } from "@/domain/platform-config";
 import type { ApproverRule, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -90,7 +91,7 @@ const chain = () =>
   db.select().from(approvalStages).where(eq(approvalStages.contentTypeId, CT)).orderBy(asc(approvalStages.position));
 const versionOf = (templateId: string) =>
   db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) });
-const approve = (templateId: string) => approveVersion({ templateId, versionNumber: 1, round: 1, sampleSetsSeen: ["typical"] });
+const approve = (templateId: string) => approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] });
 
 /**
  * Back to the seeded chain: the team's approvers only. A stage a version in review still needs can't be
@@ -992,7 +993,7 @@ describe("a bare review link a stage reviewer outside the team was sent before a
     });
 
     // Once round 2 waits on her stage, the same link opens it.
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
       ok: true,
       wentLive: false,
       number: 1,

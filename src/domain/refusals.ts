@@ -6,7 +6,8 @@
 // returns the same codes. The sentence is UI copy: reword it freely.
 //
 // Each area keeps its own table next to its rules (`REASONS` in permissions.ts, `REFUSALS` in
-// lifecycle.ts, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `STAGE_REFUSALS`), and
+// lifecycle.ts, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `STAGE_REFUSALS`,
+// `OUTPUT_REFUSALS` in review-outputs.ts), and
 // `REQUEST_REFUSALS` below holds what the server refuses before any rule runs. Every entry is built with
 // `refusal(code, sentence)`; `RefusalCode` is the union of every table's codes, and refusals.test.ts
 // checks that no two entries share one. Import refusals keep their own codes (`IMPORT_REFUSALS`).
@@ -18,6 +19,7 @@ import type { COMMENT_REFUSALS } from "./comments";
 import type { REFUSALS } from "./lifecycle";
 import type { REASONS } from "./permissions";
 import type { PLATFORM_REFUSALS } from "./platform-config";
+import type { OUTPUT_REFUSALS } from "./review-outputs";
 
 /** One refusal: its code, and the sentence shown where the person tried. */
 export interface Refusal {
@@ -114,5 +116,6 @@ export type RefusalCode =
   | CodesOf<typeof COMMENT_REFUSALS>
   | CodesOf<typeof ACCESS_REFUSALS>
   | CodesOf<typeof PLATFORM_REFUSALS>
+  | CodesOf<typeof OUTPUT_REFUSALS>
   | CodesOf<typeof REQUEST_REFUSALS>
   | ClientRefusalCode;

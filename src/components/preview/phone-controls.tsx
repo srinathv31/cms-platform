@@ -53,10 +53,16 @@ export function PhoneControls({
   channel,
   view,
   onChange,
+  viewed,
 }: {
   channel: "push" | "sms";
   view: PhoneView;
   onChange: (next: Partial<PhoneView>) => void;
+  /**
+   * The review Preview, on Push: the phones the approver has viewed the push on, each with a quiet check
+   * (decision 0037). Absent in the workspace and on SMS (one output, whichever phone): no checks.
+   */
+  viewed?: readonly DevicePlatform[];
 }) {
   const set = (patch: Partial<DeviceSettings>) => onChange({ settings: { ...view.settings, ...patch } });
   return (
@@ -64,8 +70,9 @@ export function PhoneControls({
       <Segmented
         label="Phone"
         value={view.settings.platform}
-        options={PUSH_PLATFORMS.map((value) => ({ value, label: PLATFORM_LABELS[value] }))}
+        options={PUSH_PLATFORMS.map((value) => ({ value, label: PLATFORM_LABELS[value], done: viewed ? viewed.includes(value) : undefined }))}
         onChange={(platform) => set({ platform })}
+        doneLabel="Viewed"
       />
       <DeviceOptions channel={channel} view={view} onChange={onChange} />
     </div>

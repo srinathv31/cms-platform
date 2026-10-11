@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 12 | 27 | 42 |
-| Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 25 | 5 | 50 |
+| Open | 0 | 3 | 11 | 22 | 36 |
+| Partly fixed | 0 | 4 | 3 | 3 | 10 |
+| Fixed | 1 | 19 | 26 | 9 | 55 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), and PRs #9–#40 (the Fix first list, October 2026).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), and PRs #47–#50 (N3, N5, N6, S8, H7, part of H8, and the approver viewing every output before approving).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -119,7 +119,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N3 · Low: After a revoke, Approve's consequences read as a first version
 
-- **Status:** Open
+- **Status:** Fixed. With nothing Active, the review screen passes the newest version that still renders (`contractBaseline`, as `stillRenders`) as the one consumers move from, and `consequences` has an approve case for it: "v3 becomes Active." with no "becomes Superseded" line, then its consumers ("Coral keeps rendering v1 until it relinks.") and what each has to map. What they have to map is worked out when the screen loads, with `diffVariables` (the diff submit uses), of the version under review against that version (`stillRenders.contractChanges`), because the changes stored at submit are against whatever was Active then, which may be a version revoked during review. With a version Active, the dialog reads the stored changes, as before. The redline's baseline (decision 0031) is unchanged.
 - **Where:** `src/domain/consequences.ts` (`approveLines`); `src/server/queries/review.ts` (`getReviewScreen`'s `previousNumber`, which `src/components/review/review-workspace.tsx` passes to the dialog)
 - **What happens:** The approve dialog takes its previous version from the Active one. With nothing Active, after a revoke, it says "v3 becomes Active." and "Consumers can start using it right away.", as for a first version. Consumers still pinned to a Superseded version that renders aren't named, nor are the keys they have to map before they move ("Coral has to map `annual_fee` before it moves to v3."), though the version's contract changes were worked out against that version. Noticed while fixing D1 (PR #16).
 - **Fix:** When nothing is Active, pass the newest version that still renders (`contractBaseline`) as the version consumers move from, with an approve case for it in `consequences`: no "becomes Superseded" line, and the mapping lines for its consumers.
@@ -1009,8 +1009,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Open
-- **Where:** `src/components/review/review-workspace.tsx` line 56
+- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines; the other oversized files and the store choice remain.
+- **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.
 - **Evidence:** traced
@@ -1030,7 +1030,7 @@ Rendering is already in this shape: `src/server/render/engine.ts` runs with no d
 
 ## Follow-ups from the render work
 
-- **Approver views the output before approving.** The next PR: an approver must look at every enabled channel's output before Approve is available, in a way that stays quick to use.
+- **Approver views the output before approving.** Done: Approve waits until every output of the round (each channel, Push on both phones) has rendered on the approver's screen in the Preview; the approve action refuses `output_not_viewed` until it has, an output the render refuses is blocked with `output_cannot_show` ("The PDF can't be shown. Request changes."), and the audit row records the outputs viewed ([decision 0037](decisions/0037-an-approver-views-every-output-before-approving.md)).
 - **Word import keeps the source's numbering.** Import and paste restart lists at 1 with the default style; map Word's numbering formats and start numbers into the per-list styles.
 - **The enterprise font.** Swap it into `src/server/render/channels/pdf-fonts.ts`, fixing the findings listed under [The enterprise font](#the-enterprise-font) at the same time, then `npm run golden:update` refreshes the Node-only PDF files.
 - **PDF cell detection for Java.** The parity test finds PDF table cells from the rules the Node adapter draws; a Java engine needs its own way, as `docs/render-spec.md` notes.

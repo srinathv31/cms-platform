@@ -3,8 +3,11 @@
 // the lines client-side as the sunset date changes, so `now` is the demo clock passed in.
 //
 //   approve  "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks."
-//            (a first version: "v1 becomes Active." then "Consumers can start using it right away.")
-//            and, when the version breaks the contract, one line per consumer of v1:
+//            (a first version: "v1 becomes Active." then "Consumers can start using it right away.";
+//            with nothing Active after a revoke, the newest version that still renders is the one
+//            consumers move from, and nothing becomes Superseded:
+//            "v3 becomes Active." then "Coral keeps rendering v1 until it relinks.")
+//            and, when the version breaks the contract, one line per consumer of the version it moves from:
 //            "Coral has to map `annual_fee` before it moves to v2."
 //   sunset   "Coral still renders v1 (last render today). It will keep working until March 1, 2027."
 //   revoke   "Coral rendered v1 412 times in the last 30 days. Its renders will fail immediately."
@@ -51,8 +54,21 @@ function approveLines(
   now: Date,
 ): string[] {
   const live = `v${action.newNumber} becomes Active.`;
-  // A first version: nothing is superseded, and consumers can now find it (and SHARE opens up).
-  if (action.previousNumber === null) return [live, FIRST_LIVE];
+
+  if (action.previousNumber === null) {
+    const from = action.stillRenders ?? null;
+    // A first version: nothing is superseded, and consumers can now find it (and SHARE opens up).
+    if (from === null) return [live, FIRST_LIVE];
+    // Nothing Active (it was revoked): nothing is superseded, and the consumers of the newest version that
+    // still renders move from it, on its own terms (pinned, or until its sunset).
+    const prev = `v${from.number}`;
+    const users = consumersOf(usage, from.number);
+    if (users.length === 0) return [live, noConsumer(prev)];
+    const mapping = mappingLines(users, action);
+    const ends = from.sunsetAt;
+    if (ends === null) return [live, `${keepRendering(users, prev)}.`, ...mapping];
+    return [live, ...users.map((u) => keepsWorking(u, prev, ends, now)), ...mapping];
+  }
 
   const prev = `v${action.previousNumber}`;
   const superseded = `${live} ${prev} becomes Superseded`;
@@ -63,15 +79,17 @@ function approveLines(
   if (users.length === 0) return [`${superseded}.`, noConsumer(prev)];
 
   // What each consumer of the previous version has to do before it can move on.
-  const mapping = (action.breakingKeys ?? []).length > 0 ? users.map((u) => hasToMap(u, action.breakingKeys!, action.newNumber)) : [];
+  const mapping = mappingLines(users, action);
 
-  if (sunsetAt === null) {
-    // Pinned: nothing changes for them until they relink.
-    const names = joinList(users.map((u) => u.consumerName));
-    const [keep, they] = users.length === 1 ? ["keeps", "it relinks"] : ["keep", "they relink"];
-    return [`${superseded}; ${names} ${keep} rendering ${prev} until ${they}.`, ...mapping];
-  }
+  // Pinned: nothing changes for them until they relink.
+  if (sunsetAt === null) return [`${superseded}; ${keepRendering(users, prev)}.`, ...mapping];
   return [`${superseded}.`, ...users.map((u) => keepsWorking(u, prev, sunsetAt, now)), ...mapping];
+}
+
+/** What each consumer of the version it moves from has to map first: a line per consumer, when the contract breaks. */
+function mappingLines(users: readonly Usage[], action: Extract<ConsequenceAction, { kind: "approve" }>): string[] {
+  const keys = action.breakingKeys ?? [];
+  return keys.length > 0 ? users.map((u) => hasToMap(u, keys, action.newNumber)) : [];
 }
 
 /**
@@ -94,6 +112,13 @@ export function breakingKeysOf(changes: readonly ContractChange[]): string[] {
 /** "Coral has to map `annual_fee` before it moves to v3." The keys are in backticks, as the contract lines have them. */
 function hasToMap(u: Usage, keys: readonly string[], newNumber: number): string {
   return `${u.consumerName} has to map ${joinList(keys.map((key) => `\`${key}\``))} before it moves to v${newNumber}.`;
+}
+
+/** "Coral keeps rendering v1 until it relinks", "Coral and Harbor keep rendering v1 until they relink". */
+function keepRendering(users: readonly Usage[], v: string): string {
+  const names = joinList(users.map((u) => u.consumerName));
+  const [keep, they] = users.length === 1 ? ["keeps", "it relinks"] : ["keep", "they relink"];
+  return `${names} ${keep} rendering ${v} until ${they}`;
 }
 
 /** "a", "a and b", "a, b, and c". */

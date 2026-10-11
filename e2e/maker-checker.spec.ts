@@ -17,6 +17,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Maker-checker reaches everyone who wrote a version, not only whoever pressed Submit
 // (docs/handoff-review.md, S3). Holding Author and Approver on one team is normal: approving an access
@@ -182,6 +183,7 @@ test("someone who edited a draft another author submitted can't approve it or se
 
   await test.step("5. Jordan wrote none of it: Approve and Request changes are his to press", async () => {
     await openReview(page, "jordan", id);
+    await viewEveryOutput(page);
     await expect(approveButton(page)).toBeEnabled();
     await expect(requestButton(page)).toBeEnabled();
     await expect(decision(page).getByText(WROTE)).toHaveCount(0);

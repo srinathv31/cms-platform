@@ -22,6 +22,7 @@ import {
   type ReviewVersion,
 } from "@/domain/lifecycle";
 import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
+import { OUTPUT_KEYS, type OutputKey } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
 import type { PermissionResource, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
@@ -424,6 +425,8 @@ export async function requestChanges(input: {
 const ApproveInput = RoundRefInput.extend({
   sunsetPrevious: z.string().nullish(),
   sampleSetsSeen: z.array(z.string().max(64)).max(50),
+  /** The outputs the approver had rendered on screen in Preview: keys only (decision 0037). */
+  outputsViewed: z.array(z.enum(OUTPUT_KEYS)).max(OUTPUT_KEYS.length * 2),
 });
 
 /**
@@ -434,6 +437,10 @@ const ApproveInput = RoundRefInput.extend({
  * Active per template), optionally with a sunset date, and the version becomes Active. With none (a
  * first version, or the correction after the Active version was revoked) nothing is superseded and a
  * sunset date is ignored. Consumers that render the template are sent a notice.
+ *
+ * The approver must have viewed every output of the round (`outputsViewed`): the transition works out
+ * which from the round's own channels and refuses `output_not_viewed` while one is missing, and the
+ * approval's audit row records the ones viewed (decision 0037).
  */
 export async function approveVersion(input: {
   templateId: string;
@@ -441,6 +448,7 @@ export async function approveVersion(input: {
   round: number;
   sunsetPrevious?: string | null;
   sampleSetsSeen: string[];
+  outputsViewed: readonly OutputKey[];
 }): Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>> {
   return serverAction(input, {
     input: ApproveInput,
@@ -468,6 +476,7 @@ export async function approveVersion(input: {
         sunsetPrevious: input.sunsetPrevious || null,
         zone: await readBusinessZone(tx),
         sampleSetsSeen: input.sampleSetsSeen,
+        outputsViewed: input.outputsViewed,
         templateName: version.name,
         decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
       });

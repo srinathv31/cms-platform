@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import { asPersona, expect, expectAutosaved, hydrated, liveEditor, nameField, openLibrary, tap, test, typeSlowly } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // A resubmission is the next round of the same version (decision 0033), walked once through the UI:
 //
@@ -156,6 +157,7 @@ test("a send-back keeps the version number: v1 goes back, returns as v1, round 2
     await hydrated(page);
     await expect(header(page)).toContainText("v1 · Round 2 by Maya Chen");
 
+    await viewEveryOutput(page);
     await tap(approveButton(page));
     const dialog = page.getByRole("dialog", { name: "Approve v1, round 2", exact: true });
     await expect(dialog).toBeVisible();

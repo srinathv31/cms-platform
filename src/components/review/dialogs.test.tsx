@@ -19,6 +19,7 @@ const actions = vi.hoisted(() => ({
       round: number;
       sunsetPrevious?: string | null;
       sampleSetsSeen: string[];
+      outputsViewed: readonly string[];
     }) => Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>>
   >(),
   requestChanges: vi.fn<(input: { templateId: string; versionNumber: number; round: number; reason: string }) => Promise<ActionResult>>(),
@@ -209,6 +210,7 @@ describe("ApproveDialog", () => {
   const open = (
     over: {
       previousNumber?: number | null;
+      stillRenders?: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
       stage?: typeof ONE;
       sampleSetsSeen?: string[];
       contractChanges?: ContractChange[];
@@ -223,12 +225,14 @@ describe("ApproveDialog", () => {
         versionNumber={2}
         round={over.round ?? 1}
         previousNumber={over.previousNumber === undefined ? 1 : over.previousNumber}
+        stillRenders={over.stillRenders ?? null}
         contractChanges={over.contractChanges ?? []}
         stage={over.stage ?? ONE}
         usage={USAGE}
         sunsetCalendar={{ zone: "America/New_York", today: "2026-10-05" }}
         nowIso={NOW}
         sampleSetsSeen={over.sampleSetsSeen ?? []}
+        outputsViewed={["web", "pdf"]}
         onBegin={onBegin}
         onApproved={onApproved}
         onFailed={onFailed}
@@ -298,11 +302,26 @@ describe("ApproveDialog", () => {
       round: 1,
       sunsetPrevious: null,
       sampleSetsSeen: ["typical", "long"],
+      outputsViewed: ["web", "pdf"],
     });
     expect(onBegin).toHaveBeenCalledTimes(1);
     expect(onApproved).toHaveBeenCalledWith({ wentLive: true });
     expect(onFailed).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  // N3: after a revoke nothing is Active, but an older version still renders: its consumers move from it.
+  it("after a revoke, names who still renders the older version and what they have to map, with nothing to sunset", async () => {
+    await open({
+      previousNumber: null,
+      // What submit stored was against a version revoked since; the dialog reads the changes against v1.
+      stillRenders: { number: 1, sunsetDay: null, contractChanges: [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }] },
+      contractChanges: [{ kind: "added", key: "stale_key", breaking: true, type: "text", required: true }],
+    });
+    expect(description()).toBe("v2 becomes Active.");
+    expect(boxLines()).toEqual(["Coral keeps rendering v1 until it relinks.", "Coral has to map annual_fee before it moves to v2."]);
+    expect(dialog().textContent).not.toContain("Consumers can start using it right away.");
+    expect(sunsetSwitch()).toBeFalsy();
   });
 
   it("names the round it approves once the version was sent back, and approves exactly that round", async () => {
