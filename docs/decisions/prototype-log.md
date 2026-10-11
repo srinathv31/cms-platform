@@ -5,7 +5,7 @@
 
 These are the calls the lead agent (Claude) made on its own while finishing Phases 5–7, without Sri in the loop. Sri can overrule any of them at review; each entry says what was picked and why, so it can be reversed on its own.
 
-How to read this: sections run in build order (Phases 5, 6, 7a, then integration and the 7b UX pass), and a later entry that supersedes an earlier one says so. Bold text is the pick; "Rejected" lines keep the reasoning for the variants not chosen. Screenshot and recording paths are relative to `docs/`; the dev mocks they were taken from stay at `/design/*` in the app.
+How to read this: sections run in build order (Phases 5, 6, 7a, then integration and the 7b UX pass), and a later entry that supersedes an earlier one says so. Bold text is the pick; "Rejected" lines keep the reasoning for the variants not chosen. Screenshot and recording paths are relative to `docs/`; the dev mocks they were taken from (`/design/*`) were removed from the app; they live in the `archive/design-mocks` tag.
 
 ## Phase 5: going live
 
@@ -23,7 +23,7 @@ Branch `track/golive`. Report: `archive/tracks/a-report.md`.
 - **The contract is split** into `src/contracts/api-v1.ts` (wire shapes, import-free, lint-enforced), `src/domain/golive-types.ts` (UCOMP side), `src/simulator/types.ts` (Coral side), because the simulator boundary forbids importing `@/domain`.
 
 ### Simulator look: **A (Ops console)** with two borrowings from B
-Mock: `/design/simulator?v=a|b|c` (kept as reference). Media: `decisions/media/track-a/` (tour recording: `decisions/media/track-a/simulator-tour.webm`).
+Mock: `/design/simulator?v=a|b|c` (in the `archive/design-mocks` tag). Media: `decisions/media/track-a/` (tour recording: `decisions/media/track-a/simulator-tour.webm`).
 - **Picked:** A, a navy sidebar (Offers, Customers, Deliveries, Notices with a badge); one offer = one page with Template | Values | Send tabs; dense tables with mono keys; the customer view in a right-hand drawer. Helvetica Neue, 5px corners, cool grey, signal-orange accent. Stills: `decisions/media/track-a/simulator-a-offers.png`, `decisions/media/track-a/simulator-a-link.png`, `decisions/media/track-a/simulator-a-map.png`, `decisions/media/track-a/simulator-a-send.png`, `decisions/media/track-a/simulator-a-customer-phone.png`, `decisions/media/track-a/simulator-a-notices.png`, `decisions/media/track-a/simulator-a-relink.png`, `decisions/media/track-a/simulator-a-sunset.png`.
   - Why: the plan asks for "a results grid" with exact render errors, and A's table is exactly that; it reads most convincingly as another company's back-office tool (the point of the Q7 "deliberately foreign" decision) and shows the contract and mapping densely for the engineer audience.
 - **Borrowed from B:** the results headline ("4 delivered, 1 failed") above A's grid, and the relink as consequence-first steps (What changed → Map new value → Confirm) inside A's page, so consequences come before commitment.
@@ -32,7 +32,7 @@ Mock: `/design/simulator?v=a|b|c` (kept as reference). Media: `decisions/media/t
 - Coral's own accent colour on its primary button is intentional: the one-black-primary rule is UCOMP's, not Coral's.
 
 ### Usage dashboard: **A (Insights)** + B's consumers table
-Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (kept as reference). Media: `decisions/media/track-a/usage-tour.webm`.
+Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (in the `archive/design-mocks` tag). Media: `decisions/media/track-a/usage-tour.webm`.
 - **Picked:** A, following reference-images/Unknown.png: serif "Usage" title, Overview | Consumers tabs, three stat cards (Renders · 30 days with trend + channel mix; a gauge for renders on active versions; active templates with sunset note), Top templates bars beside a Daily renders heatmap, Renders over time (13 weeks, stacked by channel) and failure rate. Stills: `decisions/media/track-a/usage-a.png`, `decisions/media/track-a/usage-a-full.png`, `decisions/media/track-a/usage-a-consumers.png`, `decisions/media/track-a/usage-a-tooltip.png`.
 - **Borrowed from B:** the consumers table (version StatusBadge, sunset note, 30-day sparkline, All / On superseded / Failing filter) as A's Consumers tab: it answers "who renders what, on which version", which feeds the approve/sunset/revoke consequence text.
 - **Rejected B as the page** (`decisions/media/track-a/usage-b*.png`): least like Unknown.png, with charts as an afterthought. **Rejected C** (`decisions/media/track-a/usage-c*.png`): two tab-like controls on one page, no heatmap.
@@ -77,7 +77,7 @@ Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (kept as reference).
 Branch `track/access`. Report: `archive/tracks/b-report.md`.
 
 
-Mocks: `/design/settings?v=a|b|c`, `/design/audit?v=a|b|c` (kept as references). Media: `decisions/media/track-b/` (walkthrough recordings: `decisions/media/track-b/settings-walkthrough.webm`, `decisions/media/track-b/audit-walkthrough.webm`).
+Mocks: `/design/settings?v=a|b|c`, `/design/audit?v=a|b|c` (in the `archive/design-mocks` tag). Media: `decisions/media/track-b/` (walkthrough recordings: `decisions/media/track-b/settings-walkthrough.webm`, `decisions/media/track-b/audit-walkthrough.webm`).
 
 ### Settings modal sections: **A (Rows)** with three borrowings from C
 - **Picked:** A, dense table rows with inline actions and a consequence strip under the row; plain caps-label groups TEAM / PLATFORM in the nav, as in Unknown-3.png. Stills: `decisions/media/track-b/settings-a-members.png`, `decisions/media/track-b/settings-a-members-suspend.png`, `decisions/media/track-b/settings-a-access-requests.png`, `decisions/media/track-b/settings-a-recertification.png`, `decisions/media/track-b/settings-a-inactivity.png`, `decisions/media/track-b/settings-a-approval-chains-add.png`.

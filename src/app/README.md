@@ -1,6 +1,6 @@
 # `src/app`: routes, layouts, and route handlers
 
-The Next.js App Router tree for Stencil, the Coral simulator, and the dev mocks. Files here are thin: a page
+The Next.js App Router tree for Stencil, the Coral simulator, and two dev labs. Files here are thin: a page
 renders static chrome and a `<Stream>` around a server component from `src/components/` that reads the request;
 a route handler parses HTTP and calls `src/server/`. No server actions live here (lint allows `"use server"` only
 in `src/server/actions/`), and outside `(dev)` the only client components are the three error boundaries, which
@@ -32,8 +32,8 @@ and every request-bound part streams. Reading request data outside `<Suspense>` 
    never `new Date()` or `Date.now()` in server code. `now()` awaits `connection()` and reads the database, so
    it is request data too.
 5. A database read that runs before any request API needs `await connection()` first. libSQL resolves in
-   microtasks, so without it the read can land in the prerender. See `getAllTeams` in
-   [queries/teams.ts](../server/queries/teams.ts) and the simulator's
+   microtasks, so without it the read can land in the prerender. See `getSimCustomers` in
+   [ui/lists.ts](../simulator/ui/lists.ts) and the simulator's
    [delivery file route](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts). The `/api/v1` GET handlers
    get the same effect by reading their headers before touching the database.
 6. `export const instant = false` appears only on the two settings pages. It opts them out of Next's
@@ -74,17 +74,16 @@ writes the route types and the global `PageProps`, `LayoutProps` and `RouteConte
 | `/sim/offers/[offerId]/link` | [link/page.tsx](./(simulator)/sim/offers/[offerId]/link/page.tsx) | Link or relink a template (`?template=`). |
 | `/sim/customers`, `/sim/deliveries`, `/sim/notices` | [customers](./(simulator)/sim/customers/page.tsx), [deliveries](./(simulator)/sim/deliveries/page.tsx), [notices](./(simulator)/sim/notices/page.tsx) | Coral's customers, sends, and notices from Stencil. |
 
-### `(dev)`: mocks and labs
+### `(dev)`: labs
 
-Nothing gates these: there is no `(dev)` layout, environment check or proxy. They ship in production builds and
-answer by URL, though nothing in the app links to them. They use fixtures only, never the database or the
-persona; the mocks read their deep-link search params.
+Two labs for working on the editor and the PDF viewer. Each page calls `notFound()` when
+`process.env.NODE_ENV === "production"`, so they answer in `next dev` and 404 in a production build. There is no
+`(dev)` layout or proxy, nothing in the app links to them, and they use fixtures only, never the database or the
+persona. The `/design/*` variant mocks (and the second stand-in renderer they carried) were removed once their
+decisions were in the product; they are recoverable from the `archive/design-mocks` tag.
 
 | URL | What it is |
 | --- | --- |
-| `/design` | Design-system sample: type, color, surfaces, the SHARE ring. `/design/sample-sets` is a harness for the sample-set switcher. |
-| `/design/audit`, `/comments`, `/preview`, `/review`, `/settings`, `/simulator`, `/usage-dashboard`, `/workspace` | Static mocks of one screen on fixture data, with a dev bar. Each page's header comment lists its deep-link params. |
-| `/design/device` | The phone kit ([src/components/device](../components/device/README.md)) on fixtures: every push and SMS view on iPhone and Android at 1:1 and in the 469px preview well, and a mock of the rail's controls for message channels. |
 | `/editor-lab` | The live editor on fixtures, beside a server-rendered `StaticDocument`. |
 | `/pdf-lab` | The PDF viewer, fed from a file input or `?src=`. |
 
@@ -263,8 +262,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   and picks a `REASONS` sentence itself. Let the query decide and return the result.
 - **A sixth error shape.** Internal routes already answer in five. A new public route uses `errorResponse`; a
   new internal one reuses an existing shape (a read, `readResponse`).
-- **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated and ship in
-  production.
+- **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated
+  and exist only outside production builds.
 
 ## Testing
 
@@ -283,7 +282,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | Spec | Covers |
 | --- | --- |
 | `e2e/principles.spec.ts` | Every product screen as each persona that can see it, the settings modal sections, every `/sim` page, and the tabs and filters inside pages. Checks: one primary button per canvas or dialog, status words only in `StatusBadge`, no placeholders, no serious axe violations, CLS 0. The simulator gets only the last three. |
-| `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, `/design`, `/editor-lab`, router prefetch. |
+| `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, router prefetch. |
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
 | `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |

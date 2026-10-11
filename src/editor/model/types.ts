@@ -85,8 +85,3 @@ export const NODE = {
   callout: "callout",
 } as const;
 
-/** TipTap JSON for a variable node: holds only the key. Label and type come from the variable list. */
-export interface VariableNodeJSON extends JSONContent {
-  type: typeof NODE.variable;
-  attrs: { key: string };
-}

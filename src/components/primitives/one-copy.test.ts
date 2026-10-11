@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // Each shared building block has one home. A screen that needs one imports it from there; it doesn't
 // paste its classes, hand-roll its semantics or keep a private map. This reads the product's source
-// (not the generated `ui/` kit, not the design mocks in `src/app/(dev)`, not the simulator, which has
+// (not the generated `ui/` kit, not the labs in `src/app/(dev)`, not the simulator, which has
 // its own look on purpose) and fails on a second copy.
 
 const ROOT = process.cwd();

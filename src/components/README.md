@@ -53,7 +53,7 @@ Feature folders:
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
 | `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block, or on a message to a channel field (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
-| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
+| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
 | `library/` | Library view and browser, New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
@@ -117,10 +117,7 @@ never an `if` with a fallthrough: a new channel is then a compile error at each 
 these (the segmented track, a hand-rolled tablist, the clipboard, the stat numeral, the team icons, a channel label
 map).
 
-The `/design` gallery (`src/app/(dev)/design`) imports these, so a change shows there too. It also holds mock
-forks of real components on fixtures (its own `AuditTable`, `ThreadCard`, `GoLive`, preview controls, and usage
-charts). Never copy from or import them. The simulator's `PageHeader` (`src/simulator/ui/bits.tsx`) is
-deliberately separate: it uses the simulator's palette.
+The simulator's `PageHeader` (`src/simulator/ui/bits.tsx`) is deliberately separate: it uses the simulator's palette.
 
 ### Tokens
 
@@ -331,8 +328,8 @@ submit, and a footer that changed between the two versions struck and inserted (
 - **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
   and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
   `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.
-- **Dead or off-contract.** `app-shell/page-placeholder.tsx` has no importers. `workspace/save-status.tsx` imports
-  `@/editor/lib/platform`, which is not in the editor's public API.
+- **Off-contract.** `workspace/save-status.tsx` imports `@/editor/lib/platform`, which is not in the editor's
+  public API.
 
 ## `src/hooks`, `src/lib`, `src/styles`
 

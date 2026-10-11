@@ -123,8 +123,6 @@ export function seedTeams(ctx: SeedCtx) {
   }
 }
 
-export const teamMemberIds = (team: TeamId) => MEMBERS.filter((m) => m.team === team).map((m) => m.user);
-
 /** Who a recertification covers: the team's members, Team Admins aside (domain/access.ts `recertSubjects`). */
 export const recertSubjectIds = (team: TeamId) =>
   MEMBERS.filter((m) => m.team === team && !m.roles.includes("team_admin"))

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { charShows, visibleLength, type CharBox, type Clip } from "./measure";
 
 // A clamped box two lines tall (20px lines), 200px wide, with a 12px ellipsis: the last line's characters
-// must end by x = 188. The DOM side (Range rects, the clamp itself) is checked on the design page.
+// must end by x = 188. The DOM side (Range rects, the clamp itself) is checked in the preview rail's phone views.
 const CLIP: Clip = { bottom: 40, lastLineTop: 20, lastLineRight: 188 };
 
 /** Characters 10px wide, wrapped at 20 per line, laid out like a browser would. */

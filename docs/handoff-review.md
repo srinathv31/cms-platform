@@ -385,7 +385,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S8 · Medium: Design mocks and labs ship in production builds
 
-- **Status:** Open
+- **Status:** Fixed. The `/design/*` mocks and the second stand-in renderer are deleted (recoverable from the `archive/design-mocks` tag); `/editor-lab` and `/pdf-lab` stay and call `notFound()` in a production build.
 - **Where:** `src/app/(dev)`
 - **What happens:** `/design/*`, `/editor-lab` and `/pdf-lab` have no production gate and are prerendered by `next build`. About 16.3k lines, roughly a fifth of non-test source, including a second stand-in renderer (`design/preview/render-doc.tsx`) that behaves differently from the real one.
 - **Fix:** Delete the variant mocks (their decisions are in the product now) or move them to a tag. Gate the labs with `notFound()` when `NODE_ENV === "production"`.
@@ -1001,8 +1001,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H7 · Low: Dead code
 
-- **Status:** Open
-- **Where:** `src/components/app-shell/page-placeholder.tsx` line 1
+- **Status:** Fixed. Deleted the unimported `page-placeholder.tsx` and `queries/teams.ts`, the stale `pdfjs-worker.d.ts`, eight unused generated `ui/` components, and the exports with no references; the compile-time contract checks `_DriftChecks` and `platformConfig` stay.
+- **Where:** `src/components/app-shell` and `src/components/ui`
 - **What happens:** 16 exports with no references, one component file nothing imports, a likely stale `pdfjs-worker.d.ts`, and 7 generated ui components that are never used.
 - **Fix:** Delete them.
 - **Evidence:** traced

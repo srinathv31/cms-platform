@@ -20,8 +20,7 @@ import { cn } from "@/lib/utils";
 
 // The right slot of the controls row on Push and SMS: which phone (iPhone · Android), and a 32px
 // Device button whose popover sets the rest: the screen a push is on, the phone's appearance, its
-// previews setting, its text size and its width. Settled on the phone kit's design page at the
-// tightest well (469px). A row that doesn't apply to what is on screen stays in place, greyed, with
+// previews setting, its text size and its width. Sized for the tightest well (469px). A row that doesn't apply to what is on screen stays in place, greyed, with
 // why under it ("Push only"), and does nothing. The popover's geometry is the same in every state: the
 // reason sits in the gap under its control, out of flow, so picking Banner (which blocks Previews) moves
 // no row under the pointer, and Push and SMS open the same popover.

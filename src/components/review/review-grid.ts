@@ -24,9 +24,6 @@
 
 import { WS } from "@/components/workspace/workspace-grid";
 
-/** Matches `@min-[53rem]/ws` in the classes below. */
-export const RAIL_BREAKPOINT_REM = 53;
-
 /**
  * Stacked, the grid bleeds out to the panel's right edge (as the workspace's does) and the rail has
  * its own padding there; the main pane's cells give the canvas padding back so text and tables don't
