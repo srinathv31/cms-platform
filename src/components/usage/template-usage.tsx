@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { WS } from "@/components/workspace/workspace-grid";
+import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addDays, formatShortDate } from "@/domain/dates";
 import { errorText } from "@/domain/golive/usage";
@@ -62,31 +63,33 @@ function RecentFailures({ errors, nowDate }: { errors: TemplateUsageData["recent
   return (
     <Panel className="mt-6">
       <PanelHead title="Recent failures" size="md" />
-      <Table aria-label="Recent failures" className="mt-3 text-[14px]">
-        <TableHeader>
-          <TableRow className="border-hairline hover:bg-transparent">
-            <TableHead className={head}>Consumer</TableHead>
-            <TableHead className={head}>Version</TableHead>
-            <TableHead className={head}>Channel</TableHead>
-            <TableHead className={head}>When</TableHead>
-            <TableHead className={head}>What happened</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {errors.map((e, i) => (
-            <TableRow key={`${e.at}-${i}`} className="h-12 border-hairline hover:bg-hover/50">
-              <TableCell className="font-medium text-text">{e.consumer.name}</TableCell>
-              <TableCell className="font-mono text-[13px] text-text">{e.versionNumber === null ? "—" : `v${e.versionNumber}`}</TableCell>
-              <TableCell className="text-text">
-                {CHANNEL_LABELS[e.channel]}
-                {e.platform ? ` · ${PLATFORM_LABELS[e.platform]}` : ""}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-text-muted">{formatLastRender(e.at, nowDate)}</TableCell>
-              <TableCell className="text-text">{errorText(e.code)}</TableCell>
+      <ScrollRegion label="Recent failures">
+        <Table aria-label="Recent failures" className="mt-3 text-[14px]">
+          <TableHeader>
+            <TableRow className="border-hairline hover:bg-transparent">
+              <TableHead className={head}>Consumer</TableHead>
+              <TableHead className={head}>Version</TableHead>
+              <TableHead className={head}>Channel</TableHead>
+              <TableHead className={head}>When</TableHead>
+              <TableHead className={head}>What happened</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {errors.map((e, i) => (
+              <TableRow key={`${e.at}-${i}`} className="h-12 border-hairline hover:bg-hover/50">
+                <TableCell className="font-medium text-text">{e.consumer.name}</TableCell>
+                <TableCell className="font-mono text-[13px] text-text">{e.versionNumber === null ? "—" : `v${e.versionNumber}`}</TableCell>
+                <TableCell className="text-text">
+                  {CHANNEL_LABELS[e.channel]}
+                  {e.platform ? ` · ${PLATFORM_LABELS[e.platform]}` : ""}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-text-muted">{formatLastRender(e.at, nowDate)}</TableCell>
+                <TableCell className="text-text">{errorText(e.code)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollRegion>
     </Panel>
   );
 }

@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 /** The scrolling page area: one inset, a comfortable measure, room under the Demo pill. */
 export function PageScroll({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-8 py-6 pb-14">
+    <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-8 py-6 pb-14 narrow:px-4">
       <div className="mx-auto flex max-w-[68rem] flex-col gap-5">{children}</div>
     </div>
   );

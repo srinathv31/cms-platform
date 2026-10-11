@@ -16,3 +16,10 @@ export const TAB_LABEL =
   "-mx-1.5 flex items-center gap-2 rounded-md px-1.5 py-0.5 group-focus-visible/tab:ring-2 group-focus-visible/tab:ring-ring";
 /** The 2px underline under the chosen tab. */
 export const TAB_UNDERLINE = "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text";
+/**
+ * A bar of tabs wider than a narrow canvas (under 26rem, a window under about 470px) scrolls inside itself rather
+ * than push the canvas sideways (reflow, decision 0045). The 1px of padding keeps the tab's -1px margin, which puts
+ * its underline on the hairline, from being clipped. `TabList` has it, and so does a skeleton of a bar.
+ */
+export const TAB_BAR_SCROLLS =
+  "@max-[26rem]/canvas:overflow-x-auto @max-[26rem]/canvas:overflow-y-hidden @max-[26rem]/canvas:pb-px";

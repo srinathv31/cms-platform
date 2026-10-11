@@ -179,8 +179,8 @@ export function ApproveDialog({
         <>
           {rest.length > 0 ? <ConsequenceList lines={rest} /> : null}
           {canSunset ? (
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="flex h-8 w-full items-center justify-between gap-3">
+            <div className="flex flex-col items-end gap-1.5 max-[26rem]:items-start">
+              <div className="flex h-8 w-full items-center justify-between gap-3 max-[26rem]:h-auto max-[26rem]:flex-wrap max-[26rem]:gap-y-2">
                 <label id={labelId} className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text">
                   <Checkbox
                     ref={check}
@@ -201,7 +201,7 @@ export function ApproveDialog({
                       <Button
                         variant="outline"
                         disabled={!on}
-                        className="h-8 min-w-44 justify-start gap-2 bg-surface px-2.5 font-normal text-text"
+                        className="h-8 min-w-44 justify-start gap-2 bg-surface px-2.5 font-normal text-text max-[26rem]:w-full"
                       />
                     }
                   >

@@ -1,6 +1,7 @@
 # 0021. The sidebar has no keyboard shortcut, an edit to a generated file
 
 Status: Accepted
+Amended 2026-10-11: below 800px the sidebar is a drawer (`collapsible="offcanvas"`), opened by a button in the top bar; it still has no keyboard shortcut (N27, [decision 0045](0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)).
 Date: 2026-10-09
 
 ## Context

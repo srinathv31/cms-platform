@@ -18,7 +18,7 @@ export function MappingTable({
   onChange: (key: string, field: SimFieldPath | null) => void;
 }) {
   return (
-    <TableWrap>
+    <TableWrap label={label}>
       <table aria-label={label} className="w-full min-w-[34rem] border-collapse">
         <thead>
           <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">

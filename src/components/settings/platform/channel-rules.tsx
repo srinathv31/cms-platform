@@ -8,6 +8,7 @@ import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { setChannelRule } from "@/server/actions/platform";
+import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Strip } from "../strip";
 import { FullRow, useFocusAfterCommit } from "./ui";
@@ -24,26 +25,30 @@ const colsFor = (channels: readonly Channel[]) => `minmax(0,1fr) repeat(${channe
 export function ChannelRulesSectionView({ section }: { section: ChannelRulesSection }) {
   // One turn-off strip at a time across the table.
   const [asking, setAsking] = useState<{ contentTypeId: string; channel: Channel } | null>(null);
+  // The matrix is two-dimensional: in a window too narrow for it (the content is under 30rem) it scrolls sideways
+  // inside its own box (reflow, decision 0045).
   return (
-    <div data-slot="platform-section" data-section="channel-rules" role="table" aria-label="Channel rules">
-      <div role="row" className="grid items-end gap-x-4 border-b border-hairline pb-2" style={{ gridTemplateColumns: colsFor(section.channels) }}>
-        <span role="columnheader" className="caps-label">Content type</span>
-        {section.channels.map((c) => (
-          <span role="columnheader" key={c} className="caps-label text-center">
-            {CHANNEL_LABELS[c]}
-          </span>
+    <ScrollRegion label="Channel rules">
+      <div data-slot="platform-section" data-section="channel-rules" role="table" aria-label="Channel rules" className="min-w-[30rem]">
+        <div role="row" className="grid items-end gap-x-4 border-b border-hairline pb-2" style={{ gridTemplateColumns: colsFor(section.channels) }}>
+          <span role="columnheader" className="caps-label">Content type</span>
+          {section.channels.map((c) => (
+            <span role="columnheader" key={c} className="caps-label text-center">
+              {CHANNEL_LABELS[c]}
+            </span>
+          ))}
+        </div>
+        {section.rows.map((row) => (
+          <TypeRow
+            key={row.contentTypeId}
+            row={row}
+            channels={section.channels}
+            asking={asking?.contentTypeId === row.contentTypeId ? asking.channel : null}
+            setAsking={(channel) => setAsking(channel ? { contentTypeId: row.contentTypeId, channel } : null)}
+          />
         ))}
       </div>
-      {section.rows.map((row) => (
-        <TypeRow
-          key={row.contentTypeId}
-          row={row}
-          channels={section.channels}
-          asking={asking?.contentTypeId === row.contentTypeId ? asking.channel : null}
-          setAsking={(channel) => setAsking(channel ? { contentTypeId: row.contentTypeId, channel } : null)}
-        />
-      ))}
-    </div>
+    </ScrollRegion>
   );
 }
 

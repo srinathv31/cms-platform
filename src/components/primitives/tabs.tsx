@@ -5,7 +5,7 @@ import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { m } from "motion/react";
 import { spring } from "@/components/motion/presets";
 import { cn } from "@/lib/utils";
-import { TAB, TAB_ACTIVE, TAB_IDLE, TAB_LABEL, TAB_UNDERLINE } from "./tab-styles";
+import { TAB, TAB_ACTIVE, TAB_BAR_SCROLLS, TAB_IDLE, TAB_LABEL, TAB_UNDERLINE } from "./tab-styles";
 
 // View switches in the page (Overview | Consumers, Document | Preview, the review queue): Base UI Tabs
 // in the tab idiom of the workspace tab bar (tab-styles.ts), with the underline sliding to the chosen
@@ -50,7 +50,7 @@ export function Tabs<T extends string>({
 /** The bar: tabs 28px apart. Arrow keys choose as they move. */
 export function TabList({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <TabsPrimitive.List aria-label={label} activateOnFocus className={cn("flex gap-7", className)}>
+    <TabsPrimitive.List aria-label={label} activateOnFocus className={cn("flex gap-7", TAB_BAR_SCROLLS, className)}>
       {children}
     </TabsPrimitive.List>
   );

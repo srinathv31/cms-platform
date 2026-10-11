@@ -30,7 +30,10 @@ import { Blocked, Pick, useFocusAfterCommit } from "./ui";
 // same function the server runs on save: each problem shows under the field it's about, and the
 // confirm stays disabled with the first one beside it. Remove asks the domain's `removeStageRefusal`.
 
-const COLS = "1.5rem minmax(0,0.85fr) minmax(0,1.15fr) auto";
+// A stage's row: number, name, reviewer, buttons. Below 40rem (the dialog's nav goes above the content) the name, the
+// reviewer and the buttons stack in one column beside the number, so a 320px window keeps a name to read.
+const COLS =
+  "grid-cols-[1.5rem_minmax(0,0.85fr)_minmax(0,1.15fr)_auto] max-[40rem]:grid-cols-[1.5rem_minmax(0,1fr)] max-[40rem]:gap-y-2";
 
 interface DraftStage {
   /** Local identity: the stage's id, or `new-n` for one being added. */
@@ -158,8 +161,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
           return (
             <li
               key={row.key}
-              className={cn("grid min-h-16 gap-x-4 border-b border-hairline py-2.5", isEditing ? "items-end" : "items-center")}
-              style={{ gridTemplateColumns: COLS }}
+              className={cn("grid min-h-16 gap-x-4 border-b border-hairline py-2.5", COLS, isEditing ? "items-end" : "items-center")}
               onKeyDown={
                 isEditing
                   ? (e) => {
@@ -193,7 +195,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                   <div className="truncate text-[15px] font-medium text-text">{row.name || "New stage"}</div>
                 )}
               </div>
-              <div className="min-w-0 text-[14px] text-text">
+              <div className="min-w-0 text-[14px] text-text max-[40rem]:col-start-2">
                 {isEditing ? (
                   <div className="flex flex-col gap-1.5">
                     <span aria-hidden className="text-[13px] text-text-muted">
@@ -225,7 +227,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                   <span className="block truncate">{ruleLabel(row.rule, approvers)}</span>
                 )}
               </div>
-              <div className="flex items-center justify-end gap-1.5">
+              <div className="flex items-center justify-end gap-1.5 max-[40rem]:col-start-2 max-[40rem]:justify-start">
                 <Button variant="ghost" size="icon" aria-label={`Move ${row.name || "stage"} up`} aria-disabled={index === 0} className="aria-disabled:opacity-40" onClick={() => index > 0 && move(index, -1)}>
                   <ArrowUp aria-hidden strokeWidth={1.75} />
                 </Button>
@@ -271,7 +273,7 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                 </p>
               ) : null}
               {reviewerProblem ? (
-                <p id={reviewerProblemId} data-problem="reviewer" className="col-start-3 col-end-5 pt-1 text-[13px] text-danger-text">
+                <p id={reviewerProblemId} data-problem="reviewer" className="col-start-3 col-end-5 pt-1 text-[13px] text-danger-text max-[40rem]:col-start-2 max-[40rem]:col-end-3">
                   {reviewerProblem}
                 </p>
               ) : null}

@@ -12,6 +12,15 @@
 
 /* Light theme only (build plan). No dark variant. */
 
+/*
+ * The app shell's one breakpoint (decision 0045). Below 800px the sidebar is a drawer behind a button in the top
+ * bar and the canvas takes the whole width; from 800px up it is the fixed column. `narrow:` is the same query as
+ * useIsMobile in src/hooks/use-mobile.ts, which decides which sidebar React renders, so keep the two in step
+ * (src/hooks/use-mobile.test.ts checks).
+ */
+@custom-variant narrow (@media (max-width: 799px));
+@custom-variant wide (@media (min-width: 800px));
+
 @theme inline {
   /* Fonts */
   --font-sans: var(--ui-font-sans);

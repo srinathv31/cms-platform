@@ -49,6 +49,8 @@ decided and why, so it can be revisited without the person who made it.
 | [0042](0042-read-models-beside-queries-and-an-editor-import-allowlist.md) | A screen's read model is declared beside the query that builds it, and code outside the editor imports only the modules its README lists, by lint | Accepted |
 | [0043](0043-split-files-by-concern-not-by-line-count.md) | A file is split when it mixes concerns a reader has to tell apart, not because it passes a line count | Accepted |
 | [0044](0044-the-workspace-session-stores-its-state-in-zustand.md) | The workspace session and the Content page's live draft keep their subscribable state in a vanilla zustand store behind their unchanged interfaces; the rules, and what only the rules use, stay in the closure | Accepted |
+| [0045](0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md) | Stencil supports desktop Chrome on work laptops, and its UI reflows down to 320 CSS px for zoom (WCAG 1.4.10), with named exceptions; below 800px the sidebar is a drawer; there is no separate mobile design | Accepted |
+| [0046](0046-phone-previews-are-approximations.md) | The phone previews are approximations of a customer's phone: the text is exact, the layout follows each platform's published conventions, and exact line breaks and type sizes on every device are not promised | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

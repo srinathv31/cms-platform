@@ -96,6 +96,15 @@ phone at 1:1, for a box that draws it unscaled).
   title is what a bystander reads, so it must never carry anything private. A banner or heads-up arrives on an
   unlocked phone, and the expanded view opens unlocked, so both still show the content.
 
+## How exact the previews are
+
+They are approximations of a customer's phone ([decision 0046](../../../docs/decisions/0046-phone-previews-are-approximations.md)).
+The text is exact: the kit prints the strings it is given, whole, and never rewords or drops any of it. The layout
+follows each platform's published conventions (the fields, the line clamps, the type ramps) at the real devices'
+proportions. Exact line breaks, type sizes and cut points on every device, OS version and user text size are not
+promised, and nothing was checked against a physical iPhone or Pixel. Cite the platform guide for any number you
+change, and don't write copy or UI that claims more ("this is exactly what customers see").
+
 ## Truncation: `onMeasure`
 
 The text is never shortened in the data: the OS cuts it on screen, and the kit cuts it the same way, with

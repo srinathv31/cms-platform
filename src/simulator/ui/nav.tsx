@@ -24,7 +24,7 @@ export function NavList({ pathname, noticesBadge }: { pathname: string | null; n
   const active = (href: string) =>
     pathname === null ? false : href === "/sim" ? pathname === "/sim" || pathname.startsWith("/sim/offers") : pathname.startsWith(href);
   return (
-    <nav aria-label="Coral" className="flex flex-col gap-0.5 px-3 pt-2">
+    <nav aria-label="Coral" className="flex flex-col gap-0.5 px-3 pt-2 narrow:flex-row narrow:flex-wrap narrow:pt-0">
       {ITEMS.map((item) => (
         <Link
           key={item.href}

@@ -23,7 +23,11 @@ import { WorkspaceShare } from "./workspace-share";
 // name keeps nearly the whole width (the ring's column is the only thing it gives up) and wraps to a
 // second line only when it must. Draft and Active are the same height: the ring is shorter than the
 // two rows, and only a wrapped name, or saving stopping for good (its third line), makes the header grow.
-const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5";
+//
+// On a narrow canvas (under 26rem, a window under about 470px) it is two columns and four rows instead: the name
+// and the ring, the status row across the full width, the Template ID under it, then why saving stopped. The
+// three-column layout would leave the status row about 30px at 320px wide (reflow, decision 0045).
+const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5 @max-[26rem]/canvas:grid-cols-[minmax(0,1fr)_auto]";
 
 /** One item of the status row: 16px of left padding, the room a separator takes (and the row pulls back). */
 const META_ITEM = "flex shrink-0 items-center pl-4 whitespace-nowrap";
@@ -49,7 +53,7 @@ export async function WorkspaceHeader({
   return (
     <header className={cn(WS.header, HEADER)}>
       <BindDraft draft={t.draft} />
-      <div className="col-span-2 col-start-1 row-start-1 min-w-0">
+      <div className="col-span-2 col-start-1 row-start-1 min-w-0 @max-[26rem]/canvas:col-span-1">
         <NameField name={t.name} editable={t.editable} />
       </div>
       {/* After a submit or a revert, focus lands here (workspace-actions.tsx, save-status.tsx), where the outcome reads. */}
@@ -59,7 +63,7 @@ export async function WorkspaceHeader({
           controls' focus rings inside the clip. */}
       <StatusRow
         state={t.status}
-        className="col-start-1 row-start-2 -mx-1.5 min-h-7 self-end justify-self-start overflow-x-clip rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="col-start-1 row-start-2 -mx-1.5 min-h-7 self-end justify-self-start overflow-x-clip rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring @max-[26rem]/canvas:col-span-2"
       >
         <div className="-ml-4 flex min-h-7 flex-wrap items-center gap-y-1.5">
           <span className={META_ITEM}>
@@ -87,12 +91,15 @@ export async function WorkspaceHeader({
         </div>
       </StatusRow>
       {/* The value row sits on the status row's line. */}
-      <TemplateId id={t.id} className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end" />
+      <TemplateId
+        id={t.id}
+        className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:col-start-1 @max-[26rem]/canvas:row-start-3 @max-[26rem]/canvas:mb-0 @max-[26rem]/canvas:ml-0 @max-[26rem]/canvas:mt-1.5"
+      />
       {/* Saving stopped for good: a line of its own, the header's full width. */}
-      {t.editable ? <SaveStopped className="col-span-3 col-start-1 row-start-3" /> : null}
+      {t.editable ? <SaveStopped className="col-span-3 col-start-1 row-start-3 @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:row-start-4" /> : null}
       {t.activeNumber !== null ? (
         // The SHARE signature: Active versions only. It shows what consumers get, so the Active version's name.
-        <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start">
+        <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start @max-[26rem]/canvas:col-start-2 @max-[26rem]/canvas:row-span-1 @max-[26rem]/canvas:ml-3">
           <WorkspaceShare templateId={t.id} templateName={t.activeName ?? t.name} activeVersion={t.activeNumber} />
         </div>
       ) : null}
@@ -104,11 +111,13 @@ export async function WorkspaceHeader({
 export function WorkspaceHeaderSkeleton() {
   return (
     <div aria-hidden className={cn(WS.header, HEADER)}>
-      <Skeleton className="col-span-2 col-start-1 row-start-1 my-[3px] h-7 w-72" />
+      <Skeleton className="col-span-2 col-start-1 row-start-1 my-[3px] h-7 w-72 max-w-full @max-[26rem]/canvas:col-span-1" />
       <div className="col-start-1 row-start-2 flex min-h-[2.625rem] items-end gap-4 pb-[3px]">
         <Skeleton className="h-[22px] w-20 rounded-md" />
         <Skeleton className="h-4 w-24" />
       </div>
+      {/* The Template ID's line under the status row, which only the narrow header has. */}
+      <div className="col-span-2 row-start-3 mt-1.5 hidden h-11 @max-[26rem]/canvas:block" />
     </div>
   );
 }

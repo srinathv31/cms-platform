@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { DemoPillHole } from "@/components/demo/demo-pill-hole";
-import { Sidebar, SidebarHeader, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarHeader, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar, NavDrawerTrigger } from "./app-sidebar";
 import { CanvasScroll } from "./canvas-scroll";
 import { HomeLink } from "./home-link";
 import { CanvasFade, PersonaSwitchProvider } from "./persona-switch";
@@ -19,8 +20,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       style={{ "--sidebar-width": "var(--sidebar-w)" } as CSSProperties}
       className="h-svh min-h-0 overflow-hidden bg-app"
     >
-      {/* One landmark for the whole sidebar: the product name, the switcher, the space's pages, its card, Settings and Help. */}
-      <Sidebar variant="inset" collapsible="none" role="navigation" aria-label="Sidebar" className="shrink-0">
+      {/* One landmark for the whole sidebar: the product name, the switcher, the space's pages, its card, Settings and Help.
+          A column from 800px up, a drawer below it (decision 0045). */}
+      <AppSidebar>
         <SidebarHeader className="gap-0 px-3 pt-5 pb-2">
           <HomeLink />
           <Stream fallback={<TeamSwitcherSkeleton />}>
@@ -30,14 +32,15 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         <Stream fallback={<SidebarBodySkeleton />}>
           <SidebarBodyHole />
         </Stream>
-      </Sidebar>
+      </AppSidebar>
 
       <PersonaSwitchProvider>
-        <SidebarInset className="m-3 ml-0 min-h-0 min-w-0 overflow-hidden rounded-4xl border border-hairline bg-canvas shadow-none">
+        <SidebarInset className="m-3 wide:ml-0 min-h-0 min-w-0 overflow-hidden rounded-4xl border border-hairline bg-canvas shadow-none">
           <header
             data-slot="top-bar"
             className="flex h-16 shrink-0 items-center justify-end px-(--canvas-pad-x)"
           >
+            <NavDrawerTrigger />
             <Stream fallback={<TopBarSkeleton />}>
               <TopBarHole />
             </Stream>

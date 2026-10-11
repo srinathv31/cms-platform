@@ -55,6 +55,7 @@ export function SunsetCalendarContent({
   return (
     <PopoverContent
       align={align}
+      aria-label="Choose a sunset date"
       className="w-auto p-0"
       // The selected day takes the focus; with none (it can't happen) the popover's default stands.
       initialFocus={() => root.current?.querySelector<HTMLElement>(SELECTED_DAY) ?? true}

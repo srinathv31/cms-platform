@@ -415,7 +415,9 @@ export function StackedBars({
     <>
       <div className="flex" style={{ height }}>
         <YLabels ticks={ticks} y={y} format={compactCount} />
-        <svg role="group" aria-label={label} width="100%" height={height} className="block min-w-0 flex-1">
+        {/* Overflow visible: the first and last tick label are centred on their column, and on a narrow canvas a column is
+            narrower than half a label (reflow, decision 0045). */}
+        <svg role="group" aria-label={label} width="100%" height={height} className="block min-w-0 flex-1 overflow-visible">
           {ticks.map((t) => (
             <line key={t} x1="0" x2="100%" y1={y(t)} y2={y(t)} className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"} strokeWidth={1} />
           ))}
@@ -434,7 +436,14 @@ export function StackedBars({
                   ) : null;
                 })}
                 {i % tickEvery === 0 ? (
-                  <text aria-hidden x={`${i * col + col / 2}%`} y={height - 6} textAnchor="middle" className="fill-text-muted text-[11px]">
+                  <text
+                    aria-hidden
+                    x={`${i * col + col / 2}%`}
+                    y={height - 6}
+                    textAnchor="middle"
+                    // On a narrow canvas every other label goes: two labels a column apart would print over each other.
+                    className={cn("fill-text-muted text-[11px]", i % (tickEvery * 2) !== 0 && "@max-[22rem]/canvas:hidden")}
+                  >
                     {d.label}
                   </text>
                 ) : null}

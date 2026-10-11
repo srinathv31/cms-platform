@@ -44,7 +44,7 @@ export function ProfileMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[22rem] rounded-2xl border border-hairline p-1.5 shadow-pop ring-0"
+        className="w-[22rem] max-w-[calc(100vw-1rem)] rounded-2xl border border-hairline p-1.5 shadow-pop ring-0"
       >
         <div className="flex items-center gap-3 px-2.5 pt-2 pb-3">
           <UserAvatar initials={me.initials} hue={me.hue} size="lg" />

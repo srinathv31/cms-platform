@@ -16,7 +16,7 @@ const KIND = {
 export function OffersTable({ offers, kind = "offer" }: { offers: SimOfferCard[]; kind?: SimOfferKind }) {
   return (
     <Panel title={kind === "alert" ? KIND.alert.table : undefined} label={kind === "alert" ? KIND.alert.table : undefined}>
-      <TableWrap>
+      <TableWrap label={KIND[kind].table}>
         <table aria-label={KIND[kind].table} className="w-full min-w-[44rem] border-collapse">
           <thead>
             <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
