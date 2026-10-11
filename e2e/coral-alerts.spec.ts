@@ -20,6 +20,7 @@ import {
   type Snapshot,
 } from "./helpers/golive";
 import { asPersona, beat, demoTimeout, expect, hydrated, shoot, test } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Coral receives alerts: the push and SMS demo moment, start to finish.
 //
@@ -122,6 +123,7 @@ test.describe("Coral receives alerts", () => {
       await expect(page.getByRole("heading", { level: 1, name: ALERT_NAME })).toBeVisible();
       await expect(decision(page)).toBeVisible();
       await hydrated(page);
+      await viewEveryOutput(page);
       await click(decision(page).getByRole("button", { name: "Approve", exact: true }));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
       await expect(dialog).toBeVisible();

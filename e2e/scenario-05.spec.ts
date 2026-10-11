@@ -51,6 +51,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Phase 5 gate: demo scenario 5 ("Breaking change, pin and sunset"), start to finish.
 //
@@ -278,6 +279,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await expect(contract).toContainText("adds required");
       await expect(contract).toContainText("annual_fee");
       await expect(contract.getByLabel("Breaking")).toHaveCount(1);
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await beat(page, 900);
       await shoot(page, "review-breaking");

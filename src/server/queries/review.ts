@@ -6,7 +6,7 @@ import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
@@ -302,6 +302,9 @@ export const getReviewScreen = cache(
     // the Active one, unless that is this version's own release.
     const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
     const active = others.find((v) => v.state === "active");
+    // With nothing Active (after a revoke), the version consumers move from is the newest that still
+    // renders: the Approve dialog names its consumers and what they have to map (N3).
+    const renders = active ? null : contractBaseline(others, nowDate);
     // A sent-back round that was resubmitted is a record: where its work went is the number's head, linked
     // when the viewer may open it (a stage reviewer from another team may not).
     const head = replacedBy(others, shown);
@@ -336,6 +339,10 @@ export const getReviewScreen = cache(
       },
       baseline,
       previousNumber: active && active.number !== number ? active.number : null,
+      stillRenders:
+        renders && renders.number !== null && renders.number !== number
+          ? { number: renders.number, sunsetDay: renders.sunsetAt ? sunsetDay(renders.sunsetAt, zone) : null }
+          : null,
       replacedBy: next ? { ...next, label: versionLabel(next, { style: "sentence" }) } : null,
       liveName: renamedFrom?.name ?? null,
       steps: stepperState(

@@ -23,6 +23,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Phase 4 gate: demo scenario 3 ("Review loop"), start to finish, with Maya and Jordan taking turns
 // through the persona switcher, as a presenter would.
@@ -412,8 +413,9 @@ test.describe("scenario 3: the review loop", () => {
       await expect(statusBadge(page)).toHaveText("In review");
       const step = decision(page).locator('[data-step="current"]');
       await expect(step).toContainText("Team approver");
-      await expect(step).toContainText("Waiting for a decision");
-      await expect(approveButton(page)).toBeEnabled();
+      // Approve waits until he has had each output on screen in the Preview (decision 0037); Request changes doesn't.
+      await expect(step).toContainText(/Preview .+ first\./);
+      await expect(approveButton(page)).toBeDisabled();
       await expect(requestButton(page)).toBeEnabled();
       await expect(decision(page).getByText(OWN_VERSION)).toHaveCount(0);
       await expect(documentEditor(page)).toContainText(OFFER_SENTENCE);
@@ -730,6 +732,7 @@ test.describe("scenario 3: the review loop", () => {
       await expect(statusBadge(page)).toHaveText("In review");
       await expect(page.getByRole("heading", { level: 1, name: NAME }).locator("xpath=../..")).toContainText("v1 · Round 2 by Maya Chen");
       await expect(decision(page).locator('[data-step="current"]')).toContainText("Team approver");
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await expect(requestButton(page)).toBeEnabled();
       await expect(decision(page)).toContainText(NOTE_V2);

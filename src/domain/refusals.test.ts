@@ -8,6 +8,7 @@ import { REFUSALS } from "./lifecycle";
 import { REASONS } from "./permissions";
 import { PLATFORM_REFUSALS } from "./platform-config";
 import { REQUEST_REFUSALS, refusal, refuse, type RefusalCode } from "./refusals";
+import { OUTPUT_REFUSALS } from "./review-outputs";
 
 // Every refusal people read carries a stable code, and the code is what code branches on
 // (handoff review I11). These tests hold the tables to that: every entry has a code, no two entries
@@ -20,6 +21,7 @@ const TABLES = {
   COMMENT_REFUSALS,
   ACCESS_REFUSALS,
   PLATFORM_REFUSALS,
+  OUTPUT_REFUSALS,
   REQUEST_REFUSALS,
 } as const;
 

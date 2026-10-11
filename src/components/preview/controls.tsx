@@ -25,19 +25,26 @@ export function ChannelTabs({
   channels,
   value,
   onChange,
+  viewed,
   className,
 }: {
   channels: readonly Channel[];
   value: Channel;
   onChange: (channel: Channel) => void;
+  /**
+   * The review Preview: the channels whose every output the approver has viewed, each with a quiet check
+   * (decision 0037). Absent in the workspace: no checks, and no room for them.
+   */
+  viewed?: readonly Channel[];
   className?: string;
 }) {
   return (
     <Segmented
       label="Channel"
       value={value}
-      options={channels.map((id) => ({ value: id, label: CHANNEL_LABELS[id] }))}
+      options={channels.map((id) => ({ value: id, label: CHANNEL_LABELS[id], done: viewed ? viewed.includes(id) : undefined }))}
       onChange={onChange}
+      doneLabel="Viewed"
       className={className}
     />
   );

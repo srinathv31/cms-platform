@@ -31,6 +31,11 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
+
+// Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
+// scripts into them ("Blocked script execution").
+test.use({ trace: "off" });
 
 // After the Active version is revoked, the template can still be corrected (handoff review D1, decision 0009).
 //
@@ -269,10 +274,14 @@ test("after the Active version is revoked, an author corrects it from its conten
   });
 
   await test.step("4.2 Jordan approves v3: it goes live over nothing, with no sunset to set", async () => {
+    await viewEveryOutput(page);
     await click(decision(page).getByRole("button", { name: "Approve", exact: true }));
     const dialog = page.getByRole("dialog", { name: "Approve v3" });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v3 becomes Active.");
+    // N3: nothing is Active, but v1 still renders, so its consumers are who move to v3: not a first version.
+    await expect(dialog.locator('[data-slot="consequences"]')).toContainText("v1");
+    await expect(dialog).not.toContainText("Consumers can start using it right away.");
     await expect(dialog.getByRole("checkbox"), "no previous Active version to sunset").toHaveCount(0);
     await expect(dialog.getByText(/sunset/i)).toHaveCount(0);
     await tap(dialog.getByRole("button", { name: "Approve v3", exact: true }));

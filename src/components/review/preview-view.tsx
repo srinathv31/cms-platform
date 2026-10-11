@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { renderMessagePreview } from "@/components/preview/message-preview";
 import type { PhoneView } from "@/components/preview/phone-controls";
 import { PreviewPane } from "@/components/preview/preview-pane";
@@ -9,6 +9,7 @@ import { usePreviewRender } from "@/components/preview/use-preview-render";
 import { INITIAL_PHONE, type PreviewDevice } from "@/components/workspace/session/session-store";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import { outputKey, type OutputKey } from "@/domain/review-outputs";
 import type { VariableValues } from "@/editor/model/types";
 import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";
 import { RV } from "./review-grid";
@@ -24,6 +25,11 @@ import { RV } from "./review-grid";
  * Nothing here is saved or edited, so there is nothing to wait for before a request (`flush` is
  * instant) and no save tick. The sample set is chosen in the tab bar; `onSeen` says which sets the
  * approver has had on screen, and the approval records them.
+ *
+ * `onViewed` says which outputs the approver has had on screen (decision 0037): Web, Email, a push on the
+ * phone picked and SMS once they rendered, a PDF once pdf.js has drawn it; never a failed render, and never
+ * for a tab merely picked. Approve waits on every output. The channel and phone controls check off the
+ * ones viewed (`viewed`).
  *
  * The well scrolls on its own, so the pane has a height of its own: the canvas's scroll area less
  * the header (124px) and the tab bar (44px), never less than 30rem.
@@ -46,6 +52,8 @@ export function PreviewView({
   setId,
   enabled,
   onSeen,
+  viewed,
+  onViewed,
   onEditValues,
 }: {
   templateId: string;
@@ -71,6 +79,10 @@ export function PreviewView({
   enabled: boolean;
   /** A sample set's output is on screen. */
   onSeen: (setId: string) => void;
+  /** The outputs viewed so far: the controls check them off. */
+  viewed: readonly OutputKey[];
+  /** An output is on screen: a channel, or Push on the phone picked. */
+  onViewed: (output: OutputKey) => void;
   /** The error state's Edit values: opens the (read-only) sample set's values. */
   onEditValues: () => void;
 }) {
@@ -104,6 +116,15 @@ export function PreviewView({
     if (enabled && rendered) onSeen(setId);
   }, [enabled, rendered, setId, onSeen]);
 
+  // The output on screen counts as viewed once it has rendered there. A PDF's bytes aren't on screen until
+  // pdf.js has drawn them, so it counts when the viewer says so (`onPdfShown`).
+  const output = outputKey(channel, platform);
+  const onScreen = channel !== "pdf" && rendered;
+  useEffect(() => {
+    if (enabled && onScreen) onViewed(output);
+  }, [enabled, onScreen, output, onViewed]);
+  const onPdfShown = useCallback(() => onViewed("pdf"), [onViewed]);
+
   return (
     <div
       id="review-panel-preview"
@@ -130,6 +151,8 @@ export function PreviewView({
         message={message}
         senders={phoneSenders(senders, teamName)}
         clock={phoneClock(today)}
+        viewed={viewed}
+        onPdfShown={onPdfShown}
       />
     </div>
   );

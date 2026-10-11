@@ -67,6 +67,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
 
 // Phase 7 gate: the whole demo script (build plan, "Demo script", scenarios 1–11) as ONE story, in order,
 // on ONE database state, from a fresh `db:reset`. No fixtures and no resets or restores in between:
@@ -575,7 +576,9 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await shoot(page, "demo-03-queue-jordan");
     await click(queueRow(page, springId, 1));
     await expectReviewScreen(page, springId, 1, NAME);
-    await expect(approveButton(page)).toBeEnabled();
+    // Approve waits until he has viewed every output (decision 0037); sending it back doesn't.
+    await expect(approveButton(page)).toBeDisabled();
+    await expect(requestButton(page)).toBeEnabled();
 
     await selectPhrase(page, docBlock(page, INTEREST_STARTS), QUOTE);
     const comment = page.getByRole("button", { name: "Comment", exact: true }).filter({ visible: true });
@@ -644,6 +647,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await click(queueRow(page, springId, 1, 2));
     await expectReviewScreen(page, springId, 1, NAME, 2);
     await expect(documentEditor(page)).toContainText(FIX.trim());
+    await viewEveryOutput(page);
     await click(approveButton(page));
     const dialog = page.getByRole("dialog", { name: "Approve v1, round 2", exact: true });
     await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v1 becomes Active.");
@@ -846,6 +850,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await beat(page, 800);
     await shoot(page, "demo-05-review-breaking");
 
+    await viewEveryOutput(page);
     await click(approveButton(page));
     const dialog = page.getByRole("dialog", { name: "Approve v2", exact: true });
     await expect(dialog).toBeVisible();

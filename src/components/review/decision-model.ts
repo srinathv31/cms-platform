@@ -5,9 +5,10 @@
 
 import { breakingKeysOf, consequences } from "@/domain/consequences";
 import { formatCount } from "@/domain/numbers";
+import { outputsRefusal } from "@/domain/review-outputs";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import { versionLabel, type NumberedRound } from "@/domain/rounds";
-import type { ContractChange, PermissionResult } from "@/domain/types";
+import type { Channel, ContractChange, PermissionResult, VersionState } from "@/domain/types";
 
 /** The longest reason the server accepts (actions/review.ts). */
 export const REASON_MAX = 2000;
@@ -46,6 +47,21 @@ export function decisionAccess(approve: PermissionResult, requestChanges: Permis
   return refused.code === "generic" ? { kind: "hidden" } : { kind: "blocked", reason: refused.reason };
 }
 
+/**
+ * Why Approve alone isn't available yet: an output of the round the viewer hasn't had on screen in the
+ * Preview (decision 0037), in the domain's sentence, the one the server refuses with. Only while the pair
+ * is otherwise theirs to press and the round is in review; Request changes never waits on it. Null once
+ * every output has been viewed.
+ */
+export function approveWaitsOn(
+  access: DecisionAccess,
+  version: { state: VersionState; channels: readonly Channel[] },
+  viewed: readonly string[],
+): string | null {
+  if (access.kind !== "open" || version.state !== "in_review") return null;
+  return outputsRefusal(version.channels, viewed)?.reason ?? null;
+}
+
 // ── Approving ────────────────────────────────────────────────────────────────
 
 export interface ApprovalStageInfo {
@@ -69,10 +85,15 @@ export interface ApproveLinesInput {
   version: NumberedRound;
   /** The Active version this one replaces; null when nothing is Active yet. */
   previousNumber: number | null;
+  /**
+   * With nothing Active (after a revoke), the newest version that still renders, which consumers move from
+   * (`ReviewScreenData.stillRenders`). Null for a first version.
+   */
+  stillRenders?: { number: number; sunsetDay: string | null } | null;
   stage: ApprovalStageInfo;
   /** YYYY-MM-DD: the sunset date chosen for the previous version, or null (it keeps rendering until relinked). */
   sunset: string | null;
-  /** The version's contract changes against the Active one: the breaking ones say what its consumers have to map. */
+  /** The version's contract changes against the version consumers move from: the breaking ones say what they have to map. */
   contractChanges?: readonly ContractChange[];
   usage: readonly ConsumerUsage[];
   /** The demo clock's instant. */
@@ -84,7 +105,16 @@ export interface ApproveLinesInput {
  * domain's `consequences`, from the render log), in released numbers: consumers never see a round. An
  * earlier stage only moves the round along: nothing goes live, so a sunset date is never part of it.
  */
-export function approveLines({ version, previousNumber, stage, sunset, contractChanges = [], usage, nowIso }: ApproveLinesInput): string[] {
+export function approveLines({
+  version,
+  previousNumber,
+  stillRenders = null,
+  stage,
+  sunset,
+  contractChanges = [],
+  usage,
+  nowIso,
+}: ApproveLinesInput): string[] {
   if (!stage.final) {
     const next = stage.next?.name ?? "the next stage";
     const v = versionLabel(version, { style: "sentence" });
@@ -96,6 +126,7 @@ export function approveLines({ version, previousNumber, stage, sunset, contractC
       newNumber: version.number,
       previousNumber,
       sunsetAt: previousNumber === null ? null : sunset,
+      stillRenders: previousNumber === null && stillRenders ? { number: stillRenders.number, sunsetAt: stillRenders.sunsetDay } : null,
       breakingKeys: breakingKeysOf(contractChanges),
     },
     usage,

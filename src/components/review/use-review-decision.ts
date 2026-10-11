@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { Route } from "next";
+import type { OutputKey } from "@/domain/review-outputs";
 import type { ReviewScreenData } from "@/domain/review-types";
 import { reviewPath } from "@/domain/rounds";
 import type { Approved } from "./approve-dialog";
-import { approvalStage, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
+import { approvalStage, approveWaitsOn, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
 import type { NextRound } from "./decision-rail";
 import type { GoLiveMoment } from "./use-go-live";
 
@@ -17,9 +18,22 @@ import type { GoLiveMoment } from "./use-go-live";
  * go-live moment is started and finished here (`goLive`, use-go-live.ts).
  *
  * The server's data is the truth and arrives anew after every action; what is kept here is what the viewer did
- * on this screen (`local`: "You approved v3.").
+ * on this screen (`local`: "You approved v3."). Approve also waits on the outputs the approver has viewed in
+ * the Preview (`viewed`, use-viewed-outputs.ts): `approveBlocked` is why, in the domain's sentence, while one
+ * is missing (decision 0037).
  */
-export function useReviewDecision({ data, team, goLive }: { data: ReviewScreenData; team: string; goLive: GoLiveMoment }) {
+export function useReviewDecision({
+  data,
+  team,
+  goLive,
+  viewed,
+}: {
+  data: ReviewScreenData;
+  team: string;
+  goLive: GoLiveMoment;
+  /** The outputs of this round the approver has had on screen in the Preview. */
+  viewed: readonly OutputKey[];
+}) {
   const { template, version, steps, can } = data;
   const stage = useMemo(() => approvalStage(steps), [steps]);
 
@@ -71,8 +85,12 @@ export function useReviewDecision({ data, team, goLive }: { data: ReviewScreenDa
     if (line !== null && decided.current) decisionRegion.current?.focus({ preventScroll: true });
   }, [line]);
 
+  const access = decisionAccess(can.approve, can.requestChanges);
+
   return {
-    access: decisionAccess(can.approve, can.requestChanges),
+    access,
+    /** Approve alone is blocked, with this sentence: an output not viewed yet. */
+    approveBlocked: approveWaitsOn(access, version, viewed),
     row,
     next,
     /** The viewer made the decision on this screen. */
@@ -87,6 +105,7 @@ export function useReviewDecision({ data, team, goLive }: { data: ReviewScreenDa
       onOpenChange: (isOpen: boolean) => !isOpen && setDialog(null),
       stage,
       // The server's data moves to Active the moment the approval lands; the header holds until the moment plays.
+      outputsViewed: viewed,
       onBegin: () => goLive.begin(stage.final),
       onApproved,
       onFailed: () => goLive.failed(),

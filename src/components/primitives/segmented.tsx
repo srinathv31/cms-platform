@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { toggleVariants } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -27,6 +28,12 @@ export interface SegmentedOption<T extends string> {
   label: string;
   /** Drawn instead of the label: an icon-only segment (the team icon picker). */
   icon?: ReactNode;
+  /**
+   * A quiet check after the label, a status (the review Preview's outputs the approver has viewed). True
+   * draws it, false keeps its room empty, so a segment is as wide before as after; undefined, no room.
+   * `Segmented` only.
+   */
+  done?: boolean;
 }
 
 interface SegmentedProps<T extends string> {
@@ -44,12 +51,15 @@ export function Segmented<T extends string>({
   options,
   onChange,
   disabled,
+  doneLabel,
   className,
 }: SegmentedProps<T> & {
   /** The group's accessible name. */
   label: string;
   /** While something it would change is busy (New template while a template is being made): greyed, and nothing moves. */
   disabled?: boolean;
+  /** What a done option's check means, as its accessible description ("Viewed"). */
+  doneLabel?: string;
 }) {
   return (
     <ToggleGroup
@@ -69,9 +79,14 @@ export function Segmented<T extends string>({
           key={option.value}
           value={option.value}
           aria-label={option.icon ? option.label : undefined}
+          aria-description={option.done ? doneLabel : undefined}
+          data-done={option.done ? "" : undefined}
           className={cn(SEGMENT, option.icon ? ICON_SEGMENT : null)}
         >
           {option.icon ?? option.label}
+          {option.done === undefined ? null : (
+            <Check aria-hidden strokeWidth={2.5} className={cn("size-3 text-positive", !option.done && "invisible")} />
+          )}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

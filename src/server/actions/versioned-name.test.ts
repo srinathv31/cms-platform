@@ -3,6 +3,7 @@ import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -193,7 +194,7 @@ describe("a rename in a draft goes live only with its version", () => {
     // Sent back, it comes back as round 2 of v3: consumers get v3, never a round.
     expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 2 });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: "2026-12-01", sampleSetsSeen: [] })).toEqual({
+    expect(await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: "2026-12-01", outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: true,
       wentLive: true,
       number: 3,

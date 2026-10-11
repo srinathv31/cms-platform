@@ -180,6 +180,7 @@ describe("getReviewScreen", () => {
     });
     expect(screen.baseline).toMatchObject({ number: 2, state: "active" });
     expect(screen.previousNumber, "approving v3 replaces the Active v2").toBe(2);
+    expect(screen.stillRenders, "only read with nothing Active").toBeNull();
     expect(screen.liveName).toBe("Cash Back Welcome Bonus — Terms");
     expect(screen.steps).toEqual([{ position: 0, name: "Team approver", status: "current" }]);
     expect(screen.can).toEqual({ approve: { ok: true }, requestChanges: { ok: true }, comment: { ok: true } });
@@ -383,6 +384,8 @@ describe("getReviewScreen", () => {
             smsFooter: null,
           });
           expect(screen.previousNumber, "nothing is Active: the Approve dialog's previous version stays null").toBeNull();
+          // N3: what consumers move from is the newest version that still renders, so the dialog names its consumers.
+          expect(screen.stillRenders).toEqual({ number: 1, sunsetDay: null });
         },
       );
     });
@@ -397,9 +400,14 @@ describe("getReviewScreen", () => {
           expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "superseded" });
           expect(screen.previousNumber).toBeNull();
 
+          const later = new Date(BASE.getTime() + 40 * 86_400_000);
+          await db.update(versions).set({ sunsetAt: later }).where(versionOf(1));
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).stillRenders, "with its own sunset day").toMatchObject({ number: 1, sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+
           // v1's sunset passes too: nothing renders, so nothing to compare with, as for a first version.
           await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - 1000) }).where(versionOf(1));
           expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).baseline).toBeNull();
+          expect((await getReviewScreen("coral-offers", ids["cash-back"]!, 3, null)).stillRenders, "nothing renders: a first version").toBeNull();
         },
       );
     });

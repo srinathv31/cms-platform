@@ -119,7 +119,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N3 · Low: After a revoke, Approve's consequences read as a first version
 
-- **Status:** Open
+- **Status:** Fixed. With nothing Active, the review screen passes the newest version that still renders (`contractBaseline`, as `stillRenders`) as the one consumers move from, and `consequences` has an approve case for it: "v3 becomes Active." with no "becomes Superseded" line, then its consumers ("Coral keeps rendering v1 until it relinks.") and what each has to map; the redline's baseline (decision 0031) is unchanged.
 - **Where:** `src/domain/consequences.ts` (`approveLines`); `src/server/queries/review.ts` (`getReviewScreen`'s `previousNumber`, which `src/components/review/review-workspace.tsx` passes to the dialog)
 - **What happens:** The approve dialog takes its previous version from the Active one. With nothing Active, after a revoke, it says "v3 becomes Active." and "Consumers can start using it right away.", as for a first version. Consumers still pinned to a Superseded version that renders aren't named, nor are the keys they have to map before they move ("Coral has to map `annual_fee` before it moves to v3."), though the version's contract changes were worked out against that version. Noticed while fixing D1 (PR #16).
 - **Fix:** When nothing is Active, pass the newest version that still renders (`contractBaseline`) as the version consumers move from, with an approve case for it in `consequences`: no "becomes Superseded" line, and the mapping lines for its consumers.
@@ -1030,7 +1030,7 @@ Rendering is already in this shape: `src/server/render/engine.ts` runs with no d
 
 ## Follow-ups from the render work
 
-- **Approver views the output before approving.** The next PR: an approver must look at every enabled channel's output before Approve is available, in a way that stays quick to use.
+- **Approver views the output before approving.** Done: Approve waits until every output of the round (each channel, Push on both phones) has rendered on the approver's screen in the Preview; the approve action refuses `output_not_viewed` until it has, and the audit row records the outputs viewed ([decision 0037](decisions/0037-an-approver-views-every-output-before-approving.md)).
 - **Word import keeps the source's numbering.** Import and paste restart lists at 1 with the default style; map Word's numbering formats and start numbers into the per-list styles.
 - **The enterprise font.** Swap it into `src/server/render/channels/pdf-fonts.ts`, fixing the findings listed under [The enterprise font](#the-enterprise-font) at the same time, then `npm run golden:update` refreshes the Node-only PDF files.
 - **PDF cell detection for Java.** The parity test finds PDF table cells from the rules the Node adapter draws; a Java engine needs its own way, as `docs/render-spec.md` notes.

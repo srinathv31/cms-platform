@@ -129,6 +129,55 @@ describe("consequences: approve a breaking version", () => {
   });
 });
 
+// N3: after a revoke nothing is Active, but an older version may still render. Its consumers move from it.
+describe("consequences: approve with nothing Active (after a revoke)", () => {
+  const afterRevoke = (stillRenders: { number: number; sunsetAt: string | null } | null, breakingKeys: string[] = []) =>
+    ({ kind: "approve", newNumber: 3, previousNumber: null, sunsetAt: null, stillRenders, breakingKeys }) as const;
+
+  it("supersedes nothing, and names the consumers still on the version that renders, with what they have to map", () => {
+    expect(consequences(afterRevoke({ number: 1, sunsetAt: null }, ["annual_fee"]), [CORAL_V1, CORAL_V2], NOW)).toEqual([
+      "v3 becomes Active.",
+      "Coral keeps rendering v1 until it relinks.",
+      "Coral has to map `annual_fee` before it moves to v3.",
+    ]);
+  });
+
+  it("names several consumers, and needs no mapping line when nothing breaks", () => {
+    expect(consequences(afterRevoke({ number: 1, sunsetAt: null }), [DEPOSITS_V1, CORAL_V1], NOW)).toEqual([
+      "v3 becomes Active.",
+      "Coral and Deposits Online keep rendering v1 until they relink.",
+    ]);
+  });
+
+  it("says until when they keep working when that version has a sunset of its own", () => {
+    expect(consequences(afterRevoke({ number: 1, sunsetAt: "2027-03-01" }, ["annual_fee"]), [CORAL_V1], NOW)).toEqual([
+      "v3 becomes Active.",
+      "Coral still renders v1 (last render today). It will keep working until March 1, 2027.",
+      "Coral has to map `annual_fee` before it moves to v3.",
+    ]);
+  });
+
+  it("says when no consumer renders it", () => {
+    expect(consequences(afterRevoke({ number: 1, sunsetAt: null }, ["annual_fee"]), [CORAL_V2], NOW)).toEqual([
+      "v3 becomes Active.",
+      "No consumer renders v1.",
+    ]);
+  });
+
+  it("reads as a first version only when nothing renders at all", () => {
+    expect(consequences(afterRevoke(null, ["annual_fee"]), [CORAL_V2], NOW)).toEqual([
+      "v3 becomes Active.",
+      "Consumers can start using it right away.",
+    ]);
+  });
+
+  it("an Active version wins: what renders after a revoke is only read when nothing is Active", () => {
+    expect(
+      consequences({ ...afterRevoke({ number: 1, sunsetAt: null }), previousNumber: 2 }, [CORAL_V2], NOW),
+    ).toEqual(["v3 becomes Active. v2 becomes Superseded; Coral keeps rendering v2 until it relinks."]);
+  });
+});
+
 describe("breakingKeysOf", () => {
   const added = (key: string, required: boolean): ContractChange => ({ kind: "added", key, breaking: required, type: "text", required });
 

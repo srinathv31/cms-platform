@@ -21,6 +21,7 @@ import { useReviewChanges } from "./use-review-changes";
 import { useReviewComments } from "./use-review-comments";
 import { useReviewDecision } from "./use-review-decision";
 import { useReviewView } from "./use-review-view";
+import { useViewedOutputs } from "./use-viewed-outputs";
 import { ChangeToggles, ViewTabs, type ReviewView } from "./view-tabs";
 
 /**
@@ -29,6 +30,8 @@ import { ChangeToggles, ViewTabs, type ReviewView } from "./view-tabs";
  * each kind of state has a hook of its own:
  *
  * - `useReviewView`: which view, and whether the Preview has been opened (use-review-view.ts);
+ * - `useViewedOutputs`: the outputs the approver has had on screen in the Preview, which Approve waits on
+ *   (use-viewed-outputs.ts, decision 0037);
  * - `useReviewChanges`: the redline switches and the diffs (use-review-changes.ts);
  * - `usePreviewSets`: the sample sets, and which were looked at (use-preview-sets.ts);
  * - `useReviewComments`: the comment threads and their focus (use-review-comments.ts);
@@ -61,7 +64,8 @@ export function ReviewWorkspace({
   const { sets, selectedSet, setSetId, values, seen, onSeen, switcher } = usePreviewSets(version, today);
   const comments = useReviewComments({ threads: data.threads, version, showDocument: views.showDocument });
   const goLive = useGoLive(version.state);
-  const decision = useReviewDecision({ data, team, goLive });
+  const outputs = useViewedOutputs(viewer.id, version.id, version.round);
+  const decision = useReviewDecision({ data, team, goLive, viewed: outputs.viewed });
   const { rename } = changes;
   const canComment = can.comment.ok;
 
@@ -154,6 +158,8 @@ export function ReviewWorkspace({
             setId={selectedSet.id}
             enabled={view === "preview"}
             onSeen={onSeen}
+            viewed={outputs.viewed}
+            onViewed={outputs.onViewed}
             onEditValues={() => switcher.current?.openEditor()}
           />
         </Activity>
@@ -161,6 +167,7 @@ export function ReviewWorkspace({
 
       <DecisionBar
         access={decision.access}
+        approveBlocked={decision.approveBlocked}
         row={decision.row}
         decidedHere={decision.decidedHere}
         onApprove={(from) => decision.open("approve", from)}
@@ -171,6 +178,7 @@ export function ReviewWorkspace({
         steps={steps}
         nowIso={nowIso}
         access={decision.access}
+        approveBlocked={decision.approveBlocked}
         row={decision.row}
         next={decision.next}
         onApprove={() => decision.open("approve")}
@@ -196,6 +204,7 @@ export function ReviewWorkspace({
         versionNumber={version.number}
         round={version.round}
         previousNumber={data.previousNumber}
+        stillRenders={data.stillRenders}
         contractChanges={version.contractChanges}
         usage={data.consumerUsage}
         sunsetCalendar={data.sunsetCalendar}
