@@ -1,6 +1,9 @@
 # 0012. Submit freezes only what it showed
 
 Status: Accepted
+Amended 2026-10-11: while the hold is on, the variables panel now keeps its editing layout with every control disabled
+(the editor root's `held` prop), and an open variable form stays open with what was typed in it, so the first and last
+Consequences lines below no longer hold (handoff review N5, PR #47).
 Date: 2026-10-09
 
 ## Context
@@ -46,12 +49,12 @@ went out after the page turned read-only and failed with `not_draft`, with nowhe
 
 ## Consequences
 
-- While the hold is on, the variables panel keeps its editing layout with every control disabled, so the rail does
-  not move under the dialog's scrim. The editor root takes a `held` prop beside `readOnly` for this
-  ([N5](../handoff-review.md#n5--low-submits-hold-rearranges-the-variables-panel-and-closes-an-open-form)).
+- While the hold is on, the variables panel shows its read-only layout (no New variable, Required as text), so the
+  rail rearranges under the dialog's scrim. A panel that keeps its layout when read-only would need a change in
+  `src/editor`.
 - The dialog recognises the stale refusal by its sentence, like the other comparisons
   [I11](../handoff-review.md#i11--medium-the-ui-branches-on-exact-english-sentences) replaces with stable codes.
 - [I6](../handoff-review.md#i6--medium-after-a-save-conflict-the-editor-stays-editable-but-nothing-saves) can take
   the same hold when saving stops, and never let it go.
-- A variable form left open in the panel stays open while the hold is on, disabled, with what was typed in it, so
-  Cancel returns the author to where they were. Nothing typed there is applied until they save it.
+- A variable form left open in the panel closes while the hold is on, and reopens on Cancel without what was typed
+  into it. Unsaved, that text was never part of the draft.

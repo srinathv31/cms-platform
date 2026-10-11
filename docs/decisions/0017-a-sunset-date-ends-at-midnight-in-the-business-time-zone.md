@@ -1,6 +1,9 @@
 # 0017. A sunset date ends at 00:00 in the business time zone
 
 Status: Accepted
+Amended 2026-10-11: `/api/v1` now sends the sunset's day and zone beside the instant
+([0038](0038-a-sunset-is-sent-with-its-day-and-zone.md)), and Coral shows that day where it showed the instant's UTC
+date, so the last Consequences line below no longer holds (PR #52).
 Date: 2026-10-09
 
 ## Context
@@ -69,6 +72,4 @@ the earlier one. Java's `atStartOfDay` does both. The US zones change at 02:00, 
 - After a change of zone, a sunset set before it ends at 00:00 in the old zone, and its day is read in the new one: a
   March 1 Eastern sunset reads as February 28 in Pacific, the day it stops there.
 - The consumer API keeps serving an instant; [src/contracts/README.md](../../src/contracts/README.md) says what it
-  means. Coral, the simulated consumer, showed the instant's UTC date, which is the same day for every zone on the
-  list. [0038](0038-a-sunset-is-sent-with-its-day-and-zone.md) added the day and the zone beside the instant, and
-  Coral shows the day.
+  means. Coral, the simulated consumer, shows the instant's UTC date, which is the same day for every zone on the list.

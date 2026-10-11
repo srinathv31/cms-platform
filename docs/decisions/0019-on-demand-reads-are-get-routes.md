@@ -1,6 +1,9 @@
 # 0019. Reads a screen loads on demand are GET routes; only mutations are server actions
 
 Status: Accepted
+Amended 2026-10-11: the simulator's two reads are now GET routes too (`/sim/templates/search` and
+`/sim/deliveries/[deliveryId]/view`) and `src/simulator/actions.ts` holds its four writes only, so the last
+Consequences line below no longer holds (handoff review N19, PR #52).
 Date: 2026-10-09
 
 ## Context
@@ -51,8 +54,5 @@ Compare read didn't parse its input. Nothing stopped an agent from adding `"use 
 - A read never waits on, or holds up, the page's server actions, and each has a URL a Spring backend can serve.
 - Lint can't tell a read from a write, so a read added to `actions/` still passes it. Review watches for that.
 - Internal routes answer errors in five shapes (`src/app/README.md`), the `ActionResult` one being new to them.
-- The simulator's `src/simulator/actions.ts` kept reads and writes in one `"use server"` file, exempt because Coral
-  is a separate demo app that reaches Stencil only over `/api/v1`. That left its two reads as public POST endpoints
-  queued with its writes ([handoff review N19](../handoff-review.md#n19--low-the-simulator-serves-reads-as-server-actions)),
-  so they are GET routes too: `/sim/templates/search` and `/sim/deliveries/[deliveryId]/view`. The file is exempt
-  from the lint rule for its four writes only, and a test pins its exports to them.
+- The simulator's `src/simulator/actions.ts` keeps reads and writes in one `"use server"` file. Coral is a separate
+  demo app that reaches Stencil only over `/api/v1`, so it is exempt.

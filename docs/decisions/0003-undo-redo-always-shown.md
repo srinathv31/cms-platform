@@ -1,6 +1,9 @@
 # 0003. Undo and redo are always shown, greyed out when idle, before the save status
 
 Status: Accepted
+Amended 2026-10-11: the save status keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the
+chevron after it no longer moves as a save lands, which the second Consequences line below says it does; only a long
+error message can still lengthen it (handoff review N10, PR #54).
 Date: 2026-10-08
 
 ## Context
@@ -41,7 +44,5 @@ to their right and moves nothing.
 ## Consequences
 
 - An untouched draft now shows two greyed icons where it used to show none.
-- The status keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the chevron after it doesn't
-  move as a save lands (handoff review N10), at the price of a small gap after "Saved". A long error message can
-  still lengthen it; nothing before it moves.
+- The status's own width can still change (the chevron moves as "Saving…" becomes "Saved"); nothing after it does.
 - `UndoRedo` renders on the server, so the platform's shortcut (⌘ or Ctrl) is read after hydration, not during render.
