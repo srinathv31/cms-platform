@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPOSER_THREAD_ID, blockTextOf, fieldTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
-import { channelFieldValues } from "@/domain/channel-fields";
+import { channelFieldValues, isChannelFieldId } from "@/domain/channel-fields";
 import { commentAnchors } from "@/domain/comments";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
@@ -25,7 +25,15 @@ export function useReviewComments({
   version: ReviewScreenData["version"];
   showDocument: () => void;
 }) {
+  // Two handles, because a version shows two things a thread can anchor to. The body's (the live editor's, or the
+  // redline's while Show changes is on) answers for its blocks; the fields' (a document's email subject and
+  // preheader, a message's whole content) answers for the channel fields. `handleOf` picks the one that owns an anchor.
   const editorRef = useRef<DocumentEditorHandle>(null);
+  const fieldsRef = useRef<DocumentEditorHandle>(null);
+  const handleOf = useCallback(
+    (blockId: string | undefined) => (blockId !== undefined && isChannelFieldId(blockId) ? fieldsRef.current : editorRef.current),
+    [],
+  );
   const { threads, threadsForEditor, editorActiveThreadId, activeThreadId, setActive, composer, openComposer, closeComposer, mutate } =
     useReviewThreads(initial);
   const openThreads = threads.filter((t) => t.status === "open").length;
@@ -76,8 +84,8 @@ export function useReviewComments({
     },
     [closeComposer],
   );
-  // Whichever shows the document answers the handle: the editor, or (Show changes on) the redline's own.
-  const requestBlockComment = useCallback((blockId: string) => editorRef.current?.requestComment(blockId), []);
+  // Whichever shows the anchor answers: for a block the editor, or (Show changes on) the redline's own; for a field, the fields'.
+  const requestBlockComment = useCallback((blockId: string) => handleOf(blockId)?.requestComment(blockId), [handleOf]);
   /** The Preview was opened: the comment box is about the document, and the person is on the tab they pressed, so focus stays there. */
   const dismissComposer = useCallback(() => {
     opener.current = null;
@@ -116,7 +124,8 @@ export function useReviewComments({
     const id = focusPending.current;
     if (!id) return;
     focusPending.current = null;
-    editorRef.current?.focusThread(id);
+    // The comment box's own id has no thread yet: `threadsForEditor` gives it the anchor it is open on.
+    handleOf(threadsForEditor.find((t) => t.id === id)?.blockId)?.focusThread(id);
   });
 
   // The block the redline tints: where the open comment box is, else the active thread's block.
@@ -128,6 +137,7 @@ export function useReviewComments({
 
   return {
     editorRef,
+    fieldsRef,
     threads,
     threadsForEditor,
     editorActiveThreadId,

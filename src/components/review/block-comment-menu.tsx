@@ -12,11 +12,12 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Channel, ChannelFamily, JSONContent, Variable } from "@/domain/types";
 import { cn } from "@/lib/utils";
-import { blockOptions, fieldOptions } from "./block-options";
+import { commentOptions } from "./block-options";
 
 /**
  * The keyboard (and no-hover) path to a comment on a block: a menu of the document's blocks, each named
- * by its text. Choosing one opens the comment box on that block, as the hover marker in the gutter and
+ * by its text, under its email subject and preheader when Email is on ("Email subject": they take comments
+ * as a block does). Choosing one opens the comment box on it, as the hover marker in the gutter and
  * ⌘⌥M do. In the rail, beside the Comments label. A message has no body: its menu lists its fields
  * ("Push title"), where its threads go.
  */
@@ -36,10 +37,7 @@ export function BlockCommentMenu({
   onPick: (blockId: string) => void;
   triggerRef: Ref<HTMLButtonElement>;
 }) {
-  const options = useMemo(
-    () => (family === "message" ? fieldOptions(channels) : blockOptions(body, variables)),
-    [family, channels, body, variables],
-  );
+  const options = useMemo(() => commentOptions(family, body, channels, variables), [family, body, channels, variables]);
   const label = family === "message" ? "Comment on a field" : "Comment on a block";
   if (options.length === 0) return null;
   return (

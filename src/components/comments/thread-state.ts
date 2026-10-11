@@ -1,6 +1,7 @@
 // The pure side of the comment list: how a mutation changes a list of threads (the optimistic
 // update), and how a list is grouped for the rail. No React here.
 
+import { isChannelFieldId } from "@/domain/channel-fields";
 import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
 import type { CommentView, ThreadView } from "@/server/queries/threads";
@@ -105,7 +106,11 @@ export function groupThreads(threads: readonly ThreadView[]): ThreadGroups {
 
 // ── Threads against the document as it is now ─────────────────────────────────────────────────────
 
-/** Whether each of these blocks is in the document: the top-level blocks first, then any nested ones that carry the id (as the server counts them). */
+/**
+ * Whether each of these blocks is in the document: the top-level blocks first, then any nested ones that carry
+ * the id (as the server counts them). A channel field ("email.subject") is not a block of the body, so it is
+ * left out: its thread is not removed content when the body changes, and keeps the server's say.
+ */
 export function liveBlockPresence(doc: JSONContent, blockIds: readonly string[]): Map<string, boolean> {
   const top = new Set<string>();
   for (const block of doc.content ?? []) {
@@ -115,6 +120,7 @@ export function liveBlockPresence(doc: JSONContent, blockIds: readonly string[])
   let nested: Set<string> | null = null;
   const presence = new Map<string, boolean>();
   for (const id of blockIds) {
+    if (isChannelFieldId(id)) continue;
     if (top.has(id)) {
       presence.set(id, true);
       continue;

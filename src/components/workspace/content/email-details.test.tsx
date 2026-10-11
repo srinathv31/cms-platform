@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { channelFieldValues } from "@/domain/channel-fields";
 import { EditorRoot, useEditorRoot } from "@/editor/components/editor-root";
 import type { JSONContent, Variable } from "@/editor/model/types";
+import type { ThreadView } from "@/server/queries/threads";
 import { EmailDetails } from "./email-details";
+import type { FieldComments } from "./field-comments";
 
 /** The root's runtime: the test renames through it, as the variables panel's form does. */
 type Runtime = ReturnType<typeof useEditorRoot>;
@@ -37,12 +39,12 @@ function Probe({ onRoot }: { onRoot: (root: Runtime) => void }) {
   return null;
 }
 
-function render(on: boolean) {
+function render(on: boolean, comments?: FieldComments) {
   act(() =>
     reactRoot.render(
       <EditorRoot variables={VARIABLES}>
         <Probe onRoot={keepRuntime} />
-        <EmailDetails on={on} editable values={channelFieldValues({ email: { subject: SUBJECT } })} />
+        <EmailDetails on={on} editable values={channelFieldValues({ email: { subject: SUBJECT } })} comments={comments} />
       </EditorRoot>,
     ),
   );
@@ -117,5 +119,47 @@ describe("Email details while Email is off", () => {
     render(true);
     await wait(10);
     expect(subjectField()?.querySelector('[data-variable="given_name"]')).not.toBeNull();
+  });
+});
+
+describe("Email details with review comments", () => {
+  const thread = (id: string, blockId: string): ThreadView => ({
+    id,
+    blockId,
+    quote: null,
+    status: "open",
+    originVersionNumber: 1,
+    originRound: 1,
+    originLabel: "v1",
+    comments: [
+      { id: `${id}-c`, author: { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 }, body: "Text", kind: "comment", createdAt: "2027-02-18T10:00:00Z" },
+    ],
+    orphaned: false,
+  });
+
+  it("gives each field its own comment button and marker, on the label's line, and starts a thread on the field's id", async () => {
+    const comments: FieldComments = {
+      threads: [thread("t1", "email.preheader")],
+      activeThreadId: null,
+      onActivate: vi.fn(),
+      onRequestComment: vi.fn(),
+    };
+    render(true, comments);
+    await wait(10);
+    const groups = [...host.querySelectorAll('[data-slot="field-comments"]')];
+    expect(groups).toHaveLength(2);
+    // Each sits in its label's row, with the label, above the field.
+    expect(groups[0].parentElement?.textContent).toContain("Subject");
+    expect(groups[1].parentElement?.textContent).toContain("Preheader");
+    expect(groups[0].querySelector("[data-field-marker]"), "no thread on the subject").toBeNull();
+    expect(groups[1].querySelector("[data-field-marker]")?.getAttribute("aria-label")).toBe("1 comment on the email preheader");
+
+    act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Comment on the email subject"]')!.click());
+    expect(comments.onRequestComment).toHaveBeenCalledWith("email.subject");
+  });
+
+  it("is as it was without comments: no controls", async () => {
+    await mount(true);
+    expect(host.querySelector('[data-slot="field-comments"]')).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import {
   fieldOnPlatform,
   fieldPlatformTag,
   fieldsOfChannels,
+  isChannelFieldId,
   normalizeAndCheckChannelField,
   typedText,
   withChannelFieldValues,
@@ -92,6 +93,13 @@ describe("the registry", () => {
     expect(fieldLines("line")).toBe("line");
     expect(fieldLines("paragraph")).toBe("line");
     expect(fieldLines("lines")).toBe("lines");
+  });
+});
+
+describe("isChannelFieldId", () => {
+  it("is true for every field's id and false for a block id, the version thread and a near miss", () => {
+    expect(CHANNEL_FIELD_IDS.every((id) => isChannelFieldId(id))).toBe(true);
+    for (const id of ["b_intro", "email", "email.", "email.subjects", "doc", ""]) expect(isChannelFieldId(id)).toBe(false);
   });
 });
 

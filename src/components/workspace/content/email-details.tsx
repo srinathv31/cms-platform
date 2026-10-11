@@ -12,6 +12,7 @@ import {
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import type { JSONContent } from "@/editor/model/types";
 import { useWorkspaceSession } from "../session/workspace-session";
+import { FieldCommentControls, type FieldComments } from "./field-comments";
 
 export interface EmailDetailsProps {
   /** Email is one of the template's channels. Off: nothing shows, and what was typed is kept. */
@@ -20,6 +21,8 @@ export interface EmailDetailsProps {
   editable: boolean;
   /** Where the fields start (the saved draft), by id. Email's are the ones shown. */
   values: ChannelFieldValues;
+  /** The review comments on the fields: a marker beside a field that has threads, and a button to start one. */
+  comments?: FieldComments;
 }
 
 /**
@@ -29,11 +32,15 @@ export interface EmailDetailsProps {
  * in the variables panel and the picker offers the same list. Each saves through the workspace session
  * under its id ("email.subject"), like the document does.
  *
+ * The subject and the preheader take review comments like a block of the document does (a thread anchors to
+ * "email.subject"): the end of each label carries the marker of its open threads, and a button to start one
+ * (src/components/workspace/content/field-comments.tsx).
+ *
  * With Email off the group is hidden, not unmounted: the fields stay in the editor root, so their
  * chips still count (deleting a variable used only in the subject still asks first), and a variable
  * renamed or deleted meanwhile reaches them, and saves, as it does the document.
  */
-export function EmailDetails({ on, editable, values }: EmailDetailsProps) {
+export function EmailDetails({ on, editable, values, comments }: EmailDetailsProps) {
   const headingId = useId();
 
   return (
@@ -43,7 +50,14 @@ export function EmailDetails({ on, editable, values }: EmailDetailsProps) {
       </h2>
       <div className="flex flex-col gap-3">
         {channelFieldsOf("email").map((field) => (
-          <ChannelFieldInput key={field.id} field={field} value={values[field.id]} hidden={!on} editable={editable} />
+          <ChannelFieldInput
+            key={field.id}
+            field={field}
+            value={values[field.id]}
+            hidden={!on}
+            editable={editable}
+            comments={comments}
+          />
         ))}
       </div>
     </section>
@@ -56,11 +70,13 @@ function ChannelFieldInput({
   value,
   hidden,
   editable,
+  comments,
 }: {
   field: ChannelField;
   value: JSONContent | null;
   hidden: boolean;
   editable: boolean;
+  comments?: FieldComments;
 }) {
   const session = useWorkspaceSession();
   const { id } = field;
@@ -68,7 +84,7 @@ function ChannelFieldInput({
 
   // Every shape is one paragraph of text and chips; only `lines` (an SMS message) takes line breaks.
   return (
-    <Labelled label={field.label}>
+    <Labelled label={field.label} controls={comments ? <FieldCommentControls field={field} comments={comments} /> : null}>
       <InlineVariableField
         label={fieldName(field)}
         value={value}
@@ -80,13 +96,19 @@ function ChannelFieldInput({
   );
 }
 
-/** A small label over its field. The field names itself to assistive tech ("Email subject"). */
-function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A small label over its field, with the field's comment controls at the end of the label's line. The field
+ * names itself to assistive tech ("Email subject"). The group lets the controls show while the field is hovered.
+ */
+function Labelled({ label, controls, children }: { label: string; controls: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span aria-hidden className="text-xs text-text-muted">
-        {label}
-      </span>
+    <div className="group/field flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span aria-hidden className="text-xs text-text-muted">
+          {label}
+        </span>
+        {controls}
+      </div>
       {children}
     </div>
   );

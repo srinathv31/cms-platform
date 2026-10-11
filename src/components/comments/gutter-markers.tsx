@@ -65,6 +65,11 @@ export interface GutterMarkersProps {
   /** What a marker is beside, in its label: a document's "block", or a message's "field" (its threads are on its fields). */
   noun?: "block" | "field";
   /**
+   * The group's name for assistive technology. Default: "Comments in the document", or, for fields,
+   * "Comments on the message". A document with two groups (its email details above its body) names each.
+   */
+  label?: string;
+  /**
    * What the hover marker can start a comment on: the elements, by selector, that carry their block's id in
    * `data-id`. A document's top-level blocks by default; the message composer's fields.
    */
@@ -192,6 +197,7 @@ export function GutterMarkers({
   compact = false,
   className,
   noun = "block",
+  label,
   blocks = ".ucomp-doc > [data-id]",
 }: GutterMarkersProps) {
   const layer = useRef<HTMLDivElement>(null);
@@ -335,7 +341,7 @@ export function GutterMarkers({
       ) : null}
 
       {markers.length > 0 ? (
-        <div role="toolbar" aria-label={noun === "field" ? "Comments on the message" : "Comments in the document"} aria-orientation="vertical" onKeyDown={onKeyDown}>
+        <div role="toolbar" aria-label={label ?? (noun === "field" ? "Comments on the message" : "Comments in the document")} aria-orientation="vertical" onKeyDown={onKeyDown}>
           {markers.map((marker) => {
             const active = activeThreadId !== null && marker.threadIds.includes(activeThreadId);
             return (
