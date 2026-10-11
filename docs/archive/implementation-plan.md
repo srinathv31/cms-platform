@@ -18,7 +18,7 @@ Oct 4, 2026 · Revision 2, after Sri's first review · No code has been written 
 **Inputs and precedence**
 1. *UCOMP Prototype — Build Plan* sets the scope. Where it differs from the brief, the build plan wins.
 2. *UCOMP Content Platform — Discovery Brief* is business background.
-3. The three Wispr Flow screenshots set the look and feel. They're written down in [design-reference.md](design-reference.md).
+3. Three screenshots of a commercial desktop app set the look and feel. They're written down in [design-reference.md](design-reference.md).
 4. Your session notes add four things:
    - shadcn/ui for every UI component.
    - `motion` for client micro-animations.
@@ -190,7 +190,7 @@ The goal is for every click to feel instant. The structure stays fixed and the c
     - Superseded: muted, plus "Sunset Mar 1" when a date is set.
     - Revoked: red.
 - **`<PageHeader>`**: serif title, an optional tracked-caps eyebrow, and a slot for the one primary action.
-- **`<Keycap>`**: the shadcn `Kbd` restyled as Flow's keycap chips. Used in the slash menu, the ⌘K hint and menus.
+- **`<Keycap>`**: the shadcn `Kbd` restyled as the reference's keycap chips. Used in the slash menu, the ⌘K hint and menus.
 - **`<StatCard>`**: a tracked-caps label over a big, regular-weight tabular numeral, with an optional trend pill.
 - **`<ShareRing>`**: the signature (below).
 
@@ -799,7 +799,7 @@ This is the code that goes into the production app. It's built in four increment
    - Notices: "v2 available" plus its contract changes.
    - Relink, which walks through mapping any new required variables.
    - Failures after a sunset or revoke show the exact render error.
-2. **Usage dashboard** (Flow's Insights layout):
+2. **Usage dashboard** (the reference's Insights layout):
    - Stat cards: renders this month with a trend pill, active templates, consumers, versions nearing sunset.
    - A teal calendar heatmap with a More/Less legend.
    - Horizontal bars of renders by consumer.
@@ -979,7 +979,7 @@ The static editor mock I'd proposed is gone. Phase 1 now shows the real editor i
    - The build plan says members are flagged at 90 days with no login, *then suspended*, but doesn't say when.
    - Default: flag at 90 days; the Team Admin can suspend or keep; automatic suspension at 120 days.
 6. **Charts.**
-   - shadcn's Chart is Recharts (about 100 KB, client-side), and Flow's gauge and heatmap aren't Recharts shapes anyway.
+   - shadcn's Chart is Recharts (about 100 KB, client-side), and the reference's gauge and heatmap aren't Recharts shapes anyway.
    - Default: small server-rendered SVG charts inside shadcn Cards and Tooltips.
 7. **Simulator presentation.**
    - Default: a full-page route in the same tab, with an "← Back to UCOMP" pill.

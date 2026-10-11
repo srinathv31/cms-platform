@@ -133,7 +133,7 @@ export interface BarRow {
   href?: string;
 }
 
-/** Bars sized to the largest row, with the share inside, like Flow's "Desktop usage". */
+/** Bars sized to the largest row, with the share inside. */
 export function HBars({
   rows,
   className,

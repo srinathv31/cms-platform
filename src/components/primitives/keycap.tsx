@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
-/** Flow-style keycap chip (⌥ Opt, ⌘, K). Hairline border on a sunken fill. */
+/** Keycap chip (⌥ Opt, ⌘, K). Hairline border on a sunken fill. */
 export function Keycap({ className, ...props }: React.ComponentProps<typeof Kbd>) {
   return (
     <Kbd
