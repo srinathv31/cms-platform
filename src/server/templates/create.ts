@@ -1,14 +1,8 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import {
-  newTemplateChannels,
-  newTemplateContentType,
-  type DraftFields,
-  type LifecycleResult,
-  type NewTemplateChanges,
-  type StarterContent,
-} from "@/domain/lifecycle";
-import { conformToSections } from "@/domain/platform-config";
+import { newTemplateChannels, newTemplateContentType, type NewTemplateChanges } from "@/domain/lifecycle/drafts";
+import type { DraftFields, LifecycleResult, StarterContent } from "@/domain/lifecycle/types";
+import { conformToSections } from "@/domain/platform-config/sections";
 import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";

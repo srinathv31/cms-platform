@@ -1,6 +1,6 @@
 "use client";
 
-import { rolesLabel } from "@/domain/access";
+import { rolesLabel } from "@/domain/access/roles";
 import type { InactivityRow, InactivitySection } from "@/domain/access-types";
 import type { PermissionResult } from "@/domain/types";
 import { keepInactive, reinstateMember, suspendInactive } from "@/server/actions/access";

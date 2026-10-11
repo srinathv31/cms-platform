@@ -6,7 +6,7 @@ import { asc, eq, getTableColumns, getTableName } from "drizzle-orm";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createDraft } from "@/domain/lifecycle";
+import { createDraft } from "@/domain/lifecycle/drafts";
 import type { Viewer } from "@/domain/types";
 import { submitVersion } from "@/server/actions/review";
 import type { Db } from "@/server/db/client";

@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh, revalidatePath } from "next/cache";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACCESS_REFUSALS } from "@/domain/access";
+import { ACCESS_REFUSALS } from "@/domain/access/refusals";
 import { REASONS } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";

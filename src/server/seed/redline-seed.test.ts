@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changesOnly, diffDocuments, groupUnchanged } from "@/domain/redline";
+import { changesOnly, diffDocuments, groupUnchanged } from "@/domain/redline/document";
 import type { RedlineDoc } from "@/domain/review-types";
 import { headOf } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
@@ -7,14 +7,14 @@ import { checkDocument } from "@/server/render/schema-check";
 import { createContext } from "./context";
 import { seedCoralTemplates } from "./templates/coral";
 
-// The redline of the real seeded version pairs. The domain test (src/domain/redline.test.ts) keeps to
+// The redline of the real seeded version pairs. The domain tests (src/domain/redline/) keep to
 // pure fixtures, because domain code can't import the seed or the editor's schema; what needs them
 // lives here: the seeded bodies (built in memory, as the seed writes them, no DB) and the check that a
 // redline, minus its marks, is still a valid editor document.
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 
-// ── Readers (the same as in src/domain/redline.test.ts) ──────────────────────
+// ── Readers (the same as in src/domain/redline/fixtures.ts) ──────────────────────
 
 const isTextblock = (node: JSONContent) => node.type === "paragraph" || node.type === "heading";
 const opOf = (x: JSONContent): unknown => x.marks?.find((m) => m.type === "redline")?.attrs?.op;

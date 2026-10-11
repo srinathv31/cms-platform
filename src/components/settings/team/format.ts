@@ -5,7 +5,7 @@
 
 import { formatAgo } from "@/domain/dates";
 
-export { firstName } from "@/domain/access";
+export { firstName } from "@/domain/access/roles";
 
 /** A last sign-in: "Today", "Yesterday", "12 days ago" by calendar day; "Never" with none on record. `today` is the section's YYYY-MM-DD. */
 export function lastActive(iso: string | null, today: string): string {

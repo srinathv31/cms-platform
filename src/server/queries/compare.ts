@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { smsFooterOf } from "@/domain/lifecycle";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { can } from "@/domain/permissions";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, ChannelFamily, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";

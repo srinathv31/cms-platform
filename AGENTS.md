@@ -132,7 +132,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | To… | Copy |
 | --- | --- |
 | Write a server action | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it |
-| Write a domain transition | `setSunset`, `startRevoke` in [src/domain/lifecycle.ts](src/domain/lifecycle.ts) |
+| Write a domain transition | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts) |
 | Build a read model with permissions | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts) |
 | Stream a page | [versions/page.tsx](src/app/(product)/[team]/templates/[templateId]/versions/page.tsx) with [versions-content.tsx](src/components/versions/versions-content.tsx) |
 | Run an action from a dialog, with validation | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx) |

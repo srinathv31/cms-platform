@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { redirect } from "next/navigation";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { JSONContent, Viewer } from "@/domain/types";

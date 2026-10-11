@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TeamIcon } from "@/components/primitives/team-icon";
 import { useActionRun } from "@/components/primitives/use-action-run";
-import { ROLE_LABEL, rolesLabel, validateAccessReason } from "@/domain/access";
+import { ROLE_LABEL, rolesLabel } from "@/domain/access/roles";
+import { validateAccessReason } from "@/domain/access/requests";
 import {
   ACCESS_REASON_MAX,
   type MyAccessRequest,

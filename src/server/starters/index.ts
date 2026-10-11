@@ -1,6 +1,6 @@
 import "server-only";
 import { ensureBlockIds } from "@/editor/schema";
-import type { StarterContent } from "@/domain/lifecycle";
+import type { StarterContent } from "@/domain/lifecycle/types";
 import { assertNever } from "@/domain/assert-never";
 import { VariableKit } from "../seed/variables";
 import { blankAlert, cardActivity, paymentReminder, statementReady, type AlertStarter } from "./alerts";

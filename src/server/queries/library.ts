@@ -10,7 +10,7 @@ import { ALL_SPACE } from "@/domain/permissions";
 import { compareRounds, type RoundRow } from "@/domain/rounds";
 import { contentTypeFamily, type ChannelFamily, type VersionState } from "@/domain/types";
 import { formatAgo } from "@/domain/dates";
-import { sunsetPassed } from "@/domain/lifecycle";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 
 export interface LibraryRow {
   id: string;

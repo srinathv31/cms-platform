@@ -6,20 +6,19 @@ import { z } from "zod";
 import { canActOnStage, currentStageOf } from "@/domain/approval-chain";
 import { sunsetInstant } from "@/domain/business-zone";
 import { isCalendarDay } from "@/domain/dates";
+import { approve } from "@/domain/lifecycle/approve";
 import {
-  approve,
   cancelRevoke as cancelRevokeTransition,
   confirmRevoke as confirmRevokeTransition,
-  contractBaseline,
-  requestChanges as requestChangesTransition,
-  setSunset as setSunsetTransition,
   startRevoke as startRevokeTransition,
-  submit,
-  sunsetPassed,
-  withWriter,
-  REFUSALS,
-  type ReviewVersion,
-} from "@/domain/lifecycle";
+} from "@/domain/lifecycle/revoke";
+import { contractBaseline } from "@/domain/lifecycle/baselines";
+import { requestChanges as requestChangesTransition } from "@/domain/lifecycle/request-changes";
+import { setSunset as setSunsetTransition, sunsetPassed } from "@/domain/lifecycle/sunset";
+import { submit } from "@/domain/lifecycle/submit";
+import { withWriter } from "@/domain/lifecycle/drafts";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
+import type { ReviewVersion } from "@/domain/lifecycle/types";
 import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
 import { OUTPUT_KEYS, type OutputKey } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
@@ -41,7 +40,7 @@ import { check, refuse, serverAction, type CommitContext } from "./kit";
 // (kit.ts):
 //   1. `authorize`: the version (or the template), read only to learn its team and its people, and
 //      `check` on that team. An unknown one is refused like a forbidden one, and then as gone;
-//   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle.ts),
+//   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle/),
 //      writes the changes with a compare-and-set on state and rev, and writes the transition's
 //      effects (audit, notifications, consumer notices) through server/effects.ts;
 //   3. `after`: `refresh()`, so the page the person is on re-renders in place.

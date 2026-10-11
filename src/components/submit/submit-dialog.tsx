@@ -12,7 +12,7 @@ import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
-import { nameChange } from "@/domain/redline";
+import { nameChange } from "@/domain/redline/document";
 import type { ActionResult } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";

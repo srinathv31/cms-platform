@@ -137,7 +137,7 @@ UCOMP is a bank's content platform. Business teams write disclosure templates wi
   - `GET /api/v1/templates/{id}` (metadata + contract);
   - `GET /api/v1/consumers/{id}/notices` (the notices Phase 4 writes).
 - The simulator at `/sim`: offers, link and pin, map values, send with a results grid, customer views (phone frame, inbox, PDF), notices, relink with new required variables, exact render errors on failure. Wire the demo pill's simulator entry.
-- The Usage dashboard (Flow's Insights layout, `Unknown.png`) and the per-template Usage tab; previews never count.
+- The Usage dashboard (the reference's Insights layout) and the per-template Usage tab; previews never count.
 - The integration panel behind SHARE: ID, Active version, channels, the contract table, copyable JSON Schema, curl/fetch samples, response formats, "What changed since vN", copy buttons.
 - Visual QA: the dashboard against Unknown.png; the simulator's "outside system" look.
 

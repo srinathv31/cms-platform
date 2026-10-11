@@ -7,7 +7,7 @@
 //   in_review, changes_requested, draft
 //                               409 version_not_released
 
-import { sunsetPassed } from "../lifecycle";
+import { sunsetPassed } from "../lifecycle/sunset";
 import type { VersionState } from "../types";
 import { versionNotReleased, versionRevoked, versionSunset } from "./errors";
 import type { RenderError } from "./types";

@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type Ref } from "react";
 import type { ChannelRuleRow, ChannelRulesSection } from "@/domain/access-types";
-import { channelOffConsequences } from "@/domain/platform-config";
+import { channelOffConsequences } from "@/domain/platform-config/channels";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";

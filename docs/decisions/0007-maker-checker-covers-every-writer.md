@@ -34,7 +34,7 @@ How the code holds it:
   starts a fresh set, so having written an earlier released version bars nobody.
 - **One rule in the domain**: `makerCheckerRefusal` in [permissions.ts](../../src/domain/permissions.ts). The
   `version.decide` guard in `can()` and the `approve` and `requestChanges` transitions in
-  [lifecycle.ts](../../src/domain/lifecycle.ts) all ask it. The submitter reads "You submitted this version.";
+  [approve.ts](../../src/domain/lifecycle/approve.ts) and [request-changes.ts](../../src/domain/lifecycle/request-changes.ts) all ask it. The submitter reads "You submitted this version.";
   another writer reads "You wrote part of this version." The review screen shows the reason on one line in the
   stepper, so it stays as short as the submitter's.
 - **Every place that decides passes the writers in**: the review actions, and the review queue and screen through

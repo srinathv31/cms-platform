@@ -8,7 +8,7 @@ import { phoneClock, phoneSenders, recipientOf, senderOf } from "@/components/pr
 import { usePreviewRender } from "@/components/preview/use-preview-render";
 import { INITIAL_PHONE, type PreviewDevice } from "@/components/workspace/session/session-store";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
 import { outputCannotBeShown, outputKey, type OutputKey } from "@/domain/review-outputs";
 import type { VariableValues } from "@/editor/model/types";
 import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";

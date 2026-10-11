@@ -2,7 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { finishImport, refusalForUnreadableKind } from "@/domain/import";
 import { IMPORT_LIMITS, IMPORT_MIME, IMPORT_REFUSALS, type ImportRefusalName, type ImportResponse } from "@/domain/import-types";
-import { createDraft } from "@/domain/lifecycle";
+import { createDraft } from "@/domain/lifecycle/drafts";
 import { REASONS, can } from "@/domain/permissions";
 import { refuse, type Refused, type RefusalCode } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";

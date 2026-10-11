@@ -4,7 +4,7 @@
 // `ConsumerUsage`, …).
 
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
 import type { ConsumerUsage, Person, StepView } from "@/domain/review-types";
 import type { NumberedRound } from "@/domain/rounds";
 import type {

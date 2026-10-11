@@ -1,15 +1,15 @@
 > **Archived.** Written while the prototype was being built; it doesn't describe the current code.
 > See [the current docs](../README.md).
 
-# Design reference — Wispr Flow screenshots, written down
+# Design reference — three screenshots, written down
 
-A text version of `reference-images/` for anyone building UI. The images are the source of truth; this file holds the measurements and the rules taken from them. **Take the feel, not the brand**: no Flow logo, names, illustrations or copy.
+A text version of three screenshots of a commercial desktop app, for anyone building UI. The screenshots are not in the repo; this file holds the measurements and the rules taken from them. **Take the feel, not the brand**: no logo, names, illustrations or copy from that app.
 
-| File | Screen | What to take from it |
-| --- | --- | --- |
-| `Unknown.png` | Insights / "Your usage" | Stat cards, gauge, bars, heatmap, and the **SHARE ring** (top-right) |
-| `Unknown-2.png` | Transforms (Beta) | Editorial single column, serif section heads, keycap chips, black primary, cards |
-| `Unknown-3.png` | Settings → Connectors | Large centered modal, grouped left nav, tracked-caps group labels, row cards |
+| Screen | What to take from it |
+| --- | --- |
+| Insights / "Your usage" | Stat cards, gauge, bars, heatmap, and the **SHARE ring** (top-right) |
+| A list page with a beta tag | Editorial single column, serif section heads, keycap chips, black primary, cards |
+| Settings, on an integrations section | Large centered modal, grouped left nav, tracked-caps group labels, row cards |
 
 ## Shell
 - The app/window background and the sidebar are both warm stone, **#F5F3EF**.
@@ -30,11 +30,11 @@ A text version of `reference-images/` for anyone building UI. The images are the
 - Cards are **#F5F3EF** on the white panel, or white on a tinted surface. No shadows. Depth comes from tonal steps: sidebar → canvas → card.
 - One data accent, deep teal **#2D5A5C**. Its scale is #4F9A8F → #8CCBBE → #D2EBE6. Empty heatmap cells are taupe **#C9C3B8**.
 - Positive delta pill: mint **#DFF3EA** background with green text **#2F7D5B**.
-- Flow's lavender "Pro" pill is **#E6D9FA** with **#5B3A9E** text. Its black "Beta" tag is **#171717** with white text and a 6px radius.
+- The reference's lavender "Pro" pill is **#E6D9FA** with **#5B3A9E** text. Its black "Beta" tag is **#171717** with white text and a 6px radius.
 
 ## Type
-- UI font is a humanist/geometric sans (Inter-like) in regular and medium weights only. Flow never uses bold.
-- Display font is a high-contrast serif. It is used for page and section titles ("Transforms", "My Transforms", "Connectors") at about 34–38px.
+- UI font is a humanist/geometric sans (Inter-like) in regular and medium weights only. The reference never uses bold.
+- Display font is a high-contrast serif. It is used for page and section titles at about 34–38px.
 - Big numerals are about 40px sans, **regular weight**, with slightly negative tracking. Use tabular figures.
 - Labels are tiny uppercase with about +0.08em tracking, in a muted color. They sit over the numerals ("WORDS PER MINUTE").
 - Line height is relaxed throughout.
@@ -56,10 +56,10 @@ A text version of `reference-images/` for anyone building UI. The images are the
 - **Data viz**
   - Semicircle gauge with a thick, round-capped teal stroke.
   - Horizontal bars (6px radius) with white percent text inside and outline icons to their left.
-  - GitHub-style heatmap: rounded about 4px squares, month labels, chevrons, and a More ↔ Less legend.
+  - Calendar-grid heatmap: rounded about 4px squares, month labels, chevrons, and a More ↔ Less legend.
 - **Info hints**: muted circled "i" icons.
 
-## The signature: SHARE ring (Unknown.png, top-right of the Insights header)
+## The signature: SHARE ring (top-right of the Insights header)
 - A circular badge about 100px across in the screenshot; expect about 72–80px in CSS.
 - At its center is an outline share glyph (a box with an up arrow, about 1.75px stroke).
 - Around the glyph runs **"SHARE · SHARE · SHARE ·"**. It is small (about 11px) semibold uppercase with very wide tracking, set on a circle that wraps the full 360°.

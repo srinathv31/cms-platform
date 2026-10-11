@@ -7,7 +7,7 @@ import { m } from "motion/react";
 import { Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fadeRise } from "@/components/motion/presets";
-import { ROLE_LABEL } from "@/domain/access";
+import { ROLE_LABEL } from "@/domain/access/roles";
 import type { SidebarCardModel } from "@/domain/access-types";
 import { formatShortDate } from "@/domain/dates";
 import { plural, pluralWord } from "@/domain/plural";
@@ -72,7 +72,7 @@ function contentOf(card: SidebarCardModel): CardContent {
 }
 
 /**
- * The one dismissible card above Settings and Help (Flow-style). One per space, by priority: access
+ * The one dismissible card above Settings and Help. One per space, by priority: access
  * requests waiting, then a recertification due (both for a Team Admin), then the viewer's own pending
  * request when they have no space yet. Dismissal is remembered in localStorage by the card's id, which
  * changes when its content does (a new request brings it back).

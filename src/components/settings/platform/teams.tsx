@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { TeamsSection } from "@/domain/access-types";
-import { newTeamConsequences, validateNewTeam } from "@/domain/platform-config";
+import { newTeamConsequences, validateNewTeam } from "@/domain/platform-config/teams";
 import { Segmented } from "@/components/primitives/segmented";
 import { TeamIcon, teamIconLabel } from "@/components/primitives/team-icon";
 import { Button } from "@/components/ui/button";

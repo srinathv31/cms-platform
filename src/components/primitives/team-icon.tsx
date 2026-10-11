@@ -19,7 +19,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import type { TEAM_ICONS } from "@/domain/platform-config";
+import type { TEAM_ICONS } from "@/domain/platform-config/limits";
 
 // `teams.icon` holds a Lucide key. The keys a team can pick (`TEAM_ICONS`, which `createTeam` checks)
 // each have an icon and the name the picker reads out; a typed record, so a key added there needs an

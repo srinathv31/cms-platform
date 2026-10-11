@@ -25,7 +25,7 @@ import {
   type UsageDashboard,
   type UsageRow,
 } from "@/domain/golive-types";
-import { sunsetPassed } from "@/domain/lifecycle";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import type { PushPlatform } from "@/domain/messages/push";
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";

@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { diffChannelFields } from "@/domain/redline";
+import { diffChannelFields } from "@/domain/redline/channel-fields";
 import type { Channel, JSONContent, Variable } from "@/domain/types";
 import { FieldsDocument, type FieldsDocumentProps } from "./fields-document";
 

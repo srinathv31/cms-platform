@@ -1,4 +1,4 @@
-// The redline renderer. `RedlineDocument` paints a RedlineDoc (domain/redline.ts `diffDocuments`)
+// The redline renderer. `RedlineDocument` paints a RedlineDoc (domain/redline/document.ts `diffDocuments`)
 // like the document itself; `FieldsDocument` paints a version's channel fields (`diffChannelFields`) as
 // the message composer shows them; `redlineSummary` reads the counts as "2 added, 1 removed, and 3 changed".
 export { RedlineDocument, type RedlineDocumentProps } from "./redline-document";

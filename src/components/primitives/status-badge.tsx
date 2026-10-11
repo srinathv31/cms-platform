@@ -48,7 +48,7 @@ export function StatusBadge({
    */
   sunsetDay?: string | null;
   /**
-   * The sunset has passed (`sunsetPassed` in domain/lifecycle.ts, decided by the read model): the version no
+   * The sunset has passed (`sunsetPassed` in domain/lifecycle/sunset.ts, decided by the read model): the version no
    * longer renders, so the badge says "Sunset passed Mar 1" rather than a date to come.
    */
   sunsetPassed?: boolean;

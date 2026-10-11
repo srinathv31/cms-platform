@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { rolesLabel } from "@/domain/access";
+import { rolesLabel } from "@/domain/access/roles";
 import type { RecertificationSection, RecertView } from "@/domain/access-types";
 import { StatCard, StatLabel, StatValue } from "@/components/primitives/stat-card";
 import { Button } from "@/components/ui/button";

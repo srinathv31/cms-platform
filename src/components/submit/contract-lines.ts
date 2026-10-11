@@ -1,5 +1,5 @@
 // The submit dialog's contract section: the draft's variable list against the baseline's (the newest
-// version that still renders, `contractBaseline` in domain/lifecycle.ts), as the plain-English lines from
+// version that still renders, `contractBaseline` in domain/lifecycle/baselines.ts), as the plain-English lines from
 // domain/contract.ts, each flagged breaking or not. Pure, so it is tested alone.
 //
 // The diff is the one the server freezes at submit (`diffVariables` on the saved lists, where a renamed

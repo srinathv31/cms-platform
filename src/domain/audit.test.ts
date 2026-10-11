@@ -70,7 +70,7 @@ const ACCESS: AccessAuditAction[] = [
   "platform.config_changed",
 ];
 
-/** Details shaped like what domain/access.ts, domain/platform-config.ts and the seed write. */
+/** Details shaped like what domain/access/, domain/platform-config/ and the seed write. */
 const DETAILS: Record<AccessAuditAction, Record<string, unknown>> = {
   "access.requested": { userId: "morgan", userName: "Morgan Lee", role: "author", reason: "Joining the offers team" },
   "access.granted": { requestId: "ar_1", userId: "morgan", userName: "Morgan Lee", role: "author", roles: ["author"], note: null },
