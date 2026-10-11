@@ -12,7 +12,7 @@ import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/componen
 import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, SERIES, StackedBars, type RatePoint, type StackSeries } from "./charts";
 import { ConsumersCard } from "./consumers-card";
 import { sunsetPhrase } from "./format";
-import { BARS_HEIGHT, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
+import { BARS_HEIGHT, HEAT_FOOTER, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
 import { Panel, PanelHead } from "./panel";
 import { UsageTabs } from "./usage-tabs";
 
@@ -111,13 +111,11 @@ function Overview({ d }: { d: UsageDashboard }) {
             <Heatmap heat={heatmap} />
           </div>
         </div>
-        <div>
-          <div className="flex h-5 items-center justify-between gap-3">
-            <HeatLegend thresholds={heatmap.thresholds} />
-            <span className="text-[13px] text-text-muted">
-              {formatShortDate(firstDay)} to {formatShortDate(d.today)}
-            </span>
-          </div>
+        <div className={HEAT_FOOTER}>
+          <HeatLegend thresholds={heatmap.thresholds} />
+          <span className="flex h-5 items-center text-[13px] text-text-muted">
+            {formatShortDate(firstDay)} to {formatShortDate(d.today)}
+          </span>
         </div>
       </Panel>
 

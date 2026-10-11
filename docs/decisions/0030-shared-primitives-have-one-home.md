@@ -2,6 +2,9 @@
 
 Status: Accepted
 Date: 2026-10-09
+Amended 2026-10-11: the Library's status filter is a `Segmented` too, and the test also catches a pressed pill
+([handoff review N13](../handoff-review.md#n13--low-the-librarys-status-filter-is-a-third-selected-style)). The
+bullets that say so are marked "Library" below.
 
 ## Context
 
@@ -23,6 +26,11 @@ fallback.
   access) stays a radio group, Tab landing on the chosen role and the arrows moving the choice. Both draw the same
   track and segments, the toggle's focus ring included. The role picker converged on that look: 10px segment padding
   where it had 12px, and the toggle's ring where it had its own.
+- **Library: the status filter is a `Segmented`.** It had been a row of pills with no track, filled `bg-selected`
+  when pressed, with the classes written inline: a third selected style beside the segmented control and the tabs.
+  It picks one of a few, so it is the segmented control, a view control with `aria-pressed`. A count is part of an
+  option's label ("Draft 3", "All 12"), in the label's own colour. Pressing the chosen status again no longer clears
+  it: All is the way back, as the other `Segmented` controls have no unchosen state either.
 - **Tabs are Base UI's.** The two hand-rolled tablists (Usage, the review's Document and Preview) and the review queue
   use `Tabs`. The review's panels are cells of the review grid, not children of the tab bar, so its tabs pass their
   own `id` and `aria-controls`. Arrow keys choose as they move, and Home and End now work too. The Usage tabs gain
@@ -35,12 +43,15 @@ fallback.
   before it says it couldn't copy.
 - **A test holds it.** `src/components/primitives/one-copy.test.ts` reads the product's source and fails on a second
   copy: the segmented track's classes, a hand-rolled `role="tab"`, `navigator.clipboard` or `execCommand`, the stat
-  numeral, the team icons, or a channel label map.
+  numeral, the team icons, or a channel label map. Library: it also fails on a pill written inline that fills
+  `bg-selected` when pressed (`rounded-full` with `aria-pressed:bg-selected`, or `data-pressed:bg-selected`).
 
 ## Alternatives considered
 
 - **One segmented semantics.** Toggle buttons everywhere would drop the radio group a form field wants; radios
   everywhere would change the roles the preview's controls have had (and that the e2e specs select by).
+- **Library: keep the pills, as a primitive of their own.** Nothing else in the product picks one of a few with
+  pills, and a second look for the same job is the drift this record is about.
 - **Keep the rail header's and the sample request's tabs on the shared `Tabs`.** They are Base UI already, at their
   own sizes (14px in the rail, 13px in the integration sheet). Folding them in needs size variants; they stay as they
   are and the components README lists them under "Don't copy".

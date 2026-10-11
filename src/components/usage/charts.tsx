@@ -18,7 +18,8 @@ import { hbarsMinHeight } from "./geometry";
  * values. Every chart whose values aren't printed is followed by an sr-only table of them (`ChartTable`).
  *
  * Colour: amounts (the heatmap, the single-series charts) use the one teal family (brand-1…4) and the
- * taupe "empty" step. Series (which channel, which version) use series-1…4: distinct hues in a fixed
+ * taupe "empty" step. The heatmap's key prints the range each step means; a ranking's bars (`HBars`) all
+ * wear one step, so a shade never reads as a category. Series (which channel, which version) use series-1…4: distinct hues in a fixed
  * order, so they are told apart by more than lightness, with a legend that names them.
  *
  * Sizing: a chart's HEIGHT is fixed in px (so nothing shifts while the page streams) and its WIDTH is
@@ -148,17 +149,15 @@ export function HBars({
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
     <ul className={cn("m-0 flex list-none flex-col gap-4 p-0", className)} style={minRows ? { minHeight: hbarsMinHeight(minRows) } : undefined}>
-      {rows.map((r, i) => {
+      {rows.map((r) => {
         const pct = Math.round(r.share * 100);
         const width = Math.max(14, (r.value / max) * 100);
         const bar = (
           <Tip title={r.label} value={`${plural(r.value, "render")} · ${pct}%`}>
             <div
-              className={cn(
-                "flex h-9 items-center rounded-md px-3 text-[14px] font-medium tabular-nums",
-                // White on the darkest step, ink on the lighter one: both clear 4.5:1.
-                i === 0 ? "bg-brand-4 text-white" : "bg-brand-3 text-text",
-              )}
+              // Every bar is one colour: the length is the value, and a shade would read as a category. Ink on
+              // the step clears 4.5:1.
+              className="flex h-9 items-center rounded-md bg-brand-3 px-3 text-[14px] font-medium text-text tabular-nums"
               style={{ width: `${width}%` }}
             >
               {pct}%
@@ -287,27 +286,38 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
   );
 }
 
-export function HeatLegend({ thresholds, className }: { thresholds: UsageHeatmap["thresholds"]; className?: string }) {
-  const range = (lo: number, hi: number) => (hi <= lo ? String(lo) : `${lo} to ${hi}`);
-  const ranges = [
-    "No",
-    range(1, thresholds[0]),
-    range(thresholds[0] + 1, thresholds[1]),
-    range(thresholds[1] + 1, thresholds[2]),
-    range(thresholds[2] + 1, thresholds[3]),
+/** The renders a day each heat level means, from 0 up; a level no day can wear (tied thresholds) has none. */
+export function heatLegendLevels(thresholds: UsageHeatmap["thresholds"]): { level: number; from: number; to: number }[] {
+  return [
+    { level: 0, from: 0, to: 0 },
+    ...thresholds.flatMap((to, i) => {
+      const from = i === 0 ? 1 : thresholds[i - 1]! + 1;
+      return to < from ? [] : [{ level: i + 1, from, to }];
+    }),
   ];
-  // "No renders in a day", "1 render in a day", "2 to 9 renders in a day".
-  const sentence = (l: number) => `${ranges[l]} ${ranges[l] === "1" ? "render" : "renders"} in a day`;
+}
+
+/** Text on each heat step: white on the darkest, ink on the rest. Both clear 4.5:1. */
+const HEAT_TEXT = ["text-text", "text-text", "text-text", "text-text", "text-white"] as const;
+
+/**
+ * The heatmap's key: a swatch per shade, in the shade's own colour, with the renders a day it means printed
+ * in it ("2–9"), least to most. No range is left to a tooltip. A screen reader gets the same range as words
+ * ("2 to 9"), which it reads the same whatever it does with a dash.
+ */
+export function HeatLegend({ thresholds, className }: { thresholds: UsageHeatmap["thresholds"]; className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2 text-[13px] text-text-muted", className)}>
-      Less
-      {HEAT_BG.map((bg, l) => (
-        <Tip key={bg} title={sentence(l)}>
-          <span aria-hidden className={cn("size-4 rounded-[4px]", bg)} />
-        </Tip>
+    <ul aria-label="Renders in a day" className={cn("m-0 flex list-none flex-wrap items-center gap-1 p-0", className)}>
+      {heatLegendLevels(thresholds).map(({ level, from, to }) => (
+        <li
+          key={level}
+          className={cn("flex h-5 min-w-6 items-center justify-center rounded-[4px] px-1 text-[11px] leading-4 tabular-nums", HEAT_BG[level], HEAT_TEXT[level])}
+        >
+          <span aria-hidden>{from === to ? formatCount(from) : `${formatCount(from)}–${formatCount(to)}`}</span>
+          <span className="sr-only">{from === to ? formatCount(from) : `${formatCount(from)} to ${formatCount(to)}`}</span>
+        </li>
       ))}
-      More
-    </div>
+    </ul>
   );
 }
 
