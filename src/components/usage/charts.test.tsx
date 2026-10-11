@@ -4,6 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HeatCell, UsageHeatmap } from "@/domain/golive-types";
+import type { TemplateUsageData } from "@/domain/golive-types";
+import { templateMixParts } from "./channel-series";
 import { ChannelMix, HBars, HeatLegend, Heatmap, RateLine, SERIES, heatLegendLevels, StackedBars, type RatePoint, type StackDatum, type StackSeries } from "./charts";
 
 // No chart value is hover-only: every chart is followed by an sr-only table of its values, its marks are
@@ -21,6 +23,11 @@ const WEEKS: StackDatum[] = [
   { label: "Sep 28", title: "Week of Sep 28", parts: [790, 1498, 0] },
   { label: "Oct 5", title: "Week of Oct 5", parts: [301, 640, 4], partial: true },
 ];
+const ALERT_MIX: Pick<TemplateUsageData, "channels" | "byChannel" | "pushByPlatform"> = {
+  channels: ["push", "sms"],
+  byChannel: { pdf: 0, web: 0, email: 0, push: 1000, sms: 1000 },
+  pushByPlatform: { ios: 580, android: 420, unrecorded: 0 },
+};
 const DAYS: RatePoint[] = [
   { title: "Oct 7", pct: 0, detail: "0 of 251 renders" },
   { title: "Oct 8", pct: 2.4, detail: "6 of 250 renders" },
@@ -95,6 +102,43 @@ describe("an sr-only table follows every chart, with its values", () => {
     });
   });
 
+  it("channel mix of an alert: Push by phone beside SMS, each with its count and share", () => {
+    const host = html(<ChannelMix parts={templateMixParts(ALERT_MIX)} />);
+    expect(table(host)).toEqual({
+      caption: "Renders by channel",
+      head: ["Channel", "Renders", "Share"],
+      rows: [
+        ["Push · iPhone", "580", "29%"],
+        ["Push · Android", "420", "21%"],
+        ["SMS", "1,000", "50%"],
+      ],
+    });
+    // The legend prints every share beside its name, so none is left to a tooltip.
+    expect([...host.querySelectorAll("ul li")].map((li) => li.textContent)).toEqual(["Push · iPhone 29%", "Push · Android 21%", "SMS 50%"]);
+  });
+
+  it("channel mix of a document: PDF, Web and Email, with nothing for a phone", () => {
+    const host = html(
+      <ChannelMix parts={templateMixParts({ channels: ["pdf", "web", "email"], byChannel: { pdf: 50, web: 30, email: 20, push: 0, sms: 0 }, pushByPlatform: { ios: 0, android: 0, unrecorded: 0 } })} />,
+    );
+    expect(table(host).rows).toEqual([
+      ["PDF", "50", "50%"],
+      ["Web", "30", "30%"],
+      ["Email", "20", "20%"],
+    ]);
+  });
+
+  it("channel mix: pushes logged before the phone was kept get a part of their own, only while there are any", () => {
+    const withLegacy = templateMixParts({ ...ALERT_MIX, pushByPlatform: { ios: 500, android: 400, unrecorded: 100 } });
+    expect(withLegacy.map((p) => [p.label, p.value])).toEqual([
+      ["Push · iPhone", 500],
+      ["Push · Android", 400],
+      ["Push · not recorded", 100],
+      ["SMS", 1000],
+    ]);
+    expect(templateMixParts(ALERT_MIX).map((p) => p.label)).not.toContain("Push · not recorded");
+  });
+
   it("heatmap: a row per week, as before", () => {
     const host = html(<Heatmap heat={HEAT} />);
     expect(table(host)).toEqual({
@@ -143,6 +187,23 @@ describe("series are told apart by hue", () => {
     const host = html(<StackedBars label="x" periodHeader="Week of" series={CHANNELS} data={WEEKS.slice(0, 1)} />);
     const fills = [...host.querySelectorAll("rect:not([data-mark])")].map((r) => r.getAttribute("class"));
     expect(fills).toEqual(["fill-series-1", "fill-series-2", "fill-series-3"]);
+  });
+
+  it("the channel mix of a template wears each channel's own hue, not the hue of its place in a shorter list", () => {
+    const host = html(<ChannelMix parts={templateMixParts(ALERT_MIX)} />);
+    const swatches = [...host.querySelectorAll("ul li > span[aria-hidden]")].map((s) => s.className);
+    // Push is the fourth channel's rose and SMS the fifth's blue, as in "Renders over time"; Android is the rose one step fainter.
+    expect(swatches.map((c) => /\bbg-series-\d\b/.exec(c)?.[0])).toEqual(["bg-series-4", "bg-series-4", "bg-series-5"]);
+    expect(swatches.map((c) => c.includes("opacity-55"))).toEqual([false, true, false]);
+    // And the bar's segments are drawn the same way.
+    const segments = [...host.querySelectorAll("div.flex > span")].map((s) => s.className);
+    expect(segments.map((c) => /\bbg-series-\d\b/.exec(c)?.[0])).toEqual(["bg-series-4", "bg-series-4", "bg-series-5"]);
+    expect(segments.map((c) => c.includes("opacity-55"))).toEqual([false, true, false]);
+  });
+
+  it("a part the channel series can place still takes its hue from its place", () => {
+    const host = html(<ChannelMix parts={[{ label: "PDF", value: 1 }, { label: "Web", value: 1 }]} />);
+    expect([...host.querySelectorAll("ul li > span[aria-hidden]")].map((s) => /\bbg-series-\d\b/.exec(s.className)?.[0])).toEqual(["bg-series-1", "bg-series-2"]);
   });
 
   it("the bars of a ranking are one colour: the length is the value, and a shade would read as a category", () => {

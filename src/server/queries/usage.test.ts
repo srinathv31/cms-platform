@@ -79,7 +79,19 @@ async function versionIdOf(templateId: string, number: number): Promise<string> 
   return String(result.rows[0]!.id);
 }
 
-function logRow(o: { id: string; at: number; templateId: string; versionId: string; versionNumber: number | null; consumerId: string | null; isPreview?: boolean; outcome?: "ok" | "error"; errorCode?: string }) {
+function logRow(o: {
+  id: string;
+  at: number;
+  templateId: string;
+  versionId: string;
+  versionNumber: number | null;
+  consumerId: string | null;
+  channel?: (typeof schema.renderLog.$inferInsert)["channel"];
+  platform?: (typeof schema.renderLog.$inferInsert)["platform"];
+  isPreview?: boolean;
+  outcome?: "ok" | "error";
+  errorCode?: string;
+}) {
   return {
     id: o.id,
     at: new Date(o.at),
@@ -87,7 +99,8 @@ function logRow(o: { id: string; at: number; templateId: string; versionId: stri
     versionId: o.versionId,
     versionNumber: o.versionNumber,
     consumerId: o.consumerId,
-    channel: "pdf" as const,
+    channel: o.channel ?? ("pdf" as const),
+    platform: o.platform ?? null,
     isPreview: o.isPreview ?? false,
     correlationId: `req_${o.id}`,
     outcome: o.outcome ?? ("ok" as const),
@@ -282,7 +295,7 @@ describe("getUsageDashboard", () => {
       for (const [name, run, most] of [
         ["dashboard, all teams", () => getUsageDashboard("all"), 7],
         ["dashboard, one team", () => getUsageDashboard("coral-offers"), 8],
-        ["template", () => getTemplateUsage("coral-offers", ids["balance-transfer"]!), 9],
+        ["template", () => getTemplateUsage("coral-offers", ids["balance-transfer"]!), 10], // one is the content type's channels
       ] as const) {
         execute.mockClear();
         batch.mockClear();
@@ -378,6 +391,87 @@ describe("getTemplateUsage", () => {
           expect(u.stats.renders.value).toBe(1);
           expect(u.rows.map((r) => [r.renders30d, r.errors30d])).toEqual([[1, 1]]);
           expect(u.daily.at(-1)).toMatchObject({ count: 1, errors: 1 });
+        },
+      );
+    } finally {
+      env.now = BASE;
+    }
+  });
+
+  it("Balance Transfer, a document: renders by channel are PDF, Web and Email, and match direct SQL", async () => {
+    as("maya");
+    const bt = ids["balance-transfer"]!;
+    const u = await getTemplateUsage("coral-offers", bt);
+    const s = since();
+    const count = (channel: string) => direct("at >= ? and template_id = ? and channel = ?", null, [s, bt, channel]);
+
+    expect(u.channels).toEqual(["pdf", "web", "email"]);
+    expect(u.byChannel).toEqual({ pdf: await count("pdf"), web: await count("web"), email: await count("email"), push: 0, sms: 0 });
+    expect(u.byChannel.pdf + u.byChannel.web + u.byChannel.email).toBe(u.stats.renders.value);
+    expect(u.byChannel.web).toBeGreaterThan(0);
+    // No phone for a document.
+    expect(u.pushByPlatform).toEqual({ ios: 0, android: 0, unrecorded: 0 });
+    expect(u.recentErrors.every((e) => e.platform === null)).toBe(true);
+  });
+
+  it("Payment Due Reminder, an alert: renders by channel are Push and SMS, and Push splits into iPhone and Android", async () => {
+    as("maya");
+    const alert = ids["payment-due-reminder"]!;
+    const u = await getTemplateUsage("coral-offers", alert);
+    const s = since();
+    const count = (where: string) => direct(`at >= ? and template_id = ? and ${where}`, null, [s, alert]);
+
+    expect(u.channels).toEqual(["push", "sms"]);
+    expect(u.byChannel).toEqual({ pdf: 0, web: 0, email: 0, push: await count("channel = 'push'"), sms: await count("channel = 'sms'") });
+    expect(u.byChannel.push).toBeGreaterThan(0);
+    expect(u.byChannel.sms).toBeGreaterThan(0);
+    expect(u.byChannel.push + u.byChannel.sms).toBe(u.stats.renders.value);
+
+    expect(u.pushByPlatform).toEqual({
+      ios: await count("channel = 'push' and platform = 'ios'"),
+      android: await count("channel = 'push' and platform = 'android'"),
+      unrecorded: 0,
+    });
+    expect(u.pushByPlatform.ios).toBeGreaterThan(0);
+    expect(u.pushByPlatform.android).toBeGreaterThan(0);
+    expect(u.pushByPlatform.ios + u.pushByPlatform.android).toBe(u.byChannel.push);
+
+    // The seeded failures: the Android push is the latest, then the three SMS, which have no phone.
+    expect(u.recentErrors.slice(0, 2)).toEqual([
+      expect.objectContaining({ channel: "push", platform: "android", code: "missing_variables" }),
+      expect.objectContaining({ channel: "push", platform: "android", code: "missing_variables" }),
+    ]);
+    expect(u.recentErrors.slice(2).map((e) => [e.channel, e.platform])).toEqual([["sms", null], ["sms", null], ["sms", null]]);
+  });
+
+  it("the channel split counts live renders of the last 30 days only; a push with no recorded phone is its own count", async () => {
+    as("maya");
+    const alert = ids["payment-due-reminder"]!;
+    const versionId = await versionIdOf(alert, 1);
+    env.now = new Date(BASE.getTime() - 400 * DAY);
+    const at = env.now.getTime();
+    const row = (id: string, o: Partial<Parameters<typeof logRow>[0]>) =>
+      logRow({ id: `rl_split_${id}`, at: at - 3_600_000, templateId: alert, versionId, versionNumber: 1, consumerId: "coral", channel: "push", ...o });
+    try {
+      await withRows(
+        [
+          row("ios", { platform: "ios" }),
+          row("ios-failed", { platform: "ios", outcome: "error", errorCode: "missing_variables" }),
+          row("android", { platform: "android" }),
+          // Logged before the platform was kept.
+          row("legacy", {}),
+          row("sms", { channel: "sms" }),
+          // Not usage, or not in the window: previews, an unregistered caller, 31 days ago.
+          row("preview", { platform: "ios", isPreview: true, consumerId: null }),
+          row("unknown", { platform: "ios", outcome: "error", errorCode: "unknown_consumer" }),
+          row("old", { platform: "android", at: at - 31 * DAY }),
+        ],
+        async () => {
+          const u = await getTemplateUsage("coral-offers", alert);
+          expect(u.byChannel).toEqual({ pdf: 0, web: 0, email: 0, push: 4, sms: 1 });
+          expect(u.pushByPlatform).toEqual({ ios: 2, android: 1, unrecorded: 1 });
+          // The failed iPhone push names its phone, the earlier SMS failures none.
+          expect(u.recentErrors[0]).toMatchObject({ channel: "push", platform: "ios", code: "missing_variables" });
         },
       );
     } finally {

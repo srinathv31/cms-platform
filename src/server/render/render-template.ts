@@ -46,7 +46,7 @@ import { writeRenderLog } from "./log";
 //     can act on (a stored document the check or the resolver refuses, or characters the PDF's
 //     fonts can't draw; see `renderFailure`); a push or SMS over its limit → 422
 //     push_payload_too_large / sms_too_long
-//  10 one render_log row, ok or error. Never values: the channel and the error code only.
+//  10 one render_log row, ok or error. Never values: the channel, a push's platform and the error code only.
 
 export interface RenderInput {
   templateId: string;
@@ -154,6 +154,7 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
       versionNumber: version.number,
       consumerId: input.preview ? null : input.consumerId,
       channel: input.channel,
+      platform: target.target.channel === "push" ? target.target.platform : null,
       isPreview: input.preview,
       correlationId: input.correlationId,
       outcome: result.ok ? "ok" : "error",

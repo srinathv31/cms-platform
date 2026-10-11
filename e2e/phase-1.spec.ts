@@ -885,6 +885,19 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     await report("workspace Annual Fee Waiver (hard load)", page);
   });
 
+  // The template's Usage tab streams in behind a skeleton with the final geometry, the channel card included:
+  // a document's mix (PDF, Web, Email) and an alert's (Push by phone, SMS) both land without moving anything.
+  for (const name of ["Balance Transfer", "Payment Due Reminder"]) {
+    test(`the Usage tab of ${name}, hard load`, async ({ page }) => {
+      await page.goto("/coral-offers/library");
+      const href = (await libraryRows(page)).find((r) => r.name.startsWith(name))!.href;
+      await page.goto(`${href}/usage`);
+      await expect(page.getByRole("heading", { name: "Renders by channel" })).toBeVisible();
+      await settle(page);
+      await report(`Usage tab, ${name} (hard load)`, page);
+    });
+  }
+
   // The save status ("Saving…", "Saved") is the Revert menu's trigger, with a chevron after the text:
   // the text keeps the width of its widest state, so the chevron stays put as each save lands (N10).
   // Not a threshold: any shift counts, since the one it caught measured 0.000002.

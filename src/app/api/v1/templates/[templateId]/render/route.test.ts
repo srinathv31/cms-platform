@@ -246,7 +246,7 @@ describe("POST …/render: previews", () => {
     expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["annual-fee-waiver"]}-draft.pdf"`);
     expect(getViewer).toHaveBeenCalledTimes(1);
     expect(await logRows("preview-1")).toEqual([
-      expect.objectContaining({ isPreview: true, consumerId: null, versionNumber: null, channel: "pdf", outcome: "ok" }),
+      expect.objectContaining({ isPreview: true, consumerId: null, versionNumber: null, channel: "pdf", platform: null, outcome: "ok" }),
     ]);
   }, 30_000);
 
@@ -532,17 +532,36 @@ describe("POST …/render: push and SMS", () => {
       payloadBytes: 114,
       newerVersion: null,
     });
-    // The log holds the channel and the outcome, never a value.
+    // The log holds the channel, the platform and the outcome, never a value.
     const [row] = await logRows("push-ios");
-    expect(row).toMatchObject({ channel: "push", outcome: "ok", errorCode: null, consumerId: "coral" });
+    expect(row).toMatchObject({ channel: "push", platform: "ios", outcome: "ok", errorCode: null, consumerId: "coral" });
     expect(JSON.stringify(row)).not.toContain("Maya");
   });
 
   it("push for Android: never a subtitle", async () => {
-    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "android", values: VALUES });
+    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "android", values: VALUES }, { ...CORAL, "X-Correlation-Id": "push-android" });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ title: "Payment due", body: "Hi Maya, your payment of $35.00 is due.", payloadBytes: 101, newerVersion: null });
+    expect(await logRows("push-android")).toEqual([expect.objectContaining({ channel: "push", platform: "android", outcome: "ok" })]);
+  });
+
+  it("logs the platform of a push, of a push preview and of a failed push, and none for any other channel", async () => {
+    const asked = [
+      { id: "plat-sms", body: { version: 1, channel: "sms", values: VALUES }, headers: CORAL, platform: null },
+      { id: "plat-ios", body: { version: 1, channel: "push", platform: "ios", values: VALUES }, headers: CORAL, platform: "ios" },
+      { id: "plat-preview", body: { version: 1, channel: "push", platform: "android", values: VALUES, preview: true }, headers: {}, platform: "android" },
+      { id: "plat-failed", body: { version: 1, channel: "push", platform: "android", values: {} }, headers: CORAL, platform: "android" },
+    ] as const;
+    for (const { id, body, headers } of asked) await post(ALERT_ID, body, { ...headers, "X-Correlation-Id": id });
+    for (const { id, platform } of asked) expect(await logRows(id), id).toEqual([expect.objectContaining({ platform })]);
+    // A failed push is logged by its code and its phone, no value.
+    expect((await logRows("plat-failed"))[0]).toMatchObject({ channel: "push", platform: "android", outcome: "error", errorCode: "missing_variables" });
+  });
+
+  it("a request refused before it is logged leaves no row, so a push without a platform never writes a null one", async () => {
+    await expectError(await post(ALERT_ID, { version: 1, channel: "push", values: VALUES }, { ...CORAL, "X-Correlation-Id": "plat-none" }), 400, "bad_request", "platform must be ios or android.");
+    expect(await logRows("plat-none")).toEqual([]);
   });
 
   it("SMS: JSON with the text as sent, the footer on its last line, and its encoding and parts", async () => {
@@ -643,7 +662,7 @@ describe("POST …/render: push and SMS", () => {
     const error = await expectError(res, 422, "push_payload_too_large", "The push is 5,040 bytes on iPhone. It can be at most 4,096 bytes.");
     expect(error.details).toEqual({ platform: "ios", payloadBytes: 5040, maxBytes: 4096 });
     const [row] = await logRows("push-big");
-    expect(row).toMatchObject({ channel: "push", outcome: "error", errorCode: "push_payload_too_large" });
+    expect(row).toMatchObject({ channel: "push", platform: "ios", outcome: "error", errorCode: "push_payload_too_large" });
     expect(JSON.stringify(row)).not.toContain("xxxx");
   });
 

@@ -134,6 +134,7 @@ export const LOG_COLUMNS = [
   "version_number",
   "consumer_id",
   "channel",
+  "platform",
   "is_preview",
   "correlation_id",
   "outcome",
