@@ -1009,8 +1009,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Open
-- **Where:** `src/components/review/review-workspace.tsx` line 56
+- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines; the other oversized files and the store choice remain.
+- **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.
 - **Evidence:** traced
