@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { NARROW_BODY, NARROW_BUTTON, NARROW_FOOTER, NARROW_REFUSAL, NARROW_SHELL, ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
@@ -183,7 +183,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
             primary();
           }
         }}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg"
+        className={cn("flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg", NARROW_SHELL)}
       >
         {summary ? (
           <>
@@ -193,7 +193,7 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
             </DialogDescription>
 
             {/* The scroll area runs out to the dialog's edges (so its scrollbar sits at the edge); the content keeps the 32px. */}
-            <div className="-mx-8 mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-8 pb-1">
+            <div className={cn("-mx-8 mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-8 pb-1", NARROW_BODY, "max-[26rem]:-mx-5 max-[26rem]:px-5")}>
               <Section title="Channels">
                 <ChannelSelector channels={summary.channels} allowed={summary.channels} editable={false} onChange={noop} />
               </Section>
@@ -251,9 +251,9 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
               </section>
             </div>
 
-            <div className="mt-7 flex shrink-0 items-center gap-3">
+            <div className={cn("mt-7 flex shrink-0 items-center gap-3", NARROW_FOOTER)}>
               {/* Always in the row (empty until a refusal), so it is announced when the reason arrives. */}
-              <p role="alert" className="min-w-0 flex-1 text-[13px] leading-4 text-danger-text">
+              <p role="alert" className={cn("min-w-0 flex-1 text-[13px] leading-4 text-danger-text", NARROW_REFUSAL)}>
                 {reason
                   ? splitKeys(reason).map((part, index) =>
                       part.code ? (
@@ -266,10 +266,10 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
                     )
                   : null}
               </p>
-              <Button variant="outline" className={cn("px-4", PENDING)} onClick={close} disabled={pending} focusableWhenDisabled>
+              <Button variant="outline" className={cn("px-4", NARROW_BUTTON, PENDING)} onClick={close} disabled={pending} focusableWhenDisabled>
                 Cancel
               </Button>
-              <Button className={cn("relative px-4", PENDING)} onClick={primary} disabled={pending} focusableWhenDisabled>
+              <Button className={cn("relative px-4", NARROW_BUTTON, PENDING)} onClick={primary} disabled={pending} focusableWhenDisabled>
                 <span className={cn(pending && "invisible")}>{stale ? "Refresh summary" : `Submit ${label}`}</span>
                 {pending ? <Spinner aria-label={stale ? "Refreshing" : "Submitting"} className="absolute" /> : null}
               </Button>

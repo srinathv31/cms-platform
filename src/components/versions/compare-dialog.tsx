@@ -28,7 +28,7 @@ export function CompareVersions({ templateId, options }: { templateId: string; o
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <ScrimDialogContent className="flex h-[min(52rem,calc(100vh-2rem))] w-[min(68rem,calc(100vw-2rem))] flex-col rounded-3xl p-0">
-          <div className="flex items-start justify-between gap-4 px-8 pt-8">
+          <div className="flex items-start justify-between gap-4 px-8 pt-8 max-[26rem]:px-5 max-[26rem]:pt-5">
             <DialogTitle className="display-lg">Compare versions</DialogTitle>
             <DialogClose
               render={
@@ -36,7 +36,7 @@ export function CompareVersions({ templateId, options }: { templateId: string; o
                   variant="ghost"
                   size="icon"
                   aria-label="Close"
-                  className="-mt-1 -mr-3 size-9 rounded-full text-text-muted hover:bg-hover hover:text-text"
+                  className="-mt-1 -mr-3 size-9 rounded-full text-text-muted hover:bg-hover hover:text-text max-[26rem]:-mr-2"
                 />
               }
             >
@@ -59,11 +59,12 @@ export function CompareVersions({ templateId, options }: { templateId: string; o
 export function CompareSkeleton() {
   return (
     <div aria-hidden className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-[3.75rem] items-center gap-3 border-b border-hairline px-8">
-        <Skeleton className="h-8 w-44 rounded-lg" />
-        <Skeleton className="h-8 w-44 rounded-lg" />
+      <div className="flex h-[3.75rem] items-center gap-3 border-b border-hairline px-8 max-[26rem]:h-auto max-[26rem]:flex-wrap max-[26rem]:px-5 max-[26rem]:py-3">
+        <Skeleton className="h-8 w-44 rounded-lg max-[26rem]:w-full" />
+        <Skeleton className="h-8 w-44 rounded-lg max-[26rem]:w-full" />
+        <Skeleton className="hidden h-5 w-full rounded-lg max-[26rem]:block" />
       </div>
-      <div className="flex flex-col gap-3 px-8 pt-8">
+      <div className="flex flex-col gap-3 px-8 pt-8 max-[26rem]:px-5">
         <Skeleton className="mx-auto h-4 w-full max-w-[47.5rem]" />
         <Skeleton className="mx-auto h-4 w-4/5 max-w-[38rem]" />
         <Skeleton className="mx-auto mt-6 h-6 w-48" />

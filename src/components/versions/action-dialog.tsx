@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import { NARROW_BODY, NARROW_BUTTON, NARROW_FOOTER, NARROW_REFUSAL, NARROW_SHELL, ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -138,7 +138,7 @@ export function ActionDialog({
           event.preventDefault();
           if (!busy) primary.onClick();
         }}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg"
+        className={cn("flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg", NARROW_SHELL)}
       >
         <div className="shrink-0">
           <DialogTitle className="display-lg">{title}</DialogTitle>
@@ -146,11 +146,11 @@ export function ActionDialog({
         </div>
         {children ? (
           // The side padding (and the matching margin) leaves a focused field's ring inside the scroller's clip.
-          <div className="mt-6 -mx-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-2 py-1">{children}</div>
+          <div className={cn("mt-6 -mx-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-2 py-1", NARROW_BODY)}>{children}</div>
         ) : null}
-        <div className="mt-6 flex shrink-0 items-center gap-3">
+        <div className={cn("mt-6 flex shrink-0 items-center gap-3", NARROW_FOOTER)}>
           {/* Always in the row (empty until a refusal), so the reason is announced when it arrives. */}
-          <p role="alert" className="min-w-0 flex-1 text-[13px] leading-4 text-danger-text">
+          <p role="alert" className={cn("min-w-0 flex-1 text-[13px] leading-4 text-danger-text", NARROW_REFUSAL)}>
             {error}
           </p>
           <DialogClose
@@ -159,7 +159,7 @@ export function ActionDialog({
                 ref={cancel}
                 variant="outline"
                 aria-disabled={busy || undefined}
-                className={cn("bg-surface px-4", busy && "pointer-events-none opacity-50")}
+                className={cn("bg-surface px-4", NARROW_BUTTON, busy && "pointer-events-none opacity-50")}
               />
             }
           >
@@ -170,7 +170,7 @@ export function ActionDialog({
             variant={primary.destructive ? "destructive" : "default"}
             aria-disabled={busy || primary.blocked || undefined}
             aria-busy={busy || undefined}
-            className={cn("relative px-4", primary.destructive && DESTRUCTIVE_PRIMARY, primary.blocked && !busy && BLOCKED)}
+            className={cn("relative px-4", NARROW_BUTTON, primary.destructive && DESTRUCTIVE_PRIMARY, primary.blocked && !busy && BLOCKED)}
             onClick={() => {
               if (!busy) primary.onClick();
             }}

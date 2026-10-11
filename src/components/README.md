@@ -109,7 +109,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |
 | `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
 | `ScaledViewport`, `ScaledBox`, `containScale` | [scaled-viewport.tsx](primitives/scaled-viewport.tsx) | Content laid out at a fixed size in CSS px and scaled down (never up) with a transform, so it wraps and cuts exactly as at 1:1 and stays crisp. `ScaledViewport` fills its box at a fixed width (Web's 800px Desktop page); `ScaledBox` keeps the content's proportions, fits it to the box down to a minimum scale for height, and reserves its scaled size (the phone kit). Client. |
-| `ScrollRegion` | [scroll-region.tsx](primitives/scroll-region.tsx) | A box for a data table that scrolls sideways inside itself in a window too narrow for it, and takes a Tab stop and a label only once it scrolls (reflow, [decision 0045](../../docs/decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)). |
+| `ScrollRegion` | [scroll-region.tsx](primitives/scroll-region.tsx) | A box for a data table that scrolls sideways inside itself in a window too narrow for it, and takes a Tab stop and a label only once it scrolls (`axis="y"` for a box that scrolls up and down, as Compare's body does) (reflow, [decision 0045](../../docs/decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)). |
 | `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
 
 A channel's name ("PDF", "Web", "Email", "Push", "SMS") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere, and a push platform's ("iPhone", "Android") is `PLATFORM_LABELS`.
@@ -205,6 +205,12 @@ submit(invalid /* a known refusal, shown without sending */, () => requestChange
 // pending: primary and Cancel are aria-disabled (focus stays), a spinner replaces the label
 // error: result.reason in a role="alert" line beside the buttons; the dialog closes only on ok
 ```
+
+A dialog reflows to 320px wide (and 256px tall) with the `NARROW_*` classes of
+[app-shell/scrim-dialog.tsx](app-shell/scrim-dialog.tsx), which `ActionDialog` and the submit dialog share: under 26rem
+of window the popup pads 1.25rem and scrolls as a whole, and the footer sticks to its bottom edge and wraps, so the
+actions never leave the screen. Dialogs are portaled out of the canvas, so they key to the window (`max-[26rem]:`),
+not to `@max-[26rem]/canvas:`. [e2e/reflow-dialogs.spec.ts](../../e2e/reflow-dialogs.spec.ts) opens each at 320px.
 
 The settings sections confirm through one `Strip` ([settings/strip.tsx](settings/strip.tsx)), which runs its action the
 same way.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,8 +11,17 @@ import { cn } from "@/lib/utils";
  *
  * It wraps the shadcn `Table`, whose own container would scroll first, so that container stops scrolling here
  * and this box does.
+ *
+ * `axis="y"` is the same for a box that scrolls up and down (a dialog's body, which fills the dialog's height): give
+ * it one stable child that grows and shrinks with its content, since the box's own size doesn't change with it.
  */
-export function ScrollRegion({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
+export function ScrollRegion({
+  label,
+  axis = "x",
+  className,
+  children,
+  ...props
+}: { label: string; axis?: "x" | "y" } & Omit<ComponentProps<"div">, "ref" | "role" | "aria-label" | "tabIndex">) {
   const box = useRef<HTMLDivElement>(null);
   const [scrolls, setScrolls] = useState(false);
 
@@ -21,20 +30,24 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
     if (!el) return;
     // Watching the box (the window changed) and its content (the table's rows changed). The first call is the
     // observer's own, right after it starts watching.
-    const observer = new ResizeObserver(() => setScrolls(el.scrollWidth > el.clientWidth + 1));
+    const observer = new ResizeObserver(() =>
+      setScrolls(axis === "y" ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1),
+    );
     observer.observe(el);
-    for (const child of el.querySelectorAll("table")) observer.observe(child);
+    for (const child of axis === "y" ? el.children : el.querySelectorAll("table")) observer.observe(child);
     return () => observer.disconnect();
-  }, []);
+  }, [axis]);
 
   return (
     <div
+      {...props}
       ref={box}
       role={scrolls ? "region" : undefined}
       aria-label={scrolls ? label : undefined}
       tabIndex={scrolls ? 0 : undefined}
       className={cn(
-        "overflow-x-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
+        "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
+        axis === "y" ? "overflow-y-auto" : "overflow-x-auto",
         className,
       )}
     >
