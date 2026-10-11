@@ -3,6 +3,7 @@ import type { Client, InValue } from "@libsql/client";
 import { expect, test, type Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { rowsOf } from "./helpers/cleanup";
+import { settled } from "./helpers/settled";
 
 // What a person sees when a page throws (docs/handoff-review.md, I7; decision 0013). Each test breaks one
 // stored JSON value, so the query that reads it throws the way a corrupt row or a failing backend would,
@@ -100,9 +101,8 @@ async function settle(page: Page, frame: boolean) {
       () => ![...document.querySelectorAll('[data-slot="skeleton"]')].some((el) => (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true })),
     );
   }
-  // Let the streamed sections' view transitions finish.
-  await page.waitForTimeout(800);
-  await page.evaluate(() => document.fonts.ready);
+  // Let the streamed sections' view transitions and the fonts finish.
+  await settled(page);
 }
 
 /** No serious or critical axe violation, as in principles.spec.ts. */

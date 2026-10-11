@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 import { advanceClock, bell, click, openBell, openSettings, personRow, profileButton, resetDemoData, settingsDialog, strip, switchPersona, unreadCount } from "./helpers/access";
+import { reactReady } from "./helpers/golive";
 import { asPersona, beat, demoTimeout, expect, hydrated, shoot, test, typeSlowly } from "./helpers/scenario";
+import { settled } from "./helpers/settled";
 
 // Phase 6 gate: demo scenario 8 ("Access"), start to finish from a fresh reset, each person through the
 // persona switcher as a presenter would.
@@ -32,6 +34,18 @@ test.afterAll(() => {
 });
 
 const card = (page: Page) => page.locator('[data-slot="sidebar-card"]').filter({ visible: true });
+
+/**
+ * The sidebar footer's Settings link, once a press on it opens the modal. The footer is drawn for the person who is
+ * signed in (its card, then the link under it), so after a persona switch it changes while the page settles: a press
+ * before React has the link, or a release after the card above it has come or gone, misses it.
+ */
+async function settingsLinkReady(page: Page) {
+  const link = page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" });
+  await expect(link).toBeVisible();
+  await reactReady(link);
+  await settled(page);
+}
 
 test.describe("scenario 8: access", () => {
   test("Morgan requests Author and Alex approves; Alex recertifies leaving Sam out; 31 days later Sam has lapsed and Devon is suspended", async ({ page }) => {
@@ -166,6 +180,7 @@ test.describe("scenario 8: access", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
       await expect(page.locator("main ul > li > a[href*='/templates/']").filter({ visible: true }).first()).toBeVisible();
       await hydrated(page);
+      await settingsLinkReady(page);
       const dialog = await openSettings(page, /^Recertification/);
       await expect(page).toHaveURL(new RegExp(`/${TEAM}/settings/recertification$`));
       const summary = dialog.locator('[data-slot="recert-summary"]');
@@ -226,6 +241,7 @@ test.describe("scenario 8: access", () => {
       await page.goto(`/${TEAM}/library`);
       await hydrated(page);
       // Alex has not signed in for 31 days, but he did just now (the persona switch is the sign-in).
+      await settingsLinkReady(page);
       const dialog = await openSettings(page, /^Members/);
       const sam = personRow(dialog, "sam");
       await expect(sam).toContainText("Sam Ortiz");

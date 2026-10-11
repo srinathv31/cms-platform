@@ -221,6 +221,8 @@ describe("required-section guard: range operations keep the headings and apply t
 });
 
 describe("the note", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("is one note at a time, announced politely, gone after about two seconds", async () => {
     vi.useFakeTimers();
     const editor = mount();
@@ -233,7 +235,9 @@ describe("the note", () => {
     const live = editor.view.dom.parentElement?.querySelector('[role="status"][aria-live="polite"]');
     await vi.advanceTimersByTimeAsync(50);
     expect(live?.textContent).toBe("Required for disclosures");
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(note(editor), "still there a second in").not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1100);
     expect(note(editor)).toBeNull();
   });
 });

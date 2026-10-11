@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { settled } from "./helpers/settled";
 
 // Reflow (WCAG 2.1 SC 1.4.10, decision 0045) for the screens e2e/reflow.spec.ts leaves out: Coral, the simulated
 // consumer (its offers, an offer's three tabs, the link flow, deliveries, customers and notices), and every section
@@ -23,7 +24,7 @@ async function hydrated(page: Page) {
     const el = document.querySelector("a[href], button");
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
   });
-  await page.waitForTimeout(800);
+  await settled(page);
 }
 
 async function open(page: Page, url: string, persona = "riley") {
@@ -123,7 +124,7 @@ for (const width of [320, 1280]) {
         await open(page, `/${TEAM}/settings/${section}`, persona);
         const dialog = page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
         await expect(dialog).toBeVisible();
-        await page.waitForTimeout(400); // the dialog fades in: axe reads its contrast once it has
+        await settled(page); // the dialog has faded in: axe reads its contrast from the colours it finds
         expect(await violations(page)).toEqual([]);
 
         const { pageOverflow, scrollers } = await sideways(page);

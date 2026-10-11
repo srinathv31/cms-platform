@@ -13,6 +13,7 @@ import {
   expectAutosaved,
   expectVisibleFocus,
   history,
+  hydrated,
   liveEditor,
   mouseMoves,
   mousePresses,
@@ -23,6 +24,8 @@ import {
   requiredHeading,
   test,
 } from "./helpers/scenario";
+import { reactReady } from "./helpers/golive";
+import { settled } from "./helpers/settled";
 
 // Phase 2 gate: demo scenario 2, steps 1–3 ("Create"), must feel effortless.
 //
@@ -59,13 +62,18 @@ async function expectNameSelected(page: Page, text: string) {
   await expect(field).toBeFocused();
   await expect(field).toBeEditable();
   await expect(field).toHaveValue(text);
-  const selection = await field.evaluate((el: HTMLTextAreaElement) => ({
-    active: document.activeElement === el,
-    start: el.selectionStart,
-    end: el.selectionEnd,
-    length: el.value.length,
-  }));
-  expect(selection).toEqual({ active: true, start: 0, end: text.length, length: text.length });
+  await expect
+    .poll(
+      () =>
+        field.evaluate((el: HTMLTextAreaElement) => ({
+          active: document.activeElement === el,
+          start: el.selectionStart,
+          end: el.selectionEnd,
+          length: el.value.length,
+        })),
+      { message: "the name is focused with all of its text selected" },
+    )
+    .toEqual({ active: true, start: 0, end: text.length, length: text.length });
 }
 
 /** The panel row for `key`: its usage text ("Unused", "1 use"). */
@@ -74,8 +82,8 @@ async function expectUses(page: Page, key: string, uses: "Unused" | "1 use" | "2
 }
 
 /**
- * A person needs a moment to see the new page before the first keystroke: take a beat, and check the
- * name is still the focused, fully selected field. Landing works by a one-shot cookie
+ * Before the first keystroke the page is live (the document's editor has taken over from the server's
+ * markup), and the name is still the focused, fully selected field. Landing works by a one-shot cookie
  * (`src/components/workspace/just-created.ts`): `createTemplate` redirects straight to the
  * template's own address and the name field takes the cookie on arrival, so nothing is dropped from
  * the address afterwards. The `not.toHaveURL(/created=/)` is a guard that no query comes back.
@@ -83,7 +91,7 @@ async function expectUses(page: Page, key: string, uses: "Unused" | "1 use" | "2
  */
 async function afterLanding(page: Page, text: string) {
   await expect(page).not.toHaveURL(/created=/);
-  await page.waitForTimeout(300);
+  await liveEditor(page);
   await expectNameSelected(page, text);
 }
 
@@ -174,8 +182,8 @@ async function redoUntilBack(page: Page, keys: readonly string[], cap = 40) {
  */
 async function redoUntilDocument(page: Page, expected: string, cap = 40) {
   for (let i = 0; i < cap && (await docText(page)) !== expected && (await history(page)).redo; i++) {
+    // The editor applies a redo inside the key handler, so its state is current when the press returns.
     await page.keyboard.press(`${MOD}+Shift+z`);
-    await page.waitForTimeout(40);
   }
   expect(await docText(page), "redo restores the document exactly").toBe(expected);
 }
@@ -204,20 +212,6 @@ async function selectHeadingBlock(page: Page, requiredKey: string) {
     if (at < 0) throw new Error(`no required heading ${key}`);
     dom.editor.chain().focus().setNodeSelection(at).run();
   }, requiredKey);
-}
-
-/** Lets entrance animations finish, so a scan or a measurement sees the settled state. */
-async function settled(page: Page) {
-  await page.evaluate(() => document.fonts.ready);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          document.getAnimations().filter((a) => a.playState === "running" && a.effect?.getTiming().iterations !== Infinity)
-            .length,
-      ),
-    )
-    .toBe(0);
 }
 
 // ── Creating the template (shared by the mouse run and the axe scans) ─────────
@@ -429,8 +423,7 @@ async function tabTo(page: Page, target: Locator, what: string, cap = 40, key = 
 async function arrowTo(page: Page, key: "ArrowUp" | "ArrowDown", block: string, cap = 40) {
   for (let presses = 0; presses < cap; presses++) {
     if ((await caret(page)).block === block) return;
-    await page.keyboard.press(key);
-    await page.waitForTimeout(25);
+    await moveCaret(page, key);
   }
   throw new Error(`the caret never reached "${block}" with ${cap} ${key} presses`);
 }
@@ -443,6 +436,9 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
 
     await test.step("1. Tab to New template, Enter opens the gallery, Esc closes it and gives focus back", async () => {
       const newTemplate = page.getByRole("button", { name: "New template" });
+      // An Enter on a button React has not hydrated yet does nothing, and a streaming section moves the tab order.
+      await reactReady(newTemplate);
+      await settled(page);
       await tabTo(page, newTemplate, "New template");
       await expectVisibleFocus(newTemplate, "New template");
 
@@ -542,6 +538,8 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await page.keyboard.press("Space");
       const options = page.getByRole("option");
       await expect(options).toHaveText(["Text", "Currency", "Percent", "Date", "Number", "US state"]);
+      // Base UI applies initial focus a frame after the popup shows: wait for it, or an arrow press races it.
+      await expect(page.locator('[role="option"]:focus')).toHaveCount(1);
       for (let presses = 0; presses < 8; presses++) {
         if ((await page.evaluate(() => document.activeElement?.textContent)) === "Date") break;
         await page.keyboard.press("ArrowDown");
@@ -667,7 +665,10 @@ test.describe("scenario 2, step 1: the name is ready the moment the page lands",
       expect(clicks.count).toBe(2);
       await page.keyboard.type(typed, { delay: 7 });
       await expect(page).not.toHaveURL(/created=/);
-      await page.waitForTimeout(400);
+      // The settle is over once the document's editor is live, React has hydrated the shell, and the layout holds still.
+      await liveEditor(page);
+      await hydrated(page);
+      await settled(page);
       const value = await nameField(page).inputValue();
       if (value !== typed) lost.push(`attempt ${attempt}: typed ${JSON.stringify(typed)}, the field holds ${JSON.stringify(value)}`);
     }

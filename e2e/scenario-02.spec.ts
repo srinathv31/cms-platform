@@ -133,7 +133,7 @@ async function create(page: Page) {
 
     // A beat to see the new page, then typing replaces the selected name; Enter goes to the document.
     await expect(page).not.toHaveURL(/created=/);
-    await page.waitForTimeout(300);
+    await liveEditor(page);
     await beat(page, 900);
     await expectNameSelected(page, "Card offer terms");
     await typeSlowly(page, NAME);

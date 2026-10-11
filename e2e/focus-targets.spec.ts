@@ -5,6 +5,7 @@ import { openDb } from "./api/helpers";
 import { removeTemplate as removeImported } from "./helpers/cleanup";
 import { SPRING_NAME, TEAM, click, createSpringTravel, reactReady, removeTemplate, type SpringFixture } from "./helpers/golive";
 import { asPersona, expect, hydrated, liveEditor, nameField, openLibrary, saveIndicator, tap, test, typeSlowly } from "./helpers/scenario";
+import { settled } from "./helpers/settled";
 
 // Where focus goes after an Esc, a submit, or the rail's header row swapping (handoff review I15). Each control
 // that code sends focus to registers itself with the workspace session, and nothing finds one by its label or
@@ -50,6 +51,20 @@ const railTab = (page: Page, name: string) => page.getByRole("tab", { name, exac
 const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
 const statusRow = (page: Page) => page.getByRole("group", { name: "Status" }).filter({ visible: true });
 const submitButton = (page: Page) => page.getByRole("button", { name: "Submit for review" });
+
+/**
+ * The caret at the end of the name. End goes to the end of the line, which is the end of the name only while
+ * the name is on one line and the caret has landed where the click put it: so press it until the caret is there,
+ * and type only then.
+ */
+async function caretToEndOfName(page: Page) {
+  const field = nameField(page);
+  await expect(async () => {
+    await page.keyboard.press("End");
+    const [start, end, length] = await field.evaluate((el: HTMLTextAreaElement) => [el.selectionStart, el.selectionEnd, el.value.length]);
+    expect([start, end]).toEqual([length, length]);
+  }).toPass({ timeout: 10_000 });
+}
 
 test("the preview, the name and a submit leave focus where the keyboard picks up", async ({ page }) => {
   const { templateId } = fixture!;
@@ -103,8 +118,12 @@ test("the preview, the name and a submit leave focus where the keyboard picks up
   await test.step("3. Mid-edit, Esc puts the old name back and the preview stays open; the next Esc closes it", async () => {
     await tap(previewToggle(page));
     await expect(previewToggle(page)).toHaveAttribute("aria-pressed", "true");
+    // The rail opens and the render streams into it: the name field takes its width for the open rail, and a click
+    // that lands before it has, or a release after the field moved, puts the caret somewhere else.
+    await settled(page);
     await tap(nameField(page));
-    await page.keyboard.press("End");
+    await expect(nameField(page)).toBeFocused();
+    await caretToEndOfName(page);
     await typeSlowly(page, " (edited)");
     await expect(nameField(page)).toHaveValue(`${SPRING_NAME} (edited)`);
     await page.keyboard.press("Escape");

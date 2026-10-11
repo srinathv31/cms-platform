@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { viewEveryOutput } from "./helpers/review";
+import { settled } from "./helpers/settled";
 
 // Phase 7 principle checks, on every route, as the persona(s) that can see it:
 //
@@ -202,23 +203,18 @@ async function settle(page: Page, opts: { shell?: boolean } = {}) {
       return !loading && live;
     }, undefined, { timeout: 20_000 })
     .catch(() => undefined);
-  // Human pace: let view transitions, fonts and the editor's server-to-live handover finish.
-  await page.waitForTimeout(1200);
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(500);
+  // Let view transitions, fonts and the editor's server-to-live handover finish.
+  await settled(page);
 }
 
 /** Opens a route as a persona and fails on a server error: another agent may be mid-edit, so wait and go again. */
 async function open(page: Page, url: string, persona: string, opts: { shell?: boolean } = {}) {
   await asPersona(page, persona);
-  for (let attempt = 1; ; attempt++) {
+  // Four tries, 4, 8 and 12 seconds apart.
+  await expect(async () => {
     const response = await page.goto(url, { waitUntil: "load" });
-    if (!response || response.status() < 500 || attempt >= 4) {
-      expect(response?.status(), `${url} responded`).toBeLessThan(500);
-      break;
-    }
-    await page.waitForTimeout(4000 * attempt);
-  }
+    expect(response?.status(), `${url} responded`).toBeLessThan(500);
+  }).toPass({ intervals: [4_000, 8_000, 12_000], timeout: 30_000 });
   await settle(page, opts);
 }
 
@@ -497,7 +493,8 @@ test.describe("Views inside a page", () => {
       for (const name of names) {
         const tab = page.getByRole("tab").filter({ visible: true }).filter({ hasText: name.replace(/\s*\d+$/, "") }).first();
         await click(tab);
-        await page.waitForTimeout(1200);
+        await expect(tab).toHaveAttribute("aria-selected", "true");
+        await settled(page);
         await checkScreen(page, `${url} as ${persona}, tab "${name}"`);
       }
     });
@@ -511,7 +508,8 @@ test.describe("Views inside a page", () => {
     for (let i = 0; i < count; i++) {
       const label = ((await filters.nth(i).textContent()) ?? "").trim();
       await click(filters.nth(i));
-      await page.waitForTimeout(900);
+      await expect(filters.nth(i)).toHaveAttribute("aria-pressed", "true");
+      await settled(page);
       await checkScreen(page, `Library filtered by "${label}" as maya`);
     }
   });
@@ -544,7 +542,7 @@ test.describe("The checks catch what they should", () => {
 
 /** Lets an opened layer finish its entrance (focus lands a frame after it opens), then runs the checks. */
 async function checkOpened(page: Page, label: string) {
-  await page.waitForTimeout(900);
+  await settled(page);
   await checkScreen(page, label);
 }
 
@@ -621,7 +619,10 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
   test("Preview mode (the rail widens, Maya)", async ({ page }) => {
     await open(page, `/coral-offers/templates/${COLLECT}`, "maya");
     await click(page.getByRole("button", { name: "Preview", exact: true }));
-    await page.waitForTimeout(2500); // the render streams into the frame
+    // The render streams into the frame: the output is there once the well has stopped being busy and holds a frame.
+    const well = page.locator('[data-slot="preview-well"]');
+    await expect(well.locator("iframe, canvas").first()).toBeAttached({ timeout: 20_000 });
+    await expect(well).not.toHaveAttribute("aria-busy", "true", { timeout: 20_000 });
     await checkOpened(page, "Preview mode as maya");
   });
 
@@ -666,7 +667,6 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await checkOpened(page, "Notifications popover as jordan");
     await page.keyboard.press("Escape");
     await click(page.getByRole("button", { name: "Help" }));
-    await page.waitForTimeout(600);
     await checkOpened(page, "Help popover as jordan");
     await page.keyboard.press("Escape");
     await click(profileButton(page));

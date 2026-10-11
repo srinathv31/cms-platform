@@ -174,8 +174,8 @@ describe("what the dialog lists", () => {
     vi.useFakeTimers();
     await render(summary());
     await settleFocus();
-    expect(note().labels?.[0]?.textContent).toBe("Note to reviewers");
     expect(document.activeElement).toBe(note());
+    expect(note().labels?.[0]?.textContent).toBe("Note to reviewers");
   });
 });
 

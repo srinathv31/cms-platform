@@ -105,7 +105,9 @@ test("someone who edited a draft another author submitted can't approve it or se
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]!;
 
     await expect(nameField(page)).toBeFocused();
-    await page.waitForTimeout(300);
+    // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.
+    await liveEditor(page);
+    await expect(nameField(page)).toBeFocused();
     await page.keyboard.press("ControlOrMeta+a");
     await typeSlowly(page, NAME);
     await expect(nameField(page)).toHaveValue(NAME);
