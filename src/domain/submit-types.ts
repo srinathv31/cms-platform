@@ -1,4 +1,4 @@
-import type { Channel, Variable } from "@/domain/types";
+import type { Channel, Variable } from "./types";
 
 /**
  * What the submit dialog shows, read from the SAVED draft right after the pending autosave went out

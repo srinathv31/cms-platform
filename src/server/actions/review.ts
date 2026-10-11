@@ -18,7 +18,6 @@ import {
   sunsetPassed,
   withWriter,
   REFUSALS,
-  type DraftFields,
   type ReviewVersion,
 } from "@/domain/lifecycle";
 import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
@@ -32,6 +31,7 @@ import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { findRound } from "@/server/queries/find-round";
 import { loadChain, loadDecisions, loadMessageRules, stageApproverIds } from "@/server/queries/review-shared";
+import { draftRow } from "@/server/templates/create";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. A version is
@@ -160,30 +160,6 @@ async function updateVersion(
     )
     .returning({ id: versions.id });
   if (!saved) refuse(whenMissed);
-}
-
-function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
-  return {
-    id: ids.id,
-    templateId: ids.templateId,
-    number: draft.number,
-    round: draft.round,
-    state: draft.state,
-    name: draft.name,
-    basedOnVersionId: draft.basedOnVersionId,
-    body: draft.body,
-    channelFields: draft.channelFields,
-    channels: draft.channels,
-    variables: draft.variables,
-    sampleSets: draft.sampleSets,
-    contractChanges: draft.contractChanges,
-    currentStage: draft.currentStage,
-    rev: draft.rev,
-    createdBy: draft.createdBy,
-    writers: draft.writers,
-    createdAt: draft.createdAt,
-    updatedAt: draft.updatedAt,
-  };
 }
 
 function effectContext(viewer: Viewer, found: { teamId: string; templateId: string }, versionId: string, at: Date) {

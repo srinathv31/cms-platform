@@ -16,7 +16,7 @@ import { nameChange } from "@/domain/redline";
 import type { ActionResult } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
 import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
-import type { SubmitSummary } from "./types";
+import type { SubmitSummary } from "@/domain/submit-types";
 
 const SUBMIT_FAILED = "Couldn't submit. Try again.";
 const REFRESH_FAILED = "Couldn't refresh the summary. Try again.";

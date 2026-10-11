@@ -24,7 +24,7 @@ import type {
 } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders, correlationIdOf, errorResponse, withDemoDate } from "@/server/api/http";
-import { readBodyCapped } from "@/server/import/read-body";
+import { readBodyCapped } from "@/server/api/read-body";
 import { renderTemplate, type RenderResult } from "@/server/render/render-template";
 import { getViewer } from "@/server/viewer";
 

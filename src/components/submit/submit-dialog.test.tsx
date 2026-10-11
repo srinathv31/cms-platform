@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle";
 import type { ActionResult } from "@/domain/review-types";
 import type { Variable } from "@/domain/types";
-import type { SubmitSummary } from "./types";
+import type { SubmitSummary } from "@/domain/submit-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

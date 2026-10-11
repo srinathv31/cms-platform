@@ -223,7 +223,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N16 · Low: Two refusal rules still live outside the domain
 
-- **Status:** Open
+- **Status:** Fixed. `validateAccessReason` (`src/domain/access.ts`) is the one reason check: the request form and `requestAccess` both use it. The domain's `createTeam` refuses an Auditor as the first Team Admin (`cannotBeFirstTeamAdmin` in `src/domain/platform-config.ts`), the `createTeam` action relies on it, and the platform read model's picker asks the same function. Every code and sentence is unchanged.
 - **Where:** `src/components/access/request-access.tsx` (the reason check); `src/server/actions/platform.ts` (`createTeam`); `src/server/queries/platform.ts`
 - **What happens:** H2 moved the settings screens' checks into the domain; two rules outside them are still copies. Request access checks the reason itself (empty, then longer than `ACCESS_REASON_MAX`), repeating the ladder of the domain's `requestAccess`, and H2's test covers settings components only. And "an Auditor can't be a team's first Team Admin" is written twice in `src/server`: the `createTeam` action refuses it, and the platform read model leaves Auditors out of the picker. The domain's `createTeam` doesn't know it, so a port would miss it. Noticed while fixing H2 (PR #28).
 - **Fix:** Export one domain check for the request's reason and use it in the form and in `requestAccess`; move the Auditor rule into the domain's `createTeam` and have the read model ask it. Both shrink [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain).
@@ -231,7 +231,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N17 · Low: The review actions keep a private copy of draftRow
 
-- **Status:** Open
+- **Status:** Fixed. `requestChanges` writes its new draft with the shared `draftRow` from `src/server/templates/create.ts`; the private copy in `src/server/actions/review.ts` and its Don't copy entry are gone.
 - **Where:** `src/server/actions/review.ts` (`draftRow`)
 - **What happens:** `requestChanges` builds its new draft row with a private copy of `draftRow`, the same as the one `src/server/templates/create.ts` exports and `src/server/actions/templates.ts` uses. A column added to versions has to be added to both, and the server README lists the copy under Don't copy. Noticed while fixing A3 (PR #39).
 - **Fix:** Import the shared `draftRow`, delete the copy, and drop its Don't copy entry.
@@ -239,8 +239,8 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N18 · Low: readBodyCapped lives in the import folder
 
-- **Status:** Open
-- **Where:** `src/server/import/read-body.ts`
+- **Status:** Fixed. `readBodyCapped` and its test moved to `src/server/api/read-body.ts`, beside `http.ts`; the import, autosave and `/api/v1` render routes and the server README point there.
+- **Where:** `readBodyCapped`, in the `src/server/import/` folder
 - **What happens:** The byte-capped body reader serves three route handlers (import, autosave and the `/api/v1` render route), but it lives under `src/server/import/`, so the other two reach into the import feature for it, and someone looking beside the other HTTP helpers won't find it. Noticed while fixing S6 (PR #20).
 - **Fix:** Move it to `src/server/api/`, beside `http.ts`, and update the three routes and the server README.
 - **Evidence:** traced
@@ -372,7 +372,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 - **Status:** Fixed. Both routes read the body with `readBodyCapped` and answer 413 past the cap, chunked or not; autosave checks access from the version id before reading a byte; and each render value is at most 1,000 characters in validation and the published schema ([decision 0011](decisions/0011-cap-each-render-value.md)).
 - **Where:** `src/app/api/drafts/[versionId]/route.ts` line 18; `src/app/api/v1/templates/[templateId]/render/route.ts` line 127
 - **What happens:** Both routes compare the `Content-Length` header, then call `request.text()`. A chunked body has no length, so the whole body is buffered. The autosave route reads the body before any permission check and never checks the size after reading; the render route is anonymous. Render values have no length cap either: one 100,000-word value costs about a second of main-thread CPU in the PDF.
-- **Fix:** Reuse `readBodyCapped` from `src/server/import/read-body.ts`, authorize before reading, and add a `maxLength` per value in validation and the schema.
+- **Fix:** Reuse `readBodyCapped` from `src/server/api/read-body.ts`, authorize before reading, and add a `maxLength` per value in validation and the schema.
 - **Evidence:** verified
 
 #### S7 · Medium: Comments are accepted on any version state
@@ -819,7 +819,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B6 · Medium: Server code imports from components
 
-- **Status:** Open
+- **Status:** Partly fixed. A lint rule now forbids `src/server` from importing `@/components`. `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. What is left is the screen view models in `src/domain/review-types.ts`, which still have to move to `server/read-models`.
 - **Where:** `src/server/queries/submit-summary.ts` line 12
 - **What happens:** `submit-summary.ts` takes the business function `listSets` from `components/preview/sample-sets`; `create-template.ts` and the imports route take cookie constants from components. `domain/review-types.ts` holds screen view models. No lint rule forbids it.
 - **Fix:** Add the rule; move `listSets` into `editor/model` and view models to `server/read-models`.

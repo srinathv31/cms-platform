@@ -234,7 +234,7 @@ export type ImportResponse =
   | { ok: true; templateId: string; href: string }
   | { ok: false; code: ImportRefusalCode | "permission"; reason: string };
 
-/** One-shot, like `ucomp_created` (src/components/workspace/just-created.ts): holds the template id; max-age 60. */
+/** One-shot, like `ucomp_created` (src/domain/arrival-cookies.ts): holds the template id; max-age 60. */
 export const JUST_IMPORTED_COOKIE = "ucomp_imported";
 
 // ── Compare with original: the rail's Original tab ───────────────────────────

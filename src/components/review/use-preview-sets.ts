@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { findSet, listSets, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
+import { findSet, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
+import { listSets } from "@/editor/model/sample-sets";
 import type { ReviewScreenData } from "@/domain/review-types";
 
 /**

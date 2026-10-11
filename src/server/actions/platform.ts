@@ -83,14 +83,12 @@ export async function createTeam(input: {
     transaction: async (tx, { viewer, input, now: at }) => {
       const admin = await tx.query.users.findFirst({ where: eq(users.id, input.adminUserId) });
       if (!admin) refuse(PLATFORM_REFUSALS.pickPerson);
-      // The Auditor is read-only everywhere: they can't be a team's first Team Admin.
-      if (admin.platformRole === "auditor") refuse(PLATFORM_REFUSALS.auditorCantBeAdmin(admin.name));
       const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
       const outcome = createTeamRule({
         name: input.name,
         description: input.description,
         icon: input.icon,
-        admin: { id: admin.id, name: admin.name },
+        admin: { id: admin.id, name: admin.name, platformRole: admin.platformRole },
         actor: actorOf(viewer),
         now: at,
         existing,

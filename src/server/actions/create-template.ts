@@ -12,7 +12,7 @@ import { conformToContentType, freshTemplateId, insertNewTemplate, newTemplateTy
 import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starters";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
-import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/components/workspace/just-created";
+import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
 import { createDraft } from "@/domain/lifecycle";
 import { check, refuse, serverAction } from "./kit";
 

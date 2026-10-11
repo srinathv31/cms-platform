@@ -221,6 +221,18 @@ export interface NewAccessRequest {
   createdAt: Date;
 }
 
+/**
+ * The first reason a request's reason can't be sent, or null: empty once trimmed (`giveReason`), then
+ * longer than ACCESS_REASON_MAX (`reasonTooLong`). The request form runs it as the person types;
+ * `requestAccess` refuses with its problem.
+ */
+export function validateAccessReason(reason: string): Refusal | null {
+  const trimmed = reason.trim();
+  if (!trimmed) return ACCESS_REFUSALS.giveReason;
+  if (trimmed.length > ACCESS_REASON_MAX) return ACCESS_REFUSALS.reasonTooLong;
+  return null;
+}
+
 export function requestAccess(input: {
   requester: Named;
   team: Named;
@@ -234,9 +246,9 @@ export function requestAccess(input: {
 }): Ok<{ request: NewAccessRequest; effects: AccessEffect[] }> | Refused {
   const { requester, team, role, now } = input;
   if (!isRequestableRole(role)) return refuse(ACCESS_REFUSALS.pickRole);
+  const problem = validateAccessReason(input.reason);
+  if (problem) return refuse(problem);
   const reason = input.reason.trim();
-  if (!reason) return refuse(ACCESS_REFUSALS.giveReason);
-  if (reason.length > ACCESS_REASON_MAX) return refuse(ACCESS_REFUSALS.reasonTooLong);
   if (input.requests.some((r) => r.teamId === team.id && r.userId === requester.id && r.status === "pending")) {
     return refuse(ACCESS_REFUSALS.pending(team.name));
   }

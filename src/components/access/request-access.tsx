@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TeamIcon } from "@/components/primitives/team-icon";
 import { useActionRun } from "@/components/primitives/use-action-run";
-import { ACCESS_REFUSALS, ROLE_LABEL, rolesLabel } from "@/domain/access";
+import { ROLE_LABEL, rolesLabel, validateAccessReason } from "@/domain/access";
 import {
   ACCESS_REASON_MAX,
   type MyAccessRequest,
@@ -115,8 +115,7 @@ function RequestForm({
   }, []);
 
   const trimmed = reason.trim();
-  const invalid =
-    trimmed === "" ? ACCESS_REFUSALS.giveReason.reason : trimmed.length > ACCESS_REASON_MAX ? ACCESS_REFUSALS.reasonTooLong.reason : null;
+  const invalid = validateAccessReason(reason)?.reason ?? null;
   const adminNames = team.admins.map((a) => a.name);
   const noAdmin = adminNames.length === 0;
   const shown = error ?? (attempted ? invalid : null);

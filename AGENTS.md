@@ -47,6 +47,7 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - `src/domain` imports no React, Next.js, Drizzle, `@/server`, `@/components`, `@/app`, or `@/simulator`, and from
   the editor only `@/editor/model/*`.
 - `src/editor` imports no `next/*` and no app code; from `src/components`, only `@/components/ui/*`.
+- `src/server` imports nothing from `@/components`. Shared types and constants go in `src/domain`.
 - `src/contracts` imports nothing.
 - `src/components/device` (the phone kit, shared with Coral) imports nothing from `@/domain`, `@/server`,
   `@/editor` or `@/app`, and from `src/components` only `ui/`, `primitives/` and `motion/`.
@@ -61,7 +62,6 @@ Not enforced yet; follow them anyway:
 
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
 - Only `src/server` imports the database client.
-- `src/server` doesn't import `src/components`. Shared types go in `src/domain`.
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
 
