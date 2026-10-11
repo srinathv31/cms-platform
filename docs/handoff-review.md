@@ -151,7 +151,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N7 · Low: Sample values have no 1,000-character limit where they're typed
 
-- **Status:** Open
+- **Status:** Fixed. `maxLength` is `MAX_VALUE_LENGTH` (now defined beside `validateValue`) on the sample-set value inputs and the variable form's Sample field, `validateValue` refuses a longer value for every type, and autosave answers "A sample value can be at most 1,000 characters." instead of zod's message ([decision 0011](decisions/0011-cap-each-render-value.md)).
 - **Where:** `src/components/preview/sample-sets/values-editor.tsx`; `src/editor/components/variable-form.tsx` (Sample); `src/server/drafts/parse-patch.ts`
 - **What happens:** Autosave refuses a sample value over 1,000 characters, the limit [S6](#s6--medium-body-size-limits-trust-the-declared-content-length) put on every render value, but the sample-set value inputs and the variable form's Sample field take any length, and `validateValue` doesn't check it. Past it, the save is refused and the status shows zod's message with its path: `Not saved. sampleSets.0.values.first_name Too big: expected string to have <=1000 characters`. Noticed while fixing S6 (PR #20).
 - **Fix:** A 1,000-character `maxLength` on those inputs, and a plain sentence for the refusal.
@@ -159,7 +159,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N8 · Low: Submit stays available after saving stops
 
-- **Status:** Open
+- **Status:** Fixed. Once saving has stopped, `SubmitButton` renders a `BlockedButton` with the stop's reason as its tooltip and accessible description, instead of a live button and a popover after the click.
 - **Where:** `src/components/workspace/workspace-actions.tsx` (`SubmitButton`)
 - **What happens:** Once saving has stopped for good ([I6](#i6--medium-after-a-save-conflict-the-editor-stays-editable-but-nothing-saves)), Submit for review still looks available. Pressing it tries the save again, then shows the stop's reason in a popover under the button, though the reason was known before the click. Noticed while fixing I6 (PR #31).
 - **Fix:** Show Submit disabled while saving is stopped, with the reason at the control (`BlockedButton`), as the rule for unavailable controls asks.
@@ -175,7 +175,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N10 · Low: The save status's chevron moves as a save lands
 
-- **Status:** Open
+- **Status:** Fixed. `SaveIndicator` keeps the width of its widest text ("Saving…"), so the chevron doesn't move as a save lands, and phase-1.spec's layout-shift tests now type into a draft and check that nothing shifts ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
 - **Where:** `src/components/workspace/save-status.tsx` (`RevertMenu`'s trigger)
 - **What happens:** On a draft with something to revert to, the save status is the Revert menu's trigger, with its chevron after the text. The text changes width from "Saving…" to "Saved", so the chevron moves about 11px as each save lands: a layout shift of about 0.000002, more than 500 ms after the last keystroke, so the zero-shift rule counts it. No e2e test types into a draft and then checks layout shift, so nothing catches it. [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift)'s What happens credits the undo and redo buttons; the shift it measured came from this trigger appearing on hydration, as its Status says. Noticed while fixing T1 (PR #12).
 - **Fix:** Give the status text the width of its widest state, or put the chevron before it, and add a layout-shift check after typing to an e2e spec.
@@ -183,7 +183,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N11 · Low: The revert toast's Undo is a second black button
 
-- **Status:** Open
+- **Status:** Fixed. `Providers` sets `toastOptions.classNames.actionButton` so a toast's action is an outline button, and revert-undo.spec checks the revert toast's Undo isn't filled.
 - **Where:** `src/components/workspace/save-status.tsx` (`offerUndo`); `src/components/motion/providers.tsx` (the `Toaster`)
 - **What happens:** The toast after a revert has an Undo action, which sonner draws by default as a filled button in the toast's text color, near black. On the workspace, Submit for review is already the screen's one black button. Noticed while fixing I2 (PR #15).
 - **Fix:** Style toast actions as outline buttons through the `Toaster`'s `toastOptions.classNames.actionButton`, set where it is mounted rather than in `src/components/ui/sonner.tsx`.

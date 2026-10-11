@@ -97,6 +97,37 @@ export function isValidKey(key: string): boolean {
 export type ValidationResult = { ok: true; value: string } | { ok: false; message: string };
 
 /**
+ * The most characters one value may have, as typed or as sent, counted in Unicode code points (what JSON
+ * Schema's `maxLength` counts; Java: `codePointCount`). A longer value is refused, never cut: values print
+ * exactly as sent. A variable holds a name, an amount, a sentence or an address, not a document
+ * (docs/decisions/0011-cap-each-render-value.md). The render route, the preview, the sample inputs and
+ * autosave all hold to it.
+ */
+export const MAX_VALUE_LENGTH = 1_000;
+
+/** What a field says about a value over the limit. */
+export const VALUE_TOO_LONG_MESSAGE = "Use 1,000 characters or fewer";
+
+/**
+ * True when `text` has more than `max` characters, counted in code points as JSON Schema's `maxLength`
+ * counts them (an emoji is one). Stops counting at `max + 1`, so a huge value costs no more than that.
+ */
+export function longerThan(text: string, max: number): boolean {
+  if (text.length <= max) return false; // never more code points than UTF-16 units
+  let count = 0;
+  for (let i = 0; i < text.length; i++) {
+    // A surrogate pair is one code point; a lone surrogate counts as one, as the string iterator does.
+    const unit = text.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) i++;
+    }
+    if (++count > max) return true;
+  }
+  return false;
+}
+
+/**
  * Checks a value for a type and returns its canonical string form:
  *   currency  "1000", "$1,000.50", "-$5"      → "1000", "1000.50", "-5"   (a leading -, then an optional $)
  *   percent   "21.90", "21.90%", "21.90 %"    → "21.90"                   (a trailing %, one space allowed before it)
@@ -106,12 +137,14 @@ export type ValidationResult = { ok: true; value: string } | { ok: false; messag
  *   text      as given
  * The decimal digits are ASCII: no leading zeros ("0.5" and "0" are fine), commas only between groups
  * of three in the whole part, a point only between digits, no + sign, no exponent, no negative zero.
- * Surrounding whitespace is ignored; blank is no value. A refusal carries a short message for the field.
+ * Surrounding whitespace is ignored; blank is no value. A value over MAX_VALUE_LENGTH characters, counted
+ * as given, is refused for every type, before the type's own check. A refusal carries a short message for the field.
  */
 export function validateValue(type: VariableType, value: VariableValue): ValidationResult {
   const given = String(value);
   const raw = given.trim();
   if (raw === "") return { ok: false, message: "Enter a value" };
+  if (longerThan(given, MAX_VALUE_LENGTH)) return { ok: false, message: VALUE_TOO_LONG_MESSAGE };
 
   switch (type) {
     case "text":

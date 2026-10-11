@@ -17,7 +17,8 @@ can only refuse it.
 
 ## Decision
 
-- Every value, of every type, is at most 1,000 characters as sent (`MAX_VALUE_LENGTH` in
+- Every value, of every type, is at most 1,000 characters as sent (`MAX_VALUE_LENGTH`, defined in
+  [variables.ts](../../src/editor/model/variables.ts) beside `validateValue` and re-exported from
   [render/types.ts](../../src/domain/render/types.ts)). A longer one is `invalid_values` (422), "first_name must be
   at most 1,000 characters.", with `maxLength: 1000` on its `details.invalid` entry. It's never cut.
 - Characters are Unicode code points, counted before any trimming: what JSON Schema's `maxLength` counts, so a
@@ -54,5 +55,7 @@ can only refuse it.
 - A consumer sending a value over 1,000 characters gets 422 where it used to get a render. None of the seeded
   consumers or golden cases come near the limit.
 - The limit is part of the `/api/v1` contract. A Java port counts with `codePointCount`, not `length()`.
-- The sample values editor in the CMS doesn't stop typing at 1,000 characters. Past it, the preview shows the
-  refusal and autosave refuses the sample.
+- The CMS's sample inputs (the sample sets' values editor and the variable form's Sample field) stop at 1,000
+  characters (`maxLength`, which counts UTF-16 units, so a sample of mostly emoji stops sooner than the route's
+  limit, never later). Should a longer one get through, `validateValue` refuses it for every type, and autosave
+  refuses it with "A sample value can be at most 1,000 characters." rather than a schema message.

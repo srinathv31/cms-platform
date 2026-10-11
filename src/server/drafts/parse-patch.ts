@@ -7,8 +7,9 @@ import { CHANNEL_FIELD_IDS, type ChannelFieldId } from "@/domain/channel-fields"
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
+import { formatCount } from "@/domain/numbers";
 import { identityOf } from "@/editor/model/contract";
-import { isValidKey } from "@/editor/model/variables";
+import { MAX_VALUE_LENGTH, isValidKey } from "@/editor/model/variables";
 import { changedFields } from "./audit-merge";
 
 /**
@@ -27,6 +28,7 @@ const MAX_VARIABLES = 200;
 const MAX_SAMPLE_SETS = 50;
 
 export const NAME_MESSAGE = `The name must be 1 to ${MAX_NAME_LENGTH} characters.`;
+export const SAMPLE_TOO_LONG_MESSAGE = `A sample value can be at most ${formatCount(MAX_VALUE_LENGTH)} characters.`;
 
 export type ParseResult = { ok: true; patch: DraftPatch } | { ok: false; message: string };
 
@@ -89,13 +91,13 @@ const variable = z.strictObject({
   label: z.string().max(200),
   type: z.enum(VARIABLE_TYPES),
   required: z.boolean(),
-  sample: z.string().max(1000),
+  sample: z.string().max(MAX_VALUE_LENGTH),
 });
 
 const sampleSet = z.strictObject({
   id: z.string().min(1).max(100),
   name: z.string().max(200),
-  values: z.record(z.string().max(100), z.union([z.string().max(1000), z.number().finite()])),
+  values: z.record(z.string().max(100), z.union([z.string().max(MAX_VALUE_LENGTH), z.number().finite()])),
 });
 
 const variables = z
@@ -146,13 +148,20 @@ const patchSchema = z.strictObject({
   sampleSets: sampleSets.optional(),
 });
 
+/** Whether a path in the patch is a sample value: a variable's `sample`, or a value in a sample set. */
+function isSamplePath(path: readonly PropertyKey[]): boolean {
+  if (path[0] === "variables") return path.length === 3 && path[2] === "sample";
+  return path[0] === "sampleSets" && path.length === 4 && path[2] === "values";
+}
+
 /** Validates a parsed JSON body. A patch with no field to change is invalid. */
 export function parseDraftPatch(input: unknown): ParseResult {
   const result = patchSchema.safeParse(input);
   if (!result.success) {
     const issue = result.error.issues[0];
-    // The name is the one field an author types into directly, so its message is written for them.
+    // The name and the sample values are what an author types into directly, so their messages are written for them.
     if (issue?.path[0] === "name") return { ok: false, message: NAME_MESSAGE };
+    if (issue?.code === "too_big" && isSamplePath(issue.path)) return { ok: false, message: SAMPLE_TOO_LONG_MESSAGE };
     const path = issue?.path.join(".");
     return { ok: false, message: path ? `${path} ${issue?.message}` : (issue?.message ?? "Invalid request.") };
   }

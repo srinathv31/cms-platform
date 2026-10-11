@@ -308,12 +308,11 @@ export interface RenderRequestBody {
 export const MAX_BODY_BYTES = 1_000_000;
 
 /**
- * The most characters one value may have, as sent, counted in Unicode code points (what JSON Schema's
- * `maxLength` counts; Java: `codePointCount`). A longer value is invalid_values, never cut: values
- * print exactly as sent. A variable holds a name, an amount, a sentence or an address, not a document
- * (docs/decisions/0011-cap-each-render-value.md).
+ * The most characters one value may have, as sent: 1,000, counted in Unicode code points. A longer value
+ * is invalid_values, never cut (docs/decisions/0011-cap-each-render-value.md). It is defined in the
+ * editor's value module, beside `validateValue`, so the sample inputs can hold to the same limit.
  */
-export const MAX_VALUE_LENGTH = 1_000;
+export { MAX_VALUE_LENGTH } from "@/editor/model/variables";
 
 /**
  * Success. Every 200 carries these headers:

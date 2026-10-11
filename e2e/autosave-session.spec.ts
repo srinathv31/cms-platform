@@ -59,6 +59,7 @@ const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][dat
 const stopped = (page: Page) => page.locator('[data-slot="save-stopped"]').filter({ visible: true });
 const stoppedReason = (page: Page) => stopped(page).getByRole("alert");
 const reloadButton = (page: Page) => stopped(page).getByRole("button", { name: "Reload", exact: true });
+const submitButton = (page: Page) => page.getByRole("button", { name: "Submit for review" });
 const channels = (page: Page) => page.locator('[aria-label="Channels"] button').filter({ visible: true });
 
 /** Maya opens Spring Travel and presses Edit: the page shows its draft, editable. Returns the draft's id. */
@@ -139,6 +140,9 @@ test("after another session saves first, the page turns read-only and offers Rel
     await expect(channels(page)).toHaveCount(3);
     for (const toggle of await channels(page).all()) await expect(toggle).toHaveAttribute("data-disabled");
     await expect(reloadButton(page)).toBeVisible();
+    // Submit shows greyed out with the reason at the control (N8), instead of looking available and explaining after the click.
+    await expect(submitButton(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(submitButton(page)).toHaveAccessibleDescription(CONFLICT);
 
     // Typing changes nothing now, and nothing is sent.
     const before = await documentEditor(page).textContent();
@@ -160,6 +164,7 @@ test("after another session saves first, the page turns read-only and offers Rel
     await expect(documentEditor(page)).not.toContainText(TOO_LATE);
     await expect(saveIndicator(page)).toHaveText("Saved");
     await expect(stopped(page)).toHaveCount(0);
+    await expect(submitButton(page)).not.toHaveAttribute("aria-disabled", "true");
   });
 
   // The refused save is a 409, which Chrome logs. It is the one console error this test expects.

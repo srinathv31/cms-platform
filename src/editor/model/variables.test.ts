@@ -23,7 +23,7 @@
 
 import { describe, expect, it } from "vitest";
 import { VARIABLE_TYPES, type VariableType } from "./types";
-import { TYPE_META, US_STATES, formatValue, isValidKey, labelFromKey, toKey, validateValue } from "./variables";
+import { MAX_VALUE_LENGTH, TYPE_META, US_STATES, formatValue, isValidKey, labelFromKey, toKey, validateValue } from "./variables";
 
 describe("toKey", () => {
   it.each([
@@ -326,6 +326,43 @@ describe("values: refused", () => {
     for (const type of VARIABLE_TYPES) {
       for (const blank of ["", "  ", "\n"]) expect(validateValue(type, blank)).toEqual({ ok: false, message: "Enter a value" });
     }
+  });
+});
+
+describe("values: the length limit", () => {
+  const TOO_LONG = { ok: false, message: "Use 1,000 characters or fewer" };
+
+  it("is 1000 characters, and a value of exactly that is fine for text and for a decimal", () => {
+    expect(MAX_VALUE_LENGTH).toBe(1000);
+    const text = "a".repeat(MAX_VALUE_LENGTH);
+    expect(validateValue("text", text)).toEqual({ ok: true, value: text });
+    const digits = `1${"0".repeat(MAX_VALUE_LENGTH - 1)}`;
+    expect(validateValue("number", digits)).toEqual({ ok: true, value: digits });
+  });
+
+  it("refuses one character more, for every type, with one message", () => {
+    for (const type of VARIABLE_TYPES) expect(validateValue(type, "9".repeat(MAX_VALUE_LENGTH + 1))).toEqual(TOO_LONG);
+  });
+
+  it("counts the value as given: whitespace around it counts", () => {
+    const padded = ` NJ${" ".repeat(MAX_VALUE_LENGTH)}`;
+    expect(validateValue("us_state", padded)).toEqual(TOO_LONG);
+    expect(validateValue("us_state", ` NJ${" ".repeat(MAX_VALUE_LENGTH - 3)}`)).toEqual({ ok: true, value: "NJ" });
+  });
+
+  it("counts code points, not UTF-16 units: 1000 emoji fit, 1001 don't", () => {
+    const emoji = "😀".repeat(MAX_VALUE_LENGTH);
+    expect(validateValue("text", emoji)).toEqual({ ok: true, value: emoji });
+    expect(validateValue("text", `${emoji}😀`)).toEqual(TOO_LONG);
+  });
+
+  it("leaves blank as no value, however long", () => {
+    expect(validateValue("text", " ".repeat(MAX_VALUE_LENGTH * 2))).toEqual({ ok: false, message: "Enter a value" });
+  });
+
+  it("leaves a refused value as it was for formatValue", () => {
+    const long = "9".repeat(MAX_VALUE_LENGTH + 1);
+    expect(formatValue("number", long)).toBe(long);
   });
 });
 

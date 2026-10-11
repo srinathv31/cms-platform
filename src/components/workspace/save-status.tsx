@@ -50,8 +50,10 @@ export interface SaveStatusProps {
  *     leaves the screen: then the toast goes, so Undo never drops a newer edit.
  * Once saving has stopped for good, the status reads "Not saved." and `SaveStopped`, on its own line
  * under it, says why and offers Reload.
- * Undo and redo come first, so nothing the status does moves them: it changes width as it saves, and
- * gains its menu's chevron once the Content tab is on screen. Before them, either would be a layout shift.
+ * Undo and redo come first, so nothing the status does moves them: it gains its menu's chevron once the
+ * Content tab is on screen, and its text can be longer when saving fails. Before them, either would be a
+ * layout shift. The text keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the
+ * chevron after it stays put as a save lands.
  */
 export function SaveStatus({ templateId, basedOn }: SaveStatusProps) {
   const { status, error, stopped } = useSaveStatus();

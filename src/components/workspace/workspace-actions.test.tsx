@@ -36,6 +36,7 @@ vi.mock("./session/workspace-session", () => ({
   useWorkspaceSession: () => session,
   usePreviewState: () => session.getPreview(),
   useRailOpen: () => session.getRailOpen(),
+  useSaveStatus: () => session.getStatus(),
 }));
 
 const { SubmitButton } = await import("./workspace-actions");
@@ -141,6 +142,51 @@ describe("the page while Submit reads the summary", () => {
     await tick();
     expect(session.getInert()).toBe(false);
     expect(document.body.querySelector("[role='alert']")?.textContent).toBe("Couldn't open the submit dialog. Try again.");
+  });
+});
+
+describe("once saving has stopped for good", () => {
+  const REASON = "Your latest changes can't be saved — this draft changed elsewhere.";
+
+  async function stop() {
+    await act(async () => session.publishStatus({ status: "error", error: REASON, stopped: true }));
+    await act(async () => root.render(<SubmitButton templateId={TEMPLATE} />));
+  }
+
+  it("shows Submit disabled, with the stop's reason at the control, instead of a button that looks available", async () => {
+    expect(submitButton().getAttribute("aria-disabled")).toBeNull();
+    await stop();
+
+    const blocked = submitButton();
+    expect(blocked.getAttribute("aria-disabled")).toBe("true");
+    expect(blocked.hasAttribute("data-disabled")).toBe(true);
+    expect(blocked.textContent).toContain("Submit");
+    // Focusable, so a keyboard user reaches it and hears why: the reason describes it.
+    expect(blocked.hasAttribute("disabled")).toBe(false);
+    const described = document.getElementById(blocked.getAttribute("aria-describedby")!);
+    expect(described?.textContent).toBe(REASON);
+  });
+
+  it("does nothing when pressed: no save, no summary, no popover, and the page stays as it was", async () => {
+    await stop();
+    const held = session.getInert();
+    await click(submitButton());
+    await tick();
+    expect(save).not.toHaveBeenCalled();
+    expect(server.summaryRoute).not.toHaveBeenCalled();
+    expect(dialog()).toBeNull();
+    expect(document.body.querySelector("[role='alert']")).toBeNull();
+    expect(session.getInert()).toBe(held);
+  });
+
+  it("is the same black button, greyed out: its size and label don't change", async () => {
+    const before = submitButton();
+    const { className, textContent } = before;
+    await stop();
+    const after = submitButton();
+    expect(after.className).toContain("bg-primary");
+    for (const name of className.split(" ").filter((name) => /^(h-|px-|@max)/.test(name))) expect(after.className).toContain(name);
+    expect(after.textContent).toBe(textContent);
   });
 });
 

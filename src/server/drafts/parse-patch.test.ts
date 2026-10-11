@@ -160,6 +160,33 @@ describe("parseDraftPatch", () => {
     expect(message({ ...base, sampleSets: [{ id: "s1", name: "A", values: { n: null } }] })).toMatch(/^sampleSets\b/);
   });
 
+  describe("a sample value over 1,000 characters", () => {
+    const AT_LIMIT = "a".repeat(1000);
+    const sentence = "A sample value can be at most 1,000 characters.";
+    const inSet = (value: string | number) => ({ ...base, sampleSets: [{ id: "s1", name: "A", values: { first_name: value } }] });
+
+    it("is taken at exactly the limit, in a sample set and in a variable", () => {
+      expect(ok(inSet(AT_LIMIT)).sampleSets?.[0].values.first_name).toBe(AT_LIMIT);
+      expect(ok({ ...base, variables: [{ ...variable, sample: AT_LIMIT }] }).variables?.[0].sample).toBe(AT_LIMIT);
+    });
+
+    it("is refused in a plain sentence, not zod's message with its path", () => {
+      expect(message(inSet(`${AT_LIMIT}b`))).toBe(sentence);
+      expect(message({ ...base, variables: [{ ...variable, sample: `${AT_LIMIT}b` }] })).toBe(sentence);
+    });
+
+    it("is refused the same way when it arrives as a JSON number with too many digits", () => {
+      const digits = `1${"0".repeat(1000)}`;
+      const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"A","values":{"n":${digits}}}]}`;
+      expect(parseDraftPatchText(text)).toEqual({ ok: false, message: sentence });
+    });
+
+    it("leaves other limits with their own messages", () => {
+      expect(message({ ...base, sampleSets: [{ id: "s1", name: "a".repeat(201), values: {} }] })).toMatch(/^sampleSets\.0\.name\b/);
+      expect(message({ ...base, variables: [{ ...variable, label: "a".repeat(201) }] })).toMatch(/^variables\.0\.label\b/);
+    });
+  });
+
   it("refuses a body that is not an object", () => {
     for (const input of [null, "x", 7, []]) expect(parseDraftPatch(input).ok).toBe(false);
   });
