@@ -135,7 +135,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N5 · Low: Submit's hold rearranges the variables panel and closes an open form
 
-- **Status:** Open
+- **Status:** Fixed. A held root (`EditorRoot`'s `held`, set from `useInert`) keeps the variables panel's layout with every control disabled, and a variable form left open stays mounted, disabled, with what was typed in it.
 - **Where:** `src/editor/components/variables-panel.tsx` (`readOnly`); `src/components/workspace/content/content-workspace.tsx` (`useInert`)
 - **What happens:** From the Submit click until the dialog closes, the page is held read-only ([I8](#i8--medium-submit-can-freeze-content-the-dialog-didnt-list)), and the variables panel switches to its read-only layout: no insert buttons, no New variable, no open form. The rail rearranges under the dialog. A variable form that was open closes, and what was typed in it and not yet applied is gone when the hold lets go, on Submit or Cancel. Noticed while fixing I8 (PR #22).
 - **Fix:** Keep the panel's editing layout while the page is held, with its controls disabled rather than removed, and keep an open form with what was typed in it.
@@ -143,7 +143,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N6 · Low: An unparsed drop, then a block move, strips the block's ids
 
-- **Status:** Open
+- **Status:** Fixed. `PanelDrop` also takes and swallows a drop with no text, no HTML and no `view.dragging`, so UniqueID never marks it and the next block moved by its grip keeps its id.
 - **Where:** `src/editor/extensions/field-binding.ts` (`PanelDrop`)
 - **What happens:** UniqueID marks every drop from outside the editor so that the next `transformPasted` strips the dropped blocks' ids, and only `transformPasted` clears the mark. A drop ProseMirror can't parse into content, a file for example, never reaches `transformPasted`, so the mark outlives it and the next block moved by its ⋮⋮ grip loses its id. Its comment threads fall to "On removed content", as in [I4](#i4--high-a-panel-drop-followed-by-a-block-move-orphans-comment-threads). `PanelDrop` goes ahead of UniqueID for panel rows only; the mark itself is upstream behavior. Noticed while fixing I4 (PR #18).
 - **Fix:** Have `PanelDrop` also take, and swallow, a drop that carries no text, no HTML and no `view.dragging`, so UniqueID never marks it. Report the mark's lifetime upstream.

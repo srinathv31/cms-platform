@@ -3,7 +3,8 @@
 //   • focus: the root remembers the last-focused field for click-to-insert, undo and redo
 //   • history: tells the root when the field's undo history may have changed
 //   • drop:  a variable dragged from the panel (our own MIME type) lands as a chip, one transaction,
-//     handled ahead of UniqueID so the drop never costs a block its id (PanelDrop, below)
+//     handled ahead of UniqueID so the drop never costs a block its id; a drop with nothing to
+//     parse (a file) is swallowed there too (PanelDrop, below)
 //   • chips: click, or Enter/Space on a selected chip, opens its popover; Esc closes it
 //   • paste: Word / Google Docs / web HTML is normalized (paste/normalize-html.ts); in the document,
 //     plain text that looks like Markdown is parsed as Markdown (paste/markdown.ts); `{{key}}` in
@@ -59,6 +60,12 @@ export const fieldBindingPluginKey = new PluginKey("fieldBinding");
  * resets a private flag, and the row would then drop as `{{key}}` text into any input on the page.
  * Going first relies only on public behavior: TipTap orders plugins by `priority`, and ProseMirror
  * stops at the first DOM handler that returns true.
+ *
+ * The same holds for any drop that carries no text, no HTML and no `view.dragging` (a file from the
+ * desktop): ProseMirror parses nothing from it and returns before `transformPasted`, so UniqueID's
+ * mark would outlive it and the next block moved by its grip would lose its id (handoff review N6).
+ * It is taken here, and swallowed, so UniqueID never marks it. The browser's own handling of a dropped
+ * file (opening it in place of the page, and the unsaved edits with it) is stopped too.
  */
 const PanelDrop = Extension.create<FieldBindingOptions>({
   name: "fieldBindingPanelDrop",
@@ -77,8 +84,16 @@ const PanelDrop = Extension.create<FieldBindingOptions>({
         props: {
           handleDOMEvents: {
             drop: (view, event) => {
-              const key = event.dataTransfer?.getData(VARIABLE_DRAG_TYPE);
-              if (!key) return false; // a block move, a file, text from elsewhere: ProseMirror's own drop
+              const transfer = event.dataTransfer;
+              const key = transfer?.getData(VARIABLE_DRAG_TYPE);
+              if (!key) {
+                // Nothing for ProseMirror to parse and no block of this editor being moved: a file.
+                if (!view.dragging && !transfer?.getData("text/plain") && !transfer?.getData("text/html")) {
+                  event.preventDefault();
+                  return true;
+                }
+                return false; // a block move, text or HTML from elsewhere: ProseMirror's own drop
+              }
               event.preventDefault();
               if (!view.editable) return true;
               const hit = view.posAtCoords({ left: event.clientX, top: event.clientY });

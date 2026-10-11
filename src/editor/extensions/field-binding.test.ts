@@ -83,15 +83,16 @@ describe("focus and paste", () => {
   });
 });
 
-// ── A panel drop, then a block move (handoff review I4) ──────────────────────────────────────────
+// ── A panel drop, or a drop with nothing to parse, then a block move (handoff review I4, N6) ──────────────────────────────────────────
 
 /** A paragraph with a block id, as stored documents have them. */
 const block = (id: string, value: string): JSONContent => ({ type: "paragraph", attrs: { id }, content: [text(value)] });
 
 /** A drop event as the browser sends it: the drag's data and how it may land. The test aims it with `aimAt`. */
-function dropEvent(data: Record<string, string>, effectAllowed: DataTransfer["effectAllowed"]): DragEvent {
+function dropEvent(data: Record<string, string>, effectAllowed: DataTransfer["effectAllowed"], files: File[] = []): DragEvent {
   const event = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
-  const dataTransfer = { getData: (type: string) => data[type] ?? "", types: Object.keys(data), effectAllowed, files: [] };
+  const types = files.length ? [...Object.keys(data), "Files"] : Object.keys(data);
+  const dataTransfer = { getData: (type: string) => data[type] ?? "", types, effectAllowed, files };
   Object.defineProperties(event, { dataTransfer: { value: dataTransfer }, clientX: { value: 0 }, clientY: { value: 0 } });
   return event;
 }
@@ -109,6 +110,18 @@ function dropFromPanel(editor: Editor, key: string, pos: number): DragEvent {
   startDrag(row);
   aimAt(editor, pos);
   const event = dropEvent({ [VARIABLE_DRAG_TYPE]: key }, "copy");
+  editor.view.dom.dispatchEvent(event);
+  row.remove();
+  return event;
+}
+
+/** A file dragged in from the desktop and dropped at `pos`: no text, no HTML, nothing ProseMirror can parse. */
+function dropFile(editor: Editor, pos: number): DragEvent {
+  const row = document.createElement("div");
+  document.body.appendChild(row);
+  startDrag(row);
+  aimAt(editor, pos);
+  const event = dropEvent({}, "all", [new File(["%PDF"], "terms.pdf", { type: "application/pdf" })]);
   editor.view.dom.dispatchEvent(event);
   row.remove();
   return event;
@@ -167,6 +180,38 @@ describe("a panel drop, then a block move", () => {
       ["b_one", "One {{first_name}}"],
       ["b_two", "Two"],
     ]);
+  });
+
+  it("a dropped file, then a block move, keeps the moved block's id (N6)", () => {
+    const { editor } = setup(DOC);
+
+    // ProseMirror can parse nothing from a file, so it never reaches `transformPasted`, the only place
+    // UniqueID's mark for "strip the ids of what was dropped" is cleared: the drop is taken before it.
+    const drop = dropFile(editor, 4);
+    expect(drop.defaultPrevented, "the file drop is swallowed").toBe(true);
+    expect(idsAndText(editor)).toEqual([
+      ["b_one", "One"],
+      ["b_two", "Two"],
+      ["b_three", "Three"],
+    ]);
+
+    moveBlockByGrip(editor, 2, 1); // "Three" to the start of "One": it goes above it
+    expect(idsAndText(editor)).toEqual([
+      ["b_three", "Three"],
+      ["b_one", "One"],
+      ["b_two", "Two"],
+    ]);
+  });
+
+  it("text dropped from elsewhere is still ProseMirror's own drop", () => {
+    const { editor } = setup(DOC);
+    const row = document.createElement("div");
+    document.body.appendChild(row);
+    startDrag(row);
+    aimAt(editor, 4);
+    editor.view.dom.dispatchEvent(dropEvent({ "text/plain": " and more" }, "copy"));
+    row.remove();
+    expect(idsAndText(editor)[0]).toEqual(["b_one", "One and more"]);
   });
 
   it("a block move on its own keeps the moved block's id", () => {

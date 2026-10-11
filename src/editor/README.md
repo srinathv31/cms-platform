@@ -69,6 +69,7 @@ interface EditorRootProps {
   baseline?: Variable[] | null;                   // the list consumers render now: contract flags
   requiredSections?: RequiredSection[];           // the content type's sections (for reference; see Behavior)
   readOnly?: boolean;                             // view only
+  held?: boolean;                                 // read-only for a while: see Behavior → Held
   requiredNote?: string;                          // default "Required for disclosures"
   children: ReactNode;
 }
@@ -194,7 +195,9 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   `callout`, `horizontalRule` has `attrs.id` (UniqueID). Existing ids are kept, and a block moved by
   its ⋮⋮ grip keeps its id, so its comment threads stay on it; pasted blocks get new ones. A panel
   row's drop is handled ahead of UniqueID (`extensions/field-binding.ts`), so it never costs the next
-  moved block its id.
+  moved block its id, and so is a drop that carries no text, no HTML and no `view.dragging` (a file from the
+  desktop): ProseMirror parses nothing from it, so UniqueID's mark for the dropped blocks' ids would outlive
+  it. Such a drop is swallowed.
 - `heading { level: 1|2|3, requiredKey?: string|null }`; HTML `data-required="<key>"`. A
   `requiredKey` appears at most once per document; pasted copies never carry one.
 - `callout` → `paragraph+`; HTML `<div data-callout>`.
@@ -317,6 +320,11 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
 - **Read-only**: no menus, handles, toolbar or table control; chip popovers still open; the panel
   shows counts and Required states without controls. Text can be selected (and copied); with
   `onRequestComment`, a selection gets a toolbar with Comment alone.
+- **Held** (`EditorRoot held`): read-only for a while, as when a host is reading or freezing the saved
+  draft. Everything above applies except the panel: it keeps its editing layout (insert rows, pencil,
+  Required switch, New variable) with every control disabled, and a variable form left open stays
+  mounted, disabled, with what was typed in it, so nothing moves when the hold starts or lets go and
+  the author returns to exactly where they were. `readOnly` wins when both are set.
 
 ### Comments (Phase 4)
 

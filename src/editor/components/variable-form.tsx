@@ -31,6 +31,8 @@ export interface VariableFormProps {
   onCancel: () => void;
   /** Edit only: shows Delete. */
   onDelete?: () => void;
+  /** Every control disabled and the keys ignored; what was typed stays (the page is held for a while). */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -46,7 +48,7 @@ const INPUT_MODE: Partial<Record<VariableType, "decimal" | "numeric" | "text">> 
   number: "decimal",
 };
 
-export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onDelete, className }: VariableFormProps) {
+export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onDelete, disabled = false, className }: VariableFormProps) {
   const id = useId();
   const [draft, setDraft] = useState<VariableDraft>(initial);
   const [keyEdited, setKeyEdited] = useState(mode === "edit");
@@ -82,6 +84,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
   const setType = (type: VariableType) => update({ ...draft, type, sample: sampleForType(draft.sample, type) });
 
   const submit = () => {
+    if (disabled) return;
     setAttempted(true);
     const result = validateDraft(draft, { takenKeys });
     if (!result.ok) {
@@ -103,7 +106,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
   // cancels from any field. Keys inside an open Select's options stay with the Select.
   const onKeyDownCapture = (event: KeyboardEvent<HTMLFormElement>) => {
     const target = event.target as HTMLElement;
-    if (target.closest(SELECT_CONTENT_SELECTOR)) return;
+    if (disabled || target.closest(SELECT_CONTENT_SELECTOR)) return;
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -135,6 +138,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
           ref={labelRef}
           id={fieldId("label")}
           value={draft.label}
+          disabled={disabled}
           onChange={(event) => setLabel(event.target.value)}
           autoComplete="off"
           aria-invalid={errors.label ? true : undefined}
@@ -147,6 +151,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
         <Input
           id={fieldId("key")}
           value={draft.key}
+          disabled={disabled}
           onChange={(event) => setKey(event.target.value)}
           autoComplete="off"
           autoCapitalize="off"
@@ -159,7 +164,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <Field label="Type" htmlFor={fieldId("type")}>
-          <Select value={draft.type} onValueChange={(value) => value && setType(value as VariableType)}>
+          <Select value={draft.type} disabled={disabled} onValueChange={(value) => value && setType(value as VariableType)}>
             <SelectTrigger id={fieldId("type")} className={cx("h-8 w-full bg-surface", FIELD_FOCUS_RING)}>
               <SelectValue>{(value: VariableType) => <TypeLabel type={value} />}</SelectValue>
             </SelectTrigger>
@@ -190,6 +195,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
               aria-label="Required"
               className={cx("data-unchecked:bg-control-off", FOCUS_RING)}
               checked={draft.required}
+              disabled={disabled}
               onCheckedChange={(required) => update({ ...draft, required })}
             />
           </span>
@@ -202,6 +208,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
           type={draft.type === "date" ? "date" : "text"}
           inputMode={INPUT_MODE[draft.type]}
           value={draft.sample}
+          disabled={disabled}
           onChange={(event) => update({ ...draft, sample: event.target.value })}
           autoComplete="off"
           aria-invalid={errors.sample ? true : undefined}
@@ -216,6 +223,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
             type="button"
             variant="ghost"
             size="sm"
+            disabled={disabled}
             onClick={onDelete}
             className={cx("-ml-1.5 gap-1.5 px-1.5 font-normal text-danger-text hover:bg-danger-soft hover:text-danger-text", FOCUS_RING)}
           >
@@ -224,10 +232,10 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
           </Button>
         ) : null}
         <div className="ml-auto flex items-center gap-1.5">
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel} className={cx("font-normal text-text-muted", FOCUS_RING)}>
+          <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onCancel} className={cx("font-normal text-text-muted", FOCUS_RING)}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" className={cx("px-3", FOCUS_RING)}>
+          <Button type="submit" size="sm" disabled={disabled} className={cx("px-3", FOCUS_RING)}>
             {mode === "create" ? "Create" : "Save"}
           </Button>
         </div>

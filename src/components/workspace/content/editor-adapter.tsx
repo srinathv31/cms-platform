@@ -30,6 +30,8 @@ export interface EditorScopeProps {
   baseline: Variable[] | null;
   requiredSections: RequiredSection[];
   readOnly: boolean;
+  /** Read-only for now (the page is held): the variables panel keeps its layout, with its controls disabled. */
+  held?: boolean;
   onVariablesChange: (variables: Variable[]) => void;
   children: React.ReactNode;
 }
@@ -40,6 +42,7 @@ export function EditorScope({
   baseline,
   requiredSections,
   readOnly,
+  held = false,
   onVariablesChange,
   children,
 }: EditorScopeProps) {
@@ -50,6 +53,7 @@ export function EditorScope({
       baseline={baseline}
       requiredSections={requiredSections}
       readOnly={readOnly}
+      held={held}
     >
       {children}
     </EditorRoot>
