@@ -87,7 +87,7 @@ Not logic or UI, and nothing to wait for. Take T4 and T3 first, since every fix 
 - [T3 · High](#t3--high-database-backed-unit-tests-depend-on-order): The database-backed tests still depend on their order.
 - [T5 · Medium](#t5--medium-e2e-cant-be-pointed-at-its-own-database): E2E can't point at its own database. Its raw-SQL assertions are part of [the Java API](#the-java-api) work.
 - [S8 · Medium](#s8--medium-design-mocks-and-labs-ship-in-production-builds): Design mocks and labs ship in production builds.
-- [G4 · Medium](#g4--medium-build-process-docs-and-artifacts-with-dead-paths): Dead paths and uncited media remain. Check git history for the third-party product named in `design-reference.md` before the repo is shared.
+- [G4 · Medium](#g4--medium-build-process-docs-and-artifacts-with-dead-paths): The git history still holds the removed reference images and the third-party product's name; whether the dev team gets it or a fresh repository is the owner's call at handoff.
 - [B6 · Medium](#b6--medium-server-code-imports-from-components): Server code imports from components, and no lint rule stops it.
 - [G5 · Medium](#g5--medium-the-editors-public-api-is-enforced-only-in-prose): Nothing enforces the editor's public API.
 - [T6 · Medium](#t6--medium-shadcn-is-a-runtime-dependency): `shadcn` is a runtime dependency, and `next-themes` is unused.
@@ -975,7 +975,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### G4 · Medium: Build-process docs and artifacts with dead paths
 
-- **Status:** Partly fixed. PR #8 archived the build-process docs. `.claude/launch.json` still points at dead worktrees, and the 86 media files under `docs/` are still there.
+- **Status:** Partly fixed. The launch config and the uncited media are deleted and the archived design reference no longer names a third-party product; whether the dev team gets the full git history, which still holds the removed reference images (3 files in 2 commits) and the product name, or a fresh repository is the owner's call at handoff.
 - **Where:** `docs/archive/handoff-phases-5-7.md`; `.claude/launch.json` line 1
 - **What happens:** Phase briefs, track reports and the handoff doc reference worktrees under another user's home directory and private ports; `.claude/launch.json` points at them too. `docs/decisions/media` is 14 MB, and 58 of its 86 files aren't cited anywhere. `design-reference.md` names a third-party product and points at `reference-images/`, which was removed but is still in git history; check that before sharing the repo.
 - **Fix:** Delete the process docs and launch config, trim the media to what's cited, rewrite `design-reference.md`, and decide whether to rewrite history.

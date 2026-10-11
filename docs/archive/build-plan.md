@@ -11,7 +11,7 @@ Build a clickable, persistent prototype of the UCOMP content app that takes one 
 
 **How to use this doc**
 
-- Read it with the **UCOMP Content Platform — Discovery Brief** (business background, decisions, open questions) and the three Wispr Flow screenshots (look-and-feel reference).
+- Read it with the **UCOMP Content Platform — Discovery Brief** (business background, decisions, open questions) and three screenshots of a commercial desktop app (look-and-feel reference).
 - This doc defines **prototype scope**. Where it differs from the brief's release 1 scope, this doc wins for the prototype. For example, the prototype mocks delivery and skips real login.
 - It says what the app must do and why, not how to build it. Write your own implementation plan; the Architecture section lists the few hard constraints.
 - All data is fictional. No real customer, account or bank content anywhere.
@@ -61,11 +61,11 @@ User experience is the top priority, ahead of feature completeness. If a feature
 
 ## Look and feel
 
-Match the *feel* of the Wispr Flow desktop app screenshots: warm, calm, editorial and tactile. It's not minimalism and not neobrutalism; it's a soft, modern desktop app with a few crafted details. Take the feel, not the brand.
+Match the *feel* of three screenshots of a commercial desktop app: warm, calm, editorial and tactile. It's not minimalism and not neobrutalism; it's a soft, modern desktop app with a few crafted details. Take the feel, not the brand.
 
 **What to take from the screenshots**
 
-| Element | What it looks like in Flow | Use it in UCOMP for |
+| Element | What it looks like in the reference | Use it in UCOMP for |
 | --- | --- | --- |
 | Canvas | Warm stone/off-white app background; content sits in one large rounded panel (about 20–24px radius) with a hairline border, inset from the window | The whole app shell |
 | Sidebar | Line icon + label per item, relaxed spacing; active item is a soft filled rounded shape, not a loud color; utility links grouped at the bottom; one dismissible card | Main navigation (see App map) |
@@ -79,7 +79,7 @@ Match the *feel* of the Wispr Flow desktop app screenshots: warm, calm, editoria
 
 **The signature detail.** Use the circular text ring once or twice so it stays special. Best fit: the **Share** button on an Active template, which opens the integration panel for consumer teams. A second option is the moment a version goes live, as a brief celebratory state. A slow rotation on hover is fine; respect reduced-motion settings.
 
-**What not to copy.** Flow's logo, product names, illustrations, hero imagery or copy. Don't clone layouts pixel for pixel.
+**What not to copy.** The reference's logo, product names, illustrations, hero imagery or copy. Don't clone layouts pixel for pixel.
 
 **Theming for TD later.** Sri will later ask a Claude Code session on his work laptop to apply TD's style guide. Make that a token swap, not a rewrite:
 
@@ -145,7 +145,7 @@ The app has a team-scoped sidebar, a few top-level pages, a template workspace w
 
 - **Sidebar, top:** the team switcher (team name and icon). It lists the persona's teams; Platform Admin and Auditor also get "All teams".
 - **Sidebar, main:** Library, Review (with a count badge for items waiting on me), Usage, Audit (only for roles that can see it).
-- **Sidebar, bottom:** Settings (opens the settings modal for Team Admins and Platform Admins) and Help. One dismissible card slot, Flow-style, used for something actionable: "Recertification due" for a Team Admin, or "Access request pending" for a new user.
+- **Sidebar, bottom:** Settings (opens the settings modal for Team Admins and Platform Admins) and Help. One dismissible card slot, as in the reference, used for something actionable: "Recertification due" for a Team Admin, or "Access request pending" for a new user.
 - **Top-right:** search (⌘K), notifications bell, and the profile menu with the persona switcher.
 - **Demo pill**, bottom-right: opens the demo drawer (reset, demo clock, consumer simulator). Style it so it's clearly not part of the product, for example a dashed outline.
 
@@ -160,11 +160,11 @@ The app has a team-scoped sidebar, a few top-level pages, a template workspace w
 | Versions | History and lifecycle actions | Timeline of versions with state, author, approver and dates; compare any two; set sunset date; revoke |
 | Review queue | Work waiting on me | Tabs: Waiting on me, Submitted by me, Recently decided |
 | Review screen | Decide on a version | See "Review and approval" |
-| Usage | Who renders what | Team dashboard in the style of Flow's Insights page; per-template view in the workspace |
+| Usage | Who renders what | Team dashboard in the style of the reference's Insights page; per-template view in the workspace |
 | Integration panel | Hand-off to consumer teams | Slide-over opened by Share: template ID, version, variable contract, sample request |
 | Audit | Who did what, when | Filterable event table |
 | Notifications | What changed for me | Popover from the bell |
-| Settings modal | Administration | Flow-style modal with grouped left nav (Team / Platform) |
+| Settings modal | Administration | Modal in the reference's style, with grouped left nav (Team / Platform) |
 | Request access | First-time user with no team | Choose a team and role, add a reason, submit; then a pending state |
 | Consumer simulator | Mock "going live" | Demo-only; styled as an outside system ("Coral — simulated") |
 
@@ -371,7 +371,7 @@ The simulator represents Coral's own system, so style it as an outside app ("Cor
 
 ### Usage
 
-Take the layout cues from Flow's Insights page.
+Take the layout cues from the reference's Insights page.
 
 - **Team dashboard:**
   - Stat cards with big numerals and tracked-caps labels: renders this month (with a trend pill), active templates, consumers, versions nearing sunset.
@@ -401,7 +401,7 @@ Access is managed inside the app (decided for release 1). The real login provide
 - Pick a team and a role (Viewer, Author or Approver), add a short reason, submit. A pending state replaces the form.
 - The Team Admin gets a notification and a sidebar card. On approval, Morgan's next view shows the team. On denial, Morgan sees the admin's note.
 
-**Settings modal** (Flow-style, grouped left nav, a small version label at the bottom)
+**Settings modal** (the reference's style, grouped left nav, a small version label at the bottom)
 
 | Group | Page | Who | What it does |
 | --- | --- | --- | --- |
