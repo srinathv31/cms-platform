@@ -42,7 +42,7 @@ Convention only (nothing checks these):
 | [ui/](ui) | shadcn components, `base-nova` style on Base UI (`@base-ui/react`); see [components.json](../../components.json). |
 | [primitives/](primitives) | The shared building blocks listed under [Primitives](#primitives). |
 | [motion/](motion) | `Providers` (motion, tooltips, toasts) mounted by [src/app/layout.tsx](../app/layout.tsx), and the presets. |
-| [app-shell/](app-shell) | The product frame: sidebar, top bar, ⌘K palette, notifications, profile and persona switch, `ScrimDialogContent` (the surface every dialog uses), `UserAvatar`, skeletons, canvas scroll restore, and the page and global error views (`route-error.tsx`, used by `src/app/(product)/error.tsx` and `src/app/global-error.tsx`). `*-hole.tsx` files are the streamed, viewer-dependent parts of the static `AppFrame`. |
+| [app-shell/](app-shell) | The product frame: sidebar (a column from 800px up, the shadcn sidebar's sheet below it, with its top-bar button: `app-sidebar.tsx`), top bar, ⌘K palette, notifications, profile and persona switch, `ScrimDialogContent` (the surface every dialog uses), `UserAvatar`, skeletons, canvas scroll restore, and the page and global error views (`route-error.tsx`, used by `src/app/(product)/error.tsx` and `src/app/global-error.tsx`). `*-hole.tsx` files are the streamed, viewer-dependent parts of the static `AppFrame`. |
 
 Feature folders:
 
@@ -88,7 +88,7 @@ one black button, and sonner's default is filled near-black.
 
 One generated file is edited on purpose. `ui/sidebar.tsx` has no window-level ⌘B / Ctrl+B listener: shadcn's
 toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` cookie, though the app's sidebar is
-`collapsible="none"`. `npx shadcn add sidebar` overwrites the file and brings the listener back;
+`collapsible="none"` from 800px up and a drawer below it. `npx shadcn add sidebar` overwrites the file and brings the listener back;
 [ui/sidebar.test.tsx](ui/sidebar.test.tsx) then fails. Remove the listener again
 ([decision 0021](../../docs/decisions/0021-the-sidebar-has-no-keyboard-shortcut.md)).
 
@@ -109,6 +109,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |
 | `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
 | `ScaledViewport`, `ScaledBox`, `containScale` | [scaled-viewport.tsx](primitives/scaled-viewport.tsx) | Content laid out at a fixed size in CSS px and scaled down (never up) with a transform, so it wraps and cuts exactly as at 1:1 and stays crisp. `ScaledViewport` fills its box at a fixed width (Web's 800px Desktop page); `ScaledBox` keeps the content's proportions, fits it to the box down to a minimum scale for height, and reserves its scaled size (the phone kit). Client. |
+| `ScrollRegion` | [scroll-region.tsx](primitives/scroll-region.tsx) | A box for a data table that scrolls sideways inside itself in a window too narrow for it, and takes a Tab stop and a label only once it scrolls (reflow, [decision 0045](../../docs/decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)). |
 | `TeamIcon`, `teamIconLabel` | [team-icon.tsx](primitives/team-icon.tsx) | A team's icon from its stored Lucide key, and the name the icon picker reads out. Typed against the domain's `TEAM_ICONS`, so a new pickable key needs an icon. Server-safe. |
 
 A channel's name ("PDF", "Web", "Email", "Push", "SMS") is `CHANNEL_LABELS` from `src/domain/render/errors.ts`, everywhere, and a push platform's ("iPhone", "Android") is `PLATFORM_LABELS`.
@@ -350,7 +351,12 @@ submit, and a footer that changed between the two versions struck and inserted (
 
 ## `src/hooks`, `src/lib`, `src/styles`
 
-- [src/hooks/use-mobile.ts](../hooks/use-mobile.ts): shadcn's `useIsMobile` (768px), used only by `ui/sidebar.tsx`.
+- [src/hooks/use-mobile.ts](../hooks/use-mobile.ts): shadcn's `useIsMobile`, used only by `ui/sidebar.tsx`. Another edit to a
+  generated file: its breakpoint is 800px, not shadcn's 768, the width below which the app shell shows the sidebar as a
+  drawer ([decision 0045](../../docs/decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)).
+  `globals.css` has the same number in its `narrow:` (below 800px) and `wide:` (800px and up) variants, which a
+  server-rendered page needs because it can't ask `useIsMobile`; [use-mobile.test.ts](../hooks/use-mobile.test.ts) keeps
+  the two equal. `tokens.css` drops `--canvas-pad-x` from 3rem to 1rem below 800px.
 - [src/lib/utils.ts](../lib/utils.ts): `cn`, re-exported from the `cn` package. Import it from `@/lib/utils`.
 - [src/lib/template-reads.ts](../lib/template-reads.ts): `readTemplate()` and `templateReadUrl()`, the browser's
   side of the on-demand template reads (see [Server and client](#server-and-client)).

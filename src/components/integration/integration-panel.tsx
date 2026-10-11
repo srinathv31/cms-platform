@@ -37,7 +37,7 @@ export function IntegrationIdentity({
   channels: readonly Channel[] | null;
 }) {
   return (
-    <div className="flex items-start gap-12">
+    <div className="flex items-start gap-12 max-sm:flex-wrap max-sm:gap-x-8 max-sm:gap-y-4">
       <TemplateId id={templateId} />
       <div className="flex flex-col items-start gap-1">
         <span className="caps-label">Active version</span>

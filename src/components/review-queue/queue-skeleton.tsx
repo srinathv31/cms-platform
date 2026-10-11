@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { TAB, TAB_LABEL } from "@/components/primitives/tab-styles";
+import { TAB, TAB_BAR_SCROLLS, TAB_LABEL } from "@/components/primitives/tab-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { COLUMNS, FOLDS, ROW, ROW_HEIGHT } from "./columns";
 import { TAB_META } from "./format-row";
@@ -9,7 +9,7 @@ import { TAB_BAR } from "./tab-styles";
 export function QueueSkeleton() {
   return (
     <div aria-hidden>
-      <div className={TAB_BAR}>
+      <div className={cn(TAB_BAR, TAB_BAR_SCROLLS)}>
         {Object.values(TAB_META).map(({ label }) => (
           <span key={label} className={cn(TAB, "text-text-muted")}>
             <span className={TAB_LABEL}>

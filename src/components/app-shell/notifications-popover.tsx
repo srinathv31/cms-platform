@@ -169,7 +169,7 @@ export function NotificationsPopover({ data }: { data: NotificationsData }) {
         align="end"
         sideOffset={8}
         aria-label="Notifications"
-        className="w-[23rem] gap-0 rounded-2xl border border-hairline p-2 shadow-pop ring-0"
+        className="w-[23rem] max-w-[calc(100vw-1rem)] gap-0 rounded-2xl border border-hairline p-2 shadow-pop ring-0"
       >
         <div className="flex h-8 items-center justify-between gap-3 px-3 pt-0.5">
           <span className="text-[15px] font-medium">Notifications</span>

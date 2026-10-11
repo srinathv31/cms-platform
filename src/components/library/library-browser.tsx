@@ -13,7 +13,18 @@ import { statusLabel } from "@/domain/status";
 import { TEMPLATE_KIND_LABELS, VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
-import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn, type StatusBadgeWidth } from "./columns";
+import {
+  COLUMNS,
+  COLUMNS_TEAM,
+  FOLDS,
+  NAME_CELL,
+  ROW,
+  STACKED_HIDDEN,
+  STACKED_ONLY,
+  TEAM_IN_SUBLINE,
+  statusColumn,
+  type StatusBadgeWidth,
+} from "./columns";
 import { StarterGallery } from "./starter-gallery";
 
 type Filter = "all" | VersionState;
@@ -32,7 +43,7 @@ function widestBadge(rows: LibraryRow[]): StatusBadgeWidth {
 
 function ListHeader({ showTeam }: { showTeam: boolean }) {
   return (
-    <div aria-hidden className="border-b border-hairline">
+    <div aria-hidden className={cn("border-b border-hairline", STACKED_HIDDEN)}>
       <div className={cn(ROW, "h-10", showTeam ? COLUMNS_TEAM : COLUMNS)}>
         <span className="caps-label">Template</span>
         {showTeam ? <span className={cn("caps-label", FOLDS)}>Team</span> : null}
@@ -56,7 +67,7 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
           showTeam ? COLUMNS_TEAM : COLUMNS,
         )}
       >
-        <span className="min-w-0">
+        <span className={cn("min-w-0", NAME_CELL)}>
           <span className="block truncate text-[15px] leading-5 font-medium" title={row.name}>
             {row.name}
           </span>
@@ -70,8 +81,14 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         <span>
           <StatusBadge state={row.status} sunsetDay={row.sunsetDay} sunsetPassed={row.sunsetPassed} now={nowIso} />
         </span>
-        <span className="text-text tabular-nums">
-          {row.activeNumber !== null ? `v${row.activeNumber}` : <span className="text-text-subtle">—</span>}
+        <span className="text-text tabular-nums @max-[26rem]/canvas:text-right">
+          {row.activeNumber !== null ? (
+            <>
+              <span className={cn("text-text-muted", STACKED_ONLY)}>Active </span>v{row.activeNumber}
+            </>
+          ) : (
+            <span className="text-text-subtle">—</span>
+          )}
         </span>
         <span className={cn("text-text-muted", FOLDS)}>{row.lastEdited}</span>
         <span className={cn("flex min-w-0 items-center gap-2.5", FOLDS)}>

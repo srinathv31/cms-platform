@@ -208,6 +208,13 @@
   --sidebar-ring: var(--focus-ring);
 }
 
+/* Narrow windows (the sidebar is a drawer, globals.css `narrow:`): the canvas gives up its side padding. */
+@media (max-width: 799px) {
+  :root {
+    --canvas-pad-x: 1rem;
+  }
+}
+
 /* ── 4. Device previews (src/components/device) ────────────────
  * The phone kit's own palette: the frame, a wallpaper drawn from the brand ramp, the glass
  * material, and the iOS system colours its screens use. Components read these and nothing else.

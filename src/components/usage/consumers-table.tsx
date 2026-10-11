@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Segmented } from "@/components/primitives/segmented";
+import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { UsageRow, UsageTag } from "@/domain/golive-types";
@@ -81,62 +82,64 @@ export function ConsumersTable({
   // first (the sparkline still shows recency), so a note never wraps for want of room.
   const lastCol = showTemplate ? "@max-[58rem]/usage:hidden" : "";
   return (
-    <Table aria-label={name} className={cn("text-[14px]", className)}>
-      <TableHeader>
-        <TableRow className="border-hairline hover:bg-transparent">
-          <TableHead className={HEAD}>Consumer</TableHead>
-          {showTemplate ? <TableHead className={HEAD}>Template</TableHead> : null}
-          <TableHead className={HEAD}>Version</TableHead>
-          <TableHead className={cn(HEAD, "text-right")}>Renders (30d)</TableHead>
-          <TableHead className={HEAD}>Trend</TableHead>
-          <TableHead className={cn(HEAD, lastCol)}>Last render</TableHead>
-          <TableHead className={HEAD}>Note</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {shown.length === 0 ? (
-          <TableRow className="h-14 border-hairline hover:bg-transparent">
-            <TableCell colSpan={columns} className="text-text-muted">
-              {FILTER_EMPTY[filter]}
-            </TableCell>
+    <ScrollRegion label={name}>
+      <Table aria-label={name} className={cn("text-[14px]", className)}>
+        <TableHeader>
+          <TableRow className="border-hairline hover:bg-transparent">
+            <TableHead className={HEAD}>Consumer</TableHead>
+            {showTemplate ? <TableHead className={HEAD}>Template</TableHead> : null}
+            <TableHead className={HEAD}>Version</TableHead>
+            <TableHead className={cn(HEAD, "text-right")}>Renders (30d)</TableHead>
+            <TableHead className={HEAD}>Trend</TableHead>
+            <TableHead className={cn(HEAD, lastCol)}>Last render</TableHead>
+            <TableHead className={HEAD}>Note</TableHead>
           </TableRow>
-        ) : (
-          shown.map((r) => (
-            <TableRow key={`${r.consumer.id}:${r.template.id}:${r.versionNumber}`} className="h-14 border-hairline hover:bg-hover/50">
-              <TableCell className="font-medium text-text">{r.consumer.name}</TableCell>
-              {showTemplate ? (
-                <TableCell className="max-w-[16rem] truncate">
-                  <Link
-                    href={`/${r.template.teamSlug}/templates/${r.template.id}/usage` as Route}
-                    title={r.template.name}
-                    className="rounded-sm text-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {r.template.name}
-                  </Link>
-                </TableCell>
-              ) : null}
-              <TableCell>
-                <span className="flex items-center gap-2">
-                  <span className="font-mono text-[13px] text-text">v{r.versionNumber}</span>
-                  <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} sunsetPassed={r.sunsetPassed} now={now} />
-                </span>
-              </TableCell>
-              <TableCell className="text-right text-text tabular-nums">{formatCount(r.renders30d)}</TableCell>
-              <TableCell>
-                <Sparkline values={r.spark} width={72} label={`${r.consumer.name}, ${r.template.name} v${r.versionNumber}`} />
-              </TableCell>
-              <TableCell className={cn("whitespace-nowrap text-text-muted", lastCol)}>{formatLastRender(r.lastRenderAt, now)}</TableCell>
-              <TableCell>
-                <span className="flex gap-1">
-                  {r.tags.map((t) => (
-                    <TagChip key={t.text} tag={t} />
-                  ))}
-                </span>
+        </TableHeader>
+        <TableBody>
+          {shown.length === 0 ? (
+            <TableRow className="h-14 border-hairline hover:bg-transparent">
+              <TableCell colSpan={columns} className="text-text-muted">
+                {FILTER_EMPTY[filter]}
               </TableCell>
             </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+          ) : (
+            shown.map((r) => (
+              <TableRow key={`${r.consumer.id}:${r.template.id}:${r.versionNumber}`} className="h-14 border-hairline hover:bg-hover/50">
+                <TableCell className="font-medium text-text">{r.consumer.name}</TableCell>
+                {showTemplate ? (
+                  <TableCell className="max-w-[16rem] truncate">
+                    <Link
+                      href={`/${r.template.teamSlug}/templates/${r.template.id}/usage` as Route}
+                      title={r.template.name}
+                      className="rounded-sm text-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {r.template.name}
+                    </Link>
+                  </TableCell>
+                ) : null}
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-[13px] text-text">v{r.versionNumber}</span>
+                    <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} sunsetPassed={r.sunsetPassed} now={now} />
+                  </span>
+                </TableCell>
+                <TableCell className="text-right text-text tabular-nums">{formatCount(r.renders30d)}</TableCell>
+                <TableCell>
+                  <Sparkline values={r.spark} width={72} label={`${r.consumer.name}, ${r.template.name} v${r.versionNumber}`} />
+                </TableCell>
+                <TableCell className={cn("whitespace-nowrap text-text-muted", lastCol)}>{formatLastRender(r.lastRenderAt, now)}</TableCell>
+                <TableCell>
+                  <span className="flex gap-1">
+                    {r.tags.map((t) => (
+                      <TagChip key={t.text} tag={t} />
+                    ))}
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </ScrollRegion>
   );
 }

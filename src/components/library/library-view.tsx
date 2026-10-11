@@ -6,7 +6,7 @@ import { now } from "@/server/clock";
 import { getLibraryRows } from "@/server/queries/library";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { cn } from "@/lib/utils";
-import { COLUMNS, FOLDS, ROW, statusColumn } from "./columns";
+import { COLUMNS, FOLDS, NAME_CELL, ROW, STACKED_HIDDEN, statusColumn } from "./columns";
 import { LibraryBrowser } from "./library-browser";
 import { NewTemplate } from "./new-template";
 
@@ -49,7 +49,7 @@ function LibraryListSkeleton() {
           <Skeleton className="h-8 w-24 rounded-full" />
         </div>
       </div>
-      <div className="border-b border-hairline">
+      <div className={cn("border-b border-hairline", STACKED_HIDDEN)}>
         <div className={cn(ROW, "h-10", COLUMNS)}>
           <span className="caps-label">Template</span>
           <span className="caps-label">Status</span>
@@ -61,7 +61,7 @@ function LibraryListSkeleton() {
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="border-b border-hairline last:border-b-0">
           <div className={cn(ROW, "min-h-[4.25rem] py-3", COLUMNS)}>
-            <span>
+            <span className={NAME_CELL}>
               <Skeleton className="h-4 w-48" />
               <Skeleton className="mt-1.5 h-3 w-36" />
             </span>

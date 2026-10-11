@@ -1,6 +1,8 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+// Stencil edit to this generated file: 800, not shadcn's 768. It is the width below which the app shell turns the
+// sidebar into a drawer (decision 0045). globals.css has the same number in its `narrow:` variant.
+export const MOBILE_BREAKPOINT = 800
 const QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`
 
 function subscribe(onChange: () => void) {

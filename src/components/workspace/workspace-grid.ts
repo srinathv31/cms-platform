@@ -83,9 +83,14 @@
 // about 394px), which is what these steps are measured against: 800px fits at step 3 with 4px to spare
 // (draft, "Submit") and a bar under 402px, a window under about 796px, cannot fit its tabs and buttons.
 // The figures are for the draft's Submit button; the Active template's Edit button is 2px narrower.
+//
+// Under 26rem of canvas (a window under about 470px) the bar cannot hold its tabs and its buttons in one line
+// at any step, so it takes two: the tabs, then the buttons. Row 2 doubles to 5.5rem, and the bar stops being
+// sticky there, because a bar that is 5.5rem tall and stuck would leave a 320x256 window little else to show
+// (reflow, decision 0045).
 
 export const WS = {
-  grid: "@container/ws relative pl-5 mr-[calc(-1*(var(--canvas-pad-x)+max(0px,(100cqw-96rem)/2)))] @max-[51.25rem]/canvas:pr-(--canvas-pad-x) -mb-14 grid min-h-(--ws-h) grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_2.75rem_1fr] [--ws-h:calc(100svh-5.5rem-2px)] [--rail-preview-w:min(calc((100cqw+68px)*0.52),calc(100cqw-424px),60rem)]",
+  grid: "@container/ws relative pl-5 mr-[calc(-1*(var(--canvas-pad-x)+max(0px,(100cqw-96rem)/2)))] @max-[51.25rem]/canvas:pr-(--canvas-pad-x) -mb-14 grid min-h-(--ws-h) grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_2.75rem_1fr] @max-[26rem]/canvas:grid-rows-[auto_5.5rem_1fr] [--ws-h:calc(100svh-5.5rem-2px)] [--rail-preview-w:min(calc((100cqw+68px)*0.52),calc(100cqw-424px),60rem)]",
 
   /** Holds the rail column's width on tabs without a rail (same size and breakpoint as `rail`). */
   railSpace: "pointer-events-none invisible col-start-2 row-start-1 hidden h-px w-80 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block",
@@ -94,13 +99,15 @@ export const WS = {
   header: "col-start-1 row-start-1 w-full max-w-(--doc-width) justify-self-center pt-2 pb-6",
 
   /** Tabs and the template's actions. Spans rows 2 and 3 so it can stay stuck to the top while the document scrolls. */
-  tabs: "@container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 @max-[53rem]/ws:gap-3 self-start justify-self-center border-b border-hairline bg-canvas @max-[34rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[39rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav]:gap-3 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav_a]:text-[14px]",
+  tabs: "@container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full @max-[26rem]/canvas:static @max-[26rem]/canvas:row-end-3 @max-[26rem]/canvas:h-auto @max-[26rem]/canvas:flex-wrap max-w-(--doc-width) items-start justify-between gap-6 @max-[53rem]/ws:gap-3 self-start justify-self-center border-b border-hairline bg-canvas @max-[34rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[39rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav]:gap-3 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav_a]:text-[14px]",
 
   /**
    * The tab's main node: the document, or another tab's placeholder. The deep bottom padding lets the
-   * last section scroll up, so a menu opened at the end of the document has room below the caret.
+   * last section scroll up, so a menu opened at the end of the document has room below the caret. Below 800px (the
+   * sidebar a drawer, the canvas padding 1rem) it pads 1.5rem more on the right, which with the grid's own makes the
+   * 2.5rem the comment markers hang in; from 800px up the canvas padding (3rem) is room enough.
    */
-  doc: "col-start-1 row-start-3 w-full min-w-0 max-w-(--doc-width) justify-self-center pt-8 pb-[max(3.5rem,40svh)] [--ucomp-doc-gutter:calc(var(--canvas-pad-x)+1.25rem)]",
+  doc: "col-start-1 row-start-3 w-full min-w-0 max-w-(--doc-width) justify-self-center pt-8 pb-[max(3.5rem,40svh)] narrow:pr-6 [--ucomp-doc-gutter:calc(var(--canvas-pad-x)+1.25rem)]",
 
   /**
    * The rail: Channels above Variables. A flush strip beside the whole main pane, as tall as the scroll
@@ -108,12 +115,15 @@ export const WS = {
    * over the right edge of the canvas. The 17px of top padding puts the first label ("Channels") on the
    * baseline of the name's first line (measured: both at y=109 on a 1440 canvas).
    *
+   * Under 26rem of canvas (a window under about 470px) the overlay is as wide as the canvas, and its inner box gives
+   * way to it (`max-w-full`), instead of running 24px off the panel's left edge.
+   *
    * `data-preview` (the preview is open) widens it: to --rail-preview-w beside the document; as an
    * overlay, to the whole canvas (it bleeds left through the grid's 1.25rem and the canvas's own
    * padding, to the panel's edge, and drops its border there). `rail` is also the group name its contents key on (`group/rail`).
    * Widened, it pads its sides 20px (`data-[preview]:px-5`), the normal rail's content edge: 12px of padding and the 8px inside it.
    */
-  rail: "group/rail sticky top-0 z-30 col-start-1 col-end-3 row-start-1 row-end-4 hidden h-(--ws-h) w-80 self-start justify-self-end overflow-x-hidden overflow-y-auto border-l border-hairline bg-canvas px-3 pt-[17px] pb-14 shadow-pop -mr-(--canvas-pad-x) transition-[width,margin-left] duration-(--dur-base) ease-(--ease-out-soft) data-[open]:block data-[preview]:w-[calc(100%+1.25rem+2*var(--canvas-pad-x))] data-[preview]:border-l-0 data-[preview]:px-5 data-[preview]:pb-3 @min-[53rem]/ws:col-start-2 @min-[53rem]/ws:col-end-auto @min-[53rem]/ws:mr-0 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block @min-[53rem]/ws:z-auto @min-[53rem]/ws:shadow-none @min-[53rem]/ws:data-[preview]:ml-6 @min-[53rem]/ws:data-[preview]:w-(--rail-preview-w) @min-[53rem]/ws:data-[preview]:border-l",
+  rail: "group/rail sticky top-0 z-30 col-start-1 col-end-3 row-start-1 row-end-4 hidden h-(--ws-h) w-80 @max-[26rem]/canvas:w-[calc(100%+1.25rem+2*var(--canvas-pad-x))] self-start justify-self-end overflow-x-hidden overflow-y-auto border-l border-hairline bg-canvas px-3 pt-[17px] pb-14 shadow-pop -mr-(--canvas-pad-x) transition-[width,margin-left] duration-(--dur-base) ease-(--ease-out-soft) data-[open]:block data-[preview]:w-[calc(100%+1.25rem+2*var(--canvas-pad-x))] data-[preview]:border-l-0 data-[preview]:px-5 data-[preview]:pb-3 @min-[53rem]/ws:col-start-2 @min-[53rem]/ws:col-end-auto @min-[53rem]/ws:mr-0 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block @min-[53rem]/ws:z-auto @min-[53rem]/ws:shadow-none @min-[53rem]/ws:data-[preview]:ml-6 @min-[53rem]/ws:data-[preview]:w-(--rail-preview-w) @min-[53rem]/ws:data-[preview]:border-l",
 
   /**
    * The box inside the rail that holds everything. Its width is the rail's final width in each state
@@ -123,5 +133,5 @@ export const WS = {
    * Beside the document the widened rail's content box is the preview width less the 20px side padding and the 1px border (`2.5rem+1px`).
    */
   railInner:
-    "ml-auto flex w-74 flex-col group-data-[preview]/rail:w-full group-data-[view=preview]/rail:h-full group-data-[preview]/rail:@min-[53rem]/ws:w-[calc(var(--rail-preview-w)-2.5rem-1px)]",
+    "ml-auto flex w-74 @max-[26rem]/canvas:max-w-full flex-col group-data-[preview]/rail:w-full group-data-[view=preview]/rail:h-full group-data-[preview]/rail:@min-[53rem]/ws:w-[calc(var(--rail-preview-w)-2.5rem-1px)]",
 } as const;

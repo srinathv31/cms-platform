@@ -21,10 +21,12 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
         <span className="rounded-md border border-dashed border-hairline-strong px-2.5 py-1 text-[12px] font-semibold tracking-wider text-label uppercase">
           Coral — simulated
         </span>
-        <span aria-hidden className="w-[8.5rem]" />
+        <span aria-hidden className="w-[8.5rem] narrow:hidden" />
       </header>
-      <div data-sim className="flex min-h-0 flex-1">
-        <aside className="flex w-56 shrink-0 flex-col bg-(--sim-nav) text-(--sim-nav-text)">
+      {/* Below 800px (a laptop zoomed past about 160%) Coral's sidebar becomes a band across the top and the page
+          scrolls as one, so its content keeps the width (reflow, decision 0045). */}
+      <div data-sim className="flex min-h-0 flex-1 narrow:flex-col narrow:overflow-y-auto">
+        <aside className="flex w-56 shrink-0 flex-col bg-(--sim-nav) text-(--sim-nav-text) narrow:w-full narrow:flex-row narrow:flex-wrap narrow:items-center">
           <div className="flex h-14 items-center gap-2.5 px-5">
             <span aria-hidden className="grid size-7 place-items-center rounded-md bg-(--sim-accent) text-[15px] font-bold text-(--sim-accent-text)">
               c
@@ -43,12 +45,12 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
               }
             />
           </Stream>
-          <div className="mt-auto border-t border-(--sim-nav-hover) p-4 text-[12px] text-(--sim-nav-muted)">
+          <div className="mt-auto border-t border-(--sim-nav-hover) p-4 text-[12px] text-(--sim-nav-muted) narrow:mt-0 narrow:ml-auto narrow:border-t-0 narrow:py-2">
             <p className="m-0 text-(--sim-nav-on)">Dana Whitfield</p>
             <p className="m-0">Offers operations</p>
           </div>
         </aside>
-        <main className="flex min-h-0 min-w-0 flex-1">{children}</main>
+        <main className="flex min-h-0 min-w-0 flex-1 narrow:flex-none">{children}</main>
       </div>
       <DemoPillHole />
     </div>

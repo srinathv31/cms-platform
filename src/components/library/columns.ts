@@ -14,9 +14,24 @@
 // under the name (`TEAM_IN_SUBLINE`). Tailwind needs the class names written out, so the breakpoint is
 // spelled in each.
 export const COLUMNS_TEAM =
-  "grid-cols-[minmax(0,1fr)_7rem_var(--status-col)_3.5rem_6.5rem_8.5rem] @max-[56rem]/canvas:grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem]";
+  "grid-cols-[minmax(0,1fr)_7rem_var(--status-col)_3.5rem_6.5rem_8.5rem] @max-[56rem]/canvas:grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem] @max-[26rem]/canvas:grid-cols-[minmax(0,1fr)_auto]";
 export const COLUMNS =
-  "grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem_6.5rem_8.5rem] @max-[56rem]/canvas:grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem]";
+  "grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem_6.5rem_8.5rem] @max-[56rem]/canvas:grid-cols-[minmax(0,1fr)_var(--status-col)_3.5rem] @max-[26rem]/canvas:grid-cols-[minmax(0,1fr)_auto]";
+
+// Below 26rem of canvas (a window under about 470px, a laptop at 275% zoom or more) the three columns that are
+// left would leave the name about 14px at 320px wide. The row stacks instead: the name takes the first line,
+// the status and the Active version share the second, and the header row, whose labels no longer line up with
+// anything, gives way (`STACKED_HIDDEN`; the row says "Active v2" itself, `STACKED_ONLY`).
+// Reflow for zoom, decision 0045.
+
+/** The name cell: a line of its own when the row stacks. */
+export const NAME_CELL = "@max-[26rem]/canvas:col-span-2";
+
+/** The header row's wrapper: its labels have nothing to line up with once the rows stack. */
+export const STACKED_HIDDEN = "@max-[26rem]/canvas:hidden";
+
+/** Text that only a stacked row shows: the Active column's label. */
+export const STACKED_ONLY = "hidden @max-[26rem]/canvas:inline";
 
 /** A cell (and its header) that gives way on a narrow canvas: Team, Last edited, Owner. */
 export const FOLDS = "@max-[56rem]/canvas:hidden";

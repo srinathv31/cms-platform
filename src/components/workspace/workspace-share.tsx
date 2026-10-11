@@ -116,7 +116,7 @@ export function WorkspaceShare({
           showCloseButton={false}
           aria-modal="true"
           onKeyDown={wrapTab}
-          className="w-[40rem] gap-0 border-hairline bg-canvas p-0 data-[side=right]:sm:max-w-[40rem]"
+          className="w-[40rem] gap-0 border-hairline bg-canvas p-0 data-[side=right]:max-sm:w-full data-[side=right]:sm:max-w-[40rem]"
         >
           <SheetHeader className="relative shrink-0 gap-1.5 border-b border-hairline px-7 pt-7 pb-5">
             <SheetClose

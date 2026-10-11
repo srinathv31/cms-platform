@@ -53,7 +53,7 @@ export function DecisionBar({
         <BlockedButton className="bg-surface" reason={access.reason} describedBy={reasonId}>
           Request changes
         </BlockedButton>
-        <p id={reasonId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted" title={access.reason}>
+        <p id={reasonId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal" title={access.reason}>
           {access.reason}
         </p>
       </div>
@@ -73,7 +73,7 @@ export function DecisionBar({
         Request changes
       </Button>
       {approveBlocked ? (
-        <p id={waitId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted" title={approveBlocked}>
+        <p id={waitId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal" title={approveBlocked}>
           {approveBlocked}
         </p>
       ) : null}

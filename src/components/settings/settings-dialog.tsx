@@ -86,11 +86,15 @@ export function SettingsDialog({
         aria-label="Settings"
         // Never wider than the window (16px a side spare): at 1280 and up the frame is as before; below
         // about 900px the nav narrows and the content pads less, and wide tables scroll inside the panel.
-        className="flex h-[min(46rem,84vh)] w-[min(72vw,70rem)] min-w-[min(56rem,calc(100vw-2rem))] rounded-3xl"
+        // Below 40rem the nav goes above the content (its list scrolls in a box 40% of the frame at most), so a
+        // 320px window keeps a content column (reflow, decision 0045).
+        className="flex h-[min(46rem,84vh)] w-[min(72vw,70rem)] min-w-[min(56rem,calc(100vw-2rem))] rounded-3xl max-[40rem]:flex-col"
       >
-        <div className="flex w-[15rem] shrink-0 flex-col bg-surface-tinted max-[56.25rem]:w-[13.5rem]">{nav}</div>
+        <div className="flex w-[15rem] shrink-0 flex-col bg-surface-tinted max-[56.25rem]:w-[13.5rem] max-[40rem]:max-h-[40%] max-[40rem]:w-full">
+          {nav}
+        </div>
 
-        <div className="relative min-w-0 flex-1 overflow-y-auto overscroll-contain px-10 pt-12 pb-10 max-[56.25rem]:px-7">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-10 pt-12 pb-10 max-[56.25rem]:px-7 max-[40rem]:px-5">
           {children}
           <DialogClose
             render={

@@ -113,7 +113,9 @@ describe("WorkspaceHeader binding", () => {
 
   // A save refused for good says why and offers Reload on a line of its own (handoff review I6).
   it("keeps a line across the header, under the status row, for a save that stopped: on an editable draft only", async () => {
-    expect(find<{ className: string }>(await render(DRAFT), SaveStopped).map((el) => el.props.className)).toEqual(["col-span-3 col-start-1 row-start-3"]);
+    expect(find<{ className: string }>(await render(DRAFT), SaveStopped).map((el) => el.props.className)).toEqual([
+      "col-span-3 col-start-1 row-start-3 @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:row-start-4",
+    ]);
     expect(find(await render({ ...DRAFT, editable: false, draft: null }), SaveStopped)).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@ export function ConsumersCard({ rows, nowIso }: { rows: UsageRow[]; nowIso: stri
   const [filter, setFilter] = useState<"all" | "superseded" | "failing">("all");
   return (
     <Panel className="@container/usage">
-      <div className="flex min-h-9 items-center justify-between gap-4">
+      <div className="flex min-h-9 items-center justify-between gap-4 @max-[26rem]/canvas:flex-wrap @max-[26rem]/canvas:gap-y-3">
         <h2 className="m-0 text-[28px] leading-9 font-normal tracking-tight text-text">Who renders what</h2>
         <ConsumerFilter value={filter} onChange={setFilter} />
       </div>

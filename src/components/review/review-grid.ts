@@ -20,7 +20,9 @@
 // (decision-bar.tsx) so the two decisions are never a long scroll away.
 //
 // The tab bar always fits its box (it never wraps: a wrapped bar would slide under the document):
-// "vs v2" and the change count give way first, in the bar's own container.
+// "vs v2" and the change count give way first, in the bar's own container. Under 26rem of canvas (a window
+// under about 470px) it does take two lines, as the workspace's does (workspace-grid.ts): row 2 is then
+// 5.5rem tall, the bar is no longer sticky, and the decision bar wraps its two buttons (reflow, decision 0045).
 
 import { WS } from "@/components/workspace/workspace-grid";
 
@@ -39,16 +41,20 @@ export const RV = {
   header: `${WS.header} ${STACKED_PR}`,
 
   /** Tabs and the view's own tools. Sticky, one 44px line over a hairline. */
-  tabs: `${STACKED_PR} @container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 self-start justify-self-center border-b border-hairline bg-canvas`,
+  tabs: `${STACKED_PR} @container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full max-w-(--doc-width) items-start justify-between gap-6 self-start justify-self-center border-b border-hairline bg-canvas @max-[26rem]/canvas:static @max-[26rem]/canvas:row-end-3 @max-[26rem]/canvas:h-auto @max-[26rem]/canvas:flex-wrap`,
 
-  /** The document or the output: the workspace's cell (text on the column's left edge, the gutter hanging left). */
+  /**
+   * The document or the output: the workspace's cell (text on the column's left edge, the gutter hanging left).
+   * Below 800px (the sidebar a drawer, the canvas padding 1rem) it pads 1.5rem more on the right, as the workspace's
+   * does: with the grid's 1rem that is the 2.5rem the comment markers hang in.
+   */
   doc: `${WS.doc} ${STACKED_PR}`,
 
   /**
    * The output: the document's cell, with a height of its own (the well scrolls inside it). Stacked, the
    * decision bar covers the bottom of the cell, so the well ends above it (the bar's 57px and 15px of air).
    */
-  output: `col-start-1 row-start-3 flex h-[max(30rem,calc(var(--ws-h)-10.5rem))] w-full min-w-0 max-w-(--doc-width) flex-col justify-self-center pt-2 pb-3 @max-[53rem]/ws:pb-[4.3rem] ${STACKED_PR}`,
+  output: `col-start-1 row-start-3 flex h-[max(30rem,calc(var(--ws-h)-10.5rem))] w-full min-w-0 max-w-(--doc-width) flex-col justify-self-center pt-2 pb-3 @max-[53rem]/ws:pb-[4.3rem] @max-[26rem]/canvas:pb-[7.5rem] ${STACKED_PR}`,
 
   /**
    * The rail. Wide: a sticky strip beside the whole main pane. Stacked: the grid's fourth row, flush to
@@ -70,7 +76,7 @@ export const RV = {
    * edge. A sticky box rests above the scroll area's own bottom padding (3.5rem), so its `bottom` takes
    * that back. The right 7rem stays clear of the Demo pill (fixed, bottom right).
    */
-  bar: "sticky bottom-[-3.5rem] z-20 col-start-1 row-start-3 -mr-(--canvas-pad-x) -ml-[calc(var(--canvas-pad-x)+1.25rem)] flex items-center gap-2 self-end h-[3.5625rem] border-t border-hairline bg-canvas pr-28 pl-[calc(var(--canvas-pad-x)+1.25rem)] @min-[53rem]/ws:hidden",
+  bar: "sticky bottom-[-3.5rem] z-20 col-start-1 row-start-3 -mr-(--canvas-pad-x) -ml-[calc(var(--canvas-pad-x)+1.25rem)] flex items-center gap-2 self-end h-[3.5625rem] @max-[26rem]/canvas:h-auto @max-[26rem]/canvas:min-h-[3.5625rem] @max-[26rem]/canvas:flex-wrap @max-[26rem]/canvas:py-2 border-t border-hairline bg-canvas pr-28 pl-[calc(var(--canvas-pad-x)+1.25rem)] @min-[53rem]/ws:hidden",
 
   /** The rail's top section (the stepper and the decision), pinned above the scroll. */
   railHead: "shrink-0 border-b border-hairline pt-1.5 pb-4 pl-(--rail-pl) pr-(--rail-pr)",
