@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import type { ContentTypeView } from "@/domain/access-types";
-import { SECTION_TITLE_MAX, describeSectionsChange, removeSectionRefusal } from "@/domain/platform-config";
+import { SECTION_TITLE_MAX } from "@/domain/platform-config/limits";
+import { describeSectionsChange, removeSectionRefusal } from "@/domain/platform-config/sections";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { RequiredSection } from "@/domain/types";
 import { BlockedButton } from "@/components/primitives/blocked-button";

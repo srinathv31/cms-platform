@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { currentStageOf } from "@/domain/approval-chain";
-import { smsFooterOf } from "@/domain/lifecycle";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { can, hasActiveTeamAccess } from "@/domain/permissions";
 import {
   BAD_REQUEST_MESSAGES,

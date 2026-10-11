@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ROLE_LABEL, describeRoleChange, rolesLabel, sortRoles } from "@/domain/access";
+import { ROLE_LABEL, rolesLabel, sortRoles } from "@/domain/access/roles";
+import { describeRoleChange } from "@/domain/access/consequences";
 import type { MemberRow, MembersSection } from "@/domain/access-types";
 import type { PermissionResult, TeamRole } from "@/domain/types";
 import { Checkbox } from "@/components/ui/checkbox";

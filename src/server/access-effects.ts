@@ -7,7 +7,7 @@ import { newId } from "@/server/ids";
 import type { Tx } from "./effects";
 
 // The write side of Phase 6 (access and platform settings), the twin of ./effects.ts for lifecycle
-// transitions. A domain function (domain/access.ts, domain/platform-config.ts) says WHAT changed and
+// transitions. A domain function (domain/access/, domain/platform-config/) says WHAT changed and
 // what to record; these helpers write it inside the caller's transaction (`inTransaction` from
 // ./effects), so a decision, its membership row, its audit row and its notifications land together.
 

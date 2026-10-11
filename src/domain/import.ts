@@ -18,7 +18,7 @@ import {
   type SectionFit,
   type SkippedPlaceholder,
 } from "./import-types";
-import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
+import { UNTITLED_TEMPLATE_NAME } from "./lifecycle/drafts";
 import { plural, pluralWord } from "./plural";
 import type { JSONContent, RequiredSection, Variable } from "./types";
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
+import { addCounts, diffChannelFields } from "@/domain/redline/channel-fields";
+import { diffDocuments, nameChange } from "@/domain/redline/document";
 import type { ReviewScreenData } from "@/server/queries/review-models";
 
 /**

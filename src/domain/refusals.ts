@@ -6,7 +6,7 @@
 // returns the same codes. The sentence is UI copy: reword it freely.
 //
 // Each area keeps its own table next to its rules (`REASONS` in permissions.ts, `REFUSALS` in
-// lifecycle.ts, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `STAGE_REFUSALS`,
+// lifecycle/refusals.ts, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `STAGE_REFUSALS`,
 // `OUTPUT_REFUSALS` in review-outputs.ts, `IMPORT_REFUSALS` in import-types.ts), and
 // `REQUEST_REFUSALS` below holds what the server refuses before any rule runs. Every entry is built with
 // `refusal(code, sentence)`; `RefusalCode` is the union of every table's codes, and refusals.test.ts
@@ -14,14 +14,14 @@
 // handlers (autosave, import, the audit export) all answer a refusal as `{ ok: false, code, reason }`
 // (decision 0041); only `/api/v1` has a shape of its own.
 
-import type { ACCESS_REFUSALS } from "./access";
+import type { ACCESS_REFUSALS } from "./access/refusals";
 import { formatCount } from "./numbers";
 import type { STAGE_REFUSALS } from "./approval-chain";
 import type { COMMENT_REFUSALS } from "./comments";
 import type { IMPORT_REFUSALS } from "./import-types";
-import type { REFUSALS } from "./lifecycle";
+import type { REFUSALS } from "./lifecycle/refusals";
 import type { REASONS } from "./permissions";
-import type { PLATFORM_REFUSALS } from "./platform-config";
+import type { PLATFORM_REFUSALS } from "./platform-config/refusals";
 import type { OUTPUT_REFUSALS } from "./review-outputs";
 
 /** One refusal: its code, and the sentence shown where the person tried. */

@@ -7,14 +7,12 @@ import type { ActionResult, ApproverFacts } from "@/domain/access-types";
 import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { asNumbered, reviewLink, versionLabel } from "@/domain/rounds";
-import {
-  PLATFORM_REFUSALS,
-  createTeam as createTeamRule,
-  saveApprovalChain as saveApprovalChainRule,
-  setBusinessZone as setBusinessZoneRule,
-  setChannelRule as setChannelRuleRule,
-  updateRequiredSections,
-} from "@/domain/platform-config";
+import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
+import { createTeam as createTeamRule } from "@/domain/platform-config/teams";
+import { saveApprovalChain as saveApprovalChainRule } from "@/domain/platform-config/approval-chains";
+import { setBusinessZone as setBusinessZoneRule } from "@/domain/platform-config/time-zone";
+import { setChannelRule as setChannelRuleRule } from "@/domain/platform-config/channels";
+import { updateRequiredSections } from "@/domain/platform-config/sections";
 import { CHANNELS, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
 import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
 import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "@/server/business-zone";
@@ -37,7 +35,7 @@ import { check, refuse, serverAction, type ActionContext } from "./kit";
 // Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules, approval
 // chains and the business time zone (contract: `PlatformActions` in domain/access-types.ts). Every action
 // runs the server action kit (kit.ts): it checks the permission (`manage`), reads the facts and writes
-// the domain's answer (domain/platform-config.ts) in ONE transaction with its audit rows and
+// the domain's answer (domain/platform-config/) in ONE transaction with its audit rows and
 // notifications, then refreshes every page (the switcher, the sidebar and the settings modal all read
 // this configuration).
 //

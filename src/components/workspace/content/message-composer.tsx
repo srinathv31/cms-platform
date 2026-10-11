@@ -17,7 +17,7 @@ import {
 } from "@/domain/channel-fields";
 import { messageFieldFlags } from "@/domain/messages/flags";
 import { truncationWarnings, type TruncationWarnings } from "@/domain/messages/truncation";
-import type { MessageTypeRules } from "@/domain/platform-config";
+import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import type { Channel, JSONContent } from "@/domain/types";
 import { useContractState } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";

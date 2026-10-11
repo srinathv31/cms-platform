@@ -6,10 +6,13 @@ import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { contractBaseline, planDraftStart, smsFooterOf, sunsetPassed } from "@/domain/lifecycle";
+import { contractBaseline } from "@/domain/lifecycle/baselines";
+import { planDraftStart } from "@/domain/lifecycle/drafts";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
 import { asNumbered, nextRound, versionLabel as labelOf, type NumberedRound } from "@/domain/rounds";
 import {
   contentTypeFamily,

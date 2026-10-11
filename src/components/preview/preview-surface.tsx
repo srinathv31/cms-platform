@@ -7,7 +7,7 @@ import type { SampleSet } from "@/editor/model/types";
 import { OriginalView } from "@/components/import/original-view";
 import { channelFieldsFrom } from "@/domain/channel-fields";
 import type { ImportOriginalRef } from "@/domain/import-types";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
+import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
 import { isDocumentChannel, type Channel } from "@/domain/types";
 import { useLiveFields, useLiveSampleSets, type LiveDraft } from "@/components/workspace/session/live-draft";
 import {

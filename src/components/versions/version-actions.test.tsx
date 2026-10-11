@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import type { PermissionResult } from "@/domain/types";
 import type { VersionTimelineItem } from "@/server/queries/versions";

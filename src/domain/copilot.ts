@@ -7,7 +7,7 @@
 
 import { TYPE_META } from "@/editor/model/variables";
 import type { CopilotPrompt, CopilotPromptInput } from "./import-types";
-import { UNTITLED_TEMPLATE_NAME } from "./lifecycle";
+import { UNTITLED_TEMPLATE_NAME } from "./lifecycle/drafts";
 import { REQUEST_REFUSALS } from "./refusals";
 import { CHANNELS, type Channel, type ChannelFamily, type JSONContent, type RequiredSection } from "./types";
 

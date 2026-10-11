@@ -8,7 +8,7 @@
 
 import { daysUntilSunset } from "../business-zone";
 import { DAY_MS, addDays, dayStartMs, utcDay } from "../dates";
-import { sunsetPassed } from "../lifecycle";
+import { sunsetPassed } from "../lifecycle/sunset";
 import { plural } from "../plural";
 import type { RenderErrorCode } from "../render/types";
 import type { VersionState } from "../types";

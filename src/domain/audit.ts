@@ -11,7 +11,7 @@
 //
 // No framework imports: the server queries, the export route and client components all use it.
 
-import { ROLE_LABEL, rolesLabel } from "./access";
+import { ROLE_LABEL, rolesLabel } from "./access/roles";
 import type {
   AnyNotificationKind,
   AuditCategory,

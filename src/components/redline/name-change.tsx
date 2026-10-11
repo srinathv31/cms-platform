@@ -1,4 +1,4 @@
-import type { NameChange } from "@/domain/redline";
+import type { NameChange } from "@/domain/redline/document";
 import { cn } from "@/lib/utils";
 
 // A rename between two versions, in the redline's marks: the old name struck through on the danger

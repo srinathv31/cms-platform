@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMMENT_REFUSALS } from "@/domain/comments";
-import { editLatest } from "@/domain/lifecycle";
+import { editLatest } from "@/domain/lifecycle/drafts";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";

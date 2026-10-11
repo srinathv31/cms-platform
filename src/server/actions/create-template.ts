@@ -13,7 +13,7 @@ import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starter
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
 import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
-import { createDraft } from "@/domain/lifecycle";
+import { createDraft } from "@/domain/lifecycle/drafts";
 import { check, refuse, serverAction } from "./kit";
 
 // New template, from a starter, on the server action kit (kit.ts). It sits apart from the other

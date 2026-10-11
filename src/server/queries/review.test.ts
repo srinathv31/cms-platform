@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
 import { COMMENT_REFUSALS } from "@/domain/comments";
 import { diffVariables } from "@/domain/contract";
-import { REFUSALS } from "@/domain/lifecycle";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";

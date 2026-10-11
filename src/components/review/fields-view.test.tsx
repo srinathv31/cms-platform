@@ -3,7 +3,7 @@ import { act, createRef, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { diffChannelFields } from "@/domain/redline";
+import { diffChannelFields } from "@/domain/redline/channel-fields";
 import type { Person } from "@/domain/review-types";
 import type { ThreadView } from "@/server/queries/threads";
 import type { JSONContent } from "@/domain/types";

@@ -6,7 +6,8 @@ import { contractDiff } from "@/domain/golive/contract-diff";
 import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
 import { apiVariables, contractJsonSchema } from "@/domain/golive/json-schema";
 import { noticeView } from "@/domain/golive/notices";
-import { contractBaseline, sunsetPassed } from "@/domain/lifecycle";
+import { contractBaseline } from "@/domain/lifecycle/baselines";
+import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import type {
   ApiContract,
   ApiError,

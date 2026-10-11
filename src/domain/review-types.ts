@@ -38,7 +38,7 @@ export type AuditAction =
   | "thread.reopened";
 
 /**
- * A `version.sunset_passed` row's details (`sweepSunsets` in lifecycle.ts): the version, the instant its
+ * A `version.sunset_passed` row's details (`sweepSunsets` in lifecycle/sunset.ts): the version, the instant its
  * renders stopped, and that instant's day in the business time zone, with the zone it was read in.
  */
 export type SunsetPassedDetails = {
@@ -174,7 +174,7 @@ export interface StepView {
 /** blockId of a thread about the whole version (a change request's reason). Shown above the first block. */
 export const DOCUMENT_THREAD = "doc";
 
-// ── Redline (domain/redline.ts) ─────────────────────────────────────────────
+// ── Redline (domain/redline/) ─────────────────────────────────────────────
 
 export type RedlineStatus = "unchanged" | "added" | "removed" | "changed" | "moved";
 

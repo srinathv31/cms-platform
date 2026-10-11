@@ -1,13 +1,13 @@
 import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { sweepSunsets, type PassedSunset, type SunsetFacts } from "@/domain/lifecycle";
+import { sweepSunsets, type PassedSunset, type SunsetFacts } from "@/domain/lifecycle/sunset";
 import { now } from "@/server/clock";
 import { db, type Db } from "@/server/db/client";
 import { auditEvents, templates, versions } from "@/server/db/schema/ucomp";
 import { readBusinessZone } from "./business-zone";
 import { inTransaction, writeEffects, type Tx } from "./effects";
 
-// The clock-driven sunset sweep (domain/lifecycle.ts `sweepSunsets`): for each sunset the demo clock has
+// The clock-driven sunset sweep (domain/lifecycle/sunset.ts `sweepSunsets`): for each sunset the demo clock has
 // passed, one `version.sunset_passed` audit row dated at the sunset, so the audit log and the Activity tab say
 // when a version stopped rendering, and one `sunset_passed` notice to each consumer of the template, in the
 // same transaction. It records; it decides nothing: whether a version renders is `sunsetPassed` at the moment

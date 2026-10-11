@@ -1,7 +1,7 @@
 // A redline: the diff of two versions, painted like the document itself.
 //
 // Server-safe (no hooks, no client APIs), so the review screen and the Versions tab can render it
-// wherever they like. It renders RedlineDoc JSON (domain/redline.ts) with the same static renderer,
+// wherever they like. It renders RedlineDoc JSON (domain/redline/) with the same static renderer,
 // schema, wrapper classes and chip component as <StaticDocument>, so the typography is the editor's.
 //
 //   inline        <ins> (green underline on a soft tint) and <del> (red strike on a soft tint), from

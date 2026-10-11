@@ -3,27 +3,20 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { DAY_MS, utcDay } from "@/domain/dates";
+import { changeRoles, keepInactive, reinstate, removeMember, suspendInactive } from "@/domain/access/members";
+import { decideRecertItem, recertPhase, recertProgress, startRecert } from "@/domain/access/recertification";
+import { firstName } from "@/domain/access/roles";
 import {
-  changeRoles,
-  decideRecertItem,
-  firstName,
   heldAsLastAdmin,
-  inactivity,
-  keepInactive,
   memberConsequences,
   recertFootnote,
   recertItemOutcome,
-  recertPhase,
-  recertProgress,
   recertRemoveConsequence,
-  reinstate,
-  removeMember,
   requestConsequences,
-  requestDecisionRefusal,
-  startRecert,
   startRecertConsequence,
-  suspendInactive,
-} from "@/domain/access";
+} from "@/domain/access/consequences";
+import { inactivity } from "@/domain/access/inactivity";
+import { requestDecisionRefusal } from "@/domain/access/requests";
 import {
   INACTIVITY_FLAG_DAYS,
   INACTIVITY_SUSPEND_DAYS,

@@ -3,7 +3,7 @@
 //
 // Server-safe like <RedlineDocument>, and painted by the same pieces: the static renderer, the editor's
 // schema, the chip component and the `redline` mark (<ins>/<del>), so a field's changes read exactly as a
-// paragraph's do. It renders `FieldRedline`s (domain/redline.ts `diffChannelFields`): the clean view is
+// paragraph's do. It renders `FieldRedline`s (domain/redline/channel-fields.ts `diffChannelFields`): the clean view is
 // the diff against no base (every field "unchanged"), so one component draws both.
 //
 //   layout "sections"  a message: each channel a section under its display heading ("Push notification"),
