@@ -213,7 +213,7 @@ export type PermissionResult = { ok: true } | Refused;
  * clears it. The server lays them over the version's stored `channel_fields`.
  */
 export interface DraftPatch extends ChannelFieldsPatch {
-  /** The rev the client last saw. A stale rev gets a `conflict` response carrying the current rev. */
+  /** The rev the client last saw. A stale rev gets a `draft_changed` refusal carrying the current rev. */
   rev: number;
   /** One per editing session (one page visit). */
   sessionKey: string;
@@ -225,8 +225,11 @@ export interface DraftPatch extends ChannelFieldsPatch {
   sampleSets?: SampleSet[];
 }
 
-export type DraftSaveError = "conflict" | "forbidden" | "not_draft" | "not_found" | "invalid";
-
+/**
+ * What an autosave answers: the new rev, or a refusal as every refusal is (`{ ok: false, code, reason }`,
+ * src/domain/refusals.ts). Its HTTP status is `statusOf` in src/server/drafts/http.ts; a stale `rev`
+ * (`draft_changed`) carries the current one.
+ */
 export type DraftSaveResponse =
   | { ok: true; rev: number; savedAt: string /* ISO, demo clock */ }
-  | { ok: false; error: DraftSaveError; rev?: number; message: string };
+  | (Refused & { rev?: number });

@@ -13,6 +13,7 @@ import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { AuditFilterBar } from "./audit-filters";
 import { AuditTable } from "./audit-table";
 import { AUDIT_CELL as at, AUDIT_ROW, AUDIT_TABLE, CHIP_ROW, auditGrid } from "./columns";
+import { ExportLink } from "./export-link";
 import { cn } from "@/lib/utils";
 
 type TeamParams = Promise<{ team: string }>;
@@ -31,7 +32,7 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
 /** The Export button and its skeleton are one width (10.75rem fits "Export 9,999 events"; wider only past that), so nothing shifts as it streams in. */
 const EXPORT_WIDTH = "w-[10.75rem] min-w-fit";
 
-/** The Export link follows the filters (same query, no page limit); a download, so a plain anchor. */
+/** The Export link follows the filters (same query, no page limit); a download anchor that reads a refusal (`ExportLink`). */
 async function ExportAction({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
   const data = await load(params, searchParams);
   const label = `Export ${plural(data.total, "event")}`;
@@ -43,12 +44,7 @@ async function ExportAction({ params, searchParams }: { params: TeamParams; sear
       </Button>
     );
   }
-  return (
-    <Button variant="outline" render={<a href={data.csvHref} download />} nativeButton={false} className={EXPORT_WIDTH}>
-      <Download aria-hidden strokeWidth={1.75} data-icon="inline-start" />
-      {label}
-    </Button>
-  );
+  return <ExportLink href={data.csvHref} label={label} className={EXPORT_WIDTH} />;
 }
 
 async function AuditBody({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {

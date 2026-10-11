@@ -144,7 +144,7 @@ describe("importTemplate", () => {
   it("checks the permission first: no create rights, or an unknown team, is 403 with the reason", async () => {
     for (const [who, team] of [["taylor", "coral-offers"], ["sam", "coral-offers"], ["maya", "nope"], ["maya", ""]] as const) {
       const res = await run(who, { name: "x.doc", bytes: new Uint8Array([0xd0, 0xcf]) }, team);
-      expect(res).toEqual({ ok: false, code: "permission", reason: REASONS.generic.reason });
+      expect(res).toEqual({ ok: false, code: "generic", reason: REASONS.generic.reason });
       expect(importStatus(res)).toBe(403);
     }
   });
@@ -158,11 +158,11 @@ describe("importTemplate", () => {
     ["notWord", { name: "fake.docx", bytes: new Uint8Array([0x25, 0x50, 0x44, 0x4e, 0x0d, 0x0a, 0x1a, 0x0a]) }, 415],
     ["unreadable", null, 400],
     ["tooLong", { name: "a.txt", bytes: new Uint8Array(IMPORT_LIMITS.maxChars + 1).fill(0x61) }, 400],
-  ] as const)("refuses %s with its sentence and status, writing nothing", async (code, file, status) => {
+  ] as const)("refuses %s with its code, sentence and status, writing nothing", async (name, file, status) => {
     const before = await db.select().from(templates);
     const folders = readdirSync(root).length;
     const res = await run("maya", file);
-    expect(res).toEqual({ ok: false, code, reason: IMPORT_REFUSALS[code] });
+    expect(res).toEqual({ ok: false, code: IMPORT_REFUSALS[name].code, reason: IMPORT_REFUSALS[name].reason });
     expect(importStatus(res)).toBe(status);
     expect(await db.select().from(templates)).toHaveLength(before.length);
     expect(readdirSync(root)).toHaveLength(folders);
@@ -181,7 +181,11 @@ describe("importTemplate", () => {
     const before = await db.select().from(templates);
     const folders = readdirSync(root).length;
     const res = await run("maya", { name: "merged.docx", bytes });
-    expect(res).toEqual({ ok: false, code: "content", reason: `${IMPORT_REFUSALS.content} ${DOCUMENT_MESSAGES.tableShape}` });
+    expect(res).toEqual({
+      ok: false,
+      code: "import_content",
+      reason: `This file can't be imported as it is. ${DOCUMENT_MESSAGES.tableShape}`,
+    });
     expect(importStatus(res)).toBe(400);
     expect(await db.select().from(templates)).toHaveLength(before.length);
     expect(readdirSync(root)).toHaveLength(folders);

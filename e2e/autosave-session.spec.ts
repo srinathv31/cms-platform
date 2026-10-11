@@ -129,6 +129,11 @@ test("after another session saves first, the page turns read-only and offers Rel
     const { rev } = await theDraft();
     const res = await page.request.put(`/api/drafts/${draftId}`, { data: { rev: Number(rev), sessionKey: randomUUID(), name: ELSEWHERE } });
     expect(res.status()).toBe(200);
+
+    // A save from the rev it just left is refused in the shape every refusal has, carrying the current rev.
+    const stale = await page.request.put(`/api/drafts/${draftId}`, { data: { rev: Number(rev), sessionKey: randomUUID(), name: "Too late" } });
+    expect(stale.status()).toBe(409);
+    expect(await stale.json()).toEqual({ ok: false, code: "draft_changed", reason: "This draft changed. Try again.", rev: Number(rev) + 1 });
   });
 
   await test.step("Her next save is refused: the page is read-only, the status says so, and Reload shows", async () => {

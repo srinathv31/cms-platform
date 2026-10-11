@@ -11,11 +11,16 @@
 //     change starts over.
 //   - A new editing session starts (a new session key, so a new audit row) when the last saved
 //     change is more than 30 minutes old.
-//   - `conflict`, `forbidden`, `not_draft` and `not_found` stop saving for good: retrying cannot
-//     fix them, and a conflict must never be overwritten silently. The state says so (`stopped`),
-//     so the page can stop taking edits it would drop. `invalid` waits for the next change.
+//   - A refusal stops saving for good, because retrying cannot fix it and a conflict must never be
+//     overwritten silently: `draft_changed` (another session saved first), the permission refusal
+//     (`generic`), `version_not_draft` and `version_gone`, and any code not named below. The state
+//     says so (`stopped`), so the page can stop taking edits it would drop. A refusal of the
+//     patch itself (`WAITS_FOR_EDIT`: it doesn't parse, a document or the channels fail their check,
+//     it's too large) waits for the next change. What each means is decided by its `code`, never its
+//     sentence (decision 0041).
 
-import type { DraftPatch, DraftSaveError, DraftSaveResponse } from "@/domain/types";
+import type { RefusalCode } from "@/domain/refusals";
+import type { DraftPatch, DraftSaveResponse } from "@/domain/types";
 
 export type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
@@ -88,21 +93,33 @@ export const RETRYING = "Not saved. Retrying…";
 export const OFFLINE = "Not saved. Check your connection.";
 
 /**
- * What the author reads for each refusal. All but `invalid` stop saving, and say plainly that the
- * changes not yet saved never will be; the save status offers Reload beside them.
+ * The refusals of the patch itself: what the author fixes by editing, so saving waits for the next
+ * change instead of stopping. Their sentence is the server's, shown as it is.
  */
-export function failureMessage(error: DraftSaveError, serverMessage: string): string {
-  switch (error) {
-    case "conflict":
+const WAITS_FOR_EDIT: readonly RefusalCode[] = ["invalid_input", "draft_too_large", "no_channels", "channel_unavailable"];
+
+/** Whether the refusal ends saving from this page: retrying can't fix it, and nothing more is sent. */
+export function stopsSaving({ code }: { code: RefusalCode }): boolean {
+  return !WAITS_FOR_EDIT.includes(code);
+}
+
+/**
+ * What the author reads for each refusal. A refusal that stops saving says plainly that the changes
+ * not yet saved never will be; the save status offers Reload beside it. One that waits for an edit
+ * shows the server's sentence.
+ */
+export function failureMessage(refusal: { code: RefusalCode; reason: string }): string {
+  switch (refusal.code) {
+    case "draft_changed":
       return "Your latest changes can't be saved — this draft changed elsewhere.";
-    case "forbidden":
+    case "generic":
       return "Your latest changes can't be saved — you can no longer edit this draft.";
-    case "not_draft":
+    case "version_not_draft":
       return "Your latest changes can't be saved — this version is no longer a draft.";
-    case "not_found":
+    case "version_gone":
       return "Your latest changes can't be saved — this draft no longer exists.";
-    case "invalid":
-      return `Not saved. ${serverMessage}`;
+    default:
+      return stopsSaving(refusal) ? `Your latest changes can't be saved. ${refusal.reason}` : `Not saved. ${refusal.reason}`;
   }
 }
 
@@ -203,8 +220,8 @@ export function createAutosave(options: AutosaveOptions): Autosave {
       // The answer is final for these fields: keep them, but don't resend until the author changes something.
       restore(fields, since);
       failures = 0;
-      error = failureMessage(response.error, response.message);
-      if (response.error !== "invalid") {
+      error = failureMessage(response);
+      if (stopsSaving(response)) {
         stopped = true;
         clearTimer();
       }

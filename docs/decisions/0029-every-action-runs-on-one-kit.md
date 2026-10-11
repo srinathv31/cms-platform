@@ -1,6 +1,9 @@
 # 0029. Every server action runs on one kit, and the browser runs them with one hook
 
 Status: Accepted
+Amended 2026-10-11: the last Consequences line no longer holds: the autosave route, import and the audit export now
+refuse in the same `{ ok: false, code, reason }` shape ([0041](0041-routes-refuse-in-the-actions-shape.md), A3);
+only `/api/v1` waits for the Java API.
 Date: 2026-10-09
 
 ## Context

@@ -1,7 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { Worker, type WorkerOptions } from "node:worker_threads";
-import { IMPORT_LIMITS, type ImportRefusalCode } from "@/domain/import-types";
+import { IMPORT_LIMITS, type ImportRefusalName } from "@/domain/import-types";
 import type { PdfPageText } from "@/domain/import";
 
 // Runs the untrusted half of a .docx or .pdf conversion (convert-worker.mjs) in a worker thread with
@@ -33,7 +33,7 @@ export const ISOLATION_LIMITS = {
 
 export type IsolatedDocx = { ok: true; html: string; messages: string[]; images: number };
 export type IsolatedPdf = { ok: true; pages: PdfPageText[]; numPages: number };
-type Refused = { ok: false; code: ImportRefusalCode };
+type Refused = { ok: false; code: ImportRefusalName };
 
 export interface IsolationOptions {
   maxHeapMb?: number;

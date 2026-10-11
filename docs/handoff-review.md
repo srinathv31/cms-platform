@@ -443,7 +443,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 - **Status:** Open
 - **Where:** `src/app/api/drafts/[versionId]/route.ts` line 15
-- **What happens:** Server actions get an Origin check from Next.js; the autosave `PUT` and import `POST` rely on the cookie being SameSite=Lax. The drafts route also answers `not_found` before `forbidden`, which reveals whether a version id exists on another team.
+- **What happens:** Server actions get an Origin check from Next.js; the autosave `PUT` and import `POST` rely on the cookie being SameSite=Lax. The drafts route also answers `version_gone` (404) before the permission refusal `generic` (403), which reveals whether a version id exists on another team.
 - **Fix:** Check `Origin` or `Sec-Fetch-Site` in the BFF route handlers; answer the same way for unknown and forbidden.
 - **Evidence:** traced
 
@@ -761,7 +761,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A3 · Medium: Six error shapes, and some actions throw
 
-- **Status:** Partly fixed. Every server action but the demo tools now runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); still to do are the autosave route's `DraftSaveResponse` (`error`, `message`), import's own codes, the audit export's plain-text errors, and `/api/v1` problem details, which wait for the Java API ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)).
+- **Status:** Partly fixed. Every server action but the demo tools runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); the autosave route, import (its two reads included) and the audit export now refuse in that same `{ ok: false, code, reason }` shape too, with codes from the refusal tables ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md), [decision 0041](decisions/0041-routes-refuse-in-the-actions-shape.md)); only `/api/v1` problem details remain, and they wait for the Java API.
 - **Where:** `src/server/actions/templates.ts` line 57
 - **What happens:** `/api/v1` uses `{error: {code, message, details}}`; drafts, imports and palette each have their own; audit export returns text. `startDraft` and `createTemplate` throw, so in production the user sees a generic message instead of the domain's sentence.
 - **Fix:** One result kit for actions and RFC 9457 problem details for routes.

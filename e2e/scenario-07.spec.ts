@@ -240,6 +240,13 @@ test.describe("scenario 7: teams and roles", () => {
       // A download anchor: Base UI gives it role "button", so find it by what it is.
       const exportLink = page.locator('a[href*="/audit/export"]').filter({ hasText: /^Export \d{1,3}(,\d{3})* events?$/ });
       await expect(exportLink).toHaveAttribute("href", /\/all\/audit\/export\?.*person=riley/);
+      // A plain click saves the file under the name the server gave it.
+      const [download] = await Promise.all([page.waitForEvent("download"), exportLink.click()]);
+      expect(download.suggestedFilename()).toMatch(/^stencil-audit-all-\d{4}-\d{2}-\d{2}\.csv$/);
+      // A refusal is the same { ok, code, reason } as every other, never a file.
+      const refused = await page.request.get("/nowhere/audit/export");
+      expect(refused.status()).toBe(404);
+      expect(await refused.json()).toEqual({ ok: false, code: "space_unavailable", reason: "This team isn't available to you." });
       await beat(page, 900);
       await shoot(page, "taylor-audit-riley");
 

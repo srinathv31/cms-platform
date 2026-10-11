@@ -4,6 +4,9 @@ Status: Accepted
 Amended 2026-10-11: the simulator's two reads are now GET routes too (`/sim/templates/search` and
 `/sim/deliveries/[deliveryId]/view`) and `src/simulator/actions.ts` holds its four writes only, so the last
 Consequences line below no longer holds (handoff review N19, PR #52).
+Amended 2026-10-11: internal routes no longer answer errors in five shapes, as the third Consequences line says:
+they refuse as `{ ok: false, code, reason }`, import's two reads included
+([0041](0041-routes-refuse-in-the-actions-shape.md), A3).
 Date: 2026-10-09
 
 ## Context

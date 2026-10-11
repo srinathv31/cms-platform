@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent } from "@/domain/types";
+import type { RefusalCode } from "@/domain/refusals";
+import type { DraftPatch, DraftSaveResponse, JSONContent } from "@/domain/types";
 import {
   OFFLINE,
   RETRYING,
   createAutosave,
   failureMessage,
   mergeFields,
+  stopsSaving,
   type AutosaveOptions,
   type SendOptions,
 } from "./autosave-scheduler";
 
 const doc = (text: string): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
 const saved = (rev: number): DraftSaveResponse => ({ ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" });
-const refused = (error: DraftSaveError, message = "msg", rev?: number): DraftSaveResponse =>
-  rev === undefined ? { ok: false, error, message } : { ok: false, error, rev, message };
+const refused = (code: RefusalCode, reason = "msg", rev?: number): DraftSaveResponse =>
+  rev === undefined ? { ok: false, code, reason } : { ok: false, code, rev, reason };
 
 interface Call {
   patch: DraftPatch;
@@ -83,14 +85,46 @@ describe("mergeFields", () => {
 
 describe("failureMessage", () => {
   it("says the same thing for each refusal, in a few words", () => {
-    expect(failureMessage("conflict", "x")).toBe("Your latest changes can't be saved — this draft changed elsewhere.");
-    expect(failureMessage("invalid", "The name must be 1 to 120 characters.")).toBe("Not saved. The name must be 1 to 120 characters.");
+    expect(failureMessage({ code: "draft_changed", reason: "x" })).toBe("Your latest changes can't be saved — this draft changed elsewhere.");
+    expect(failureMessage({ code: "invalid_input", reason: "The name must be 1 to 120 characters." })).toBe(
+      "Not saved. The name must be 1 to 120 characters.",
+    );
   });
 
   it("says plainly that what wasn't saved never will be, when saving stops, with no instruction (Reload is a control)", () => {
-    for (const error of ["conflict", "forbidden", "not_draft", "not_found"] as const) {
-      expect(failureMessage(error, "x")).toMatch(/^Your latest changes can't be saved — /);
-      expect(failureMessage(error, "x")).not.toMatch(/reload/i);
+    for (const code of ["draft_changed", "generic", "version_not_draft", "version_gone"] as const) {
+      expect(failureMessage({ code, reason: "x" }), code).toMatch(/^Your latest changes can't be saved — /);
+      expect(failureMessage({ code, reason: "x" }), code).not.toMatch(/reload/i);
+    }
+  });
+
+  it("branches on the code: another sentence for the same code changes nothing", () => {
+    expect(failureMessage({ code: "generic", reason: "Not allowed, sorry." })).toBe(
+      "Your latest changes can't be saved — you can no longer edit this draft.",
+    );
+    expect(failureMessage({ code: "version_gone", reason: "Gone." })).toBe("Your latest changes can't be saved — this draft no longer exists.");
+  });
+
+  it("shows the server's sentence for a refusal of the patch, and for a code it doesn't know", () => {
+    expect(failureMessage({ code: "channel_unavailable", reason: "That channel isn't available for this content type." })).toBe(
+      "Not saved. That channel isn't available for this content type.",
+    );
+    expect(failureMessage({ code: "a_new_code" as RefusalCode, reason: "Something new." })).toBe(
+      "Your latest changes can't be saved. Something new.",
+    );
+  });
+});
+
+describe("stopsSaving", () => {
+  it("is false for the refusals of the patch itself, which the next change can fix", () => {
+    for (const code of ["invalid_input", "draft_too_large", "no_channels", "channel_unavailable"] as const) {
+      expect(stopsSaving({ code }), code).toBe(false);
+    }
+  });
+
+  it("is true for every other code, so a refusal nobody planned for never overwrites silently", () => {
+    for (const code of ["draft_changed", "generic", "version_not_draft", "version_gone", "a_new_code"] as RefusalCode[]) {
+      expect(stopsSaving({ code }), code).toBe(true);
     }
   });
 });
@@ -554,15 +588,15 @@ describe("a request that never comes back", () => {
 
 describe("answers that stop saving", () => {
   it.each([
-    ["conflict", "Your latest changes can't be saved — this draft changed elsewhere."],
-    ["forbidden", "Your latest changes can't be saved — you can no longer edit this draft."],
-    ["not_draft", "Your latest changes can't be saved — this version is no longer a draft."],
-    ["not_found", "Your latest changes can't be saved — this draft no longer exists."],
-  ] as const)("%s: shows the message, says it has stopped, and never sends again", async (error, text) => {
+    ["draft_changed", "Your latest changes can't be saved — this draft changed elsewhere."],
+    ["generic", "Your latest changes can't be saved — you can no longer edit this draft."],
+    ["version_not_draft", "Your latest changes can't be saved — this version is no longer a draft."],
+    ["version_gone", "Your latest changes can't be saved — this draft no longer exists."],
+  ] as const)("%s: shows the message, says it has stopped, and never sends again", async (code, text) => {
     const { autosave, calls, tick, answer } = setup();
     autosave.save({ body: doc("mine") });
     await tick(800);
-    await answer(refused(error, "server words", 9));
+    await answer(refused(code, "server words", 9));
 
     expect(autosave.getState()).toEqual({ status: "error", error: text, stopped: true });
 
@@ -579,7 +613,7 @@ describe("answers that stop saving", () => {
     await tick(800);
     const listener = vi.fn();
     autosave.subscribe(listener);
-    await answer(refused("conflict"));
+    await answer(refused("draft_changed"));
     expect(listener).toHaveBeenCalledTimes(1);
     const state = autosave.getState();
 
@@ -597,7 +631,7 @@ describe("answers that stop saving", () => {
     await fail();
     expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
     await tick(1_000);
-    await answer(refused("invalid", "The name must be 1 to 120 characters."));
+    await answer(refused("invalid_input", "The name must be 1 to 120 characters."));
     expect(autosave.getState()).toEqual({ status: "error", error: "Not saved. The name must be 1 to 120 characters." });
   });
 
@@ -605,17 +639,17 @@ describe("answers that stop saving", () => {
     const { autosave, calls, tick, answer } = setup();
     autosave.save({ name: "A" });
     await tick(800);
-    await answer(refused("conflict", "x", 12));
+    await answer(refused("draft_changed", "x", 12));
     autosave.save({ name: "B" });
     await tick(5000);
     expect(calls).toHaveLength(1);
   });
 
-  it("invalid: shows the server's words, does not retry, and sends again on the next change", async () => {
+  it("invalid_input: shows the server's words, does not retry, and sends again on the next change", async () => {
     const { autosave, calls, tick, answer } = setup();
     autosave.save({ name: "x".repeat(200), body: doc("fine") });
     await tick(800);
-    await answer(refused("invalid", "The name must be 1 to 120 characters."));
+    await answer(refused("invalid_input", "The name must be 1 to 120 characters."));
     expect(autosave.getState()).toEqual({ status: "error", error: "Not saved. The name must be 1 to 120 characters." });
 
     await tick(120_000);

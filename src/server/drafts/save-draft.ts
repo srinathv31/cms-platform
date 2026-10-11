@@ -5,7 +5,7 @@ import { db } from "@/server/db/client";
 import { accessRefusal, applyDraftPatch } from "./apply-patch";
 
 /**
- * The `not_found` or `forbidden` answer for this viewer and version, or null when they may save to it.
+ * The `version_gone` or permission refusal for this viewer and version, or null when they may save to it.
  * The route asks this before it reads the body.
  */
 export function draftAccessRefusal(viewer: Viewer, versionId: string) {
@@ -15,7 +15,7 @@ export function draftAccessRefusal(viewer: Viewer, versionId: string) {
 /**
  * Saves an autosave patch to a draft: permission check, state and rev check, the write, and the
  * merged audit row, in one transaction. `patch` must come from `parseDraftPatch`.
- * Returns the contract's response; the route maps `error` to an HTTP status.
+ * Returns the contract's response; the route maps a refusal's `code` to an HTTP status.
  */
 export async function saveDraft(viewer: Viewer, versionId: string, patch: DraftPatch): Promise<DraftSaveResponse> {
   // Read the demo clock before the transaction opens: it queries the database on its own connection.

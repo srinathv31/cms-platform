@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { CHANNEL_FIELD_IDS, type ChannelFieldId } from "@/domain/channel-fields";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
@@ -20,7 +21,7 @@ import { changedFields } from "./audit-merge";
 export const MAX_BODY_SIZE = 2_000_000;
 export const MAX_NAME_LENGTH = 120;
 
-export const TOO_LARGE_MESSAGE = "The draft is too large to save.";
+export const TOO_LARGE_MESSAGE = REQUEST_REFUSALS.draftTooLarge.reason;
 
 const MAX_DEPTH = 40;
 const MAX_NODES = 100_000;
