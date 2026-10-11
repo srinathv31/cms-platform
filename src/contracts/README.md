@@ -11,7 +11,9 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
   import `@/domain` or `@/server`, so anything this file pulled in would cross that boundary. A self-contained file
   can also be lifted out or turned into an API description without bringing app code along.
 - Only what a consumer can see: `ApiVersionState` is `active | superseded | revoked`, and `ApiRenderRequest` has no
-  `"draft"` version or `preview` flag (both CMS-only). Dates are ISO 8601 strings on the demo clock.
+  `"draft"` version, `preview` flag or `round`. Those are Stencil's own preview route's
+  (`POST /api/templates/{id}/preview`, not part of this contract); `/api/v1` refuses a draft and ignores `preview` and
+  `round` ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)). Dates are ISO 8601 strings on the demo clock.
 - A sunset is an instant. `sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` or `sunset_passed`
   notice) is when renders of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in
   Stencil's business time zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
@@ -35,8 +37,8 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 | `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind`, `ApiPage` | [notices/route.ts](<../app/api/v1/consumers/[consumerId]/notices/route.ts>) |
 | `POST /api/v1/templates/{id}/render` | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response`, `ApiPushResponse`, `ApiSmsResponse` (a raw PDF or HTML answer has no type); errors `ApiPushTooLargeDetails`, `ApiSmsTooLongDetails` | [render/route.ts](<../app/api/v1/templates/[templateId]/render/route.ts>) |
 
-Every request carries `X-Consumer-Id` (a registered consumer); only the render route waives it, for the CMS's own
-previews.
+Every request carries `X-Consumer-Id` (a registered consumer), the render route's included. `/api/v1` serves consumers
+only: it never serves a draft or a version in review, and it reads no session or cookie.
 
 ## Channels: documents and messages
 
@@ -121,6 +123,9 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | 413 | `body_too_large` |
 | 422 | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
 | 500 | `render_failed` |
+
+`preview_forbidden` is Stencil's own preview route's: `/api/v1` never returns it (it stays in `ApiErrorCode` so the
+two code lists match).
 
 `consumer_not_found` and `consumer_mismatch` belong to the notices route. The other 15 are the render codes
 (`RenderErrorCode` in `src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS`

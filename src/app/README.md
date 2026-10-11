@@ -100,11 +100,12 @@ decisions were in the product; they are recoverable from the `archive/design-moc
 | `GET /api/templates/[templateId]/submit-summary` | [route.ts](./api/templates/[templateId]/submit-summary/route.ts) | Browser: the submit dialog and its Refresh summary ([workspace-actions.tsx](../components/workspace/workspace-actions.tsx)). |
 | `GET /api/templates/[templateId]/copilot-prompt` | [route.ts](./api/templates/[templateId]/copilot-prompt/route.ts) | Browser: the Copilot prompt dialog ([copilot-prompt.tsx](../components/workspace/copilot/copilot-prompt.tsx)). |
 | `GET /api/templates/[templateId]/integration` | [route.ts](./api/templates/[templateId]/integration/route.ts) | Browser: the SHARE panel, on open and as a prefetch ([workspace-share.tsx](../components/workspace/workspace-share.tsx)). |
+| `POST /api/templates/[templateId]/preview` | [route.ts](./api/templates/[templateId]/preview/route.ts) | Browser: the Preview (editor, workspace, review screen), per render ([render-preview.ts](../components/preview/render-preview.ts)). The session's person, any state ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)). |
 | `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV; [export-link.tsx](../components/audit/export-link.tsx) shows a refusal). |
 | `GET /api/v1/templates?q=&limit=&after=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/templates/[templateId]?version=&since=` | [route.ts](./api/v1/templates/[templateId]/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
-| `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Browser preview with `preview: true` ([render-preview.ts](../components/preview/render-preview.ts)); simulator and outside consumers with `X-Consumer-Id`. |
+| `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Simulator and outside consumers with `X-Consumer-Id`. Consumers only: never a draft or a version in review, and no session or cookie. |
 | `GET /sim/deliveries/[deliveryId]/file` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts) | Simulator: the customer views' iframes and PDF. |
 | `GET /sim/deliveries/[deliveryId]/view` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/view/route.ts) | Simulator: the customer drawer, when it opens on a delivery ([offer-view.tsx](../simulator/ui/offer-view.tsx)). |
 | `GET /sim/templates/search?q=` | [route.ts](./(simulator)/sim/templates/search/route.ts) | Simulator: the link flow's template search, debounced ([link-flow.tsx](../simulator/ui/link-flow.tsx)). |
@@ -185,8 +186,8 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
   [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
-  Render requires it unless `preview: true`, which uses the persona cookie instead, and checks it in
-  [render-template.ts](../server/render/render-template.ts).
+  Render requires it too, and checks it in [render-template.ts](../server/render/render-template.ts). `/api/v1`
+  reads no cookie and no session: Stencil's own previews are `POST /api/templates/[templateId]/preview`.
 - Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
   `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
   refuse a cursor from another list, or a notices cursor from before a demo reset (`noticeEpoch`), with
@@ -222,6 +223,13 @@ refuses, 404 for an unknown template or version, 409 when there is nothing to re
 The browser calls them through `readTemplate()` in [lib/template-reads.ts](../lib/template-reads.ts). A request
 without a persona cookie acts as the default persona, as every page does, until real sign-in
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
+
+**The preview** (`POST /api/templates/[templateId]/preview`) is the one POST among them, because it carries the sample
+values. It reads the person from the session (`getViewer()`), renders through `renderTemplate` with `preview: true`,
+and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
+errors as the consumer render route, through [server/api/render-http.ts](../server/api/render-http.ts) and
+`errorResponse`. It takes `version` as `"draft"` or a number, an optional `round`, and any state previews
+([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 
 **The palette's search** (`/api/palette/[space]?q=&template=`) is a read of the same kind: the route passes the
 viewer and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with

@@ -28,16 +28,18 @@ import { findRound } from "@/server/queries/find-round";
 import { runEngine, type RenderBody } from "./engine";
 import { writeRenderLog } from "./log";
 
-// The render pipeline behind POST /api/v1/templates/{templateId}/render. The editor preview, the
-// review screen and the simulator all come through here, so an approver sees what a customer gets.
+// The render pipeline behind two routes: POST /api/v1/templates/{templateId}/render (consumers, with
+// `preview: false`) and POST /api/templates/{templateId}/preview (Stencil's own preview, for the
+// signed-in person: the editor, the workspace and the review screen, with `preview: true`). Both come
+// through here, so an approver sees what a customer gets.
 //
 //   0 the target: push needs a platform, no other channel takes one, push and SMS take no encoding
 //     → 400 bad_request (not logged)
 //   1 template (+ content type)  → 404 template_not_found
 //   2 version, or the open draft → 404 version_not_found          (nothing is logged before here)
 //     A number is its head (`findRound`): the released row, else its latest round, which a consumer is
-//     refused at 4. A preview may name a round (`round`, `?round=` on the review screen); a consumer's
-//     `round` never reaches here (the route drops it).
+//     refused at 4. A preview may name a round (`round`, `?round=` on the review screen); the consumer
+//     route has no round to pass.
 //   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
 //   4 version rules (consumers only) → 409 / 410
 //   5 channel: content type allows it → 422 channel_not_allowed; version has it → 422 channel_not_enabled

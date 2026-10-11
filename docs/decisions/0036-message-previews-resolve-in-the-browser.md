@@ -1,6 +1,7 @@
 # 0036. Message previews resolve in the browser, through the render's own function
 
 Status: Accepted
+Amended 2026-10-11: the document channels' preview posts to Stencil's own `/api/templates/{id}/preview`, not `/api/v1/.../render` with `preview: true` (A1, [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 Date: 2026-10-09
 
 ## Context

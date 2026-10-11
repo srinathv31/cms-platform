@@ -1,6 +1,7 @@
-// The preview's one call to the render API: POST /api/v1/templates/{id}/render with `preview: true`,
-// the same route (and so the same output) the review screen and the consumer simulator get. The
-// contract is src/domain/render/types.ts.
+// The preview's one call to the render engine: POST /api/templates/{id}/preview, Stencil's own route
+// (it reads the session; decision 0047), for the editor, the workspace and the review screen. It
+// renders through the same engine as the consumer API, so what an approver sees is what a customer
+// gets. The contract is src/domain/render/types.ts. Nothing in this app's UI calls /api/v1.
 //
 // Only the document channels (PDF, Web, Email) come from the route. Push and SMS are plain text, so
 // the preview renders them in the browser with the route's own function (message-preview.ts,
@@ -57,10 +58,10 @@ export async function renderPreview({
 }: RenderPreviewRequest): Promise<RenderPreviewResult> {
   let response: Response;
   try {
-    response = await fetch(`/api/v1/templates/${encodeURIComponent(templateId)}/render`, {
+    response = await fetch(`/api/templates/${encodeURIComponent(templateId)}/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, ...(version !== "draft" && round !== null ? { round } : {}), channel, values, preview: true }),
+      body: JSON.stringify({ version, ...(version !== "draft" && round !== null ? { round } : {}), channel, values }),
       signal,
     });
   } catch (error) {

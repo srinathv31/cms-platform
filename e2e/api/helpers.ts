@@ -254,9 +254,27 @@ export async function render(
   return { res, correlationId: cid };
 }
 
+export const previewPath = (templateId: string) => `/api/templates/${templateId}/preview`;
+
+/**
+ * POSTs to Stencil's own preview route, which reads the person from the persona cookie (a context from
+ * `asPersona`). It takes no X-Consumer-Id. A correlation id is added unless `correlationId` is null.
+ */
+export async function preview(
+  request: APIRequestContext,
+  { templateId, body, correlationId, headers = {} }: Omit<Call, "consumer">,
+): Promise<{ res: APIResponse; correlationId: string | null }> {
+  const cid = correlationId === null ? null : (correlationId ?? correlation("preview"));
+  const res = await request.post(previewPath(templateId), {
+    data: body,
+    headers: { ...(cid === null ? {} : { "X-Correlation-Id": cid }), ...headers },
+  });
+  return { res, correlationId: cid };
+}
+
 /**
  * Runs `fn` with a request context that carries the persona cookie (as the persona switcher sets
- * it), then disposes the context. The cookie only matters to previews.
+ * it), then disposes the context. The cookie only matters to the preview route.
  */
 export async function asPersona<T>(
   playwright: PlaywrightWorkerArgs["playwright"],

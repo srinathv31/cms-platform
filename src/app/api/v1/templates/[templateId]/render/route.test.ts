@@ -56,7 +56,6 @@ const persona = (userId: string, teamIds: string[]): Viewer => ({
   memberships: teamIds.map((teamId) => ({ teamId, teamSlug: teamId, teamName: teamId, roles: ["author"], status: "active" })),
 });
 const maya = persona("maya", ["coral-offers"]);
-const morgan = persona("morgan", []);
 
 beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(maya);
@@ -233,54 +232,53 @@ describe("POST …/render: superseded versions", () => {
   });
 });
 
-describe("POST …/render: previews", () => {
-  it("previews the open draft as the persona, tagged in the headers and in render_log", async () => {
-    const res = await post(
-      "annual-fee-waiver",
-      { version: "draft", channel: "pdf", values: CUSTOMER, preview: true },
-      { "X-Correlation-Id": "preview-1", "X-Consumer-Id": "coral" },
-    );
-    expect(res.status).toBe(200);
-    expect(res.headers.get("X-Stencil-Version")).toBe("draft");
-    expect(res.headers.get("X-Stencil-Preview")).toBe("true");
-    expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["annual-fee-waiver"]}-draft.pdf"`);
-    expect(getViewer).toHaveBeenCalledTimes(1);
-    expect(await logRows("preview-1")).toEqual([
-      expect.objectContaining({ isPreview: true, consumerId: null, versionNumber: null, channel: "pdf", platform: null, outcome: "ok" }),
-    ]);
-  }, 30_000);
-
-  it("doesn't need X-Consumer-Id", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, preview: true }, {});
-    expect(res.status).toBe(200);
-  });
-
-  it("is forbidden (403) for a persona without the template's team, and logged as a preview", async () => {
-    vi.mocked(getViewer).mockResolvedValue(morgan);
-    const res = await post(
-      "balance-transfer",
-      { version: 2, channel: "web", values: CUSTOMER, preview: true },
-      { "X-Correlation-Id": "preview-forbidden" },
-    );
-    await expectError(res, 403, "preview_forbidden", "You can't preview this template.");
-    expect(await logRows("preview-forbidden")).toEqual([
-      expect.objectContaining({ isPreview: true, consumerId: null, outcome: "error", errorCode: "preview_forbidden" }),
-    ]);
-  });
-});
-
-// The CMS preview may name a round of a number (the review screen's `?round=`); a consumer never sees
-// rounds, so without `preview` the field is dropped unread and the number is its head.
-describe("POST …/render: rounds", () => {
+// /api/v1 serves consumers only (decision 0047): what used to be a CMS preview is refused like any
+// consumer request that names no consumer, a draft, or a version that isn't released. The route never
+// reads the session, so a signed-in person gets nothing a consumer wouldn't. Stencil's own preview is
+// POST /api/templates/[templateId]/preview.
+describe("POST …/render: consumers only", () => {
   const FEE = { ...CUSTOMER, annual_fee: "95" };
 
-  it("a preview of a round renders that round, labelled in the filename; the version header stays the number", async () => {
-    const res = await post("cash-back", { version: 3, round: 1, channel: "pdf", values: FEE, preview: true }, {});
-    expect(res.status).toBe(200);
-    expect(res.headers.get("X-Stencil-Version")).toBe("3");
-    expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["cash-back"]}-v3-round-1.pdf"`);
-  }, 30_000);
+  it("refuses the open draft, with or without `preview` and a consumer, and never asks who is signed in", async () => {
+    for (const [body, headers] of [
+      [{ version: "draft", channel: "pdf", values: CUSTOMER, preview: true }, {}],
+      [{ version: "draft", channel: "pdf", values: CUSTOMER, preview: true }, CORAL],
+      [{ version: "draft", channel: "pdf", values: CUSTOMER }, CORAL],
+    ] as const) {
+      const res = await post("annual-fee-waiver", body, { ...headers, "X-Correlation-Id": "no-draft" });
+      await expectError(res, 400, "bad_request", "version must be a version number.");
+    }
+    expect(getViewer).not.toHaveBeenCalled();
+    expect(await logRows("no-draft")).toEqual([]);
+  });
 
+  it("refuses a preview of a released version that names no consumer: the cookie's person is not a consumer", async () => {
+    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, preview: true }, { "X-Correlation-Id": "no-consumer" });
+    await expectError(res, 400, "consumer_required", "X-Consumer-Id is required.");
+    expect(getViewer).not.toHaveBeenCalled();
+    expect(await logRows("no-consumer")).toEqual([]);
+  });
+
+  it("serves a version in review to nobody, `preview` or not: a consumer is refused it, and it is logged as a consumer's", async () => {
+    for (const preview of [true, false, "yes"]) {
+      const res = await post("cash-back", { version: 3, channel: "web", values: FEE, preview }, { ...CORAL, "X-Correlation-Id": `in-review-${preview}` });
+      await expectError(res, 409, "version_not_released", "Version 3 is in review. Version 2 is active.");
+      expect(await logRows(`in-review-${preview}`)).toEqual([
+        expect.objectContaining({ isPreview: false, consumerId: "coral", outcome: "error", errorCode: "version_not_released" }),
+      ]);
+    }
+    expect(getViewer).not.toHaveBeenCalled();
+  });
+
+  it("renders a released version as a consumer whatever `preview` says, with no preview header and no session read", async () => {
+    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, preview: true }, { ...CORAL, "X-Correlation-Id": "released" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Stencil-Preview")).toBeNull();
+    expect(getViewer).not.toHaveBeenCalled();
+    expect(await logRows("released")).toEqual([expect.objectContaining({ isPreview: false, consumerId: "coral", outcome: "ok" })]);
+  });
+
+  // A consumer never sees rounds: the field is dropped unread and the number is its head.
   it("a consumer's round is ignored, whatever it holds: the number's head answers", async () => {
     for (const round of [1, "x", 0]) {
       const res = await post("cash-back", { version: 3, round, channel: "web", values: FEE });
@@ -288,13 +286,6 @@ describe("POST …/render: rounds", () => {
     }
     const released = await post("balance-transfer", { version: 2, round: 7, channel: "web", values: CUSTOMER });
     expect(released.status).toBe(200);
-  });
-
-  it("a preview's round must be a whole number from 1", async () => {
-    for (const round of [0, "1", 1.5]) {
-      const res = await post("cash-back", { version: 3, round, channel: "web", values: FEE, preview: true }, {});
-      await expectError(res, 400, "bad_request", "round must be a whole number from 1.");
-    }
   });
 });
 
@@ -316,8 +307,7 @@ describe("POST …/render: 400 bad requests", () => {
     ["values as an array", { ...good, values: [] }, "values must be an object."],
     ["values as null", { ...good, values: null }, "values must be an object."],
     ["another encoding", { ...good, encoding: "hex" }, "encoding must be base64."],
-    ["preview as a string", { ...good, preview: "yes" }, "preview must be true or false."],
-    ["the draft without preview", { ...good, version: "draft" }, "version must be a version number."],
+    ["the draft", { ...good, version: "draft" }, "version must be a version number."],
   ])("%s", async (_, body, message) => {
     await expectError(await post("balance-transfer", body), 400, "bad_request", message);
   });
@@ -546,11 +536,10 @@ describe("POST …/render: push and SMS", () => {
     expect(await logRows("push-android")).toEqual([expect.objectContaining({ channel: "push", platform: "android", outcome: "ok" })]);
   });
 
-  it("logs the platform of a push, of a push preview and of a failed push, and none for any other channel", async () => {
+  it("logs the platform of a push and of a failed push, and none for any other channel", async () => {
     const asked = [
       { id: "plat-sms", body: { version: 1, channel: "sms", values: VALUES }, headers: CORAL, platform: null },
       { id: "plat-ios", body: { version: 1, channel: "push", platform: "ios", values: VALUES }, headers: CORAL, platform: "ios" },
-      { id: "plat-preview", body: { version: 1, channel: "push", platform: "android", values: VALUES, preview: true }, headers: {}, platform: "android" },
       { id: "plat-failed", body: { version: 1, channel: "push", platform: "android", values: {} }, headers: CORAL, platform: "android" },
     ] as const;
     for (const { id, body, headers } of asked) await post(ALERT_ID, body, { ...headers, "X-Correlation-Id": id });
@@ -578,16 +567,11 @@ describe("POST …/render: push and SMS", () => {
 
   it("ends with the footer the version was submitted with: a later change to the content type's reaches only a draft", async () => {
     const { contentTypes } = await import("@/server/db/schema/ucomp");
-    const NEW = "Coral: Reply STOP to end, HELP for help.";
-    await db.update(contentTypes).set({ smsFooter: NEW }).where(eq(contentTypes.id, "ct_alert"));
-    await db.insert(versions).values({ ...(await db.select().from(versions).where(eq(versions.id, "v_alert_1")))[0]!, id: "v_alert_draft", number: null, state: "draft", smsFooter: null });
+    await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to end, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
     try {
       const active = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
       expect(((await active.json()) as { text: string }).text).toMatch(/\nCoral: Reply STOP to opt out, HELP for help\.$/);
-      const draft = await post(ALERT_ID, { version: "draft", preview: true, channel: "sms", values: VALUES }, {});
-      expect(((await draft.json()) as { text: string }).text).toMatch(new RegExp(`\\n${NEW.replace(/[.]/g, "\\.")}$`));
     } finally {
-      await db.delete(versions).where(eq(versions.id, "v_alert_draft"));
       await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
     }
   });
