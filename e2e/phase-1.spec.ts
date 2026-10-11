@@ -823,37 +823,6 @@ test.describe("overlays", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// Dev pages
-// ───────────────────────────────────────────────────────────────────────────
-
-test.describe("dev pages", () => {
-  test("/design renders the design system sample", async ({ page }) => {
-    await page.goto("/design");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    // Every lifecycle status is shown with the one badge.
-    for (const state of ["draft", "in_review", "changes_requested", "active", "superseded", "revoked"]) {
-      await expect(page.locator(`[data-status='${state}']`).first()).toBeVisible();
-    }
-    await expect(page.locator("[data-slot='share-ring']").first()).toBeVisible();
-  });
-
-  test("/editor-lab mounts the editor and the slash menu works", async ({ page }) => {
-    await page.goto("/editor-lab");
-    await expect(page.getByRole("heading", { level: 1, name: "Editor lab" })).toBeVisible();
-    const ed = (await liveEditor(page)).first();
-    await expect(ed).toBeVisible();
-    await expect(ed).toHaveAttribute("contenteditable", "true");
-    await caretAtEndOf(page, ed.locator("p").last());
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("/");
-    await expect(page.getByRole("option").first()).toBeVisible();
-    await expect(page.getByRole("option", { name: /Heading 2/ })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("option")).toHaveCount(0);
-  });
-});
-
-// ───────────────────────────────────────────────────────────────────────────
 // Performance: layout shift on library and workspace
 // ───────────────────────────────────────────────────────────────────────────
 

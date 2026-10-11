@@ -36,7 +36,3 @@ export function int(rng: Rng, min: number, max: number): number {
 export function pick<T>(rng: Rng, items: readonly T[]): T {
   return items[Math.floor(rng() * items.length)];
 }
-
-export function chance(rng: Rng, p: number): boolean {
-  return rng() < p;
-}

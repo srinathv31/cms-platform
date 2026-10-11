@@ -12,35 +12,6 @@ import { formatAgo } from "@/domain/dates";
 /** The bell holds this many, newest first. */
 export const NOTIFICATIONS_LIMIT = 30;
 
-export interface NotificationItem {
-  id: string;
-  title: string;
-  body: string | null;
-  href: string | null;
-  ago: string;
-  unread: boolean;
-}
-
-/** @deprecated Phase 3's shape; `getNotificationsData` supersedes it (kept until the bell switches). */
-export const getNotifications = cache(async (): Promise<NotificationItem[]> => {
-  const viewer = await getViewer();
-  const nowDate = await demoNow();
-  const rows = await db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, viewer.userId))
-    .orderBy(desc(notifications.createdAt))
-    .limit(20);
-  return rows.map((n) => ({
-    id: n.id,
-    title: n.title,
-    body: n.body,
-    href: n.href,
-    ago: formatAgo(n.createdAt, nowDate, { capitalize: true }),
-    unread: n.readAt === null,
-  }));
-});
-
 /**
  * The bell: the viewer's latest notifications (newest first) and how many are unread in all. Every
  * row has a sentence and a link: the ones its writer stored, else the kind's fallback

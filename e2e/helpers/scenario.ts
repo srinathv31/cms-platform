@@ -245,16 +245,6 @@ export async function chipsPresent(page: Page, keys: readonly string[]): Promise
   );
 }
 
-/** The viewport rectangle of a block's text (not the block's full width), for aiming the mouse. */
-export async function textRect(block: Locator) {
-  return block.evaluate((el) => {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    const r = range.getBoundingClientRect();
-    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
-  });
-}
-
 /** The viewport point at `offset` characters into a block's first text node (for aiming a drop). */
 export async function pointInText(block: Locator, offset: number) {
   return block.evaluate((el, at) => {

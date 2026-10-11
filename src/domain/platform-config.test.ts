@@ -125,7 +125,7 @@ describe("createTeam", () => {
         .filter((e) => e.isDirectory() && !e.name.startsWith("[") && !e.name.startsWith("_") && !e.name.startsWith("@"))
         .flatMap((e) => (e.name.startsWith("(") ? segments(join(dir, e.name)) : [e.name]));
     const top = segments(join(process.cwd(), "src/app"));
-    expect(top).toEqual(expect.arrayContaining(["api", "sim", "request-access", "design"]));
+    expect(top).toEqual(expect.arrayContaining(["api", "sim", "request-access", "editor-lab"]));
     expect(top.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
   });
 });

@@ -184,8 +184,6 @@ implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCO
   `ui/format.tsx` and add what's missing there.
 - `ui/link-flow.tsx` builds `SimMappingRow`s inline, repeating `mappingRows` in `queries.ts` (server-only, so the
   client can't import it).
-- `src/app/(dev)/design/simulator/` is a dev-only design mock of these screens, with its own `bits.tsx`, data and
-  raw colors. It is not the simulator.
 - The comment blocks in `types.ts` that restate the helper and action signatures have drifted from the code (they
   say every action calls `refresh()`, and the auto-map list is short two keys). Read `actions.ts` and `mapping.ts`.
 - `src/server/seed/sim.ts` has its own `SIM_FIELDS` (a key → path map for seeded links). It shares only the name with

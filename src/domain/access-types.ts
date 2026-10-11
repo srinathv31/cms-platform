@@ -638,19 +638,6 @@ export type SidebarCardModel =
 
 // ── Server actions (all return ActionResult; every one checks permissions first) ─
 
-export interface AccessActions {
-  // src/server/actions/access.ts
-  requestAccess(input: { teamId: string; role: RequestableRole; reason: string }): Promise<ActionResult<{ requestId: string }>>;
-  decideAccessRequest(input: { requestId: string; decision: "approve" | "deny"; note?: string }): Promise<ActionResult>;
-  changeMemberRoles(input: { membershipId: string; roles: TeamRole[] }): Promise<ActionResult>;
-  removeMember(input: { membershipId: string }): Promise<ActionResult>;
-  reinstateMember(input: { membershipId: string }): Promise<ActionResult>;
-  suspendInactive(input: { membershipId: string }): Promise<ActionResult>;
-  keepInactive(input: { membershipId: string }): Promise<ActionResult>;
-  decideRecertItem(input: { recertId: string; userId: string; decision: RecertDecision }): Promise<ActionResult>;
-  startRecertification(input: { teamId: string }): Promise<ActionResult<{ recertId: string }>>;
-}
-
 export interface PlatformActions {
   // src/server/actions/platform.ts
   createTeam(input: { name: string; description: string; icon: string; adminUserId: string }): Promise<ActionResult<{ slug: string }>>;
@@ -663,12 +650,6 @@ export interface PlatformActions {
   }): Promise<ActionResult>;
   /** One of `BUSINESS_ZONES`. Sunsets already set keep their instants. */
   setBusinessZone(input: { zone: string }): Promise<ActionResult>;
-}
-
-export interface NotificationActions {
-  // src/server/actions/notifications.ts
-  markNotificationRead(input: { id: string }): Promise<ActionResult>;
-  markAllNotificationsRead(): Promise<ActionResult<{ count: number }>>;
 }
 
 // ── domain/platform-config.ts signatures (implemented by slice P1) ──────────
@@ -764,27 +745,4 @@ export interface AuditDomain {
   parseAuditFilters(params: Record<string, string | string[] | undefined>): AuditFilters;
   /** RFC 4180 CSV: When (ISO, demo clock), Who, Team, Template, Version, Action, Details. No variable values ever. */
   toCsv(rows: AuditRow[]): string;
-}
-
-// ── Queries (server/queries/*; all `cache()`d, all inside <Stream>) ─────────
-
-export interface AccessQueries {
-  // src/server/queries/access.ts (slice S1)
-  getRequestAccessData(): Promise<RequestAccessData>;
-  getMembersSection(teamSlug: string): Promise<MembersSection>;
-  getAccessRequestsSection(teamSlug: string): Promise<AccessRequestsSection>;
-  getRecertificationSection(teamSlug: string): Promise<RecertificationSection>;
-  getInactivitySection(teamSlug: string): Promise<InactivitySection>;
-  /** By space slug, for the sidebar (folded into getShell's SpaceNav as `card`). */
-  getSidebarCards(): Promise<Record<string, SidebarCardModel | null>>;
-  // src/server/queries/platform.ts (slice P1)
-  getTeamsSection(): Promise<TeamsSection>;
-  getContentTypesSection(): Promise<ContentTypesSection>;
-  getChannelRulesSection(): Promise<ChannelRulesSection>;
-  getApprovalChainsSection(): Promise<ApprovalChainsSection>;
-  getBusinessZoneSection(): Promise<BusinessZoneSection>;
-  // src/server/queries/audit.ts (slice S3)
-  getAuditPage(spaceSlug: string, filters: AuditFilters): Promise<AuditPageData>;
-  // src/server/queries/notifications.ts (slice S3; replaces getNotifications' shape additively)
-  getNotificationsData(): Promise<NotificationsData>;
 }

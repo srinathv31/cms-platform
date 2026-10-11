@@ -14,7 +14,7 @@ import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/
 import type { ChannelFieldKey } from "../channel-fields";
 import type { SmsEncoding } from "../messages/gsm7";
 import type { PushPlatform } from "../messages/push";
-import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType, VariableValues } from "../types";
+import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType } from "../types";
 
 export type { BulletStyle, MarkerDelimiter, MarkerFormat };
 
@@ -263,42 +263,6 @@ export type CanonicalValues = Readonly<Record<string, string>>;
 export interface ResolveContext {
   variables: readonly Variable[];
   values: CanonicalValues;
-}
-
-// ── The route: POST /api/v1/templates/{templateId}/render ────────────────────
-
-/**
- * Request body.
- *
- * Headers:
- *   X-Consumer-Id     required unless `preview` (a registered consumer id: "coral", "deposits-online")
- *   X-Correlation-Id  optional; generated when absent; echoed on every response and in render_log
- *
- * A consumer pins a version number. `"draft"` (the open draft) is allowed only with `preview`.
- * `preview` is the CMS's own preview: the persona cookie must be able to view the template, any
- * version state renders (version rules are skipped), and the render_log row is tagged as a preview
- * with no consumer, so it never counts toward usage.
- *
- * The body is at most MAX_BODY_BYTES, and each value at most MAX_VALUE_LENGTH characters.
- */
-export interface RenderRequestBody {
-  version: number | "draft";
-  channel: Channel;
-  /** Required with channel push, refused with any other: the platform the push is for. */
-  platform?: PushPlatform;
-  /** key → value, canonical ("21.99", "2027-03-04", "NJ") or friendly ("21.99%", "3/4/2027", "New Jersey"). Unknown keys are ignored. */
-  values: VariableValues;
-  /**
-   * Opt-in for consumers that can't take binary: the body comes back as JSON with base64 content. PDF,
-   * web and email only; push and SMS are JSON already, and refuse it.
-   */
-  encoding?: "base64";
-  preview?: boolean;
-  /**
-   * CMS preview only; ignored without `preview`. Which round of `version` to render (`?round=` on the
-   * review screen). Without it a number is its head: the released row, else its latest round.
-   */
-  round?: number;
 }
 
 /**

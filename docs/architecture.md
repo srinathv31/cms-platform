@@ -7,8 +7,8 @@ rendered from its one body) or a message (an Alert, rendered to a push notificat
 fields), never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)).
 
 It is one Next.js 16 app (App Router, Cache Components) on one local SQLite file. Three things share the app: the
-CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and a set of
-dev-only design mocks. It is a working prototype on its way to production. The production backend isn't decided:
+CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and two
+dev-only labs (the editor and the PDF viewer). It is a working prototype on its way to production. The production backend isn't decided:
 either the existing Spring Boot "UCOMP API" with this app as its BFF, or this app's own server code. Changes should
 keep both open, which mostly means: rules in `src/domain`, database access only in `src/server`.
 
@@ -220,7 +220,6 @@ Facts about the code today. Each line goes away in the PR that fixes it.
 
 - No real authentication: the persona cookie, failing open to Maya, identifies every request.
 - Demo controls are ungated: reset, advance clock, and persona switch work in any build, for anyone.
-- `/design/*`, `/editor-lab`, and `/pdf-lab` are prerendered into production builds and answer by URL.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
   run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops

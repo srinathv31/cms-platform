@@ -8,10 +8,6 @@ the kit, from what `/api/v1` rendered: the push on the lock screen (or dropping 
 and a web page on `ScreenPreview`. It is presentation only: it takes resolved plain strings (variables already
 replaced with values) and knows nothing about templates, channels or versions.
 
-The design page is [/design/device](../../app/(dev)/design/device/page.tsx): iPhone and Android side by side, every
-view at 1:1 in light and dark, at each text size and width, inside the tightest preview well, and a working mock
-of the rail's controls.
-
 ## Rules
 
 - **Boundary** (lint-enforced in [eslint.config.mjs](../../../eslint.config.mjs)): no `@/domain`, `@/server`,
@@ -238,6 +234,6 @@ proportions and the scale), [links.test.ts](links.test.ts),
 [messages-thread.test.tsx](messages-thread.test.tsx) (the sender, or "No sender", in each thread's header) and
 [android/notification-card.test.tsx](android/notification-card.test.tsx) (no subtitle on Android; with previews
 hidden, the title stays and only the text goes) run in node. Layout, clamping and the Range read need a real
-browser: check them on the design page, whose Truncation section prints what `onMeasure` reports beside each
-screen. Coral's phone, with a thread of several texts and a banner arriving, is driven end to end by
+browser: check them in the preview rail's Push and SMS views (the Device popover sets the phone, text size and
+width) and in Coral's customer drawer. Coral's phone, with a thread of several texts and a banner arriving, is driven end to end by
 `e2e/coral-alerts.spec.ts`.

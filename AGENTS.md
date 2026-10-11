@@ -143,7 +143,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
-bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
+bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.
 
 ## Keeping the docs true
 

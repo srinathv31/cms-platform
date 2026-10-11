@@ -17,8 +17,6 @@ interface Person {
   activeHoursAgo: number;
 }
 
-export const PERSONA_IDS = ["maya", "jordan", "alex", "priya", "sam", "riley", "taylor", "morgan", "dana"] as const;
-
 const PEOPLE: Person[] = [
   // Personas (build plan: "Seed personas")
   { id: "maya", name: "Maya Chen", title: "Senior Content Designer", hue: 28, persona: true, activeHoursAgo: 0.5 },
