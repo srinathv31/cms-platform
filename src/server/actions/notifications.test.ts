@@ -1,29 +1,23 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NOTIFICATION_KINDS } from "@/domain/audit";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
 import { getNotificationsData } from "@/server/queries/notifications";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { markAllNotificationsRead, markNotificationRead } from "./notifications";
 
 // The bell against a temporary database filled by the real seed. Alex has three notifications:
 // Chris's access request and the recertification (unread), Devon's inactivity flag (read).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-notifications-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-notifications-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -33,20 +27,14 @@ const { notifications } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
 const people: Record<string, Viewer> = {};
 
+seededDatabasePerTest({ base: BASE });
+
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
+  ({ db } = await import("@/server/db/client"));
   for (const id of ["alex", "maya", "priya", "morgan"]) people[id] = await loadPersona(db, id);
 }, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
-});
 
 beforeEach(() => {
   vi.mocked(refresh).mockClear();

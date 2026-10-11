@@ -283,11 +283,12 @@ async function selectPhrase(page: Page, target: Locator, phrase: string) {
   await moveTo(page, target, { x: from.x - box.x, y: from.y - box.y });
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.waitForTimeout(isDemo() ? 140 : 60);
+  await beat(page, 140);
   await page.mouse.move(to.x, to.y, { steps: isDemo() ? 24 : 8 });
   await page.mouse.up();
-  const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
-  expect(selected, "the drag selected the phrase").toBe(phrase);
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""), { message: "the drag selected the phrase" })
+    .toBe(phrase);
 }
 
 // ── The spec ─────────────────────────────────────────────────────────────────
@@ -323,7 +324,9 @@ test.describe("scenario 3: the review loop", () => {
       // The name is selected: typing replaces it; Enter goes to the document, where the caret is in the first section.
       await expect(nameField(page)).toBeFocused();
       await expect(nameField(page)).toHaveValue("Card offer terms");
-      await page.waitForTimeout(300);
+      // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.
+      await liveEditor(page);
+      await expect(nameField(page)).toBeFocused();
       await page.keyboard.press("ControlOrMeta+a");
       await typeSlowly(page, NAME);
       await expect(nameField(page)).toHaveValue(NAME);

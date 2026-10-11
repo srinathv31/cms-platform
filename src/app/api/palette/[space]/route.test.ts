@@ -1,13 +1,9 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { NextRequest } from "next/server";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PALETTE_QUERY_MAX } from "@/domain/palette";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { GET } from "./route";
 
@@ -21,13 +17,11 @@ import { GET } from "./route";
 // Notice. Sam is a Viewer on Coral Offers, Eli an Author on Deposits only, Morgan has no team, Taylor is
 // the Auditor (every team, through All teams).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-palette-search-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-palette-search-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -47,20 +41,13 @@ const INVALID = { ok: false, code: "invalid_search", reason: "This search can't 
 const NOT_YOURS = { ok: false, code: "space_unavailable", reason: "This team isn't available to you." };
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: env.now })).templates;
-  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+const ids = seededDatabasePerTest({ base: env.now });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
 });
 
 beforeEach(() => as("maya"));

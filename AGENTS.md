@@ -16,19 +16,21 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server on port 3000. |
-| `npm run db:reset` | Drops and reseeds `data/ucomp.db` and empties `data/uploads`. Needed once after cloning. |
+| `npm run db:reset` | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning. |
 | `npm run typecheck` | `next typegen && tsc --noEmit`. Run it after adding or renaming a route. |
 | `npm run lint` | ESLint, including the import boundaries below. |
-| `npm test` | Vitest, about 10 seconds. Never touches `data/ucomp.db`. |
+| `npm test` | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with. |
 | `npm run docs:check` | Fails on broken doc links and paths, and on a `src/` folder without a README. |
 | `npm run golden:update` | Regenerates the render golden files after an intended change to render output. Read the diff. |
 | `npm run build` | The production build. It is the only check that enforces the Cache Components rules. |
-| `npm run e2e` | Playwright against the production build on port 3100. Resets `data/ucomp.db` and writes to it. |
+| `npm run e2e` | Playwright against the production build on port 3100. Resets and writes to its own `data/e2e.db` and `data/e2e-uploads`, never the demo's. |
+| `npx playwright test --project=demo` | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script. |
 | `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations. |
 
 Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, and `npm run docs:check`. Add `npm run build`
-when you changed a page, a layout, a route handler, or anything a server component reads. Don't run `npm run e2e` or
-`npm run db:reset` in someone's working copy without asking: both wipe the demo database.
+when you changed a page, a layout, a route handler, or anything a server component reads. Don't run `npm run db:reset`
+in someone's working copy without asking: it wipes the demo database. `npm run e2e` resets only its own database and
+uploads folder, so it is safe for the demo.
 
 ## Layers and boundaries
 
@@ -142,7 +144,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | Add an `/api/v1` route | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts) |
 | Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts) |
 | Format a count or a plural | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts) |
-| Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
+| Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts): a database of its own for every test (`seededDatabasePerTest`); each test builds the state it needs |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
 bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.

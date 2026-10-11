@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_DATABASE_URL, E2E_UPLOADS_DIR } from "./e2e/storage";
 
 // Scenario specs run serially from a fresh reset against the production build (`npm run demo`).
 // The gate port runs the production build (`next start`, after a db:reset). It's 3100 by default; each
@@ -20,7 +21,9 @@ process.env.UCOMP_OPT_IN_PROJECTS = requested;
 const wants = (name: string) => requested.split(",").includes(name);
 
 // Only the scenario specs and the whole demo script (Phase 7b): `scenario-02a` (the Phase 2 gate in short
-// form) is not a gate recording.
+// form) is not a gate recording. The demo script is for those two projects alone: `chromium` ignores it, so
+// `npm run e2e` never plays it (decision 0049). Run it with `npx playwright test --project=demo`.
+const DEMO_SCRIPT = /demo-script\.spec\.ts/;
 const SCENARIOS = /(scenario-\d+|demo-script)\.spec\.ts/;
 
 export default defineConfig({
@@ -35,7 +38,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "chromium", testIgnore: DEMO_SCRIPT, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
     ...(wants("demo")
       ? [
           {
@@ -77,11 +80,14 @@ export default defineConfig({
   // Only the gate port (the production build) may be started here, because starting resets the
   // database. On any other E2E_PORT (a dev server, e.g. 3000) the server must already be up:
   // a dev server answering 500 mid-edit used to look "not running" and trigger a reset of the shared DB.
+  // The reset and the server get e2e's own database and uploads folder (e2e/storage.ts, which every
+  // helper reads too), so a run never touches the demo's data/ucomp.db or data/uploads.
   webServer:
     PORT === GATE_PORT
       ? {
           command: `npm run db:reset && npx next start -p ${PORT}`,
           url: `http://localhost:${PORT}`,
+          env: { DATABASE_URL: E2E_DATABASE_URL, UPLOADS_DIR: E2E_UPLOADS_DIR },
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
         }

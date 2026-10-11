@@ -1,24 +1,19 @@
-import { readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { eq, isNotNull } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { sunsetDay, sunsetInstant } from "@/domain/business-zone";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "./business-zone";
 
 // The business time zone's setting, and the migration that moved every stored sunset from midnight UTC
 // to 00:00 Eastern on the same day (decision 0017), run on a seeded database.
 
-const env = vi.hoisted(() => ({ dir: "" }));
-
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-business-zone-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-business-zone-");
 });
 
 const { settings, versions } = schema;
@@ -29,15 +24,10 @@ const DAY = 86_400_000;
 let db: Db;
 let libsql: Client;
 
+seededDatabasePerTest({ base: BASE });
+
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 describe("the business time zone setting", () => {

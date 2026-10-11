@@ -38,7 +38,7 @@ import {
 //   4. Channels: not enabled on the version, not allowed by the content type, unknown.
 //   5. Version rules for consumers; the request errors that come before them, the body size limit
 //      among them (declared, and chunked with no Content-Length).
-//   6. Previews: tagged, and only for people who can see the template's team.
+//   6. Consumers only: what used to be a CMS preview is refused here (previews: preview.spec.ts).
 //   7. render_log: one row per render, and never a value.
 //
 // No page is opened, so there is no console to watch. Nothing is hardcoded by id: versions are found
@@ -548,7 +548,7 @@ test.describe("version rules for consumers", () => {
     await expectError(res, 404, "template_not_found", "Template UC-ZZZZZZ doesn't exist.");
   });
 
-  test("\"draft\" without preview is a 400 bad_request", async ({ request }) => {
+  test("\"draft\" is a 400 bad_request, whatever preview says", async ({ request }) => {
     const v = pick(await versions(), "open draft", (x) => x.state === "draft");
     const { res } = await render(request, { templateId: v.templateId, body: { version: "draft", channel: "web", values: validValues(v.variables) } });
     await expectError(res, 400, "bad_request", "version must be a version number.");
@@ -587,7 +587,6 @@ test.describe("a malformed request is a 400 bad_request", () => {
       ["values as an array", { version: v.number, channel: "web", values: [] }, "values must be an object."],
       ["values as a string", { version: v.number, channel: "web", values: "x" }, "values must be an object."],
       ["an encoding that isn't base64", { version: v.number, channel: "web", values, encoding: "gzip" }, "encoding must be base64."],
-      ["preview that isn't a boolean", { version: v.number, channel: "web", values, preview: "yes" }, "preview must be true or false."],
     ];
     for (const [what, body, message] of cases) {
       const { res } = await render(request, { templateId: v.templateId, body });
@@ -625,136 +624,14 @@ test.describe("a body over 1,000,000 bytes is a 413 body_too_large", () => {
   });
 });
 
-// ── 6. Previews ──────────────────────────────────────────────────────────────
+// ── 6. Consumers only ────────────────────────────────────────────────────────
+// /api/v1 serves consumers (decision 0047). Stencil's own preview is POST /api/templates/{id}/preview
+// (preview.spec.ts), so a request shaped like one is refused here, whatever cookie it carries.
 
 const PERSONA_CAN_SEE = "maya"; // Coral Offers author
 const PERSONA_CANNOT_SEE_DEPOSITS = "maya";
-const PERSONA_WITH_NO_TEAM = "morgan";
 
-test.describe("previews", () => {
-  test("a draft previews as the persona and is tagged a preview", async ({ playwright, baseURL }) => {
-    const draft = pick(await versions(), "open draft in Coral Offers with web on", (v) => v.state === "draft" && v.teamId === "coral-offers" && v.channels.includes("web"));
-    const cid = correlation("preview-draft");
-    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
-      // The consumer header is ignored on a preview, even one that names nobody registered.
-      const { res } = await render(request, {
-        templateId: draft.templateId,
-        correlationId: cid,
-        consumer: "acme",
-        body: { version: "draft", channel: "web", values: validValues(draft.variables), preview: true },
-      });
-      expect(res.status()).toBe(200);
-      expect(res.headers()["content-type"]).toBe("text/html; charset=utf-8");
-      expect(res.headers()["x-stencil-preview"]).toBe("true");
-      expect(res.headers()["x-stencil-version"]).toBe("draft");
-      expect(res.headers()["x-stencil-template-id"]).toBe(draft.templateId);
-      expect(res.headers()["cache-control"]).toBe("no-store");
-      expect(res.headers()["x-correlation-id"]).toBe(cid);
-      expect(await res.text()).toMatch(/<!doctype html>/i);
-    });
-
-    const rows = await logFor(db, cid);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      template_id: draft.templateId,
-      version_id: draft.id,
-      version_number: null,
-      channel: "web",
-      is_preview: 1,
-      consumer_id: null,
-      outcome: "ok",
-      error_code: null,
-    });
-  });
-
-  test("a draft's PDF preview is named for the draft", async ({ playwright, baseURL }) => {
-    const draft = pick(await versions(), "open draft in Coral Offers with pdf on", (v) => v.state === "draft" && v.teamId === "coral-offers" && v.channels.includes("pdf"));
-    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
-      const { res } = await render(request, {
-        templateId: draft.templateId,
-        consumer: null,
-        body: { version: "draft", channel: "pdf", values: validValues(draft.variables), preview: true },
-      });
-      expect(res.status()).toBe(200);
-      expect(res.headers()["content-type"]).toBe("application/pdf");
-      expect(res.headers()["content-disposition"]).toBe(`inline; filename="${draft.templateId}-draft.pdf"`);
-      expect(res.headers()["x-stencil-preview"]).toBe("true");
-      expect(pdfMagic(await res.body())).toBe("%PDF");
-    });
-  });
-
-  test("any state previews: in review, revoked and Superseded skip the version rules", async ({ playwright, baseURL }) => {
-    const all = await versions();
-    const unreleased = [
-      pick(all, "Coral Offers version in review", (v) => v.state === "in_review" && v.teamId === "coral-offers"),
-      pick(all, "Coral Offers revoked version", (v) => v.state === "revoked" && v.teamId === "coral-offers"),
-      pick(all, "Coral Offers Superseded version with an Active successor", (v) => v.state === "superseded" && v.teamId === "coral-offers" && v.activeNumber !== null),
-    ];
-    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
-      for (const v of unreleased) {
-        const cid = correlation(`preview-${v.state}`);
-        const { res } = await render(request, {
-          templateId: v.templateId,
-          consumer: null,
-          correlationId: cid,
-          body: bodyFor(v, v.channels[0], validValues(v.variables), { preview: true }),
-        });
-        expect(res.status(), v.state).toBe(200);
-        expect(res.headers()["x-stencil-preview"], v.state).toBe("true");
-        expect(res.headers()["x-stencil-version"], v.state).toBe(String(v.number));
-        // A Superseded version still points to the version that replaced it.
-        expect(res.headers()["x-stencil-newer-version"], v.state).toBe(v.state === "superseded" ? String(v.activeNumber) : undefined);
-        expect((await logFor(db, cid))[0], v.state).toMatchObject({ is_preview: 1, consumer_id: null, outcome: "ok" });
-      }
-    });
-  });
-
-  test("a preview still checks the version's channels and the values", async ({ playwright, baseURL }) => {
-    const draft = pick(await versions(), "open draft in Coral Offers without email", (v) => v.state === "draft" && v.teamId === "coral-offers" && !v.channels.includes("email"));
-    const enabled = ALL_CHANNELS.filter((c) => draft.channels.includes(c));
-    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
-      const notEnabled = await render(request, {
-        templateId: draft.templateId,
-        consumer: null,
-        body: { version: "draft", channel: "email", values: validValues(draft.variables), preview: true },
-      });
-      await expectError(notEnabled.res, 422, "channel_not_enabled", `This draft doesn't render to Email. Its channels are ${andList(enabled.map((c) => LABEL[c]))}.`);
-
-      const missing = await render(request, {
-        templateId: draft.templateId,
-        consumer: null,
-        body: { version: "draft", channel: "web", values: {}, preview: true },
-      });
-      await expectError(missing.res, 422, "missing_variables", `Missing required variables: ${required(draft).map((x) => x.key).join(", ")}.`);
-    });
-  });
-
-  test("a persona who can't see the template's team gets a 403 preview_forbidden, and it is logged as a preview", async ({ playwright, baseURL }) => {
-    const all = await versions();
-    const deposits = pick(all, "open draft in Deposits", (v) => v.state === "draft" && v.teamId === "deposits");
-    const coral = pick(all, "open draft in Coral Offers", (v) => v.state === "draft" && v.teamId === "coral-offers");
-
-    for (const [persona, draft] of [
-      [PERSONA_CANNOT_SEE_DEPOSITS, deposits],
-      [PERSONA_WITH_NO_TEAM, coral],
-    ] as const) {
-      const cid = correlation(`forbidden-${persona}`);
-      await asPersona(playwright, baseURL!, persona, async (request) => {
-        const { res } = await render(request, {
-          templateId: draft.templateId,
-          consumer: null,
-          correlationId: cid,
-          body: { version: "draft", channel: "web", values: validValues(draft.variables), preview: true },
-        });
-        await expectError(res, 403, "preview_forbidden", "You can't preview this template.");
-        expect(res.headers()["x-stencil-preview"]).toBeUndefined();
-      });
-      const rows = await logFor(db, cid);
-      expect(rows, persona).toHaveLength(1);
-      expect(rows[0], persona).toMatchObject({ is_preview: 1, consumer_id: null, outcome: "error", error_code: "preview_forbidden" });
-    }
-  });
-
+test.describe("consumers only", () => {
   test("the persona cookie has no say in a consumer render", async ({ playwright, baseURL }) => {
     const v = pick(await versions(), "Active Deposits version", (x) => x.state === "active" && x.teamId === "deposits" && x.channels.includes("web"));
     await asPersona(playwright, baseURL!, PERSONA_CANNOT_SEE_DEPOSITS, async (request) => {
@@ -764,11 +641,46 @@ test.describe("previews", () => {
     });
   });
 
-  test("a consumer render of a draft is refused even with the persona cookie", async ({ playwright, baseURL }) => {
+  test("a draft is refused, with or without preview and a consumer, even with the persona cookie", async ({ playwright, baseURL }) => {
     const draft = pick(await versions(), "open draft in Coral Offers", (v) => v.state === "draft" && v.teamId === "coral-offers");
+    const values = validValues(draft.variables);
     await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
-      const { res } = await render(request, { templateId: draft.templateId, body: { version: "draft", channel: "web", values: validValues(draft.variables) } });
-      await expectError(res, 400, "bad_request", "version must be a version number.");
+      for (const [what, call] of [
+        ["no preview", { body: { version: "draft", channel: "web", values } }],
+        ["preview, no consumer", { consumer: null, body: { version: "draft", channel: "web", values, preview: true } }],
+        ["preview, a consumer", { body: { version: "draft", channel: "web", values, preview: true } }],
+      ] as const) {
+        const cid = correlation("no-draft");
+        const { res } = await render(request, { templateId: draft.templateId, correlationId: cid, ...call });
+        await expectError(res, 400, "bad_request", "version must be a version number.").catch((reason) => {
+          throw new Error(`${what}: ${reason instanceof Error ? reason.message : reason}`);
+        });
+        expect(res.headers()["x-stencil-preview"], what).toBeUndefined();
+        expect(await logFor(db, cid), `${what}: refused before it is logged`).toHaveLength(0);
+      }
+    });
+  });
+
+  test("a preview of a released version that names no consumer is refused: the cookie's person is not a consumer", async ({ playwright, baseURL }) => {
+    const v = await activeEverywhere();
+    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
+      const cid = correlation("no-consumer");
+      const { res } = await render(request, { templateId: v.templateId, consumer: null, correlationId: cid, body: bodyFor(v, "web", validValues(v.variables), { preview: true }) });
+      await expectError(res, 400, "consumer_required", "X-Consumer-Id is required.");
+      expect(await logFor(db, cid)).toHaveLength(0);
+    });
+  });
+
+  test("a version in review is never served, `preview` or not: it is a consumer's refusal, logged as a consumer's", async ({ playwright, baseURL }) => {
+    const inReview = pick(await versions(), "Coral Offers version in review", (v) => v.state === "in_review" && v.teamId === "coral-offers");
+    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
+      for (const extra of [{ preview: true }, { preview: false }, {}]) {
+        const cid = correlation("in-review");
+        const { res } = await render(request, { templateId: inReview.templateId, correlationId: cid, body: bodyFor(inReview, inReview.channels[0], validValues(inReview.variables), extra) });
+        await expectError(res, 409, "version_not_released");
+        expect(res.headers()["x-stencil-preview"]).toBeUndefined();
+        expect((await logFor(db, cid))[0]).toMatchObject({ is_preview: 0, consumer_id: "coral", outcome: "error", error_code: "version_not_released" });
+      }
     });
   });
 });
@@ -844,7 +756,7 @@ test.describe("render_log", () => {
     const cases: Array<[string, Parameters<typeof render>[1]]> = [
       ["unknown template", { templateId: "UC-ZZZZZZ", body: { version: 1, channel: "web", values } }],
       ["unknown version", { templateId: v.templateId, body: { version: 9999, channel: "web", values } }],
-      ["no open draft", { templateId: noDraft.templateId, body: { version: "draft", channel: "web", values: validValues(noDraft.variables), preview: true } }],
+      ["a draft marked as a preview", { templateId: noDraft.templateId, body: { version: "draft", channel: "web", values: validValues(noDraft.variables), preview: true } }],
       ["malformed body", { templateId: v.templateId, body: { version: v.number, channel: "fax", values } }],
       ["draft without preview", { templateId: draft.templateId, body: { version: "draft", channel: "web", values } }],
       ["no consumer", { templateId: v.templateId, consumer: null, body: bodyFor(v, "web") }],
@@ -862,7 +774,7 @@ test.describe("render_log", () => {
     expect(rows.map((r) => String(r.name)).sort()).toEqual([...LOG_COLUMNS].sort());
   });
 
-  test("no variable value, raw or formatted, is ever in render_log", async ({ request, playwright, baseURL }) => {
+  test("no variable value, raw or formatted, is ever in render_log", async ({ request }) => {
     // Values that can't be mistaken for anything else, per type. The formatted forms are what the
     // renderer prints ("$98,765.43", "87.65%", "July 19, 2031"), so they count too. (A bare digit
     // run like the number's 7654321 could turn up inside a timestamp, so only its formatted form is searched for.)
@@ -884,9 +796,7 @@ test.describe("render_log", () => {
     // The deposits disclosure has a currency variable; the Coral one is a second template. Prefer both.
     const withCurrency = pick(all, "Active version with all channels and a currency variable", (v) => rendersToAll(v) && v.variables.some((x) => x.type === "currency"));
     const other = pick(all, "second Active version", (v) => v.state === "active" && v.templateId !== withCurrency.templateId && v.channels.includes("web"));
-    const draft = pick(all, "open draft in Coral Offers with web on", (v) => v.state === "draft" && v.teamId === "coral-offers" && v.channels.includes("web"));
     const wrongOnWithCurrency = required(withCurrency).find((x) => x.type !== "text")!;
-    const wrongOnDraft = required(draft).find((x) => x.type !== "text")!;
     const [absent1, absent2] = required(other);
 
     interface Sent {
@@ -932,26 +842,6 @@ test.describe("render_log", () => {
     // not released, with sentinels in the request
     const inReview = pick(all, "version in review", (v) => v.state === "in_review");
     await send("in review", { templateId: inReview.templateId, body: bodyFor(inReview, inReview.channels[0], sentinelValues(inReview.variables)) }, 409);
-
-    // previews, ok and invalid
-    await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (preview) => {
-      await send(
-        "preview ok",
-        { templateId: draft.templateId, consumer: null, body: { version: "draft", channel: "web", values: sentinelValues(draft.variables), preview: true } },
-        200,
-        preview,
-      );
-      await send(
-        "preview invalid",
-        {
-          templateId: draft.templateId,
-          consumer: null,
-          body: { version: "draft", channel: "web", values: sentinelValues(draft.variables, { [wrongOnDraft.key]: `${SENTINEL_TEXT}-wrong` }), preview: true },
-        },
-        422,
-        preview,
-      );
-    });
 
     // Every row these requests wrote: one each, with exactly the expected columns, and no sentinel in any of them.
     for (const { what, cid } of sent) {

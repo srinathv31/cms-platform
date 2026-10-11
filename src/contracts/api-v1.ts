@@ -12,8 +12,9 @@
 //   GET  /api/v1/consumers/{consumerId}/notices     UCOMP's outbox for one consumer    → ApiNoticeList (paged)
 //   POST /api/v1/templates/{id}/render              (Phase 3; contract in src/domain/render/types.ts)
 //
-// Every request carries `X-Consumer-Id` (a registered consumer: "coral", "deposits-online"); the render
-// route alone waives it for the CMS's own previews. `X-Correlation-Id` is optional and echoed back.
+// Every request carries `X-Consumer-Id` (a registered consumer: "coral", "deposits-online"), the render
+// route's included: /api/v1 serves consumers only, and Stencil's own previews are a separate internal route
+// (POST /api/templates/{id}/preview). `X-Correlation-Id` is optional and echoed back.
 // Every response is `Cache-Control: no-store`. Errors are always `ApiErrorBody` with the status in
 // API_ERROR_STATUS (src/domain/golive-types.ts). Dates are ISO 8601 strings on the demo clock.
 
@@ -38,7 +39,7 @@ export type ApiErrorCode =
   | "consumer_required"
   | "body_too_large" // 413: the body is over 1,000,000 bytes
   | "unknown_consumer"
-  | "preview_forbidden"
+  | "preview_forbidden" // 403: never returned by /api/v1; Stencil's own preview route uses it (kept so the codes match RenderErrorCode)
   | "template_not_found"
   | "version_not_found"
   | "version_not_released"
@@ -362,7 +363,8 @@ export interface ApiNotice {
 // ── POST /api/v1/templates/{id}/render (Phase 3; restated for consumers) ────────
 
 /**
- * The body a consumer sends. `"draft"` and `preview` are CMS-only and not part of the consumer API.
+ * The body a consumer sends. A `"draft"` version is never served here (400 bad_request), and a field that isn't listed
+ * (`preview`, `round`) is ignored.
  * At most 1,000,000 bytes (else 413 body_too_large); each value at most 1000 characters, counted in
  * Unicode code points (else 422 invalid_values, "first_name must be at most 1,000 characters."). A value
  * is never cut: it prints exactly as sent, or is refused.

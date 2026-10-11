@@ -1,9 +1,8 @@
-import { readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { and, asc, eq, gte } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh, revalidatePath } from "next/cache";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformActions } from "@/domain/access-types";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
@@ -22,8 +21,7 @@ import {
   getTeamsSection,
 } from "@/server/queries/platform";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "@/server/queries/review";
-import { seedDatabase } from "@/server/seed";
-import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
+import { createTemplateWithDraft, draftRev, loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
 import { createTeam, saveApprovalChain, setBusinessZone, setChannelRule, updateContentType } from "./platform";
@@ -33,13 +31,11 @@ import { approveVersion, requestChanges, submitVersion } from "./review";
 // filled by the real seed. Only the database handle, the demo clock, the persona and Next's cache
 // calls are swapped.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-platform-actions-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-platform-actions-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -61,16 +57,11 @@ let db: Db;
 let libsql: Client;
 const people: Record<string, Viewer> = {};
 
+seededDatabasePerTest({ base: BASE });
+
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
   for (const id of ["maya", "jordan", "alex", "sam", "riley", "dana", "eli", "naomi"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 let minute = 0;
@@ -95,23 +86,13 @@ const versionOf = (templateId: string) =>
   db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) });
 const approve = (templateId: string) => approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] });
 
-/**
- * Back to the seeded chain: the team's approvers only. A stage a version in review still needs can't be
- * removed, so this file's versions still in review are taken out of review first.
- */
-async function resetChain() {
+/** Dana Park's Legal reviewer stage is on the chain, after the Team approver. Returns the Legal stage's id. */
+async function addLegalStage() {
   as("riley");
-  const current = await chain();
-  if (current.length === 1 && current[0]!.id === TEAM_STAGE) return;
-  const extra = current.filter((s) => s.id !== TEAM_STAGE).map((s) => s.id);
-  for (const v of await db.select().from(versions).where(eq(versions.state, "in_review"))) {
-    if (v.stages?.some((s) => extra.includes(s.id))) {
-      await db.update(versions).set({ state: "changes_requested" }).where(eq(versions.id, v.id));
-    }
-  }
-  expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }] })).toEqual({
+  expect(await saveApprovalChain({ contentTypeId: CT, stages: [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }, LEGAL] })).toEqual({
     ok: true,
   });
+  return (await chain())[1]!.id;
 }
 
 async function submitted(teamId: string, author: string) {
@@ -328,10 +309,6 @@ describe("setChannelRule", () => {
 
 describe("setBusinessZone", () => {
   const zoneRow = async () => (await db.select().from(schema.settings).where(eq(schema.settings.key, "business_zone")))[0];
-  afterAll(async () => {
-    await db.delete(schema.settings).where(eq(schema.settings.key, "business_zone"));
-  });
-
   it("is Eastern until a Platform Admin picks another, from the US zones and UTC", async () => {
     as("riley");
     const section = await getBusinessZoneSection();
@@ -372,6 +349,9 @@ describe("setBusinessZone", () => {
   });
 
   it("writes nothing for the zone it already has, and refuses a zone off the list", async () => {
+    as("riley");
+    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({ ok: true });
+    vi.mocked(refresh).mockClear();
     const at = as("riley");
     expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({ ok: true });
     expect(await setBusinessZone({ zone: "Europe/London" })).toEqual({ ok: false, ...PLATFORM_REFUSALS.pickZone });
@@ -385,8 +365,6 @@ describe("setBusinessZone", () => {
 // ── Approval chains ───────────────────────────────────────────
 
 describe("saveApprovalChain", () => {
-  afterAll(resetChain);
-
   it("adds Dana Park's Legal reviewer stage; versions in review keep their stage", async () => {
     const waiting = await submitted("coral-offers", "maya");
     const at = as("riley");
@@ -415,8 +393,8 @@ describe("saveApprovalChain", () => {
   });
 
   it("leaves a version in review as it is when stages are reordered: it keeps its own stages", async () => {
+    const legalId = await addLegalStage();
     const templateId = await submitted("coral-offers", "maya");
-    const legalId = (await chain())[1]!.id;
     const own = [
       { id: TEAM_STAGE, name: "Team approver" },
       { id: legalId, name: "Legal reviewer" },
@@ -496,7 +474,7 @@ describe("saveApprovalChain", () => {
     await db.insert(memberships).values({ id: "m_casey", userId: "casey", teamId: "deposits", status: "active", addedAt: BASE });
     await db.insert(membershipRoles).values({ membershipId: "m_casey", role: "approver" });
     people.casey = await loadPersona(db, "casey");
-    const legal = (await chain()).find((s) => s.name === "Legal reviewer")!;
+    const legal = { id: await addLegalStage() };
     const team = { id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE };
     const legalStage = { id: legal.id, ...LEGAL };
     const casey: ApproverRule = { kind: "user", userId: "casey" };
@@ -564,6 +542,7 @@ describe("saveApprovalChain", () => {
   });
 
   it("checks people named before too: a chain naming someone who has since lost access can't be saved", async () => {
+    await addLegalStage();
     const before = await chain();
     expect(before.some((s) => s.approverRule.kind === "user" && s.approverRule.userId === "dana")).toBe(true);
     const renamed = before.map((s) => ({ id: s.id, name: s.id === TEAM_STAGE ? "Team sign-off" : s.name, rule: s.approverRule }));
@@ -583,8 +562,8 @@ describe("saveApprovalChain", () => {
   });
 
   it("when a waiting stage names someone else, they're told about the versions already waiting", async () => {
+    const legalId = await addLegalStage();
     const templateId = await submitted("coral-offers", "maya"); // waits on the Team approver stage
-    const legalId = (await chain())[1]!.id;
     const at = as("riley");
     const stages = (rule: ApproverRule) => [
       { id: TEAM_STAGE, name: "Team approver", rule },
@@ -602,13 +581,13 @@ describe("saveApprovalChain", () => {
   });
 
   it("when a waiting stage goes back to the team's approvers, nobody who wrote the version is told", async () => {
+    const legalId = await addLegalStage();
     const templateId = await submitted("coral-offers", "maya");
     // Alex holds Approver on Coral Offers; say he edited Maya's draft too.
     await db
       .update(versions)
       .set({ writers: ["maya", "alex"] })
       .where(and(eq(versions.templateId, templateId), eq(versions.number, 1)));
-    const legalId = (await chain())[1]!.id;
     const stages = (rule: ApproverRule) => [
       { id: TEAM_STAGE, name: "Team approver", rule },
       { id: legalId, ...LEGAL },
@@ -628,13 +607,8 @@ describe("saveApprovalChain", () => {
 describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", () => {
   let legalId: string;
 
-  beforeAll(async () => {
-    as("riley");
-    const current = await chain();
-    const legal = current.find((s) => s.name === "Legal reviewer");
-    const stages = [{ id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE }, legal ? { id: legal.id, ...LEGAL } : LEGAL];
-    expect(await saveApprovalChain({ contentTypeId: CT, stages })).toEqual({ ok: true });
-    legalId = (await chain())[1]!.id;
+  beforeEach(async () => {
+    legalId = await addLegalStage();
   });
 
   it("Maya submits → Jordan approves stage 1 → it waits on Dana → Dana approves stage 2 → Active", async () => {
@@ -791,13 +765,9 @@ describe("editing the chain while versions are in review: each version keeps the
   const team = { id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE };
   let legal: { id: string; name: string; rule: ApproverRule };
 
-  beforeAll(async () => {
-    as("riley");
-    const found = (await chain()).find((s) => s.name === "Legal reviewer");
-    if (!found) expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, LEGAL] })).toEqual({ ok: true });
-    legal = { id: (await chain()).find((s) => s.name === "Legal reviewer")!.id, ...LEGAL };
+  beforeEach(async () => {
+    legal = { id: await addLegalStage(), ...LEGAL };
   });
-  afterAll(resetChain);
 
   async function setChain(stages: { id?: string; name: string; rule: ApproverRule }[]) {
     as("riley");
@@ -876,6 +846,9 @@ describe("editing the chain while versions are in review: each version keeps the
   });
 
   it("removing a stage still ahead of a version in its own stages is refused", async () => {
+    const compliance = { name: "Compliance", rule: { kind: "user", userId: "naomi" } as ApproverRule };
+    await setChain([team, compliance, legal]);
+    await submitted("coral-offers", "maya"); // another version in review on the three stages
     const current = await chain();
     const templateId = await submitted("coral-offers", "maya"); // recorded Team, Compliance, Legal; waits on Team
     as("riley");
@@ -892,9 +865,6 @@ describe("editing the chain while versions are in review: each version keeps the
   });
 
   it("a new rule on the stage it waits on reaches it: Naomi decides what waited on Dana", async () => {
-    await resetChain(); // takes the earlier tests' versions out of review, so Compliance can go
-    await setChain([team, LEGAL]);
-    legal = { id: (await chain())[1]!.id, ...LEGAL };
     const templateId = await submitted("coral-offers", "maya");
     as("jordan");
     expect(await approve(templateId)).toEqual({ ok: true, wentLive: false, number: 1, round: 1 });
@@ -951,14 +921,12 @@ describe("a bare review link a stage reviewer outside the team was sent before a
   const team = { id: TEAM_STAGE, name: "Team approver", rule: TEAM_RULE };
   const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
 
-  beforeAll(async () => {
-    await resetChain();
+  beforeEach(async () => {
     as("riley");
     expect(await saveApprovalChain({ contentTypeId: CT, stages: [team, { name: "Legal reviewer", rule: { kind: "user", userId: "naomi" } }] })).toEqual({
       ok: true,
     });
   });
-  afterAll(resetChain);
 
   it("opens the round Naomi sent back while the next round waits on a stage that doesn't name her; the team gets the head", async () => {
     const templateId = await submitted("coral-offers", "maya");
@@ -1060,7 +1028,6 @@ describe("the stages backfill in the migration", () => {
   });
 
   it("someone who approved before the migration can't approve the stage their approval was matched to", async () => {
-    await resetChain(); // the chain is the Team approver stage alone
     const templateId = await submitted("coral-offers", "maya");
     const version = (await versionOf(templateId))!;
     // The data as it stood before stage ids: under [First approver, Team approver] Jordan approved the

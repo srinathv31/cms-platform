@@ -78,6 +78,31 @@ test.afterAll(async () => {
 
 const copilotRow = (page: Page) => page.getByRole("button", { name: "Copilot prompt" }).filter({ visible: true });
 
+/**
+ * The editor's own selection has caught up with the browser's. A key that moves the caret (End) moves the browser's
+ * selection first and the editor reads it a moment later; a paste in between would land where the caret was.
+ */
+async function expectEditorSelectionCaughtUp(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          interface Live {
+            state: { selection: { from: number } };
+            view: { posAtDOM(node: Node, offset: number): number };
+          }
+          const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null) as
+            | (HTMLElement & { editor: Live })
+            | undefined;
+          const selection = window.getSelection();
+          if (!dom || !selection?.anchorNode || !dom.contains(selection.anchorNode)) return false;
+          return dom.editor.view.posAtDOM(selection.anchorNode, selection.anchorOffset) === dom.editor.state.selection.from;
+        }),
+      { message: "the editor's selection is the browser's" },
+    )
+    .toBe(true);
+}
+
 test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{purchase_apr}}, which becomes a chip", async ({ page }) => {
   test.setTimeout(120_000);
 
@@ -94,7 +119,9 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
 
     await expect(nameField(page)).toBeFocused();
-    await page.waitForTimeout(300);
+    // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.
+    await liveEditor(page);
+    await expect(nameField(page)).toBeFocused();
     await page.keyboard.press("ControlOrMeta+a");
     await typeSlowly(page, NAME);
     await page.keyboard.press("Enter");
@@ -157,7 +184,7 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
     // Her caret goes back into the document, at the end of the sentence she wrote.
     await tap(body.getByText(OFFER_SENTENCE));
     await page.keyboard.press("End");
-    await page.waitForTimeout(150);
+    await expectEditorSelectionCaughtUp(page);
     const before = await body.locator("h2[data-required]").count();
     expect(before).toBe(3);
 

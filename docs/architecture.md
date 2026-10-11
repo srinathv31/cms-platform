@@ -129,7 +129,7 @@ returns. The rules are specified in [render-spec.md](render-spec.md). The one be
 prints exactly what the author typed and saw, with no rounding, dropping, renumbering, or rewording.
 
 1. Find the template and version (404). A version number means its released version, else its latest round.
-   Check the consumer (`X-Consumer-Id`, 403), or for a preview, the viewer.
+   Check the consumer (`X-Consumer-Id`, 403), or for a preview (Stencil's own route), the viewer.
 2. Version rules, consumers only (`checkVersion` in
    [version-rules.ts](../src/domain/render/version-rules.ts)): Active renders; Superseded renders until its sunset,
    then 410; Revoked is 410; unreleased states are 409.
@@ -144,10 +144,13 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
 
-The CMS preview posts to the same URL with `preview: true` and the persona cookie instead of `X-Consumer-Id`, and
-may name the review `round` to render; a consumer can't. It skips the version rules and is logged as a preview. Coral calls the URL over HTTP from the server, as a real
-consumer would. Because the preview shares the endpoint, another backend can't take over `/api/v1` until the two
-are split.
+The CMS preview is a separate route, `POST /api/templates/{id}/preview`
+([route.ts](../src/app/api/templates/[templateId]/preview/route.ts)): it takes the person from the session, not an
+`X-Consumer-Id`, may name the review `round`, renders a draft or any state, skips the version rules and is logged as
+a preview. It runs the same `renderTemplate` and answers with the same bodies, so what an approver sees is what a
+consumer gets ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
+`/api/v1` serves consumers only and reads no session, so another backend can take it over without the browser's
+cookie. Coral calls the consumer URL over HTTP from the server, as a real consumer would.
 
 ## Data
 
@@ -237,6 +240,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   first. When nothing is listening there, it runs `npm run db:reset` and starts `next start`. The helpers in
   `e2e/api/helpers.ts` open `data/ucomp.db` directly and write to it, so `DATABASE_URL` can't isolate a run. To keep
   your local demo data, run the suite from a copy of the working tree. The full suite takes about 12 minutes.
+  Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
+  are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
+  ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
 - **Golden files:** [src/server/render/golden](../src/server/render/golden/README.md) freezes every channel's
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also

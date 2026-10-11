@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 8 | 6 | 17 |
-| Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 29 | 32 | 81 |
+| Open | 0 | 2 | 6 | 5 | 13 |
+| Partly fixed | 0 | 3 | 3 | 2 | 8 |
+| Fixed | 1 | 21 | 31 | 33 | 86 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), and PR #66 (N26 and N27).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -81,10 +81,9 @@ The three items that needed an owner decision were decided: [D1](#d1--high-revok
 
 ### Alongside: tooling and hygiene
 
-Not logic or UI, and nothing to wait for. Take T4 and T3 first, since every fix relies on the checks; fit the rest in between the findings in [Found while fixing](#found-while-fixing).
+Not logic or UI, and nothing to wait for. Take T4 first, since every fix relies on the checks; fit the rest in between the findings in [Found while fixing](#found-while-fixing).
 
 - [T4 · High](#t4--high-no-ci-node-pin-or-environment-template): No CI, Node pin or `.env.example`. A workflow running e2e would have caught [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift).
-- [T3 · High](#t3--high-database-backed-unit-tests-depend-on-order): The database-backed tests still depend on their order.
 - [T5 · Medium](#t5--medium-e2e-cant-be-pointed-at-its-own-database): E2E can't point at its own database. Its raw-SQL assertions are part of [the Java API](#the-java-api) work.
 - [S8 · Medium](#s8--medium-design-mocks-and-labs-ship-in-production-builds): Design mocks and labs ship in production builds.
 - [G4 · Medium](#g4--medium-build-process-docs-and-artifacts-with-dead-paths): The git history still holds the removed reference images and the third-party product's name; whether the dev team gets it or a fresh repository is the owner's call at handoff.
@@ -255,7 +254,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N20 · Low: Five e2e specs fail now and then when runs share a machine
 
-- **Status:** Open
+- **Status:** Fixed. scenario-02a's keyboard run waits for the New template button to hydrate and for the caret to land after each arrow key, scenario-08 for the sidebar's Settings link to be hydrated and still before it presses it, focus-targets for the caret to be at the end of the name before it types, comment-policy for the review screen to stop moving under its clicks, and the database helper retries `SQLITE_BUSY` (sibling PR); the four specs pass ten times each (`--repeat-each=10`) on a machine under load.
 - **Where:** `e2e/comment-policy.spec.ts`; `e2e/scenario-08.spec.ts`; `e2e/demo-script.spec.ts`; `e2e/scenario-02a.spec.ts`; `e2e/focus-targets.spec.ts`
 - **What happens:** While several e2e runs shared one machine, each of these failed in some run and passed when run alone: comment-policy (`SQLITE_BUSY` on its own database access), scenario-08 (its Settings link), demo-script at step 8.3, scenario-02a's keyboard-only run, and focus-targets' first test, which typed " (edited)" into the middle of the template name. A gate that fails at random gets rerun until it passes, and a real failure hides among the reruns. Seen in the e2e runs of the Fix first PRs.
 - **Fix:** Find what each one races and wait for that with a web-first assertion, retry `SQLITE_BUSY` in the specs' own database access, and check each under load with `--repeat-each`. Relates to [T7](#t7--medium-slow-and-brittle-test-habits) and [T5](#t5--medium-e2e-cant-be-pointed-at-its-own-database).
@@ -329,7 +328,7 @@ These findings are real, and several are High, but each one is fixed by building
 | [S4 · High](#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep) | Work out each membership's effective status from its recertification and inactivity deadlines when the viewer is loaded, so a lapsed approver is refused on their next request, and run the sweep on a schedule instead of on demo triggers. |
 | [S10 · Low](#s10--low-mutating-route-handlers-have-no-origin-check) | Better Auth's origin checks cover its own endpoints, not the app's. Once the cookie is a real session, the autosave and import route handlers check `Origin` or `Sec-Fetch-Site` themselves, and answer unknown and forbidden ids the same way. |
 
-The sign-in work also touches findings filed elsewhere. [A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews): keep the session cookie off `/api/v1` by moving CMS preview to a BFF route first. [I12](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data) is fixed: the palette keeps its answers per viewer, as two real people sharing a browser need. [S5](#s5--high-consumer-identity-is-a-self-asserted-header): consumers are systems, not people, so they get client credentials (an Entra ID app registration can issue them), not Better Auth sessions. The app reads the session in one place, the fail-closed request context in step 1 of [the backend seam](#the-backend-seam).
+The sign-in work also touches findings filed elsewhere. [A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews) is fixed: CMS preview is a BFF route, so the session cookie is already off `/api/v1`. [I12](#i12--medium-every-page-ships-the-whole-template-catalog-and-the-palette-keeps-the-last-personas-data) is fixed: the palette keeps its answers per viewer, as two real people sharing a browser need. [S5](#s5--high-consumer-identity-is-a-self-asserted-header): consumers are systems, not people, so they get client credentials (an Entra ID app registration can issue them), not Better Auth sessions. The app reads the session in one place, the fail-closed request context in step 1 of [the backend seam](#the-backend-seam).
 
 ### Demo tools
 
@@ -346,7 +345,7 @@ If the backend moves to the Spring Boot API with this app as its BFF, these find
 
 | Finding | What the port has to get right |
 | --- | --- |
-| [A1 · High](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews) | Do it first, before Spring owns `/api/v1`: CMS preview moves to a BFF route that calls the render engine with the session, and `/api/v1` serves consumers only. |
+| [A1 · High](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews) | Done: CMS preview is a BFF route that calls the render engine with the session, and `/api/v1` serves consumers only. |
 | [S5 · High](#s5--high-consumer-identity-is-a-self-asserted-header) | Consumers authenticate at the gateway with client credentials or mTLS, calls are rate-limited, and unauthenticated calls write no render-log rows. The contract says so. |
 | [B1 · High](#b1--high-server-actions-are-the-service-layer) | A request context and service interfaces, with today's code as the local implementation and an HTTP one beside it. Rendering already works this way. |
 | [B2 · High](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) | Each rule it lists becomes one domain function. Fix first items that touched these rules ([S7](#s7--medium-comments-are-accepted-on-any-version-state), [D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve) and [H2](#h2--medium-client-components-re-implement-domain-rules) among them) moved theirs; [N16](#n16--low-two-refusal-rules-still-live-outside-the-domain) lists two that are left. |
@@ -386,8 +385,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S2 · High: Identity fails open to the default persona
 
 - **Status:** Deferred. Replaced when real login lands. Whatever replaces `getViewer()` must refuse, not default to a person.
-- **Where:** `src/server/viewer.ts` line 58; `src/app/api/v1/templates/[templateId]/render/route.ts` line 151
-- **What happens:** With no cookie or an unknown id, `getViewer()` returns Maya. The public render route uses it for `preview: true`, so an anonymous `POST {version: "draft", preview: true}` renders Coral Offers' unreleased drafts. Whatever replaces the persona cookie will inherit this contract unless it changes now.
+- **Where:** `src/server/viewer.ts` line 58; `src/app/api/templates/[templateId]/preview/route.ts` line 57
+- **What happens:** With no cookie or an unknown id, `getViewer()` returns Maya. Stencil's preview route uses it, so an anonymous `POST {version: "draft"}` to it renders Coral Offers' unreleased drafts (it is no longer on the public `/api/v1` URL). Whatever replaces the persona cookie will inherit this contract unless it changes now.
 - **Fix:** Return no viewer (401 or redirect to sign-in) when there's no identity. Make the persona switcher a dev-only provider behind the same function.
 - **Evidence:** verified
 
@@ -753,7 +752,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A1 · High: The public consumer endpoint also serves CMS previews
 
-- **Status:** Open
+- **Status:** Fixed. The Preview calls Stencil's own `POST /api/templates/[templateId]/preview`, which reads the session and renders through the same engine with the same bodies and errors; `/api/v1/.../render` serves consumers only (`X-Consumer-Id`, a released number), never a draft or a version in review, and reads no cookie ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 - **Where:** `src/app/api/v1/templates/[templateId]/render/route.ts` line 137; `src/components/preview/render-preview.ts` line 49
 - **What happens:** `POST /api/v1/.../render` accepts both `X-Consumer-Id` and the browser's persona cookie, plus `version: "draft"`. Two auth models share one public URL; once Spring owns `/api/v1`, previews either break or Spring must accept browser cookies.
 - **Fix:** A BFF-internal preview route that calls the render service with the session. Keep `/api/v1` consumer-only.
@@ -893,7 +892,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T3 · High: Database-backed unit tests depend on order
 
-- **Status:** Partly fixed. The render, domain-render and editor tests pass in shuffled order (PR #6). The database-backed narrative tests listed here still don't.
+- **Status:** Fixed. Every database-backed test runs on a copy of a seeded database of its own (`src/lib/fresh-database.ts`, [decision 0048](decisions/0048-every-database-test-gets-its-own-database.md)); the narrative files build the state each test needs, and `vitest.config.mts` shuffles the tests in every run and prints the seed of a failure.
 - **Where:** `src/server/actions/review.test.ts` line 1; `src/simulator/actions.test.ts` line 1
 - **What happens:** With `--sequence.shuffle --sequence.seed=12345`, 31 tests fail in 9 files (simulator actions 8 of 11, review 8 of 25, access 5 of 20, access sweep 4 of 7). The files are written as narratives, so a single `-t` run fails too. Agents will copy the pattern.
 - **Fix:** A per-test fixture that copies a pre-seeded database in `beforeEach`, then shuffle in CI.
@@ -909,7 +908,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T5 · Medium: E2E can't be pointed at its own database
 
-- **Status:** Open
+- **Status:** Fixed. `playwright.config.ts` gives e2e its own `data/e2e.db` and `data/e2e-uploads` (`E2E_DATABASE_URL`, `E2E_UPLOADS_DIR`, read once in `e2e/storage.ts`) and starts the server on them as `DATABASE_URL` and the new `UPLOADS_DIR`, so a run never touches the demo database; the raw-SQL assertions stay for the Java API work.
 - **Where:** `e2e/api/helpers.ts` line 12
 - **What happens:** `openDb()` hard-codes `data/ucomp.db` and two helpers hard-code the uploads folder, so `DATABASE_URL` splits server and tests. Thirteen specs assert with raw SQL, which won't survive a Java backend.
 - **Fix:** One `E2E_DATABASE_URL` and uploads dir set in `playwright.config.ts` and read by the helpers; assert through the API where possible.
@@ -925,7 +924,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T7 · Medium: Slow and brittle test habits
 
-- **Status:** Open
+- **Status:** Fixed. Unit tests that slept in real time run on Vitest's fake timers (14 files, the 2.1-second `required-sections` wait among them); every e2e spec waits on its condition (a web-first assertion, `expect.poll`, or `settled()` in `e2e/helpers/settled.ts` for fonts, animations and layout at rest) instead of `waitForTimeout`, except the two prefetch tests' named 3-second counting window; the helpers click, type and drag at test speed with the recording pacing in `e2e/media/`; and `demo-script.spec.ts` runs only in the opt-in demo project ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)). Waits left on purpose: a real SQLite lock and child process, one animation frame, and timing assertions that measure speed.
 - **Where:** `src/editor/extensions/required-sections.test.ts` line 230; `e2e/demo-script.spec.ts` line 1
 - **What happens:** A real 2.1-second sleep and several 25 to 80 ms sleeps in unit tests; 38 `waitForTimeout` calls in e2e; a 90 ms pacing delay on every click; demo-recording branches inside functional helpers; a 1,318-line `demo-script` test duplicating the scenarios. The selector ratio is good (832 role-based against 283 locators).
 - **Fix:** Fake timers; web-first assertions; move recording pacing out of the functional helpers; retire or merge `demo-script.spec.ts`.
@@ -1071,7 +1070,7 @@ The owner may keep Next.js as the backend or move business rules and storage to 
 2. **Use-case services behind interfaces** in a new `services` folder under `src/server/`: today's Drizzle code moves unchanged into a local implementation; an HTTP implementation can call Spring later. Only the local implementation, `src/server/db` and `src/server/seed` import Drizzle.
 3. **Read models return capability flags** (`{ok, code, reason}`) with stable codes. Components render them; they never call `can()` or compare English sentences.
 4. **Move the rules listed in [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) into `src/domain`** as pure functions returning `{changes, effects}`.
-5. **A machine-readable contract** for `/api/v1`: OpenAPI 3.1, RFC 9457 problem details, cursor paging and consumer credentials. Move CMS preview to a BFF route ([A1](#a1--high-the-public-consumer-endpoint-also-serves-cms-previews)).
+5. **A machine-readable contract** for `/api/v1`: OpenAPI 3.1, RFC 9457 problem details, cursor paging and consumer credentials.
 6. **One config module** with `DEMO_MODE`, `CONSUMER_API_BASE_URL` and a `Clock` interface.
 
 Rendering is already in this shape: `src/server/render/engine.ts` runs with no database, `docs/render-spec.md` specifies it, and the golden files are the acceptance test for a second implementation.

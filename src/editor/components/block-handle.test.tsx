@@ -8,7 +8,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { Editor } from "@tiptap/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { editorExtensions } from "../schema";
 import { createVariableStore } from "../state/variable-store";
 import { byRole } from "../testing/editor";
@@ -19,10 +19,14 @@ import { TableMenu } from "./table-menu";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 afterEach(() => {
   cleanup?.();
   cleanup = null;
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 const p = (text: string): JSONContent => ({ type: "paragraph", content: [{ type: "text", text }] });
@@ -47,7 +51,7 @@ const DOC: JSONContent = {
   ],
 };
 
-const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms = 0) => vi.advanceTimersByTimeAsync(ms);
 
 function setup() {
   const frame = document.createElement("div");

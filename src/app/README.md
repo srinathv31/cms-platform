@@ -100,11 +100,12 @@ decisions were in the product; they are recoverable from the `archive/design-moc
 | `GET /api/templates/[templateId]/submit-summary` | [route.ts](./api/templates/[templateId]/submit-summary/route.ts) | Browser: the submit dialog and its Refresh summary ([workspace-actions.tsx](../components/workspace/workspace-actions.tsx)). |
 | `GET /api/templates/[templateId]/copilot-prompt` | [route.ts](./api/templates/[templateId]/copilot-prompt/route.ts) | Browser: the Copilot prompt dialog ([copilot-prompt.tsx](../components/workspace/copilot/copilot-prompt.tsx)). |
 | `GET /api/templates/[templateId]/integration` | [route.ts](./api/templates/[templateId]/integration/route.ts) | Browser: the SHARE panel, on open and as a prefetch ([workspace-share.tsx](../components/workspace/workspace-share.tsx)). |
+| `POST /api/templates/[templateId]/preview` | [route.ts](./api/templates/[templateId]/preview/route.ts) | Browser: the Preview (editor, workspace, review screen), per render ([render-preview.ts](../components/preview/render-preview.ts)). The session's person, any state ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)). |
 | `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV; [export-link.tsx](../components/audit/export-link.tsx) shows a refusal). |
 | `GET /api/v1/templates?q=&limit=&after=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/templates/[templateId]?version=&since=` | [route.ts](./api/v1/templates/[templateId]/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
-| `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Browser preview with `preview: true` ([render-preview.ts](../components/preview/render-preview.ts)); simulator and outside consumers with `X-Consumer-Id`. |
+| `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Simulator and outside consumers with `X-Consumer-Id`. Consumers only: never a draft or a version in review, and no session or cookie. |
 | `GET /sim/deliveries/[deliveryId]/file` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts) | Simulator: the customer views' iframes and PDF. |
 | `GET /sim/deliveries/[deliveryId]/view` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/view/route.ts) | Simulator: the customer drawer, when it opens on a delivery ([offer-view.tsx](../simulator/ui/offer-view.tsx)). |
 | `GET /sim/templates/search?q=` | [route.ts](./(simulator)/sim/templates/search/route.ts) | Simulator: the link flow's template search, debounced ([link-flow.tsx](../simulator/ui/link-flow.tsx)). |
@@ -185,8 +186,8 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
   [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
-  Render requires it unless `preview: true`, which uses the persona cookie instead, and checks it in
-  [render-template.ts](../server/render/render-template.ts).
+  Render requires it too, and checks it in [render-template.ts](../server/render/render-template.ts). `/api/v1`
+  reads no cookie and no session: Stencil's own previews are `POST /api/templates/[templateId]/preview`.
 - Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
   `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
   refuse a cursor from another list, or a notices cursor from before a demo reset (`noticeEpoch`), with
@@ -222,6 +223,13 @@ refuses, 404 for an unknown template or version, 409 when there is nothing to re
 The browser calls them through `readTemplate()` in [lib/template-reads.ts](../lib/template-reads.ts). A request
 without a persona cookie acts as the default persona, as every page does, until real sign-in
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
+
+**The preview** (`POST /api/templates/[templateId]/preview`) is the one POST among them, because it carries the sample
+values. It reads the person from the session (`getViewer()`), renders through `renderTemplate` with `preview: true`,
+and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
+errors as the consumer render route, through [server/api/render-http.ts](../server/api/render-http.ts) and
+`errorResponse`. It takes `version` as `"draft"` or a number, an optional `round`, and any state previews
+([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 
 **The palette's search** (`/api/palette/[space]?q=&template=`) is a read of the same kind: the route passes the
 viewer and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
@@ -285,16 +293,31 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 
 - **Route handlers:** co-located `route.test.ts` files under `api/`, run with `npx vitest run src/app/api`. The
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
-  database (`tempDatabase` in `src/server/testing/review-fixtures.ts`) and mock `@/server/clock`. The template
+  database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
+  database per test) and mock `@/server/clock`. The template
   reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
   with `getViewer` mocked to each persona, and so is the palette's search
   ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](./(product)/[team]/audit/export/route.test.ts)) mocks the viewer and the
   query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
-  3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
-  `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server
-  without a reset: `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`.
+  3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, with e2e's own
+  database and uploads folder (`E2E_DATABASE_URL`, default `file:./data/e2e.db`; `E2E_UPLOADS_DIR`, default
+  `./data/e2e-uploads`), passed as the server's `DATABASE_URL` and `UPLOADS_DIR`. The demo's `data/ucomp.db` and
+  `data/uploads` are never touched. [e2e/storage.ts](../../e2e/storage.ts) reads the two values once; `openDb()` in
+  `e2e/api/helpers.ts` and the cleanup helpers use it, so server and specs share the files, and `openDb()` waits out
+  and retries the server's `SQLITE_BUSY`. `resetDemoData()` (`e2e/helpers/access.ts`), which a spec calls from
+  `afterAll` when it cannot put its changes back by hand, re-seeds those same files. To check against a running dev
+  server without a reset, start that server with the same two variables (`DATABASE_URL=file:./data/e2e.db UPLOADS_DIR=./data/e2e-uploads npm run dev`, after
+  an `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`. To
+  point the specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
+  `E2E_UPLOADS_DIR=./data/uploads`.
+- **Pace and recording:** a functional spec clicks, types and drags at test speed. The helpers in `e2e/helpers/`
+  (`tap`, `typeSlowly`, `dragRowTo`) carry no pause and no recording code; waits are on a condition, never a
+  `waitForTimeout`. The demo recording lives in `e2e/media/`: the opt-in `demo` project (cursor, mouse glides,
+  slow clicks and typing, a video) and `stills-1280` (the 1280 stills). `chromium` never runs
+  `e2e/demo-script.spec.ts`; run it with `npx playwright test --project=demo e2e/demo-script.spec.ts`, and the
+  whole media set with `npm run gate:media` ([decision 0049](../../docs/decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
 
 | Spec | Covers |
 | --- | --- |
@@ -320,6 +343,6 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/sunset-zone.spec.ts` | A sunset date ends at 00:00 in the business time zone, and changing the zone moves no sunset already set. |
 | `e2e/variable-rename.spec.ts` | A renamed variable reaches the submit dialog and the stored contract as one rename. |
 | `e2e/versioned-name.spec.ts` | A draft rename reaches customers only when its version is approved, and the review shows it. |
-| `e2e/demo-script.spec.ts` | The whole demo script on one database state. |
+| `e2e/demo-script.spec.ts` | The whole demo script on one database state. Only in the opt-in `demo` and `stills-1280` projects, never in `chromium`. |
 | `e2e/error-boundaries.spec.ts` | Each error boundary, reached by breaking a stored JSON value for one test: what it shows and keeps, and Try again once the value is back. |
 | `e2e/api/consumer.spec.ts`, `render.spec.ts`, `imports.spec.ts` | The `/api/v1` GET routes, the render route, and the import routes over HTTP. |

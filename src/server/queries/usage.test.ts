@@ -1,14 +1,11 @@
-import { rmSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { inArray } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { HEATMAP_WEEKS, HISTORY_DAYS, TREND_WEEKS, USAGE_WINDOW_DAYS } from "@/domain/golive-types";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getTemplateUsage, getUsageDashboard } from "./usage";
 
@@ -17,13 +14,11 @@ import { getTemplateUsage, getUsageDashboard } from "./usage";
 //   - Holiday Points v1 is Revoked (its renders stopped 34 days ago);
 //   - a handful of failed renders (Cash Back v2, Rate Change, High-Yield Savings v2).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-usage-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-usage-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -33,19 +28,13 @@ const DAY = 86_400_000;
 
 let db: Db;
 let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
+
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
   for (const id of ["maya", "riley", "eli"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 function as(userId: string) {

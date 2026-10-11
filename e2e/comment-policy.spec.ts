@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { rowsOf } from "./helpers/cleanup";
 import { asPersona, expect, hydrated, liveEditor, tap, test, typeSlowly } from "./helpers/scenario";
+import { settled } from "./helpers/settled";
 
 // Comments belong to a draft or a version in review (docs/handoff-review.md, S7 and S9; decision 0010).
 //
@@ -96,6 +97,8 @@ async function openReview(page: Page, person: string, templateId: string, number
   await expect(decision(page)).toBeVisible();
   await liveEditor(page);
   await hydrated(page);
+  // The rail's controls are pressed with a held click: wait until nothing is still streaming in under them.
+  await settled(page);
 }
 
 test.use({ trace: "off", screenshot: "only-on-failure" });
@@ -169,6 +172,7 @@ test("a reviewer comments on a version in review; an Active version's threads of
     await page.goto(`/${TEAM}/templates/${balance.templateId}`);
     await liveEditor(page);
     await hydrated(page);
+    await settled(page);
     const rail = page.locator('aside[aria-label="Comments and variables"]');
     await expect(rail).toBeVisible();
     const record = rail.locator(`article[data-thread="${RECORD}"]`);

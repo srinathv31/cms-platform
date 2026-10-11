@@ -7,8 +7,9 @@
 //   → check the document (schema-check.ts) → resolve TipTap JSON into a RenderDoc (resolve.ts)
 //   → channel adapter → render_log row
 //
-// The editor preview, the review screen and the simulator all call the same route, so what an
-// approver sees is exactly what a customer gets. render_log NEVER holds variable values.
+// The editor preview and the review screen (POST /api/templates/{id}/preview) and the consumers and the
+// simulator (POST /api/v1/templates/{id}/render) go through the same engine, so what an approver sees is
+// exactly what a customer gets. render_log NEVER holds variable values.
 
 import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/list-markers";
 import type { ChannelFieldKey } from "../channel-fields";
@@ -284,7 +285,7 @@ export { MAX_VALUE_LENGTH } from "@/editor/model/variables";
  *   X-Stencil-Template-Id    "UC-4F7K2Q"
  *   X-Stencil-Version        "2", or "draft"
  *   X-Stencil-Newer-Version  "3", only when the rendered version is Superseded (still renders until its sunset)
- *   X-Stencil-Preview        "true", only on previews
+ *   X-Stencil-Preview        "true", only on previews (Stencil's own route, never /api/v1)
  *
  * Bodies:
  *   pdf    application/pdf (bytes); Content-Disposition: inline; filename="UC-4F7K2Q-v2.pdf" ("…-draft.pdf";
@@ -333,7 +334,7 @@ export interface Base64ResponseBody {
  * | 400    | consumer_required     | "X-Consumer-Id is required."                                              |
  * | 413    | body_too_large        | "The body must be at most 1,000,000 bytes."                              |
  * | 403    | unknown_consumer      | "Consumer \"acme\" isn't registered."                                     |
- * | 403    | preview_forbidden     | "You can't preview this template."                                        |
+ * | 403    | preview_forbidden     | "You can't preview this template." (the preview route only; /api/v1 never returns it) |
  * | 404    | template_not_found    | "Template UC-4F7K2Q doesn't exist."                                       |
  * | 404    | version_not_found     | "Template UC-4F7K2Q has no version 7." / "Template UC-4F7K2Q has no open draft." |
  * | 409    | version_not_released  | "Version 3 is in review. Version 2 is active." / "… No version is active yet." |

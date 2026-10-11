@@ -1,4 +1,6 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { resetDemoData } from "./helpers/access";
+import { settled } from "./helpers/settled";
 
 // Phase 1 gate: shell, personas, library, workspace header (SHARE ring), editor first look.
 // Runs serially against the production build after `npm run db:reset` (see playwright.config.ts).
@@ -274,15 +276,20 @@ async function dragSelect(page: Page, block: Locator) {
   const y = rect.top + rect.height / 2;
   await page.mouse.move(rect.left + 1, y, { steps: 3 });
   await page.mouse.down();
-  await page.waitForTimeout(80);
   await page.mouse.move(rect.right - 1, y, { steps: 8 });
-  await page.waitForTimeout(80);
   await page.mouse.up();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Per-persona shell and library
 // ───────────────────────────────────────────────────────────────────────────
+
+// The workspace tests type into the editor, and the autosave keeps what they type (Annual Fee Waiver's draft): put the
+// seed back when the file is done, so the specs after it start from it.
+test.afterAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
+});
 
 test.describe("shell and library, per persona", () => {
   for (const spec of PERSONAS) {
@@ -534,8 +541,8 @@ test.describe("workspace", () => {
     expect(box.width).toBeGreaterThanOrEqual(72);
     expect(box.width).toBeLessThanOrEqual(80);
 
+    // Hovered, the ring turns for as long as the pointer stays: nothing to settle. The click waits for the button to stop scaling.
     await share.hover();
-    await page.waitForTimeout(400);
     await share.click();
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
@@ -839,9 +846,15 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
   const LIMIT = 0.01;
 
   async function settle(page: Page) {
-    // Hydration, fonts, streamed holes, the live editor swap-in: give them time to land.
-    await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(1500);
+    // Hydration, streamed holes, the live editor swap-in: wait for each, then for the layout and the fonts to hold still.
+    await hydrated(page);
+    await page.waitForFunction(() => {
+      const shown = (el: Element) => (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }) && el.getClientRects().length > 0;
+      const loading = [...document.querySelectorAll('[data-slot="skeleton"], [aria-busy="true"]')].some(shown);
+      const editors = [...document.querySelectorAll(".ProseMirror")].filter(shown);
+      return !loading && editors.every((el) => "pmViewDesc" in el);
+    });
+    await settled(page);
   }
 
   async function report(label: string, page: Page) {
@@ -860,9 +873,7 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
       box.style.cssText = "height:300px;width:300px;background:#ccc";
       document.querySelector("main")!.prepend(box);
     });
-    await page.waitForTimeout(500);
-    const { cls } = await readCls(page);
-    expect(cls).toBeGreaterThan(LIMIT);
+    await expect.poll(async () => (await readCls(page)).cls, { message: "the injected block's shift is reported" }).toBeGreaterThan(LIMIT);
   });
 
   for (const id of ["maya", "alex", "riley"]) {
@@ -928,7 +939,7 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
       await expect(status).toHaveText("Saved", { timeout: 15_000 });
       await expect(status, "the status is on screen, where a shift would be reported").toBeInViewport();
     }
-    await page.waitForTimeout(1000);
+    await settled(page);
     const { shifts } = await readCls(page);
     expect(shifts.slice(before), "layout shifts after typing, while each save landed").toEqual([]);
   });
@@ -969,6 +980,9 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
 test.describe("router prefetch", () => {
   test.use({ calmPrefetch: false });
 
+  /** How long the requests are counted. The window is what the test measures (a loop shows as hundreds in seconds), so it stays a fixed time. */
+  const PREFETCH_WINDOW_MS = 3_000;
+
   // Found in Phase 1 QA: on the production build, the library page re-requested the prefetch of
   // every visible link (~650 requests a second) until the tab closed. Aborting only the
   // `/templates/UC-…` prefetches stopped it, so the template-row links are the trigger.
@@ -979,7 +993,7 @@ test.describe("router prefetch", () => {
     });
     await page.goto("/coral-offers/library");
     await libraryRows(page);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(PREFETCH_WINDOW_MS);
     console.log(`library RSC requests in ~3s: ${rsc}`);
     // A page with 5 rows and 6 nav links needs a few dozen prefetches at most.
     expect(rsc).toBeLessThan(60);
@@ -998,7 +1012,7 @@ test.describe("router prefetch", () => {
     await page.goto(href!);
     await expect(page.getByRole("heading", { level: 1, name: "Balance Transfer Intro — Terms" })).toBeVisible();
     await expect(ring(page)).toBeVisible();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(PREFETCH_WINDOW_MS);
     console.log(`workspace RSC requests in ~3s: ${rsc}`);
     expect(rsc).toBeLessThan(60);
   });

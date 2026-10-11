@@ -143,7 +143,7 @@ describe("Revert to v1", () => {
   const saved: SaveFields[] = [];
   let removeContent: () => void;
 
-  const sleep = (ms: number) => act(async () => void (await new Promise((resolve) => setTimeout(resolve, ms))));
+  const sleep = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
   async function until(check: () => unknown) {
     for (let i = 0; i < 40; i++) {
       if (check()) return;
@@ -182,6 +182,7 @@ describe("Revert to v1", () => {
   }
 
   beforeEach(async () => {
+    vi.useFakeTimers();
     session = null;
     baseRoute.mockReset();
     vi.mocked(toast).mockClear();
@@ -210,6 +211,7 @@ describe("Revert to v1", () => {
     await act(async () => root.unmount());
     container.remove();
     document.body.innerHTML = "";
+    vi.useRealTimers();
   });
 
   it("reads the base of the draft on screen, by its version id", async () => {

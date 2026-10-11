@@ -15,18 +15,17 @@ afterEach(() => {
 });
 
 describe("renderPreview", () => {
-  it("posts the version, channel, values and the preview flag to the template's render route", async () => {
+  it("posts the version, channel and values to the template's own preview route, never to /api/v1", async () => {
     respondWith(new Response("<html></html>", { status: 200 }));
     await renderPreview({ ...request, channel: "web" });
 
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("/api/v1/templates/UC-4F7K2Q/render");
+    expect(url).toBe("/api/templates/UC-4F7K2Q/preview");
     expect(init?.method).toBe("POST");
     expect(JSON.parse(String(init?.body))).toEqual({
       version: "draft",
       channel: "web",
       values: { first_name: "Maya" },
-      preview: true,
     });
   });
 
@@ -42,7 +41,7 @@ describe("renderPreview", () => {
   it("names the round of a numbered version when it has one, and never for the draft", async () => {
     respondWith(new Response("<html></html>", { status: 200 }));
     await renderPreview({ ...request, version: 3, round: 1, channel: "web" });
-    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toMatchObject({ version: 3, round: 1, preview: true });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual({ version: 3, round: 1, channel: "web", values: { first_name: "Maya" } });
 
     respondWith(new Response("<html></html>", { status: 200 }));
     await renderPreview({ ...request, round: 2, channel: "web" });

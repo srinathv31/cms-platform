@@ -11,9 +11,10 @@ import { test, type Locator, type Page } from "@playwright/test";
 // recording never shows a resize. Outside these projects every helper here is a no-op, so a spec runs
 // at its normal speed.
 //
-// Demo mode (pacing, cursor) is `UCOMP_DEMO=1`; shooting is on in demo mode or with `UCOMP_STILLS=1`.
-// The projects turn them on per test (the fixture in helpers/scenario.ts); set them yourself to get the
-// same in any other project.
+// Demo mode (the cursor, the pauses) is `UCOMP_DEMO=1`; shooting is on in demo mode or with `UCOMP_STILLS=1`.
+// The projects turn them on per test (the `demoStage` fixture in ./stage.ts, which also installs the paced
+// clicks, typing and drag of ./presentation.ts); set the variables yourself to get the same in any other
+// project, minus the paced clicks.
 
 export const isDemo = () => process.env.UCOMP_DEMO === "1";
 
@@ -247,6 +248,26 @@ export async function moveTo(page: Page, target: Locator, at?: Point) {
   } catch {
     // Not found, not unique, or gone: let the click say so.
   }
+}
+
+// ── Noise ────────────────────────────────────────────────────────────────────
+
+/**
+ * In the `demo` project only, takes out the console lines the recording harness itself causes, so a
+ * real error still fails the run:
+ *  - "Blocked script execution" in a PDF frame (the harness's init scripts reach the PDF viewer's sandboxed frame);
+ *  - "duplicate view-transition-name: ucomp-demo-cursor" and the aborted transition that follows it (the
+ *    cursor dot named for view transitions, mounted twice by two overlapping injections after a full page load).
+ * Call it from an afterEach: it runs before the `problems` fixture checks the list.
+ */
+export function dropDemoNoise(problems: string[]) {
+  if (!isDemo()) return;
+  const noise = [
+    /Blocked script execution in '[^']*\/sim\/deliveries\/[^/']+\/file'/,
+    /Unexpected duplicate view-transition-name: ucomp-demo-cursor/,
+    /^pageerror: Transition was aborted because of invalid state/,
+  ];
+  for (let i = problems.length - 1; i >= 0; i--) if (noise.some((pattern) => pattern.test(problems[i]))) problems.splice(i, 1);
 }
 
 // ── The stills ───────────────────────────────────────────────────────────────

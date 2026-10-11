@@ -37,5 +37,5 @@ npm run typecheck
 npm run lint
 npm test         # vitest
 npm run docs:check   # links, paths and READMEs in the docs
-npm run build && npm run e2e   # Playwright, against the production build (resets the demo DB)
+npm run build && npm run e2e   # Playwright, against the production build (own database, data/e2e.db)
 ```

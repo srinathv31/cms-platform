@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { settled } from "./helpers/settled";
 
 // Reflow of two screens #66's reflow.spec.ts doesn't reach (WCAG 2.1 SC 1.4.10, decision 0045): a 320px window is
 // Chrome at 400% on a 1280px laptop.
@@ -28,7 +29,7 @@ async function open(page: Page, url: string, persona: string) {
     const el = document.querySelector("button[aria-label$='profile and persona']");
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
   });
-  await page.waitForTimeout(800);
+  await settled(page);
 }
 
 /** What the page and the canvas (the shell's scroll area) hold sideways. */
@@ -62,7 +63,10 @@ async function openDraft(page: Page) {
   await open(page, `/coral-offers/templates/${FEE_WAIVER}`, "maya");
   const doc = page.locator(".ucomp-doc[contenteditable='true']");
   await expect(doc).toBeVisible();
-  await page.waitForTimeout(800); // the handle attaches a moment after the editor does
+  // The server's markup has given way to the live editor (it stamps `pmViewDesc`), and the layout has stopped moving:
+  // `hoverBlock` aims at a box measured once, and the block handle attaches to the live editor.
+  await page.waitForFunction(() => "pmViewDesc" in (document.querySelector(".ucomp-doc[contenteditable='true']") ?? {}));
+  await settled(page);
   return doc;
 }
 
@@ -111,7 +115,7 @@ test.describe("the block handle at 320px", () => {
     await GRIP(page).click();
     const menu = page.locator("[data-block-menu]");
     await expect(menu).toBeVisible();
-    await page.waitForTimeout(400); // it fades in; its position has settled
+    await settled(page); // it has faded in and its position has settled
     const box = (await menu.boundingBox())!;
     expect(box.x, "the menu's left edge is on screen").toBeGreaterThanOrEqual(0);
     expect(box.x + box.width, "the menu's right edge is on screen").toBeLessThanOrEqual(320);

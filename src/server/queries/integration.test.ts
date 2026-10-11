@@ -1,14 +1,10 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { RESPONSE_FORMATS } from "@/domain/golive/samples";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getIntegrationPanel, loadIntegrationPanel } from "./integration";
 
 // The integration panel's data and its viewer-checked loader (the GET route's read) against a temporary database
@@ -18,9 +14,7 @@ const env = vi.hoisted(() => ({ dir: "", host: "localhost:3001", proto: null as 
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-integration-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-integration-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("next/headers", () => ({
@@ -32,20 +26,13 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 const ORIGIN = "http://localhost:3001";
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-  for (const id of ["maya", "sam", "morgan", "riley"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+const ids = seededDatabasePerTest({ base: BASE });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "sam", "morgan", "riley"]) people[id] = await loadPersona(db, id);
 });
 
 const id = (key: string) => ids[key]!;

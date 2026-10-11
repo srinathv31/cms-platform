@@ -1,15 +1,9 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { createClient, type Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LifecycleEffect } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import { inTransaction, NOTICE_SEQ_KEY, notificationHref, takeNoticeSeqs, writeEffects, type EffectContext } from "./effects";
 
 // The effects writer against a temporary database filled by the real seed: Coral Offers has two
@@ -19,23 +13,7 @@ const { auditEvents, consumerNotices, memberships, notifications, renderLog, set
 const DAY = 86_400_000;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
-let dir: string;
-let client: Client;
-let db: Db;
-let ids: Record<string, string>;
-
-beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ucomp-effects-"));
-  client = createClient({ url: `file:${join(dir, "effects.db")}` });
-  db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-}, 60_000);
-
-afterAll(() => {
-  client?.close();
-  rmSync(dir, { recursive: true, force: true });
-});
+const { db, ids } = standaloneDatabasePerTest({ base: BASE });
 
 // Every test writes at its own instant, so its rows are easy to pick out.
 let tick = 0;

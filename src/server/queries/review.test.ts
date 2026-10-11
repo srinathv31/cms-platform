@@ -1,8 +1,5 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq, inArray } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
 import { COMMENT_REFUSALS } from "@/domain/comments";
 import { diffVariables } from "@/domain/contract";
@@ -12,8 +9,7 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { findRound } from "./find-round";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
@@ -31,13 +27,11 @@ import { getWorkspaceDocument } from "./workspace";
 //   - Balance Transfer v1 is Superseded with a sunset in 21 days, v2 Active, both rendered by Coral;
 //   - Holiday Points v1 is Revoked.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-review-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-review-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -46,20 +40,12 @@ const { commentThreads, contentTypes, versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-  for (const id of ["maya", "jordan", "alex", "sam", "riley", "eli"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "jordan", "alex", "sam", "riley", "eli", "priya"]) people[id] = await loadPersona(db, id);
 });
 
 function as(userId: string) {
@@ -224,11 +210,11 @@ describe("getReviewScreen", () => {
     // Priya holds Author and Approver on Coral Offers (an access request can add the role) and edited
     // Maya's Cash Back v3 before Maya submitted it.
     const priya = await loadPersona(db, "priya");
-    people.priya = {
+    people.priyaApprover = {
       ...priya,
       memberships: priya.memberships.map((m) => (m.teamId === "coral-offers" ? { ...m, roles: ["author", "approver"] } : m)),
     };
-    as("priya");
+    as("priyaApprover");
     const v3 = (await findRound(db, ids["cash-back"]!, 3))!;
     expect((await getReviewQueue("coral-offers")).waiting.map((r) => r.versionNumber), "an approver who wrote none of it").toEqual([3]);
 

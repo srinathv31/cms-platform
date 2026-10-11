@@ -46,7 +46,7 @@ Contents:
 
 ## 1. Pipeline
 
-`POST /api/v1/templates/{templateId}/render` runs these stages in order. The first stage that fails ends the request with the error shown (section 11).
+`POST /api/v1/templates/{templateId}/render` (consumers) and Stencil's own preview, `POST /api/templates/{templateId}/preview` (the signed-in person), run these stages in order. The first stage that fails ends the request with the error shown (section 11).
 
 | # | Stage | Fails with |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ Contents:
 | 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF; or the message's text → a push for its platform, or an SMS, measured against its limit (section 10) | 500 `render_failed`; a message over its limit: 422 `push_payload_too_large` / `sms_too_long` |
 | 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values; a push's row names its platform) | — |
 
-Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only with `preview: true`, `round` only with `preview: true` (a whole number from 1; without `preview` it is ignored, whatever it holds, since consumers never see rounds), a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and an `X-Consumer-Id` header unless it is a preview (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
+Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only on the preview route, `round` only on the preview route (a whole number from 1; the consumer route ignores it, whatever it holds, since consumers never see rounds, and ignores a `preview` field too), a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and, on the consumer route only, an `X-Consumer-Id` header (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
 Stages 6 to 9 are the engine (in the Node code, `src/server/render/engine.ts`, which the route and the golden tests both run; for push and SMS, stages 8 and 9 are `renderMessage` in `src/domain/render/message.ts`, the same function the composer's preview runs in the browser). Stages 6 to 8 must give identical results in every engine. They are the same for every channel, except that stage 7 also checks the channel's own fields and stage 8 resolves them, a message channel skips the body, and a `render_failed` message names the channel (section 11). Stage 9 must give identical content in every channel.
 

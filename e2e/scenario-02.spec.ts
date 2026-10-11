@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
-import { allVersions, correlation, expectError, openDb, render, validValues } from "./api/helpers";
+import { allVersions, correlation, expectError, openDb, preview, render, validValues } from "./api/helpers";
+import { resetDemoData } from "./helpers/access";
 import {
   NAME,
   asPersona,
@@ -133,7 +134,7 @@ async function create(page: Page) {
 
     // A beat to see the new page, then typing replaces the selected name; Enter goes to the document.
     await expect(page).not.toHaveURL(/created=/);
-    await page.waitForTimeout(300);
+    await liveEditor(page);
     await beat(page, 900);
     await expectNameSelected(page, "Card offer terms");
     await typeSlowly(page, NAME);
@@ -375,6 +376,13 @@ const emailFrame = (page: Page) => page.locator('iframe[title="Email preview"]')
 // has none. So this file runs without a trace (a failure keeps a screenshot), and a real blocked
 // script in a preview frame still fails it.
 test.use({ trace: "off", screenshot: "only-on-failure" });
+
+// The story creates a template and submits it (v1, In review), and leaves it: put the seed back when the file is done,
+// so the specs after it start from it.
+test.afterAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
+});
 
 test.describe("scenario 2: create, preview, submit", () => {
   test("Maya writes Spring Travel Rewards, previews PDF, Web and Email with two sample sets, and submits v1", async ({
@@ -624,12 +632,11 @@ test.describe("scenario 2: create, preview, submit", () => {
         });
         await expectError(consumerCall.res, 409, "version_not_released", "Version 1 is in review. No version is active yet.");
 
-        const previewCall = await render(request, {
+        const previewCall = await preview(request, {
           templateId,
-          consumer: null,
           correlationId: correlation("scenario02-preview"),
           headers: { Cookie: "ucomp_persona=maya" },
-          body: { version: 1, channel: "web", values, preview: true },
+          body: { version: 1, channel: "web", values },
         });
         expect(previewCall.res.status(), "a preview of a version in review").toBe(200);
         expect(previewCall.res.headers()["content-type"]).toContain("text/html");

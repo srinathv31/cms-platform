@@ -1,42 +1,27 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { versions } from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getCopilotPrompt } from "./copilot";
 
 // The Copilot prompt read against a temporary database filled by the real seed. Annual Fee Waiver
 // has an open draft; Cash Back's latest version is in review (no draft).
 
-const env = vi.hoisted(() => ({ dir: "" }));
-
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-copilot-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-copilot-");
 });
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: new Date("2026-10-04T12:00:00.000Z") })).templates;
-  for (const id of ["maya", "taylor"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+const ids = seededDatabasePerTest({ base: new Date("2026-10-04T12:00:00.000Z") });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "taylor"]) people[id] = await loadPersona(db, id);
 });
 
 describe("getCopilotPrompt", () => {

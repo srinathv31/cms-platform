@@ -61,6 +61,10 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
+  const left = unsettled.size;
+  unsettled.clear();
+  expect(left, "a server answer the test never settled").toBe(0);
 });
 
 const base: Omit<ThreadListProps, "threads"> = {
@@ -84,11 +88,17 @@ const button = (within: ParentNode, name: RegExp | string) =>
   )!;
 const click = (el: HTMLElement) => act(() => el.click());
 const flush = () => act(() => Promise.resolve());
-
-/** A promise the test settles by hand: the server's answer. */
+/**
+ * A promise the test settles by hand: the server's answer. A test must settle every one it makes: React
+ * queues transitions that are still waiting for an answer ahead of the next test's, so an answer left
+ * hanging makes a later test's refused change show only if that test runs first.
+ */
+const unsettled = new Set<unknown>();
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((r) => (resolve = r));
+  unsettled.add(promise);
+  void promise.then(() => unsettled.delete(promise));
   return { promise, resolve };
 }
 
@@ -399,7 +409,7 @@ const esc = (el: HTMLElement) =>
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
   });
 /** Animation frames, for the focus a list returns after a host has had its turn. */
-const frames = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 80)));
+const frames = () => act(async () => void (await vi.advanceTimersByTimeAsync(80)));
 const replyOf = (id: string) => card(id).querySelector<HTMLElement>('[data-slot="reply"]')!;
 const OPEN = THREADS.filter((t) => t.status === "open");
 
@@ -443,6 +453,10 @@ function Page({
 }
 
 describe("ThreadList: focus never falls to the page", () => {
+  beforeEach(() => {
+    vi.useFakeTimers(); // `frames()` runs the animation frames and timers a focus return waits on
+  });
+
   /** The server's list after it resolved a thread. */
   const resolvedIn = (list: ThreadView[], id: string) =>
     list.map((t) => (t.id === id ? { ...t, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW } : t));
@@ -466,22 +480,26 @@ describe("ThreadList: focus never falls to the page", () => {
   });
 
   it("after resolving the last open card of several, moves to the one before it", async () => {
-    actions.resolveThread.mockReturnValue(deferred<{ ok: true }>().promise);
+    const answer = deferred<{ ok: true }>();
+    actions.resolveThread.mockReturnValue(answer.promise);
     act(() => root.render(<Page initial={OPEN.filter((t) => t.id !== "gone")} />));
     press(button(card("apr"), "Resolve"));
     await flush();
     expect(order()).not.toContain("apr");
     expect(document.activeElement).toBe(replyOf("spend"));
+    await act(async () => answer.resolve({ ok: true }));
   });
 
   it("when none are left open, moves to the Resolved (N) toggle", async () => {
-    actions.resolveThread.mockReturnValue(deferred<{ ok: true }>().promise);
+    const answer = deferred<{ ok: true }>();
+    actions.resolveThread.mockReturnValue(answer.promise);
     act(() => root.render(<Page initial={[THREADS[1]]} />));
     press(button(card("spend"), "Resolve"));
     await flush();
     const toggle = container.querySelector<HTMLElement>('[data-slot="resolved-toggle"]')!;
     expect(toggle.textContent).toContain("Resolved (1)");
     expect(document.activeElement).toBe(toggle);
+    await act(async () => answer.resolve({ ok: true }));
   });
 
   it("doesn't take focus from where the person has gone since", async () => {
@@ -498,13 +516,15 @@ describe("ThreadList: focus never falls to the page", () => {
   });
 
   it("after Reopen, follows the card into the open list", async () => {
-    actions.reopenThread.mockReturnValue(deferred<{ ok: true }>().promise);
+    const answer = deferred<{ ok: true }>();
+    actions.reopenThread.mockReturnValue(answer.promise);
     act(() => root.render(<Page />));
     click(button(container, /Resolved \(2\)/));
     press(button(card("old-1"), "Reopen"));
     await flush();
     expect(order()).toContain("old-1");
     expect(document.activeElement).toBe(card("old-1"));
+    await act(async () => answer.resolve({ ok: true }));
   });
 
   it("after a post, moves to the new thread's card once it has its real id", async () => {
@@ -756,9 +776,11 @@ describe("ThreadList: a thread on a document's email subject", () => {
     comments: [{ id: "c-s", author: JORDAN, body: "Is this a promise?", kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
   });
 
-  /** The page's side: the shared hook, the field's text for the card, and a button that opens the composer on the subject. */
-  function SubjectPage({ initial = [onSubject] }: { initial?: ThreadView[] }) {
-    const review = useReviewThreads(initial);
+  /** The page's side: the server's list, the shared hook, the field's text for the card, and a button that opens the composer on the subject. */
+  function SubjectPage({ initial = [onSubject], onList }: { initial?: ThreadView[]; onList?: (apply: (next: ThreadView[]) => void) => void }) {
+    const [server, setServer] = useState(initial);
+    onList?.(setServer);
+    const review = useReviewThreads(server);
     return (
       <>
         <button data-open onClick={() => review.openComposer({ blockId: "email.subject" })}>
@@ -809,18 +831,31 @@ describe("ThreadList: a thread on a document's email subject", () => {
   });
 
   it("resolves it, and reopens it from Resolved", async () => {
-    actions.resolveThread.mockResolvedValue({ ok: true });
-    actions.reopenThread.mockResolvedValue({ ok: true });
-    act(() => root.render(<SubjectPage />));
+    const resolving = deferred<{ ok: true }>();
+    const reopening = deferred<{ ok: true }>();
+    actions.resolveThread.mockReturnValue(resolving.promise);
+    actions.reopenThread.mockReturnValue(reopening.promise);
+    let setServer!: (next: ThreadView[]) => void;
+    act(() => root.render(<SubjectPage onList={(apply) => (setServer = apply)} />));
     click(button(card("subject"), "Resolve"));
     await flush();
     expect(actions.resolveThread).toHaveBeenCalledWith({ threadId: "subject" });
     expect(order()).not.toContain("subject");
     expect(container.textContent).toContain("Resolved (1)");
+    // The server confirms: its list has the thread resolved.
+    await act(async () => {
+      setServer([{ ...onSubject, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW }]);
+      resolving.resolve({ ok: true });
+    });
     click(button(container, /Resolved \(1\)/));
     click(button(card("subject"), "Reopen"));
     await flush();
     expect(actions.reopenThread).toHaveBeenCalledWith({ threadId: "subject" });
+    expect(order()).toEqual(["subject"]);
+    await act(async () => {
+      setServer([onSubject]);
+      reopening.resolve({ ok: true });
+    });
     expect(order()).toEqual(["subject"]);
   });
 });

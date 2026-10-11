@@ -1,11 +1,8 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, asc, eq, gt, inArray } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { runAccessSweep } from "./access-sweep";
 
 // The sweep against a temporary database filled by the real seed, with the demo clock moved by hand.
@@ -13,25 +10,11 @@ import { runAccessSweep } from "./access-sweep";
 // covers Dana, Devon, Jordan, Maya, Priya and Sam. Devon last signed in 95 days ago (flagged 5 days
 // ago), so the 120-day suspension lands 25 days after the seed. Alex is Coral's only Team Admin.
 
-const env = vi.hoisted(() => ({
-  dir: "",
-  now: new Date("2026-10-04T12:00:00.000Z"),
-  /** The database the code under test sees; a test may point it elsewhere. */
-  db: null as unknown,
-}));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-access-sweep-");
-  env.dir = temp.dir;
-  env.db = temp.db;
-  return {
-    DATABASE_URL: temp.DATABASE_URL,
-    libsql: temp.libsql,
-    get db() {
-      return env.db;
-    },
-  };
+  return tempDatabase("ucomp-access-sweep-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
@@ -41,19 +24,17 @@ const DAY = 86_400_000;
 const day = (n: number) => new Date(BASE.getTime() + n * DAY);
 
 let db: Db;
-let libsql: Client;
 let recertId: string;
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-  recertId = (await db.query.recertifications.findFirst({ where: eq(recertifications.teamId, "coral-offers") }))!.id;
-}, 60_000);
+seededDatabasePerTest({ base: BASE });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  recertId = (await db.query.recertifications.findFirst({ where: eq(recertifications.teamId, "coral-offers") }))!.id;
+});
+
+beforeEach(() => {
+  env.now = BASE;
 });
 
 const coral = (userId: string) =>
@@ -64,17 +45,28 @@ const count = async (table: typeof auditEvents | typeof notifications) => (await
 const auditAfter = (at: Date) =>
   db.select().from(auditEvents).where(gt(auditEvents.at, at)).orderBy(asc(auditEvents.at), asc(auditEvents.action));
 
+/** Alex confirms every member but Sam on day 16 (recertification Keep does not restart Devon's inactivity clock). */
+const alexKeepsAllButSam = () =>
+  db
+    .update(recertItems)
+    .set({ decision: "keep", decidedBy: "alex", decidedAt: day(16) })
+    .where(and(eq(recertItems.recertId, recertId), inArray(recertItems.userId, ["dana", "devon", "jordan", "maya", "priya"])));
+
+/** The sweep as it runs `n` days after the seed. */
+async function sweepAt(n: number) {
+  env.now = day(n);
+  return runAccessSweep();
+}
+
 describe("runAccessSweep across the seed's deadlines", () => {
   it("finds nothing to do on a freshly seeded database", async () => {
-    env.now = BASE;
     const before = await count(auditEvents);
     expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
     expect(await count(auditEvents)).toBe(before);
   });
 
   it("15 days on: Devon is flagged but still active, and the review is still open", async () => {
-    env.now = day(15);
-    const result = await runAccessSweep();
+    const result = await sweepAt(15);
     expect(result.membershipChanges).toEqual([]);
     expect(result.recertsClosed).toEqual([]);
     expect(await coral("devon")).toMatchObject({ status: "active", statusReason: null });
@@ -82,15 +74,10 @@ describe("runAccessSweep across the seed's deadlines", () => {
   });
 
   it("31 days on (Alex kept everyone but Sam): Devon suspended at day 25, Sam lapsed at the deadline", async () => {
-    // Alex confirms every member but Sam (recertification Keep does not restart Devon's inactivity clock).
-    await db
-      .update(recertItems)
-      .set({ decision: "keep", decidedBy: "alex", decidedAt: day(16) })
-      .where(and(eq(recertItems.recertId, recertId), inArray(recertItems.userId, ["dana", "devon", "jordan", "maya", "priya"])));
+    await alexKeepsAllButSam();
 
-    env.now = day(31);
     const auditBefore = await count(auditEvents);
-    const result = await runAccessSweep();
+    const result = await sweepAt(31);
 
     const suspendAt = day(25); // 95 days idle at the seed + 25 = 120
     const dueAt = day(30);
@@ -139,20 +126,21 @@ describe("runAccessSweep across the seed's deadlines", () => {
   });
 
   it("is idempotent: sweeping again, or later, writes nothing more", async () => {
+    await alexKeepsAllButSam();
+    await sweepAt(31);
     const audit = await count(auditEvents);
     const sent = await count(notifications);
-    env.now = day(31);
-    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
-    env.now = day(32);
-    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await sweepAt(31)).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await sweepAt(32)).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
     expect(await count(auditEvents)).toBe(audit);
     expect(await count(notifications)).toBe(sent);
   });
 
   it("flags a newly idle member once, at day 90, and tells the Team Admins", async () => {
+    await alexKeepsAllButSam();
+    await sweepAt(31);
     // Dana last signed in 9 days before the seed: day 81 is her 90th day.
-    env.now = day(82);
-    const result = await runAccessSweep();
+    const result = await sweepAt(82);
     const flagAt = day(81);
     expect((await coral("dana"))!.inactivityFlaggedAt).toEqual(flagAt);
     expect(result.effects.map((e) => [e.kind, e.kind === "audit" ? e.action : e.notification])).toEqual(
@@ -175,83 +163,47 @@ describe("runAccessSweep across the seed's deadlines", () => {
 
 describe("runAccessSweep in one 31-day jump with nobody confirmed", () => {
   it("lapses every unconfirmed member at the deadline; Devon's earlier suspension wins", async () => {
-    // A second database: the seed again, untouched.
-    const { tempDatabase } = await import("@/server/testing/review-fixtures");
-    const temp = tempDatabase("ucomp-access-sweep-2-");
-    try {
-      await migrate(temp.db, { migrationsFolder: "./src/server/db/migrations" });
-      await seedDatabase(temp.db, { base: BASE });
-      const original = env.db;
-      env.db = temp.db; // the code under test now reads the fresh database
-      try {
-        env.now = day(31);
-        const result = await runAccessSweep();
-        const statuses = await temp.db
-          .select({ userId: memberships.userId, status: memberships.status, at: memberships.statusChangedAt })
-          .from(memberships)
-          .where(eq(memberships.teamId, "coral-offers"))
-          .orderBy(memberships.userId);
-        expect(statuses).toEqual([
-          { userId: "alex", status: "active", at: null },
-          { userId: "dana", status: "lapsed", at: day(30) },
-          { userId: "devon", status: "suspended", at: day(25) },
-          { userId: "jordan", status: "lapsed", at: day(30) },
-          { userId: "maya", status: "lapsed", at: day(30) },
-          { userId: "priya", status: "lapsed", at: day(30) },
-          { userId: "sam", status: "lapsed", at: day(30) },
-        ]);
-        expect(result.recertsClosed).toHaveLength(1);
-        expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
-      } finally {
-        env.db = original;
-      }
-    } finally {
-      temp.libsql.close();
-      rmSync(temp.dir, { recursive: true, force: true });
-    }
-  }, 60_000);
+    const result = await sweepAt(31);
+    const statuses = await db
+      .select({ userId: memberships.userId, status: memberships.status, at: memberships.statusChangedAt })
+      .from(memberships)
+      .where(eq(memberships.teamId, "coral-offers"))
+      .orderBy(memberships.userId);
+    expect(statuses).toEqual([
+      { userId: "alex", status: "active", at: null },
+      { userId: "dana", status: "lapsed", at: day(30) },
+      { userId: "devon", status: "suspended", at: day(25) },
+      { userId: "jordan", status: "lapsed", at: day(30) },
+      { userId: "maya", status: "lapsed", at: day(30) },
+      { userId: "priya", status: "lapsed", at: day(30) },
+      { userId: "sam", status: "lapsed", at: day(30) },
+    ]);
+    expect(result.recertsClosed).toHaveLength(1);
+    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+  });
 });
 
 describe("runAccessSweep never leaves a team without a Team Admin", () => {
   it("130 days on with nobody signing in: each team's only Team Admin stays active and Riley is told", async () => {
-    const { tempDatabase } = await import("@/server/testing/review-fixtures");
-    const temp = tempDatabase("ucomp-access-sweep-3-");
-    try {
-      await migrate(temp.db, { migrationsFolder: "./src/server/db/migrations" });
-      await seedDatabase(temp.db, { base: BASE });
-      const original = env.db;
-      env.db = temp.db;
-      try {
-        env.now = day(130);
-        await runAccessSweep();
-        const adminRows = await temp.db
-          .select({ userId: memberships.userId, status: memberships.status })
-          .from(memberships)
-          .where(inArray(memberships.userId, ["alex", "naomi", "hana"]))
-          .orderBy(memberships.userId);
-        expect(adminRows).toEqual([
-          { userId: "alex", status: "active" },
-          { userId: "hana", status: "active" },
-          { userId: "naomi", status: "active" },
-        ]);
-        expect((await coralIn(temp.db, "jordan"))?.status).not.toBe("active"); // everyone else did lapse or go idle
-        const kept = await temp.db.select().from(auditEvents).where(eq(auditEvents.action, "access.kept_last_admin"));
-        expect(kept.map((r) => r.teamId).sort()).toEqual(["card-statements", "coral-offers", "deposits"].sort());
-        const told = await temp.db
-          .select({ userId: notifications.userId, href: notifications.href })
-          .from(notifications)
-          .where(and(eq(notifications.userId, "riley"), eq(notifications.href, "/all/settings/teams")));
-        expect(told).toHaveLength(3);
-        expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
-      } finally {
-        env.db = original;
-      }
-    } finally {
-      temp.libsql.close();
-      rmSync(temp.dir, { recursive: true, force: true });
-    }
-  }, 60_000);
+    await sweepAt(130);
+    const adminRows = await db
+      .select({ userId: memberships.userId, status: memberships.status })
+      .from(memberships)
+      .where(inArray(memberships.userId, ["alex", "naomi", "hana"]))
+      .orderBy(memberships.userId);
+    expect(adminRows).toEqual([
+      { userId: "alex", status: "active" },
+      { userId: "hana", status: "active" },
+      { userId: "naomi", status: "active" },
+    ]);
+    expect((await coral("jordan"))?.status).not.toBe("active"); // everyone else did lapse or go idle
+    const kept = await db.select().from(auditEvents).where(eq(auditEvents.action, "access.kept_last_admin"));
+    expect(kept.map((r) => r.teamId).sort()).toEqual(["card-statements", "coral-offers", "deposits"].sort());
+    const told = await db
+      .select({ userId: notifications.userId, href: notifications.href })
+      .from(notifications)
+      .where(and(eq(notifications.userId, "riley"), eq(notifications.href, "/all/settings/teams")));
+    expect(told).toHaveLength(3);
+    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+  });
 });
-
-const coralIn = (d: Db, userId: string) =>
-  d.query.memberships.findFirst({ where: and(eq(memberships.teamId, "coral-offers"), eq(memberships.userId, userId)) });

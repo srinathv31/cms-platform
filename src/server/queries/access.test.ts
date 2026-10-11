@@ -1,12 +1,8 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ACCESS_REFUSALS } from "@/domain/access/refusals";
 import { PermissionError, REASONS } from "@/domain/permissions";
 import type { Db } from "@/server/db/client";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { decideAccessRequest, requestAccess } from "@/server/actions/access";
 import { runAccessSweep } from "@/server/access-sweep";
@@ -22,13 +18,11 @@ import {
 
 // The access read models against a temporary database filled by the real seed.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-access-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-access-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -39,17 +33,11 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 
 let db: Db;
-let libsql: Client;
+
+seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 let minute = 0;
@@ -57,6 +45,12 @@ async function as(userId: string) {
   minute += 1;
   env.now = new Date(BASE.getTime() + minute * 60_000);
   vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, userId));
+}
+
+/** Morgan asks for Author access to Coral Offers; Chris's request from the seed is already waiting. */
+async function morganRequestsAccess() {
+  await as("morgan");
+  expect((await requestAccess({ teamId: "coral-offers", role: "author", reason: "Spring offers." })).ok).toBe(true);
 }
 
 describe("access read models", () => {
@@ -80,8 +74,7 @@ describe("access read models", () => {
       "coral-offers": expect.objectContaining({ kind: "access_requests", count: 1, firstName: "Chris", role: "author" }),
     });
 
-    await as("morgan");
-    expect((await requestAccess({ teamId: "coral-offers", role: "author", reason: "Spring offers." })).ok).toBe(true);
+    await morganRequestsAccess();
     await as("morgan");
     const data = await getRequestAccessData();
     expect(data.requests).toEqual([
@@ -99,6 +92,7 @@ describe("access read models", () => {
   });
 
   it("Access requests section: pending oldest first; your own request can't be decided", async () => {
+    await morganRequestsAccess();
     await as("alex");
     const section = await getAccessRequestsSection("coral-offers");
     expect(section.pending.map((r) => [r.person.id, r.can.decide.ok])).toEqual([
@@ -135,6 +129,7 @@ describe("access read models", () => {
   });
 
   it("Recertification and Inactivity sections, and the recert card once requests are decided", async () => {
+    await morganRequestsAccess();
     await as("alex");
     const recert = await getRecertificationSection("coral-offers");
     expect(recert.current).toMatchObject({ phase: "open", progress: { label: "0 of 6 confirmed" }, lapsed: [] });

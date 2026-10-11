@@ -67,6 +67,7 @@ let root: Root;
 let container: HTMLElement;
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -76,10 +77,11 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 const render = (props: HostProps = {}) => act(async () => root.render(<Host {...props} />));
-const sleep = (ms: number) => act(async () => void (await new Promise((resolve) => setTimeout(resolve, ms))));
+const sleep = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 /** Waits for what Base UI does a tick later (a menu opening, the editor opening after the menu). */
 async function until(check: () => unknown) {
