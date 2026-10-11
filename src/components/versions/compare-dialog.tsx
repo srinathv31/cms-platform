@@ -7,7 +7,7 @@ import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { CompareOption } from "@/domain/review-types";
+import type { CompareOption } from "@/server/queries/versions";
 
 // "Compare versions": a large dialog with the redline between any two versions of the template, every
 // round included ("v3 · Round 1"). The button is all the page loads up front; the panel (and the

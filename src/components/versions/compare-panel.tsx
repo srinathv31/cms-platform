@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
-import type { CompareOption, RedlineDoc } from "@/domain/review-types";
+import type { RedlineDoc } from "@/domain/review-types";
 import { STATUS_META } from "@/domain/status";
 import type { Variable } from "@/editor/model/types";
 import { readTemplate } from "@/lib/template-reads";
 import { cn } from "@/lib/utils";
 import type { ComparePair } from "@/server/queries/compare";
+import type { CompareOption } from "@/server/queries/versions";
 
 // The Compare dialog's content: the two version pickers, the "Changes only" switch, and the redline: the
 // name, each channel's own fields (an email's subject and preheader, above the body; an alert's push and

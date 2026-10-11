@@ -2,8 +2,9 @@
 import { act, createRef, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DOCUMENT_THREAD, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { DocumentEditorHandle } from "@/editor/types";
+import type { ThreadView } from "@/server/queries/threads";
 import { GutterMarkers, markerThreads, nextMarkerIndex } from "./gutter-markers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

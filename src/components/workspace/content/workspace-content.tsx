@@ -35,7 +35,6 @@ export async function WorkspaceContent({
       body={doc.body}
       variables={doc.variables}
       baseline={doc.baseline}
-      requiredSections={doc.requiredSections}
       channels={doc.channels}
       allowedChannels={doc.allowedChannels}
       family={doc.family}

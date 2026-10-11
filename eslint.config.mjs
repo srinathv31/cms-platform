@@ -20,11 +20,67 @@ const noEditorBarrel = {
     "There is no @/editor barrel (it was removed: it loaded the React editor UI). Import the server-safe modules that define what you need: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
 };
 
+// The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor
+// imports these and nothing else, so the editor can change what is behind them. A module is public when the
+// README lists it, and the README lists it when it is a sensible part of the API: keep the two the same.
+const EDITOR_PUBLIC_MODULES = [
+  "components/document-editor",
+  "components/editor-root",
+  "components/inline-variable-field",
+  "components/static-document",
+  "components/variable-chip",
+  "components/variables-panel",
+  "extensions/list-markers",
+  "lib/platform",
+  "model/characters",
+  "model/contract",
+  "model/document-check",
+  "model/links",
+  "model/list-markers",
+  "model/normalize",
+  "model/sample-sets",
+  "model/section-title",
+  "model/table-grid",
+  "model/types",
+  "model/usage",
+  "model/variables",
+  "paste/chips",
+  "paste/markdown",
+  "paste/normalize-html",
+  "schema",
+  "state/variable-store",
+  "styles.css",
+  "testing/editor",
+  "types",
+];
+const editorInternals = {
+  regex: `^@/editor/(?!(?:${EDITOR_PUBLIC_MODULES.map((module) => module.replaceAll(".", "\\.")).join("|")})$)`,
+  message:
+    "Outside src/editor, import only the editor's public modules (src/editor/README.md, Public API; there is no @/editor barrel). To make a module public, add it to the README's table and to EDITOR_PUBLIC_MODULES in eslint.config.mjs.",
+};
+// @/editor/schema is public for three names; its other exports are for the editor's own modules.
+const editorSchemaNames = {
+  name: "@/editor/schema",
+  allowImportNames: ["baseExtensions", "BaseExtensionOptions", "ensureBlockIds"],
+  message:
+    "From @/editor/schema, code outside src/editor uses baseExtensions, BaseExtensionOptions and ensureBlockIds only (src/editor/README.md).",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
 
   // ── Architecture boundaries (implementation plan §5) ──────────
+  {
+    // Every file outside the editor holds to its public API. Flat config keeps one set of no-restricted-imports
+    // options per file, so this block covers the files no block below does, and each block below lists
+    // editorInternals (and editorSchemaNames) again.
+    files: ["**/*.{ts,tsx,js,jsx,mjs,mts}"],
+    ignores: ["src/editor/**"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [editorSchemaNames], patterns: [editorInternals] }],
+    },
+  },
   {
     // The editor is a portable production module: React, TipTap, shadcn ui, lucide, motion, zustand only.
     files: ["src/editor/**/*.{ts,tsx}"],
@@ -51,6 +107,7 @@ const eslintConfig = defineConfig([
           patterns: [
             { group: ["react", "react/*", "next", "next/*", "drizzle-orm", "drizzle-orm/*", "@/server/*", "@/components/*", "@/app/*", "@/simulator/*"], message: "domain/ is pure TypeScript." },
             { regex: "^@/editor(?!/model(/|$))", message: "domain/ may only use the editor's pure model." },
+            editorInternals,
           ],
         },
       ],
@@ -62,7 +119,7 @@ const eslintConfig = defineConfig([
     files: ["src/app/(product)/**/*", "src/app/api/**/*", "src/components/**/*"],
     ignores: ["src/components/device/**/*"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noSimulatorData] }],
+      "no-restricted-imports": ["error", { paths: [editorSchemaNames], patterns: [noSimulatorData, editorInternals] }],
     },
   },
   {
@@ -91,14 +148,17 @@ const eslintConfig = defineConfig([
     files: ["src/server/**/*"],
     ignores: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noSimulatorData, noComponents] }],
+      "no-restricted-imports": [
+        "error",
+        { paths: [noEditorBarrel, editorSchemaNames], patterns: [noSimulatorData, noComponents, editorInternals] },
+      ],
     },
   },
   {
     // The seed and the reset write the simulator's tables, so the simulator rule doesn't apply to them.
     files: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noComponents] }],
+      "no-restricted-imports": ["error", { paths: [noEditorBarrel, editorSchemaNames], patterns: [noComponents, editorInternals] }],
     },
   },
   {

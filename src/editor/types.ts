@@ -4,7 +4,7 @@
 //
 // Composition:
 //
-//   <EditorRoot variables onVariablesChange baseline requiredSections readOnly>
+//   <EditorRoot variables onVariablesChange baseline readOnly>
 //     <DocumentEditor content onChange ref />        the document body
 //     <VariablesPanel />                             the right-hand panel
 //     <InlineVariableField label value onChange />   channel fields (email subject, push title, SMS message)
@@ -12,12 +12,12 @@
 //
 // Everything inside one root shares a single variable list, so a chip, a panel row and an inline
 // field always agree. <DocumentEditor> also works on its own (no root): it then creates a private
-// root from its own `variables`, `requiredSections`, `readOnly` and `onVariablesChange` props.
+// root from its own `variables`, `readOnly` and `onVariablesChange` props.
 
 import type { ReactNode, Ref } from "react";
 import type { CharacterRules } from "./model/characters";
 import type { FieldLines } from "./model/normalize";
-import type { ContractChange, JSONContent, RequiredSection, Variable } from "./model/types";
+import type { ContractChange, JSONContent, Variable } from "./model/types";
 
 /**
  * A review thread as the editor sees it. It anchors to a block id (`attrs.id`) and, optionally, a
@@ -71,12 +71,6 @@ export interface EditorRootProps {
    * them as they happen.
    */
   baseline?: Variable[] | null;
-  /**
-   * The content type's required sections. The document marks them on their H2s (`requiredKey`)
-   * and the guard locks every heading that carries a key (no delete, rename, retype or move);
-   * this list is accepted for the host's reference and isn't consulted by the editor yet.
-   */
-  requiredSections?: RequiredSection[];
   /** View only: no toolbar, handles, `/` or `{{` menus, and no panel editing. */
   readOnly?: boolean;
   /**
@@ -147,8 +141,6 @@ export interface DocumentEditorProps {
   // Standalone use only. Inside an <EditorRoot> these come from the root and are ignored here.
   /** The template's variable list (the consumer contract). Chips read label/type from here. */
   variables?: Variable[];
-  /** See EditorRootProps.requiredSections. */
-  requiredSections?: RequiredSection[];
   readOnly?: boolean;
   /** Fires when the variable list changes (e.g. `{{key}}` pasted for an unknown key). */
   onVariablesChange?: (variables: Variable[]) => void;
@@ -170,8 +162,6 @@ export interface DocumentEditorProps {
    * block-level comment. The host opens its composer and saves the thread.
    */
   onRequestComment?: (anchor: CommentRequest) => void;
-  /** Accepted, not drawn: the host places thread cards itself (see the handle's rect methods). */
-  renderThread?: (thread: ThreadAnchor) => ReactNode;
 }
 
 // ── <VariablesPanel> ──────────────────────────────────────────

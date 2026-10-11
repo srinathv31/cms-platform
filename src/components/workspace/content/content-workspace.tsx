@@ -12,10 +12,11 @@ import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type Ch
 import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
-import type { Person, ThreadView } from "@/domain/review-types";
-import type { Channel, ChannelFamily, JSONContent, RequiredSection, SampleSet, Variable } from "@/domain/types";
+import type { Person } from "@/domain/review-types";
+import type { Channel, ChannelFamily, JSONContent, SampleSet, Variable } from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
+import type { ThreadView } from "@/server/queries/threads";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";
 import { createLiveDraft } from "../session/live-draft";
@@ -47,7 +48,6 @@ export interface ContentWorkspaceProps {
   body: JSONContent;
   variables: Variable[];
   baseline: Variable[] | null;
-  requiredSections: RequiredSection[];
   channels: Channel[];
   allowedChannels: Channel[];
   /** A document (the editor) or a message (the composer): the content type's family, for the template's whole life. */
@@ -118,7 +118,6 @@ export function ContentWorkspace({
   body,
   variables,
   baseline,
-  requiredSections,
   channels: initialChannels,
   allowedChannels,
   family,
@@ -327,7 +326,6 @@ export function ContentWorkspace({
       key={shown.gen}
       variables={shown.variables}
       baseline={baseline}
-      requiredSections={requiredSections}
       readOnly={!editable}
       held={editable && inert}
       onVariablesChange={onVariablesChange}

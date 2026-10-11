@@ -8,9 +8,10 @@ import { duration, ease } from "@/components/motion/presets";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { Button } from "@/components/ui/button";
 import { ALL_CHANNEL_FIELDS } from "@/domain/channel-fields";
-import type { CommentView, Person, ThreadView } from "@/domain/review-types";
+import type { Person } from "@/domain/review-types";
 import { cn } from "@/lib/utils";
 import { formatAgo } from "@/domain/dates";
+import type { CommentView, ThreadView } from "@/server/queries/threads";
 import { isOptimistic } from "./thread-state";
 
 // The thread UI. A card is the quote it is about, the comments (avatar, name, time, text), then a

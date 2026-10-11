@@ -9,11 +9,12 @@ import { ActionDialog, useActionDialog } from "@/components/versions/action-dial
 import { formatLong } from "@/components/versions/format";
 import { SunsetCalendarContent, SunsetZone } from "@/components/versions/sunset-calendar";
 import { defaultSunsetDate, validateSunsetDate } from "@/components/versions/validation";
-import type { ConsumerUsage, SunsetCalendar } from "@/domain/review-types";
+import type { ConsumerUsage } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
 import type { OutputKey } from "@/domain/review-outputs";
 import type { ContractChange } from "@/domain/types";
 import { approveVersion } from "@/server/actions/review";
+import type { SunsetCalendar } from "@/server/queries/review-models";
 import { approveLines, type ApprovalStageInfo } from "./decision-model";
 import { WithKeys } from "./rail-sections";
 

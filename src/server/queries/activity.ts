@@ -2,13 +2,24 @@ import "server-only";
 import { cache } from "react";
 import { desc, eq, sql } from "drizzle-orm";
 import { describeActivity, eventVersionLabel } from "@/domain/activity";
-import type { ActivityItem } from "@/domain/review-types";
+import type { AuditAction, Person } from "@/domain/review-types";
 import { db } from "@/server/db/client";
 import { auditEvents, versions } from "@/server/db/schema/ucomp";
 import { getPeople, iso, personOf, requireTemplate } from "./review-shared";
 
 // The template's Activity tab: its audit events, newest first, each as one plain sentence. An event about
 // a version is labelled by its row as it is now, with its round for a review event (`eventVersionLabel`).
+
+export interface ActivityItem {
+  id: string;
+  at: string;
+  actor: Person | null; // null = system
+  action: AuditAction | string;
+  /** "v3 · Round 1" (chrome; the round only for review events, `eventVersionLabel`); null for the draft. */
+  versionLabel: string | null;
+  /** One plain sentence from domain/activity.ts: "Jordan Ellis started revoking v1: Wrong APR in legal notices." */
+  summary: string;
+}
 
 /** A template's history is short; this only guards against a runaway list. */
 export const ACTIVITY_LIMIT = 500;

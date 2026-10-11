@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DOCUMENT_THREAD, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
+import type { ThreadView } from "@/server/queries/threads";
 import {
   groupThreads,
   insertThread,

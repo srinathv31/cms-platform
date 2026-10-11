@@ -8,26 +8,22 @@ import { createContext, use, useEffect, useLayoutEffect, useMemo, useState } fro
 import { useStore } from "zustand";
 import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
 import { diffVariables } from "../model/contract";
-import type { RequiredSection } from "../model/types";
 import { createEditorRootRuntime, type EditorRootRuntime } from "../state/editor-root";
 import type { ContractState, EditorHistory, EditorRootProps } from "../types";
 
 const EditorRootContext = createContext<EditorRootRuntime | null>(null);
 
-const NO_SECTIONS: RequiredSection[] = [];
-
 export function EditorRoot({
   variables,
   onVariablesChange,
   baseline = null,
-  requiredSections = NO_SECTIONS,
   readOnly = false,
   held = false,
   requiredNote = DEFAULT_REQUIRED_NOTE,
   children,
 }: EditorRootProps) {
   const [runtime] = useState(() =>
-    createEditorRootRuntime({ variables, baseline, requiredSections, readOnly, held, requiredNote }),
+    createEditorRootRuntime({ variables, baseline, readOnly, held, requiredNote }),
   );
 
   // List changes only come from interaction after mount, so wiring the listener in an effect is in time.
@@ -43,13 +39,12 @@ export function EditorRoot({
       current.readOnly === (readOnly || held) &&
       current.held === nextHeld &&
       current.baseline === baseline &&
-      current.requiredSections === requiredSections &&
       current.requiredNote === requiredNote
     ) {
       return;
     }
-    runtime.config.setState({ readOnly: readOnly || held, held: nextHeld, baseline, requiredSections, requiredNote });
-  }, [runtime, readOnly, held, baseline, requiredSections, requiredNote]);
+    runtime.config.setState({ readOnly: readOnly || held, held: nextHeld, baseline, requiredNote });
+  }, [runtime, readOnly, held, baseline, requiredNote]);
 
   useEffect(() => {
     runtime.markCommitted();

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import type { ActivityItem } from "@/domain/review-types";
+import type { ActivityItem } from "@/server/queries/activity";
 import { dayGroups } from "./day-groups";
 
 // The Activity tab's days are UTC days, like every absolute date on the Versions and Activity tabs,

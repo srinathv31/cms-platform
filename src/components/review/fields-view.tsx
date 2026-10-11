@@ -3,9 +3,10 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type RefObject } from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { FieldsDocument, createRedlineHandle } from "@/components/redline";
-import type { FieldRedline, FooterRedline, ThreadView } from "@/domain/review-types";
+import type { FieldRedline, FooterRedline } from "@/domain/review-types";
 import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import type { ThreadView } from "@/server/queries/threads";
 
 /**
  * A message's content on the review screen: its channel fields as the composer shows them, read-only
