@@ -240,6 +240,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   first. When nothing is listening there, it runs `npm run db:reset` and starts `next start`. The helpers in
   `e2e/api/helpers.ts` open `data/ucomp.db` directly and write to it, so `DATABASE_URL` can't isolate a run. To keep
   your local demo data, run the suite from a copy of the working tree. The full suite takes about 12 minutes.
+  Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
+  are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
+  ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
 - **Golden files:** [src/server/render/golden](../src/server/render/golden/README.md) freezes every channel's
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also

@@ -24,6 +24,7 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 | `npm run golden:update` | Regenerates the render golden files after an intended change to render output. Read the diff. |
 | `npm run build` | The production build. It is the only check that enforces the Cache Components rules. |
 | `npm run e2e` | Playwright against the production build on port 3100. Resets and writes to its own `data/e2e.db` and `data/e2e-uploads`, never the demo's. |
+| `npx playwright test --project=demo` | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script. |
 | `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations. |
 
 Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, and `npm run docs:check`. Add `npm run build`
