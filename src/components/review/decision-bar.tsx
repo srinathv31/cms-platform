@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, type ComponentProps } from "react";
 import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Button } from "@/components/ui/button";
 import type { DecisionAccess, DecisionRow } from "./decision-model";
@@ -13,6 +14,25 @@ import { RV } from "./review-grid";
 // own line (the live status, and where focus goes) is a long scroll below; for a version that was decided
 // before, or isn't in review, there is no bar. Beside the rail it is hidden (CSS, in the grid), and the
 // rail's own pair is the one. It leaves the window's bottom right clear for the Demo pill.
+
+// Under 26rem of canvas the bar wraps to a height of its own, and it rests over the last rows of the document's (or the
+// output's) cell. It publishes that height as `--decision-bar-h` on the grid, where those cells pad their bottom by it
+// (review-grid.ts), so the last lines can always be scrolled clear of the bar.
+function Bar(props: ComponentProps<"div">) {
+  const publish = useCallback((bar: HTMLDivElement) => {
+    const grid = bar.parentElement;
+    if (!grid) return;
+    const measure = () => grid.style.setProperty("--decision-bar-h", `${bar.offsetHeight}px`);
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    measure();
+    return () => {
+      observer.disconnect();
+      grid.style.removeProperty("--decision-bar-h");
+    };
+  }, []);
+  return <div ref={publish} data-slot="decision-bar" className={RV.bar} {...props} />;
+}
 
 export function DecisionBar({
   access,
@@ -35,18 +55,18 @@ export function DecisionBar({
   if (row.kind !== "buttons") {
     // The rail's line is the status (it is announced and takes focus); this one only shows it.
     return decidedHere && row.kind === "line" ? (
-      <div data-slot="decision-bar" className={RV.bar}>
+      <Bar>
         <p aria-hidden className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
           {row.text}
         </p>
-      </div>
+      </Bar>
     ) : null;
   }
   if (access.kind === "hidden") return null;
   if (access.kind === "blocked") {
     const reasonId = "decision-bar-blocked";
     return (
-      <div data-slot="decision-bar" role="group" aria-label="Decide" className={RV.bar}>
+      <Bar role="group" aria-label="Decide">
         <BlockedButton variant="default" reason={access.reason} describedBy={reasonId}>
           Approve
         </BlockedButton>
@@ -56,12 +76,12 @@ export function DecisionBar({
         <p id={reasonId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal" title={access.reason}>
           {access.reason}
         </p>
-      </div>
+      </Bar>
     );
   }
   const waitId = "decision-bar-waits";
   return (
-    <div data-slot="decision-bar" role="group" aria-label="Decide" className={RV.bar}>
+    <Bar role="group" aria-label="Decide">
       {approveBlocked ? (
         <BlockedButton variant="default" reason={approveBlocked} describedBy={waitId}>
           Approve
@@ -77,6 +97,6 @@ export function DecisionBar({
           {approveBlocked}
         </p>
       ) : null}
-    </div>
+    </Bar>
   );
 }
