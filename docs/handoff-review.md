@@ -15,11 +15,11 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
 | Open | 0 | 3 | 8 | 8 | 19 |
-| Partly fixed | 0 | 4 | 3 | 3 | 10 |
-| Fixed | 1 | 19 | 29 | 29 | 78 |
+| Partly fixed | 0 | 4 | 3 | 2 | 9 |
+| Fixed | 1 | 19 | 29 | 30 | 79 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), and PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), and PRs #63–#65 (H8, and G4 apart from the git history).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -1057,7 +1057,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines. The four domain files (`lifecycle.ts`, `access.ts`, `platform-config.ts`, `redline.ts`) are split by concern into folders ([decision 0043](decisions/0043-split-files-by-concern-not-by-line-count.md)), the other long files stay under that rule, and the workspace session store's library is still to be decided by the owner.
+- **Status:** Fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines. The four domain files (`lifecycle.ts`, `access.ts`, `platform-config.ts`, `redline.ts`) are split by concern into folders ([decision 0043](decisions/0043-split-files-by-concern-not-by-line-count.md)), and the other long files stay under that rule. The workspace session and the live draft keep their state in vanilla zustand, the library the editor uses, behind their unchanged interfaces ([decision 0044](decisions/0044-the-workspace-session-stores-its-state-in-zustand.md)).
 - **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.

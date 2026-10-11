@@ -4,11 +4,13 @@
 // a push or an SMS re-renders in the browser as it is typed (decision 0036), never waiting for a save.
 // Autosave still gets every change through the workspace session; this only holds the latest values.
 //
-// One per Content page (and per revert: the page makes a new one when it remounts its fields). Plain
-// TypeScript with a `useSyncExternalStore` hook for each part, so a keystroke re-renders only what
-// reads that part, not the editor around it.
+// One per Content page (and per revert: the page makes a new one when it remounts its fields). The
+// values live in a vanilla zustand store, like the workspace session's state (decision 0044), with a
+// `useSyncExternalStore` hook for each part, so a keystroke re-renders only what reads that part, not
+// the editor around it.
 
 import { useSyncExternalStore } from "react";
+import { createStore } from "zustand/vanilla";
 import type { ChannelFieldId, ChannelFieldValues } from "@/domain/channel-fields";
 import type { JSONContent, SampleSet } from "@/domain/types";
 
@@ -22,29 +24,32 @@ export interface LiveDraft {
   setSampleSets: (sets: SampleSet[]) => void;
 }
 
-export function createLiveDraft(initial: { fields: ChannelFieldValues; sampleSets: SampleSet[] }): LiveDraft {
-  let fields = initial.fields;
-  let sampleSets = initial.sampleSets;
-  const listeners = new Set<() => void>();
-  const emit = () => {
-    for (const listener of [...listeners]) listener();
-  };
+interface LiveDraftState {
+  fields: ChannelFieldValues;
+  sampleSets: SampleSet[];
+}
+
+export function createLiveDraft(initial: LiveDraftState): LiveDraft {
+  const store = createStore<LiveDraftState>()(() => ({ fields: initial.fields, sampleSets: initial.sampleSets }));
   return {
+    // The listener is called with no arguments (zustand passes it the state), once per change.
     subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+      const unsubscribe = store.subscribe(() => listener());
+      return () => {
+        unsubscribe();
+      };
     },
-    getFields: () => fields,
+    getFields: () => store.getState().fields,
     setField(id, value) {
+      const { fields } = store.getState();
+      // zustand notifies on every `setState`: a write that changes nothing writes nothing.
       if (fields[id] === value) return;
-      fields = { ...fields, [id]: value };
-      emit();
+      store.setState({ fields: { ...fields, [id]: value } });
     },
-    getSampleSets: () => sampleSets,
+    getSampleSets: () => store.getState().sampleSets,
     setSampleSets(sets) {
-      if (sets === sampleSets) return;
-      sampleSets = sets;
-      emit();
+      if (sets === store.getState().sampleSets) return;
+      store.setState({ sampleSets: sets });
     },
   };
 }

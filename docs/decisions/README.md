@@ -48,6 +48,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0041](0041-routes-refuse-in-the-actions-shape.md) | The browser's routes (autosave, import, the audit export) refuse as `{ ok: false, code, reason }`, with codes from the refusal tables | Accepted |
 | [0042](0042-read-models-beside-queries-and-an-editor-import-allowlist.md) | A screen's read model is declared beside the query that builds it, and code outside the editor imports only the modules its README lists, by lint | Accepted |
 | [0043](0043-split-files-by-concern-not-by-line-count.md) | A file is split when it mixes concerns a reader has to tell apart, not because it passes a line count | Accepted |
+| [0044](0044-the-workspace-session-stores-its-state-in-zustand.md) | The workspace session and the Content page's live draft keep their subscribable state in a vanilla zustand store behind their unchanged interfaces; the rules, and what only the rules use, stay in the closure | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

@@ -5,7 +5,7 @@ import { useDraftAutosave } from "../autosave/use-draft-autosave";
 import type { FocusTargetElements, FocusTargetName } from "./focus-targets";
 import {
   createWorkspaceSession,
-  INITIAL_PREVIEW,
+  INITIAL_SESSION_STATE,
   type DraftBinding,
   type HistoryControls,
   type PreviewState,
@@ -35,7 +35,7 @@ export function WorkspaceSessionProvider({ children }: { children: React.ReactNo
 }
 
 function SessionHostSlot({ session }: { session: WorkspaceSession }) {
-  const binding = useSyncExternalStore(session.subscribe, session.getBinding, () => null);
+  const binding = useSyncExternalStore(session.subscribe, session.getBinding, () => INITIAL_SESSION_STATE.binding);
   // A new version is a new autosave session, so it is a new host.
   return binding ? <DraftSessionHost key={binding.versionId} session={session} binding={binding} /> : null;
 }
@@ -86,47 +86,48 @@ export function useWorkspaceSession(): WorkspaceSession {
   return session;
 }
 
-const SAVED: SessionStatus = { status: "saved" };
+// Each hook reads one getter of the session. The server and hydration render show the session's initial
+// state (`INITIAL_SESSION_STATE`, the one the store starts from), so the first markup is the same on both.
 
 /** The autosave status of the draft on screen. "saved" before a draft is bound. */
 export function useSaveStatus(): SessionStatus {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getStatus, () => SAVED);
+  return useSyncExternalStore(session.subscribe, session.getStatus, () => INITIAL_SESSION_STATE.status);
 }
 
 export function useRailOpen(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getRailOpen, () => false);
+  return useSyncExternalStore(session.subscribe, session.getRailOpen, () => INITIAL_SESSION_STATE.railOpen);
 }
 
 /** The tab the author picked in the rail (Comments | Variables), or null until they pick one. */
 export function useRailTab(): RailTab | null {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getRailTab, () => null);
+  return useSyncExternalStore(session.subscribe, session.getRailTab, () => INITIAL_SESSION_STATE.railTab);
 }
 
 /** The preview's state (open, view, channel, sample set, device), shared by the tab bar and the rail. */
 export function usePreviewState(): PreviewState {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getPreview, () => INITIAL_PREVIEW);
+  return useSyncExternalStore(session.subscribe, session.getPreview, () => INITIAL_SESSION_STATE.preview);
 }
 
 /** Counts the saves that have landed; a change means the saved draft is different now. */
 export function useSaveTick(): number {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getSaveTick, () => 0);
+  return useSyncExternalStore(session.subscribe, session.getSaveTick, () => INITIAL_SESSION_STATE.saveTick);
 }
 
 /** Undo and redo for the header's buttons, or null when no editor is on screen. */
 export function useHistoryControls(): HistoryControls | null {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getHistory, () => null);
+  return useSyncExternalStore(session.subscribe, session.getHistory, () => INITIAL_SESSION_STATE.history);
 }
 
 /** "Revert to when you opened it" can be offered: something changed, and all of it can be put back. */
 export function useCanRevert(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getCanRevert, () => false);
+  return useSyncExternalStore(session.subscribe, session.getCanRevert, () => INITIAL_SESSION_STATE.canRevert);
 }
 
 /**
@@ -136,7 +137,7 @@ export function useCanRevert(): boolean {
  */
 export function useInert(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getInert, () => false);
+  return useSyncExternalStore(session.subscribe, session.getInert, () => INITIAL_SESSION_STATE.inert);
 }
 
 /**
@@ -145,13 +146,13 @@ export function useInert(): boolean {
  */
 export function useTabFailed(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getTabFailed, () => false);
+  return useSyncExternalStore(session.subscribe, session.getTabFailed, () => INITIAL_SESSION_STATE.tabFailed);
 }
 
 /** Some part of the page on screen can show other values of every one of `fields` (the Content tab, editable, for the content fields). */
 export function useOwnsFields(fields: readonly string[]): boolean {
   const session = useWorkspaceSession();
-  const owned = useSyncExternalStore(session.subscribe, session.getOwnedFields, () => "");
+  const owned = useSyncExternalStore(session.subscribe, session.getOwnedFields, () => INITIAL_SESSION_STATE.ownedFields);
   const set = new Set(owned.split(","));
   return fields.every((field) => set.has(field));
 }

@@ -225,8 +225,13 @@ audit export (`audit/export-audit.ts`), and the ⌘K palette. Autosave, uploads 
 `{ ok: false, code, reason }` like a server action's, and branch on the `code`, never the sentence: the autosave
 scheduler decides by it whether saving stops (`stopsSaving`) and which message to show; uploads and the audit export
 show the `reason` where the person acted. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
-State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
-The Content page's draft as typed, ahead of autosave (each channel field and the sample sets), is another
+State shared across subtrees is a small session (`workspace/session/session-store.ts`) over a vanilla zustand store
+([decision 0044](../../docs/decisions/0044-the-workspace-session-stores-its-state-in-zustand.md)). Components read it through
+the session's getters, with the hooks in `workspace-session.tsx` (`useSyncExternalStore`, the server snapshot from
+`INITIAL_SESSION_STATE`), and only the session's methods write it, each change as one `setState`. zustand notifies on
+every `setState`, so a method whose change can be a no-op checks before it writes. What only the rules use (the autosave
+host's `save` and `flush`, held changes, the restore targets, the hold counters) is not state and stays in the closure.
+The Content page's draft as typed, ahead of autosave (each channel field and the sample sets), is another zustand store
 (`workspace/session/live-draft.ts`): the composer writes it on every keystroke, and the phone preview, the meta line
 and the cut warnings read it.
 The workspace header, in the template layout, binds it to the draft it shows (`BindDraft`), so autosave runs on every

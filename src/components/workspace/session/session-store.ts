@@ -1,8 +1,9 @@
 // The workspace session: what the header (in the layout) and the Content page (a child of that layout)
 // share. They are separate React subtrees, so they meet in this small store.
 //
-// Plain TypeScript, no React: the provider owns one store per workspace and the components read it
-// with useSyncExternalStore. It holds
+// Plain TypeScript, no React: the provider owns one session per workspace and the components read it
+// with useSyncExternalStore. What they read lives in a vanilla zustand store (`SessionState`, below);
+// the rules, and what only the rules use, stay in the closure around it. It holds
 //   - the binding: which draft is being edited (versionId, rev). null on a read-only page. The
 //     header (in the layout, on every tab) binds the draft it shows, so a rename on Versions saves
 //     too; the Content page binds the draft it edits as well (see `bind`).
@@ -37,6 +38,7 @@
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
 
+import { createStore } from "zustand/vanilla";
 import type { DeviceSettings, PushScreen } from "@/components/device";
 import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
@@ -271,6 +273,56 @@ export interface WorkspaceSession {
 
 const SAVED: SessionStatus = { status: "saved" };
 
+/**
+ * What components read, and nothing else: each field has a getter on `WorkspaceSession` and, in
+ * `workspace-session.tsx`, a hook. Only the rules in `createWorkspaceSession` write it, and each change
+ * is one `setState`, so subscribers hear once per change. (zustand notifies on every `setState`, even
+ * one that changes nothing: a rule whose change can be a no-op checks before it writes.)
+ */
+export interface SessionState {
+  binding: DraftBinding | null;
+  status: SessionStatus;
+  railOpen: boolean;
+  railTab: RailTab | null;
+  preview: PreviewState;
+  saveTick: number;
+  history: HistoryControls | null;
+  /** The latest value of every field saved since the page opened (null: nothing changed). */
+  edited: SaveFields | null;
+  /** `edited` is set, a draft is bound, and every edited field is owned: worked out again whenever one of the three moves. */
+  canRevert: boolean;
+  /** Set when a draft is bound (an effect): the session itself is made during render, where the clock can't be read. */
+  openedAt: number;
+  editGeneration: number;
+  ownedFields: string;
+  /** Something holds the page still (`makeInert`). */
+  inert: boolean;
+  /** A tab is showing its error (`failTab`). */
+  tabFailed: boolean;
+}
+
+/**
+ * The session before anything is bound. The store starts from it, and it is what the server and the
+ * hydration render show (`useSyncExternalStore`'s server snapshots), so the markup of the first render
+ * is the same on both sides.
+ */
+export const INITIAL_SESSION_STATE: SessionState = {
+  binding: null,
+  status: SAVED,
+  railOpen: false,
+  railTab: null,
+  preview: INITIAL_PREVIEW,
+  saveTick: 0,
+  history: null,
+  edited: null,
+  canRevert: false,
+  openedAt: 0,
+  editGeneration: 0,
+  ownedFields: "",
+  inert: false,
+  tabFailed: false,
+};
+
 /** One preview field unchanged: equal, or (the phone's settings) equal field by field. */
 function samePreviewValue(a: PreviewState[keyof PreviewState], b: PreviewState[keyof PreviewState]): boolean {
   if (a === b) return true;
@@ -280,55 +332,36 @@ function samePreviewValue(a: PreviewState[keyof PreviewState], b: PreviewState[k
 }
 
 export function createWorkspaceSession(): WorkspaceSession {
-  let binding: DraftBinding | null = null;
-  let status: SessionStatus = SAVED;
-  let railOpen = false;
-  let railTab: RailTab | null = null;
-  let preview: PreviewState = INITIAL_PREVIEW;
-  let saveTick = 0;
-  let history: HistoryControls | null = null;
-  // The latest value of every field saved since the page opened (null: nothing changed).
-  let edited: SaveFields | null = null;
-  // Set when a draft is bound (an effect): the store itself is made during render, where the clock can't be read.
-  let openedAt = 0;
-  let editGeneration = 0;
-  // How many holders keep the page inert (`makeInert`).
-  let inertHolds = 0;
-  // How many error views are on screen (`failTab`).
-  let failedTabs = 0;
-  let canRevert = false;
-  let ownedFields = "";
-  const targets = new Set<RestoreTarget>();
+  const store = createStore<SessionState>()(() => ({ ...INITIAL_SESSION_STATE }));
+  const get = store.getState;
+  const set = store.setState;
+  // What only the rules use, and no component renders (so none of it is state: a change would notify
+  // for nothing): the autosave host's hooks, changes held for it, who waits on them, the parts of the
+  // page that can show other values, the editor, and how many holders keep each hold.
   let sink: ((fields: SaveFields) => void) | null = null;
   let flusher: (() => Promise<void>) | null = null;
   let held: SaveFields | null = null;
   // Flushes asked for while changes are held for a host that hasn't connected yet.
   let waiting: (() => void)[] = [];
+  const targets = new Set<RestoreTarget>();
   let editor: DocumentEditorHandle | null = null;
-  const listeners = new Set<() => void>();
+  // How many holders keep the page inert (`makeInert`), and how many error views are on screen (`failTab`).
+  let inertHolds = 0;
+  let failedTabs = 0;
 
-  const emit = () => {
-    for (const listener of [...listeners]) listener();
-  };
-  const setPreview = (patch: Partial<PreviewState>) => {
-    const next = { ...preview, ...patch };
-    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => samePreviewValue(next[key], preview[key]))) return;
-    preview = next;
-    emit();
-  };
   const owned = () => new Set([...targets].flatMap((target) => Object.keys(target.opening)));
+  /** Every edited field has a part of the page on screen that can show its opening value again. */
+  const revertible = (edited: SaveFields | null, binding: DraftBinding | null) => {
+    if (edited === null || binding === null) return false;
+    const mine = owned();
+    return Object.keys(edited).every((key) => mine.has(key));
+  };
   /** The targets changed: the owned fields, and so whether a revert can be offered, may have too. */
   const syncTargets = () => {
-    const next = [...owned()].sort().join(",");
-    const changed = next !== ownedFields;
-    ownedFields = next;
-    return syncCanRevert() || changed;
-  };
-  const syncCanRevert = () => {
-    const next = edited !== null && binding !== null && Object.keys(edited).every((key) => owned().has(key));
-    if (next === canRevert) return false;
-    canRevert = next;
-    return true;
+    const { ownedFields, canRevert, edited, binding } = get();
+    const nextOwned = [...owned()].sort().join(",");
+    const nextCanRevert = revertible(edited, binding);
+    if (nextOwned !== ownedFields || nextCanRevert !== canRevert) set({ ownedFields: nextOwned, canRevert: nextCanRevert });
   };
   /** Hands fields to autosave (now, or once the host connects). */
   const send = (fields: SaveFields) => {
@@ -340,9 +373,12 @@ export function createWorkspaceSession(): WorkspaceSession {
     for (const target of targets) Object.assign(opening, target.opening);
     return opening;
   };
-  /** Shows `fields` everywhere they are shown, and saves them. Call it before `edited` takes them in. */
+  /**
+   * Shows `fields` everywhere they are shown, and saves them. Call it before `edited` takes them in,
+   * and read the state again after it: a part that shows them can edit in turn.
+   */
   const apply = (fields: SaveFields) => {
-    const values = { ...openingValues(), ...edited, ...fields };
+    const values = { ...openingValues(), ...get().edited, ...fields };
     for (const target of [...targets]) target.restore(fields, values);
     send(fields);
   };
@@ -352,54 +388,52 @@ export function createWorkspaceSession(): WorkspaceSession {
     for (const resolve of release) resolve();
   };
   const canRestore = (fields: SaveFields, since: number) => {
-    if (binding === null || inertHolds > 0 || since !== editGeneration) return false;
+    const { binding, inert, editGeneration } = get();
+    if (binding === null || inert || since !== editGeneration) return false;
     const mine = owned();
     return Object.keys(fields).every((key) => mine.has(key));
   };
+  const setPreview = (patch: Partial<PreviewState>) => {
+    const { preview } = get();
+    const next = { ...preview, ...patch };
+    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => samePreviewValue(next[key], preview[key]))) return;
+    set({ preview: next });
+  };
 
   return {
+    // The listener is called with no arguments (zustand passes it the state), once per `setState`.
     subscribe(listener) {
-      listeners.add(listener);
+      const unsubscribe = store.subscribe(() => listener());
       return () => {
-        listeners.delete(listener);
+        unsubscribe();
       };
     },
-    getBinding: () => binding,
-    getStatus: () => status,
-    getRailOpen: () => railOpen,
-    getRailTab: () => railTab,
-    getPreview: () => preview,
-    getSaveTick: () => saveTick,
-    getHistory: () => history,
-    getCanRevert: () => canRevert,
-    getOpenedAt: () => openedAt,
-    getOwnedFields: () => ownedFields,
-    getEditGeneration: () => editGeneration,
-    getInert: () => inertHolds > 0,
-    getTabFailed: () => failedTabs > 0,
+    getBinding: () => get().binding,
+    getStatus: () => get().status,
+    getRailOpen: () => get().railOpen,
+    getRailTab: () => get().railTab,
+    getPreview: () => get().preview,
+    getSaveTick: () => get().saveTick,
+    getHistory: () => get().history,
+    getCanRevert: () => get().canRevert,
+    getOpenedAt: () => get().openedAt,
+    getOwnedFields: () => get().ownedFields,
+    getEditGeneration: () => get().editGeneration,
+    getInert: () => get().inert,
+    getTabFailed: () => get().tabFailed,
 
     bind(next) {
+      const { binding, editGeneration } = get();
       if (next === null) {
         if (binding === null) return;
-        binding = null;
-        status = SAVED;
         held = null;
-        edited = null;
-        editGeneration += 1;
-        syncCanRevert();
         releaseWaiting();
-        emit();
+        set({ binding: null, status: SAVED, edited: null, canRevert: false, editGeneration: editGeneration + 1 });
         return;
       }
       // A re-render or a tab switch binds the same draft again; only a new version starts a session.
       if (binding?.versionId === next.versionId) return;
-      binding = next;
-      status = SAVED;
-      edited = null;
-      editGeneration += 1;
-      openedAt = Date.now();
-      syncCanRevert();
-      emit();
+      set({ binding: next, status: SAVED, edited: null, canRevert: false, editGeneration: editGeneration + 1, openedAt: Date.now() });
     },
 
     attach(save, flush) {
@@ -421,28 +455,29 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     publishStatus(next) {
+      const { status, saveTick } = get();
       if (status.status === next.status && status.error === next.error && !!status.stopped === !!next.stopped) return;
       // A save landing: the one transition a preview cares about. (A save that fails goes to "error".)
-      if (status.status === "saving" && next.status === "saved") saveTick += 1;
-      status = next;
-      emit();
+      const landed = status.status === "saving" && next.status === "saved";
+      set({ status: next, saveTick: landed ? saveTick + 1 : saveTick });
     },
 
     save(fields) {
       send(fields);
-      editGeneration += 1;
-      if (binding !== null) {
-        edited = mergeFields(edited, fields);
-        syncCanRevert();
-      }
+      const { binding, edited, editGeneration } = get();
       // Every edit is news to a revert's toast: its Undo goes once something else has changed.
-      emit();
+      if (binding === null) {
+        set({ editGeneration: editGeneration + 1 });
+        return;
+      }
+      const next = mergeFields(edited, fields);
+      set({ edited: next, canRevert: revertible(next, binding), editGeneration: editGeneration + 1 });
     },
 
     flush() {
       if (sink) return flusher ? flusher() : Promise.resolve();
       // Changes are held for a host that is about to connect: wait for it to take and send them.
-      if (binding !== null && held !== null) {
+      if (get().binding !== null && held !== null) {
         return new Promise<void>((resolve) => {
           waiting.push(resolve);
         });
@@ -451,32 +486,30 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     setHistory(next) {
+      const { history } = get();
       if (next === history) return;
       if (next && history && next.canUndo === history.canUndo && next.canRedo === history.canRedo && next.undo === history.undo && next.redo === history.redo) return;
-      history = next;
-      emit();
+      set({ history: next });
     },
 
     addRestoreTarget(target) {
       targets.add(target);
-      if (syncTargets()) emit();
+      syncTargets();
       return () => {
         if (!targets.delete(target)) return;
-        if (syncTargets()) emit();
+        syncTargets();
       };
     },
 
     revert() {
-      if (!canRevert || edited === null || inertHolds > 0) return null;
+      const { canRevert, edited, inert } = get();
+      if (!canRevert || edited === null || inert) return null;
       const changed = edited;
       const opening = openingValues();
       // Only what changed goes back: a field nobody touched stays out of the save.
       const back = Object.fromEntries(Object.keys(changed).map((key) => [key, opening[key as keyof SaveFields]])) as SaveFields;
       apply(back);
-      edited = null;
-      editGeneration += 1;
-      syncCanRevert();
-      emit();
+      set({ edited: null, canRevert: false, editGeneration: get().editGeneration + 1 });
       return changed;
     },
 
@@ -485,47 +518,46 @@ export function createWorkspaceSession(): WorkspaceSession {
     restore(fields, since) {
       if (!canRestore(fields, since)) return false;
       apply(fields);
-      edited = mergeFields(edited, fields);
-      editGeneration += 1;
-      syncCanRevert();
-      emit();
+      const { edited, binding, editGeneration } = get();
+      const next = mergeFields(edited, fields);
+      set({ edited: next, canRevert: revertible(next, binding), editGeneration: editGeneration + 1 });
       return true;
     },
 
     replace(fields) {
       const mine = owned();
-      if (binding === null || inertHolds > 0 || !Object.keys(fields).every((key) => mine.has(key))) return null;
+      const { binding, inert, edited } = get();
+      if (binding === null || inert || !Object.keys(fields).every((key) => mine.has(key))) return null;
       const current: SaveFields = { ...openingValues(), ...edited };
       const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, current[key as keyof SaveFields]])) as SaveFields;
       apply(fields);
-      edited = mergeFields(edited, fields);
-      editGeneration += 1;
-      syncCanRevert();
-      emit();
+      const after = get();
+      const next = mergeFields(after.edited, fields);
+      set({ edited: next, canRevert: revertible(next, after.binding), editGeneration: after.editGeneration + 1 });
       return previous;
     },
 
     makeInert() {
       inertHolds += 1;
-      if (inertHolds === 1) emit();
+      if (inertHolds === 1) set({ inert: true });
       let holding = true;
       return () => {
         if (!holding) return;
         holding = false;
         inertHolds -= 1;
-        if (inertHolds === 0) emit();
+        if (inertHolds === 0) set({ inert: false });
       };
     },
 
     failTab() {
       failedTabs += 1;
-      if (failedTabs === 1) emit();
+      if (failedTabs === 1) set({ tabFailed: true });
       let failed = true;
       return () => {
         if (!failed) return;
         failed = false;
         failedTabs -= 1;
-        if (failedTabs === 0) emit();
+        if (failedTabs === 0) set({ tabFailed: false });
       };
     },
 
@@ -537,38 +569,24 @@ export function createWorkspaceSession(): WorkspaceSession {
     },
 
     setRailOpen(open) {
-      if (railOpen === open) return;
-      railOpen = open;
-      emit();
+      if (get().railOpen === open) return;
+      set({ railOpen: open });
     },
 
     selectRailView(view) {
-      let changed = false;
-      if (view !== "preview" && view !== "original" && railTab !== view) {
-        railTab = view;
-        changed = true;
-      }
-      if (preview.open && preview.view !== view) {
-        preview = { ...preview, view };
-        changed = true;
-      }
-      if (changed) emit();
+      const { railTab, preview } = get();
+      const patch: Partial<SessionState> = {};
+      if (view !== "preview" && view !== "original" && railTab !== view) patch.railTab = view;
+      if (preview.open && preview.view !== view) patch.preview = { ...preview, view };
+      if (Object.keys(patch).length > 0) set(patch);
     },
     showComments() {
-      let changed = false;
-      if (railTab !== "comments") {
-        railTab = "comments";
-        changed = true;
-      }
-      if (preview.open && preview.view !== "comments") {
-        preview = { ...preview, view: "comments" };
-        changed = true;
-      }
-      if (!railOpen) {
-        railOpen = true;
-        changed = true;
-      }
-      if (changed) emit();
+      const { railTab, preview, railOpen } = get();
+      const patch: Partial<SessionState> = {};
+      if (railTab !== "comments") patch.railTab = "comments";
+      if (preview.open && preview.view !== "comments") patch.preview = { ...preview, view: "comments" };
+      if (!railOpen) patch.railOpen = true;
+      if (Object.keys(patch).length > 0) set(patch);
     },
 
     openPreview: () => setPreview({ open: true, view: "preview" }),
