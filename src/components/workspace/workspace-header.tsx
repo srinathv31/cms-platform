@@ -63,7 +63,7 @@ export async function WorkspaceHeader({
       >
         <div className="-ml-4 flex min-h-7 flex-wrap items-center gap-y-1.5">
           <span className={META_ITEM}>
-            <StatusBadge state={t.status} sunsetDay={t.sunsetDay} now={nowDate} />
+            <StatusBadge state={t.status} sunsetDay={t.sunsetDay} sunsetPassed={t.sunsetPassed} now={nowDate} />
           </span>
           {t.versionLabel ? <span className={cn(META_ITEM, "text-[14px] leading-6 text-text-muted")}>{t.versionLabel}</span> : null}
           {t.editable ? (

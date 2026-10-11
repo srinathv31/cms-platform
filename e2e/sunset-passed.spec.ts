@@ -101,6 +101,12 @@ test("once v1's sunset has passed, Change sunset stays in place, disabled, with 
   const v1 = page.locator('[data-slot="version-entry"][data-version="1"]').filter({ visible: true });
   await expect(v1).toHaveAttribute("data-state", "superseded");
   await expect(v1).toContainText("Sunset passed");
+  // And so does the badge: the version no longer renders, so it can't read like a date to come (handoff review
+  // N4). The day is the one in the business zone, as the entry's dates give it.
+  const shortDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(
+    new Date(`${sunsetDay(new Date(sunsetAt), NY)}T00:00:00Z`),
+  );
+  await expect(v1.locator('[data-status="superseded"]')).toHaveText(new RegExp(`^Superseded\\s*·\\s*Sunset passed ${shortDay}(, \\d{4})?$`));
 
   const change = v1.getByRole("button", { name: "Change sunset for v1", exact: true });
   await expect(change).toBeVisible();
@@ -129,6 +135,12 @@ test("once v1's sunset has passed, Change sunset stays in place, disabled, with 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const [after] = await rows(db, "SELECT state, sunset_at FROM versions WHERE template_id = ? AND number = 1", [templateId]);
   expect(after).toMatchObject({ state: "superseded", sunset_at: sunsetAt });
+
+  // The Usage tab's consumers read v1 the same way (a render the version no longer serves can't wait on a date).
+  await page.goto(`/${TEAM}/templates/${templateId}/usage`);
+  await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
+  const usageBadge = page.locator('[data-status="superseded"]').filter({ visible: true }).first();
+  await expect(usageBadge).toHaveText(new RegExp(`^Superseded\\s*·\\s*Sunset passed ${shortDay}(, \\d{4})?$`));
 });
 
 test("a persona switch records v1's passed sunset once, Activity says it stopped rendering on its day, and Coral is told", async ({ page }) => {

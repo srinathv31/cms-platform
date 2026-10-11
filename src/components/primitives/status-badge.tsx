@@ -36,6 +36,7 @@ function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
 export function StatusBadge({
   state,
   sunsetDay,
+  sunsetPassed,
   now,
   className,
 }: {
@@ -46,6 +47,11 @@ export function StatusBadge({
    * day in every viewer's time zone.
    */
   sunsetDay?: string | null;
+  /**
+   * The sunset has passed (`sunsetPassed` in domain/lifecycle.ts, decided by the read model): the version no
+   * longer renders, so the badge says "Sunset passed Mar 1" rather than a date to come.
+   */
+  sunsetPassed?: boolean;
   /** The demo clock's now: a sunset outside its year says the year ("Sunset Jan 3, 2027"). */
   now?: Date | string;
   className?: string;
@@ -60,7 +66,9 @@ export function StatusBadge({
       <StatusIcon icon={meta.icon} />
       {meta.label}
       {state === "superseded" && sunsetDay ? (
-        <span className="font-normal">· Sunset {formatShortDate(sunsetDay, now)}</span>
+        <span className="font-normal">
+          · Sunset{sunsetPassed ? " passed" : ""} {formatShortDate(sunsetDay, now)}
+        </span>
       ) : null}
     </Badge>
   );

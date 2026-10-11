@@ -123,6 +123,8 @@ test("Jordan sets v1's sunset: the picker names Eastern, and 00:00 Eastern on th
   // The badge names the day picked.
   const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`));
   await expect(v1Entry(page).locator('[data-status="superseded"]')).toContainText(`Sunset ${short}`);
+  // A day still to come reads as one: "passed" is only for a sunset that has (handoff review N4).
+  await expect(v1Entry(page).locator('[data-status="superseded"]')).not.toContainText("passed");
   expect(daysBetween(today, day)).toBe(30);
 });
 

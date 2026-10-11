@@ -252,6 +252,7 @@ function buildRows(
         ctx.zone,
       ),
       sunsetDay: version?.sunsetAt ? sunsetDay(version.sunsetAt, ctx.zone) : null,
+      sunsetPassed: version ? sunsetPassed(version, ctx.now) : false,
       spark: sparkDays.map((d) => spark?.get(d) ?? 0),
     });
   }

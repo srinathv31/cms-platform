@@ -13,7 +13,7 @@ import { statusLabel } from "@/domain/status";
 import { VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
-import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn } from "./columns";
+import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn, type StatusBadgeWidth } from "./columns";
 import { StarterGallery } from "./starter-gallery";
 
 type Filter = "all" | VersionState;
@@ -21,6 +21,13 @@ type Filter = "all" | VersionState;
 /** Case-insensitive match on the template's name or its ID (UC-4F7K2Q). */
 function matches(row: LibraryRow, needle: string): boolean {
   return row.name.toLowerCase().includes(needle) || row.id.toLowerCase().includes(needle);
+}
+
+/** The widest status badge among the rows, which sizes the status column. */
+function widestBadge(rows: LibraryRow[]): StatusBadgeWidth {
+  const sunsets = rows.filter((row) => row.status === "superseded" && row.sunsetDay !== null);
+  if (sunsets.some((row) => row.sunsetPassed)) return "sunset-passed";
+  return sunsets.length > 0 ? "sunset" : "default";
 }
 
 function ListHeader({ showTeam }: { showTeam: boolean }) {
@@ -60,7 +67,7 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         </span>
         {showTeam ? <span className={cn("truncate text-text-muted", FOLDS)}>{row.teamName}</span> : null}
         <span>
-          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} now={nowIso} />
+          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} sunsetPassed={row.sunsetPassed} now={nowIso} />
         </span>
         <span className="text-text tabular-nums">
           {row.activeNumber !== null ? `v${row.activeNumber}` : <span className="text-text-subtle">—</span>}
@@ -135,7 +142,7 @@ export function LibraryBrowser({
         : `No ${statusLabel(activeFilter).toLowerCase()} templates.`;
 
   return (
-    <div style={statusColumn(rows.some((row) => row.status === "superseded" && row.sunsetDay !== null))}>
+    <div style={statusColumn(widestBadge(rows))}>
       <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
         <InputGroup className="h-9 w-72 rounded-full border-hairline bg-surface">
           <InputGroupAddon>

@@ -328,6 +328,7 @@ export function ReviewWorkspace({
         round={version.round}
         state={shownState}
         sunsetDay={version.sunsetDay ?? null}
+        sunsetPassed={version.sunsetPassed}
         author={version.submittedBy}
         submittedAt={version.submittedAt}
         nowIso={nowIso}

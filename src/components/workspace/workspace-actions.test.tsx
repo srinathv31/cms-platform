@@ -36,6 +36,7 @@ vi.mock("./session/workspace-session", () => ({
   useWorkspaceSession: () => session,
   usePreviewState: () => session.getPreview(),
   useRailOpen: () => session.getRailOpen(),
+  useTabFailed: () => session.getTabFailed(),
 }));
 
 const { SubmitButton } = await import("./workspace-actions");

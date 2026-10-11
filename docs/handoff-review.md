@@ -127,7 +127,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N4 · Low: A passed sunset still reads as a date to come on the status badge
 
-- **Status:** Open
+- **Status:** Fixed. `StatusBadge` takes `sunsetPassed` and reads "Superseded · Sunset passed Oct 1"; every read model that feeds it (Versions, Usage's consumers, the workspace header, the Library, the review header, the integration panel's "since") now decides `sunsetPassed` with the domain's one test, and the Library sizes its status column for the longer wording.
 - **Where:** `src/components/primitives/status-badge.tsx` (`StatusBadge`)
 - **What happens:** A Superseded version with a sunset date reads "Superseded · Sunset Oct 1" whether the day is ahead or has passed. Once it has passed the version no longer renders, but the badge still reads like a date to come, wherever it shows one: Versions, Usage and the review header among them. Versions adds "Sunset passed Oct 1" to the entry's dates; the badge beside it doesn't change. Noticed while fixing D2 (PR #9).
 - **Fix:** Pass the badge whether the sunset has passed (the Versions and Usage read models already work out `sunsetPassed`) and word it for that, for example "Superseded · Sunset passed Oct 1".
@@ -167,7 +167,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N9 · Low: The error boundaries leave three loose ends
 
-- **Status:** Open
+- **Status:** Fixed. `TabError` takes a `failTab` hold on the workspace session while it is on screen, and the tab bar's Edit, Submit for review, Preview and rail toggle show as `BlockedButton`s with the reason; `src/app/(simulator)/error.tsx` shows Coral's own `SimError` with Back to offers (`/sim`); the sidebar skeleton's rows are drawn at full contrast.
 - **Where:** `src/components/workspace/workspace-tab-bar.tsx`; `src/app/global-error.tsx`; `src/components/app-shell/skeletons.tsx` (`StaticRow`)
 - **What happens:** When a workspace tab fails, its error takes the document's cell and the header and tab bar stay, with the tab bar's Edit, Submit for review and Preview still enabled, though the tab they act on didn't load. The simulator has no error boundary of its own, so a failure under `/sim` shows Stencil's global error page, whose Back to library goes to `/`. And the sidebar's skeleton, on screen while the sidebar streams in, dims its labels to 60% opacity, which axe measures at 4.39:1, under 4.5:1. Noticed while fixing I7 (PR #23).
 - **Fix:** Disable the tab bar's actions while the tab shows its error, with the reason; give `src/app/(simulator)` its own `error.tsx` that goes back to `/sim`; draw the skeleton's labels at full contrast.

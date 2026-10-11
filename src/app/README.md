@@ -3,7 +3,7 @@
 The Next.js App Router tree for Stencil, the Coral simulator, and the dev mocks. Files here are thin: a page
 renders static chrome and a `<Stream>` around a server component from `src/components/` that reads the request;
 a route handler parses HTTP and calls `src/server/`. No server actions live here (lint allows `"use server"` only
-in `src/server/actions/`), and outside `(dev)` the only client components are the three error boundaries, which
+in `src/server/actions/`), and outside `(dev)` the only client components are the four error boundaries, which
 Next requires to be client components. Business rules belong in `src/domain/` and `src/server/`.
 
 ## Rules
@@ -144,7 +144,7 @@ requests in about 3 seconds on the Library and on a workspace.
 
 ## Errors
 
-Three error boundaries catch a throw by route, not by `<Stream>`
+Four error boundaries catch a throw by route, not by `<Stream>`
 ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). An error boundary
 doesn't cover the layout beside it, so each keeps what its segment's layouts render:
 
@@ -152,13 +152,17 @@ doesn't cover the layout beside it, so each keeps what its segment's layouts ren
 | --- | --- | --- | --- |
 | [(product)/error.tsx](./(product)/error.tsx) | Pages inside `AppFrame`, `TeamGuard`, the `@modal` slot, the workspace layout. | `PageError`: "This page didn't load" as the page title. | Sidebar and top bar. |
 | [templates/[templateId]/error.tsx](./(product)/[team]/templates/[templateId]/error.tsx) | A workspace tab's page. | `TabError` in the document's grid cell. | Workspace header and tab bar. |
-| [global-error.tsx](global-error.tsx) | `AppFrame`'s streamed parts, the root layout, and `(simulator)`. | `GlobalErrorView`: the canvas panel with `PageError`. | Nothing. It renders its own `<html>` with `globals.css` and the fonts, and no providers. |
+| [(simulator)/error.tsx](./(simulator)/error.tsx) | A page under `/sim`. | `SimError` ([simulator/ui/error-view.tsx](../simulator/ui/error-view.tsx)): "This page didn't load" as Coral's page title, in Coral's look. | Coral's layout: the Back to Stencil strip, its nav and the Demo pill. |
+| [global-error.tsx](global-error.tsx) | `AppFrame`'s streamed parts, the root layout, and the layouts of `(simulator)`. | `GlobalErrorView`: the canvas panel with `PageError`. | Nothing. It renders its own `<html>` with `globals.css` and the fonts, and no providers. |
 
-The views live in [route-error.tsx](../components/app-shell/route-error.tsx) and
-[tab-error.tsx](../components/workspace/tab-error.tsx). Each offers Try again, which calls Next's `retry` (a
-refetch of the route), and Back to library (the URL's space, or `/`), and shows the error's `digest` when Next gives
-one. None shows the error's message or logs it; Next logs it already. Try again is the black button, except on
-`TabError`, where the tab bar keeps the workspace's black button.
+The views live in [route-error.tsx](../components/app-shell/route-error.tsx),
+[tab-error.tsx](../components/workspace/tab-error.tsx) and, for Coral, [error-view.tsx](../simulator/ui/error-view.tsx)
+(built from Coral's own pieces, because the simulator imports nothing from Stencil's server, domain or editor and draws
+in its own palette). Each offers Try again, which calls Next's `retry` (a refetch of the route), and a way back:
+Back to library (the URL's space, or `/`), or, in Coral, Back to offers (`/sim`). Each shows the error's `digest` when
+Next gives one. None shows the error's message or logs it; Next logs it already. Try again is the black button, except
+on `TabError`, where the tab bar keeps the workspace's black button: greyed, with the reason at the control, while the
+error is on screen, because the tab it acts on didn't load.
 
 A `notFound()` or `redirect()` passes through these boundaries to Next's own handling.
 

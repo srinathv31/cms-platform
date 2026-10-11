@@ -147,7 +147,7 @@ describe("getUsageDashboard", () => {
     });
     const v1 = d.rows.find((r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1)!;
     // The sunset is a day in the business time zone: October 25, 00:00 Eastern.
-    expect(v1).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionState: "superseded", sunsetDay: "2026-10-25" });
+    expect(v1).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionState: "superseded", sunsetDay: "2026-10-25", sunsetPassed: false });
     expect(v1.tags).toEqual([{ tone: "warning", text: "sunset in 21 days" }]);
     expect(v1.spark).toHaveLength(USAGE_WINDOW_DAYS);
     expect(v1.spark.at(-1)).toBeGreaterThan(0); // the seed's latest v1 render was 37 minutes ago
@@ -253,6 +253,7 @@ describe("getUsageDashboard", () => {
       expect(d.stats.nearingSunset).toMatchObject({ value: 0, soonest: null });
       const v1 = d.rows.find((r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1)!;
       expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
+      expect(v1).toMatchObject({ sunsetDay: "2026-10-25", sunsetPassed: true });
       expect(d.stats.renders.value).toBe(await direct("at >= ?", "coral-offers", [since()]));
     } finally {
       env.now = BASE;

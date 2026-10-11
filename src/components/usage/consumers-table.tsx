@@ -118,7 +118,7 @@ export function ConsumersTable({
               <TableCell>
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-[13px] text-text">v{r.versionNumber}</span>
-                  <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} now={now} />
+                  <StatusBadge state={r.versionState} sunsetDay={r.sunsetDay} sunsetPassed={r.sunsetPassed} now={now} />
                 </span>
               </TableCell>
               <TableCell className="text-right text-text tabular-nums">{formatCount(r.renders30d)}</TableCell>

@@ -225,6 +225,8 @@ export interface UsageRow {
   tags: UsageTag[];
   /** The version's sunset day (YYYY-MM-DD, business time zone) for `<StatusBadge sunsetDay>`; null when none is set. */
   sunsetDay: string | null;
+  /** The sunset has passed (`sunsetPassed`), for `<StatusBadge sunsetPassed>`. False when none is set. */
+  sunsetPassed: boolean;
   /** Added by S2: successful renders per UTC day for the sparkline, USAGE_WINDOW_DAYS values, oldest first, today last. */
   spark: number[];
 }
@@ -356,6 +358,8 @@ export interface IntegrationPanelData {
     state: VersionState;
     /** YYYY-MM-DD in the business time zone; null when no sunset is set. */
     sunsetDay: string | null;
+    /** The sunset has passed (`sunsetPassed`). False when none is set. */
+    sunsetPassed: boolean;
     diff: { breaking: boolean; items: ApiContractChange[] };
   }[];
 }

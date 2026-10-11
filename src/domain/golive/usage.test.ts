@@ -182,6 +182,7 @@ describe("compareUsageRows", () => {
     lastRenderAt: NOW.toISOString(),
     tags: tones.map((tone) => ({ tone, text: tone })),
     sunsetDay: null,
+    sunsetPassed: false,
     spark: [],
   });
   it("danger first, then warning, then other tags, then renders desc", () => {
