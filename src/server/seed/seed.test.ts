@@ -654,7 +654,7 @@ describe("render history", () => {
     expect(info.rows.map((r) => String(r.name)).sort()).toEqual(
       [
         "at", "channel", "consumer_id", "correlation_id", "duration_ms", "error_code", "id",
-        "is_preview", "outcome", "template_id", "version_id", "version_number",
+        "is_preview", "outcome", "platform", "template_id", "version_id", "version_number",
       ].sort(),
     );
 
@@ -719,6 +719,22 @@ describe("render history", () => {
     for (const r of rows) {
       expect(["push", "sms"].includes(r.channel), `${r.channel} on ${r.versionId}`).toBe(alertIds.has(r.versionId));
     }
+  });
+
+  it("names the phone of every push, both of them, and of no other channel", async () => {
+    const rows = await db.select().from(ucomp.renderLog);
+    const pushes = rows.filter((r) => r.channel === "push");
+    expect(pushes.length).toBeGreaterThan(1000);
+    for (const r of rows.filter((x) => x.channel !== "push")) expect(r.platform, `${r.channel} row ${r.id}`).toBeNull();
+    for (const r of pushes) expect(["ios", "android"], r.id).toContain(r.platform);
+    // About six in ten for an iPhone.
+    const ios = pushes.filter((r) => r.platform === "ios").length / pushes.length;
+    expect(ios).toBeGreaterThan(0.5);
+    expect(ios).toBeLessThan(0.66);
+    // A failed push says which phone it failed on.
+    const failed = pushes.filter((r) => r.outcome === "error");
+    expect(failed.length).toBeGreaterThan(0);
+    expect(new Set(failed.map((r) => r.platform))).toEqual(new Set(["android"]));
   });
 
   it("stops Holiday Points v1 renders at the revoke, and renders nothing for unreleased versions as a consumer", async () => {

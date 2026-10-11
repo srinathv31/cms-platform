@@ -135,7 +135,9 @@ The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.cs
 - **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
   use `series-1…5`, five hues in a fixed order, one per channel (a version chart uses the first four, then taupe),
   checked as a set for colour-blind separation
-  ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)). No value is hover-only: a chart's
+  ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)); the phones of a push share Push's
+  hue, the second one step fainter ([0039](../../docs/decisions/0039-the-render-log-keeps-a-pushs-platform.md)),
+  and `usage/channel-series.ts` holds each channel's hue for both Usage screens. No value is hover-only: a chart's
   readable marks are one Tab stop with arrow keys between them (`usage/chart-keys.tsx`), and a chart whose values
   aren't printed is followed by an sr-only table of them.
 

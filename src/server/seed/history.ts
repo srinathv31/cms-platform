@@ -1,4 +1,5 @@
 import type { Channel } from "@/domain/types";
+import type { PushPlatform } from "@/domain/messages/push";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { DAY, HOUR, type SeedCtx, type VersionRef } from "./context";
 import type { ConsumerId } from "./platform";
@@ -67,13 +68,25 @@ const PREVIEWS: { tpl: string; ver: string; from: number; to: number; count: num
 ];
 
 /** A handful of failures, so the Usage page has something honest to show. */
-const ERRORS: { tpl: string; ver: string; consumer: ConsumerId; at: number; count: number; code: RenderErrorCode; channel: Channel }[] = [
+const ERRORS: {
+  tpl: string;
+  ver: string;
+  consumer: ConsumerId;
+  at: number;
+  count: number;
+  code: RenderErrorCode;
+  channel: Channel;
+  /** A push failure names the phone it was for; left out, it takes the one its row number gives. */
+  platform?: PushPlatform;
+}[] = [
   { tpl: "cash-back", ver: "v2", consumer: "coral", at: 22.3, count: 6, code: "missing_variables", channel: "pdf" },
   { tpl: "balance-transfer", ver: "v1", consumer: "coral", at: 31.1, count: 2, code: "invalid_values", channel: "web" },
   { tpl: "cash-back", ver: "v2", consumer: "coral", at: 14.6, count: 1, code: "channel_not_enabled", channel: "email" },
   { tpl: "rate-change-notice", ver: "v1", consumer: "coral", at: 9.4, count: 1, code: "render_failed", channel: "pdf" },
   { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", at: 18.2, count: 2, code: "missing_variables", channel: "web" },
   { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", at: 12.4, count: 3, code: "missing_variables", channel: "sms" },
+  // Last, so every random draw of the history before it is the same as without it.
+  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", at: 5.2, count: 2, code: "missing_variables", channel: "push", platform: "android" },
 ];
 
 /** The latest render of each Active/Superseded version that Coral or Deposits Online still uses. */
@@ -96,6 +109,18 @@ function pickChannel(rng: Rng, channels: Channel[]): Channel {
     if (roll <= 0) return c;
   }
   return channels[0];
+}
+
+/** About this share of pushes are for an iPhone, the rest for an Android phone. */
+const IOS_SHARE = 0.58;
+
+/**
+ * Which phone a seeded push was for. It comes from the row's number, not the random stream, so adding the
+ * platform left every other draw of the history (and with it the rest of the seed) as it was. A
+ * multiplicative hash read from its high bits, so neighbouring rows don't alternate.
+ */
+function pushPlatformOf(n: number): PushPlatform {
+  return ((n * 2654435761) >>> 0) / 2 ** 32 < IOS_SHARE ? "ios" : "android";
 }
 
 /** How long a render takes, in ms: at least `min`, plus up to `spread`. */
@@ -158,6 +183,7 @@ export function seedHistory(ctx: SeedCtx) {
     outcome?: "ok" | "error";
     code?: string;
     durationMs?: number;
+    platform?: PushPlatform;
   }) => {
     const t = ctx.template(o.tpl);
     const v: VersionRef | undefined = t.versions[o.ver];
@@ -174,6 +200,7 @@ export function seedHistory(ctx: SeedCtx) {
       versionNumber: numbered ? v.number : null,
       consumerId: o.consumer,
       channel: o.channel,
+      platform: o.channel === "push" ? (o.platform ?? pushPlatformOf(counter)) : null,
       isPreview: o.preview ?? false,
       correlationId: `req_${Math.floor(rng() * 36 ** 6).toString(36).padStart(6, "0")}${Math.floor(rng() * 36 ** 6)
         .toString(36)
@@ -247,6 +274,7 @@ export function seedHistory(ctx: SeedCtx) {
         consumer: e.consumer,
         channel: e.channel,
         outcome: "error",
+        platform: e.platform,
         code: e.code,
         durationMs: e.code === "render_failed" ? 30_000 : int(rng, 6, 24),
       });

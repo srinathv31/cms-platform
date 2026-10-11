@@ -26,14 +26,15 @@ import {
   type UsageRow,
 } from "@/domain/golive-types";
 import { sunsetPassed } from "@/domain/lifecycle";
+import type { PushPlatform } from "@/domain/messages/push";
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { isReleased } from "@/domain/rounds";
-import { type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
+import { CHANNELS, type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
-import { consumers, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { requireTemplate } from "./review-shared";
 import { requireSpace } from "./spaces";
 import { currentName } from "./template-name";
@@ -135,6 +136,8 @@ interface Cell {
   consumerId: string;
   versionNumber: number;
   channel: Channel;
+  /** A push's phone; null for every other channel, and for a push logged before the platform was kept. */
+  platform: PushPlatform | null;
   ok30: number;
   err30: number;
   /** Attempts (succeeded or failed) in the 30 days before the current window. */
@@ -142,7 +145,7 @@ interface Cell {
   lastAt: number;
 }
 
-/** Per template × consumer × version × channel: the two rolling windows and the last render. */
+/** Per template × consumer × version × channel (× platform, for a push): the two rolling windows and the last render. */
 async function loadCells(w: UsageWindows, templateIds: readonly string[] | null, from?: number): Promise<Cell[]> {
   const current = sql`${renderLog.at} >= ${w.since}`;
   const rows = await db
@@ -151,6 +154,7 @@ async function loadCells(w: UsageWindows, templateIds: readonly string[] | null,
       consumerId: renderLog.consumerId,
       versionNumber: renderLog.versionNumber,
       channel: renderLog.channel,
+      platform: renderLog.platform,
       ok30: sql<number>`sum(case when ${isOk} and ${current} then 1 else 0 end)`,
       err30: sql<number>`sum(case when ${isError} and ${current} then 1 else 0 end)`,
       prev: sql<number>`sum(case when ${renderLog.at} >= ${w.previousSince} and ${renderLog.at} < ${w.since} then 1 else 0 end)`,
@@ -158,7 +162,7 @@ async function loadCells(w: UsageWindows, templateIds: readonly string[] | null,
     })
     .from(renderLog)
     .where(usageWhere(w, templateIds, from))
-    .groupBy(renderLog.templateId, renderLog.consumerId, renderLog.versionNumber, renderLog.channel);
+    .groupBy(renderLog.templateId, renderLog.consumerId, renderLog.versionNumber, renderLog.channel, renderLog.platform);
   return rows
     .filter((r) => r.versionNumber !== null)
     .map((r) => ({
@@ -166,6 +170,7 @@ async function loadCells(w: UsageWindows, templateIds: readonly string[] | null,
       consumerId: r.consumerId!,
       versionNumber: r.versionNumber!,
       channel: r.channel,
+      platform: r.platform,
       ok30: num(r.ok30),
       err30: num(r.err30),
       prev: num(r.prev),
@@ -418,7 +423,7 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
   const info: TemplateInfo = { id: template.id, name: template.name, teamSlug: template.teamSlug };
   const ids = [template.id];
 
-  const [versionMap, consumerNames, cells, sparks, series, errorRows] = await Promise.all([
+  const [versionMap, consumerNames, cells, sparks, series, errorRows, [contentType]] = await Promise.all([
     loadVersions(ids),
     loadConsumerNames(),
     // All time: a version's consumers include those that stopped rendering it.
@@ -435,12 +440,14 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
         consumerId: renderLog.consumerId,
         versionNumber: renderLog.versionNumber,
         channel: renderLog.channel,
+        platform: renderLog.platform,
         code: renderLog.errorCode,
       })
       .from(renderLog)
       .where(and(usageWhere(w, ids), isError))
       .orderBy(desc(renderLog.at))
       .limit(10),
+    db.select({ allowedChannels: contentTypes.allowedChannels }).from(contentTypes).where(eq(contentTypes.id, template.contentTypeId)).limit(1),
   ]);
 
   const rows = buildRows(cells, { now: nowDate, zone, w, templates: new Map([[info.id, info]]), versions: versionMap, consumerNames, sparks });
@@ -448,12 +455,18 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
   let ok = 0;
   let errors = 0;
   let previous = 0;
+  const byChannel = emptyChannels();
+  const pushByPlatform = { ios: 0, android: 0, unrecorded: 0 };
   for (const c of cells) {
     ok += c.ok30;
     errors += c.err30;
     previous += c.prev;
+    const renders = c.ok30 + c.err30;
+    byChannel[c.channel] += renders;
+    if (c.channel === "push") pushByPlatform[c.platform ?? "unrecorded"] += renders;
   }
   const attempts = ok + errors;
+  const allowed = contentType?.allowedChannels ?? [];
 
   // Released versions, newest first, each with every consumer that ever rendered it.
   const released = [...versionMap.values()].filter((v) => isReleased(v.state)).sort((a, b) => b.number - a.number);
@@ -529,11 +542,15 @@ export const getTemplateUsage = cache(async (spaceSlug: string, templateId: stri
         consumer: { id: e.consumerId!, name: consumerNames.get(e.consumerId!) ?? consumerLabel(e.consumerId!) },
         versionNumber: e.versionNumber,
         channel: e.channel,
+        platform: e.platform,
         code,
         text: errorText(code),
       };
     }),
     success: { ok, errors, pct: percent(ok, attempts) },
+    channels: CHANNELS.filter((c) => allowed.includes(c)),
+    byChannel,
+    pushByPlatform,
     stillOn,
     weeklyVersions,
     weekly: [...weekly.values()],

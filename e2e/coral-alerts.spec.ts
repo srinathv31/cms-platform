@@ -33,6 +33,7 @@ import { viewEveryOutput } from "./helpers/review";
 //   5. Marcus's phone: the same push, without the subtitle (Android never shows one).
 //   6. With Marcus's phone open, Coral sends to him again: the heads-up drops in (opened and closed, it is on
 //      the lock screen), and his thread holds both texts, oldest first. Back on the push: the lock screen.
+//   7. In Stencil, the alert's Usage tab splits its renders by channel: Push by iPhone and by Android, and SMS.
 //
 // afterAll puts back what the run changed: Card Used Abroad goes back in review (its version row, and the
 // approval, audit events, notifications and notices the approval wrote), and Coral's link, deliveries and
@@ -187,6 +188,9 @@ test.describe("Coral receives alerts", () => {
       // What Stencil reported for each text: Olivia's fits one part; Marcus's longer merchant takes two.
       await expect(grid.getByRole("row").filter({ hasText: OLIVIA.name })).toContainText("GSM-7 · 1 part");
       await expect(grid.getByRole("row").filter({ hasText: MARCUS.name })).toContainText("GSM-7 · 2 parts");
+      // The render log names the phone each push was for (a setting of the request, never a value).
+      const pushes = await rows(db, "SELECT platform, COUNT(*) AS n FROM render_log WHERE template_id = ? AND channel = 'push' AND is_preview = 0 GROUP BY platform ORDER BY platform", [templateId]);
+      expect(pushes.map((r) => [r.platform, Number(r.n)])).toEqual([["android", 1], ["ios", 1]]);
     });
 
     await test.step("4. Olivia's iPhone: the push on the lock screen, with its subtitle; the text with its footer", async () => {
@@ -261,6 +265,21 @@ test.describe("Coral receives alerts", () => {
       await expect(phone(customerView(page, MARCUS.name, "Push")).locator("figcaption")).toHaveText("Lock screen, Android-style preview");
       await page.keyboard.press("Escape");
       await expect(customerView(page, MARCUS.name, "Push")).toHaveCount(0);
+    });
+
+    await test.step("7. In Stencil, the alert's Usage splits its renders: Push by iPhone and Android, and SMS", async () => {
+      // Three sends so far: Olivia's, Marcus's, and Marcus's again. One iPhone push, two Android, three texts.
+      await page.goto(`/${TEAM}/templates/${templateId}/usage`);
+      await expect(page.getByRole("heading", { level: 1, name: ALERT_NAME })).toBeVisible();
+      await hydrated(page);
+      const usage = page.locator('section[data-slot="usage"]').filter({ visible: true });
+      await expect(usage.getByRole("heading", { name: "Renders by channel" })).toBeVisible();
+      const split = usage.getByRole("table", { name: "Renders by channel" });
+      const cells = (name: string) => split.getByRole("row").filter({ has: page.getByRole("rowheader", { name, exact: true }) }).getByRole("cell");
+      await expect(cells("Push · iPhone")).toHaveText(["1", "17%"]);
+      await expect(cells("Push · Android")).toHaveText(["2", "33%"]);
+      await expect(cells("SMS")).toHaveText(["3", "50%"]);
+      await expect(split.getByRole("row"), "a header, Push by phone and SMS: no document channel").toHaveCount(4);
     });
   });
 });

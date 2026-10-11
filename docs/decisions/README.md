@@ -44,6 +44,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0036](0036-message-previews-resolve-in-the-browser.md) | Push and SMS previews render in the browser on every keystroke, through the route's own `renderMessage`; no request | Accepted |
 | [0037](0037-an-approver-views-every-output-before-approving.md) | An approver views every output before approving (each channel, Push on both phones); the approve action is refused until they have, and the audit row records them | Accepted |
 | [0038](0038-a-sunset-is-sent-with-its-day-and-zone.md) | `/api/v1` sends a sunset with its day and zone beside the instant, wherever it sends one | Accepted |
+| [0039](0039-the-render-log-keeps-a-pushs-platform.md) | The render log keeps a push's platform (iPhone or Android), and a template's Usage splits Push by it, the phones in the push hue | Accepted |
 | [0042](0042-read-models-beside-queries-and-an-editor-import-allowlist.md) | A screen's read model is declared beside the query that builds it, and code outside the editor imports only the modules its README lists, by lint | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:

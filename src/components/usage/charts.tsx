@@ -578,21 +578,35 @@ export function Sparkline({ values, width = 80, height = 28, label }: { values: 
 
 // ── Channel mix ──────────────────────────────────────────────────────────────
 
+export interface MixPart {
+  label: string;
+  value: number;
+  /** The part's hue, written out so the class scanner sees it. Without one, the series hue at the part's place. */
+  bg?: string;
+  /** A fainter step of the hue: a member of the same channel as the part before it (Android push beside iPhone push). */
+  faded?: boolean;
+}
+
+/** How much fainter a `faded` part is drawn; the same step the bars use for a week still in progress. */
+const FADED = "opacity-55";
+
 /**
- * One bar split by channel, its legend printing each share. `parts` come in the order of the channel
- * series (PDF, Web, Email), so each channel wears the hue it has in "Renders over time". The counts, in
- * the tooltips, are in its table too.
+ * One bar split by channel, its legend printing each share. Without a `bg` the parts come in the order of the
+ * channel series (PDF, Web, Email, Push, SMS), so each channel wears the hue it has in "Renders over time";
+ * a screen that lists only some of the channels gives each part its hue. The counts, in the tooltips, are in
+ * the table too.
  */
-export function ChannelMix({ parts, className }: { parts: { label: string; value: number }[]; className?: string }) {
+export function ChannelMix({ parts, className }: { parts: MixPart[]; className?: string }) {
   const total = parts.reduce((a, p) => a + p.value, 0);
   const pct = (v: number) => (total === 0 ? 0 : Math.round((v / total) * 100));
+  const hue = (p: MixPart, i: number) => p.bg ?? SERIES[i]?.bg;
   return (
     <div className={className}>
       <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-heat-empty">
         {parts.map((p, i) =>
           p.value > 0 ? (
             <Tip key={p.label} title={p.label} value={`${formatCount(p.value)} · ${pct(p.value)}%`}>
-              <span className={SERIES[i]?.bg} style={{ width: `${(p.value / total) * 100}%` }} />
+              <span className={cn(hue(p, i), p.faded && FADED)} style={{ width: `${(p.value / total) * 100}%` }} />
             </Tip>
           ) : null,
         )}
@@ -600,7 +614,7 @@ export function ChannelMix({ parts, className }: { parts: { label: string; value
       <ul className="m-0 mt-2.5 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13px] text-text-muted">
         {parts.map((p, i) => (
           <li key={p.label} className="flex items-center gap-1.5">
-            <span aria-hidden className={cn("size-2 rounded-full", SERIES[i]?.bg)} />
+            <span aria-hidden className={cn("size-2 rounded-full", hue(p, i), p.faded && FADED)} />
             {p.label} <span className="text-text tabular-nums">{pct(p.value)}%</span>
           </li>
         ))}

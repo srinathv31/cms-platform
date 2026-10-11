@@ -289,14 +289,28 @@ export interface TemplateUsageData {
   daily: { date: string; count: number; errors: number }[];
   /** Released versions, newest first, each with who renders it. The same data feeds the consequence text. */
   versions: TemplateUsageVersion[];
-  /** The last 10 failed non-preview renders. */
-  recentErrors: { at: string; consumer: { id: string; name: string }; versionNumber: number | null; channel: Channel; code: RenderErrorCode; text: string }[];
+  /** The last 10 failed non-preview renders. `platform` is the phone of a failed push (null for every other channel, and for a push logged before it was kept). */
+  recentErrors: {
+    at: string;
+    consumer: { id: string; name: string };
+    versionNumber: number | null;
+    channel: Channel;
+    platform: PushPlatform | null;
+    code: RenderErrorCode;
+    text: string;
+  }[];
 
   // Added by S2 for the picked composition:
   /** ok / (ok + error), last 30 days ("Succeeded"). */
   success: { ok: number; errors: number; pct: number | null };
   /** "N% still on vX": last 30 days' successful renders on each version that is no longer Active, most first. pct 0–100 (whole). */
   stillOn: { versionNumber: number; state: VersionState; renders: number; pct: number }[];
+  /** The channels the template's content type allows, in `CHANNELS` order: the ones "Renders by channel" lists. */
+  channels: Channel[];
+  /** Renders (succeeded or failed) by channel, last 30 days: the dashboard's `byChannel` for this template. 0 for a channel it doesn't render to. */
+  byChannel: Record<Channel, number>;
+  /** The pushes among `byChannel.push`, by the phone they were for. `unrecorded` is a push logged before the platform was kept; the three add up to `byChannel.push`. */
+  pushByPlatform: Record<PushPlatform | "unrecorded", number>;
   /** "Renders by version": the series, ascending (every version with a successful render in the TREND_WEEKS window). */
   weeklyVersions: number[];
   /** TREND_WEEKS Sunday-first weeks, oldest first; `byVersion[n]` = successful renders on vn that week (0 when none). */

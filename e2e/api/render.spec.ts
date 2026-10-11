@@ -790,6 +790,7 @@ test.describe("render_log", () => {
         version_number: v.number,
         consumer_id: "deposits-online",
         channel,
+        platform: null,
         is_preview: 0,
         correlation_id: cid,
         outcome: "ok",
@@ -984,7 +985,13 @@ test.describe("alerts", () => {
       expect(res.status()).toBe(200);
       expect(res.headers()["content-type"]).toMatch(/^application\/json/);
       expect(res.headers()["x-stencil-version"]).toBe(String(v.number));
-      expect((await logFor(db, correlationId!))[0]).toMatchObject({ outcome: "ok", channel: "channel" in body ? body.channel : null, consumer_id: "coral" });
+      // The log row names the channel and, for a push, the phone: a setting of the request, never a value.
+      expect((await logFor(db, correlationId!))[0]).toMatchObject({
+        outcome: "ok",
+        channel: "channel" in body ? body.channel : null,
+        platform: "platform" in body ? body.platform : null,
+        consumer_id: "coral",
+      });
       return (await res.json()) as Record<string, unknown>;
     };
 
@@ -1004,5 +1011,16 @@ test.describe("alerts", () => {
       parts: 1,
     });
     expect(sms.characters).toBe((sms.text as string).length);
+  });
+
+  test("a failed push is logged with its phone and its code; a push without its platform is refused before anything is logged", async ({ request }) => {
+    const v = pick(await allVersions(db), "Active alert with push and SMS on", (x) => x.state === "active" && x.channels.includes("push") && x.channels.includes("sms"));
+    const failed = await render(request, { templateId: v.templateId, body: { version: v.number, channel: "push", platform: "android", values: {} } });
+    await expectError(failed.res, 422, "missing_variables");
+    expect(await logFor(db, failed.correlationId!)).toEqual([expect.objectContaining({ channel: "push", platform: "android", outcome: "error", error_code: "missing_variables" })]);
+
+    const refused = await render(request, { templateId: v.templateId, body: { version: v.number, channel: "push", values: validValues(v.variables) } });
+    await expectError(refused.res, 400, "bad_request");
+    expect(await logFor(db, refused.correlationId!)).toHaveLength(0);
   });
 });

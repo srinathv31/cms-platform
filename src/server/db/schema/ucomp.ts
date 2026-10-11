@@ -27,6 +27,7 @@ import type {
   VersionState,
 } from "@/domain/types";
 import type { ChannelFields } from "@/domain/channel-fields";
+import type { PushPlatform } from "@/domain/messages/push";
 import type { ConsumerNoticeKind, VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
@@ -290,6 +291,8 @@ export const renderLog = sqliteTable(
     versionNumber: integer("version_number"),
     consumerId: text("consumer_id"),
     channel: text("channel").$type<Channel>().notNull(),
+    /** Which phone a push was for ("ios" or "android"); null for every other channel, and for pushes logged before it was kept. A setting of the request, never a value. */
+    platform: text("platform").$type<PushPlatform>(),
     isPreview: integer("is_preview", { mode: "boolean" }).notNull().default(false),
     correlationId: text("correlation_id").notNull(),
     outcome: text("outcome").$type<"ok" | "error">().notNull(),
