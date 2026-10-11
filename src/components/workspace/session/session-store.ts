@@ -332,7 +332,7 @@ function samePreviewValue(a: PreviewState[keyof PreviewState], b: PreviewState[k
 }
 
 export function createWorkspaceSession(): WorkspaceSession {
-  const store = createStore<SessionState>()(() => INITIAL_SESSION_STATE);
+  const store = createStore<SessionState>()(() => ({ ...INITIAL_SESSION_STATE }));
   const get = store.getState;
   const set = store.setState;
   // What only the rules use, and no component renders (so none of it is state: a change would notify
