@@ -292,9 +292,16 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](./(product)/[team]/audit/export/route.test.ts)) mocks the viewer and the
   query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
-  3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
-  `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server
-  without a reset: `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`.
+  3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, with e2e's own
+  database and uploads folder (`E2E_DATABASE_URL`, default `file:./data/e2e.db`; `E2E_UPLOADS_DIR`, default
+  `./data/e2e-uploads`), passed as the server's `DATABASE_URL` and `UPLOADS_DIR`. The demo's `data/ucomp.db` and
+  `data/uploads` are never touched. [e2e/storage.ts](../../e2e/storage.ts) reads the two values once; `openDb()` in
+  `e2e/api/helpers.ts` and the cleanup helpers use it, so server and specs share the files, and `openDb()` waits out
+  and retries the server's `SQLITE_BUSY`. To check against a running dev server without a reset, start that server
+  with the same two variables (`DATABASE_URL=file:./data/e2e.db UPLOADS_DIR=./data/e2e-uploads npm run dev`, after
+  an `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`. To
+  point the specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
+  `E2E_UPLOADS_DIR=./data/uploads`.
 
 | Spec | Covers |
 | --- | --- |

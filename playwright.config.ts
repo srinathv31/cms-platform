@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_DATABASE_URL, E2E_UPLOADS_DIR } from "./e2e/storage";
 
 // Scenario specs run serially from a fresh reset against the production build (`npm run demo`).
 // The gate port runs the production build (`next start`, after a db:reset). It's 3100 by default; each
@@ -77,11 +78,14 @@ export default defineConfig({
   // Only the gate port (the production build) may be started here, because starting resets the
   // database. On any other E2E_PORT (a dev server, e.g. 3000) the server must already be up:
   // a dev server answering 500 mid-edit used to look "not running" and trigger a reset of the shared DB.
+  // The reset and the server get e2e's own database and uploads folder (e2e/storage.ts, which every
+  // helper reads too), so a run never touches the demo's data/ucomp.db or data/uploads.
   webServer:
     PORT === GATE_PORT
       ? {
           command: `npm run db:reset && npx next start -p ${PORT}`,
           url: `http://localhost:${PORT}`,
+          env: { DATABASE_URL: E2E_DATABASE_URL, UPLOADS_DIR: E2E_UPLOADS_DIR },
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
         }

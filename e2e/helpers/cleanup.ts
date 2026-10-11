@@ -1,9 +1,10 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import type { Client, InValue } from "@libsql/client";
+import { E2E_UPLOADS_DIR } from "../storage";
 
 // Removing a template a spec created, and everything it owns (children first), by its id: rows in the
-// database and the upload folders under data/uploads (one per upload id; never a wildcard).
+// database and the upload folders under e2e's uploads directory (one per upload id; never a wildcard).
 
 /** The file has no busy timeout, and the app writes to it: a statement waits its turn. */
 async function busy<T>(run: () => Promise<T>): Promise<T> {
@@ -44,6 +45,6 @@ export async function removeTemplate(db: Client, id: string) {
   for (const [sql, args] of statements) await busy(() => db.execute({ sql, args }));
   for (const upload of uploads) {
     const folder = String(upload.id);
-    if (/^[\w-]{8,}$/.test(folder)) await rm(path.join(process.cwd(), "data", "uploads", folder), { recursive: true, force: true });
+    if (/^[\w-]{8,}$/.test(folder)) await rm(path.join(E2E_UPLOADS_DIR, folder), { recursive: true, force: true });
   }
 }

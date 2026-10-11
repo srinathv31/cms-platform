@@ -5,12 +5,12 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { db, libsql } from "./db/client";
 import { settings } from "./db/schema/ucomp";
 import { CLOCK_OFFSET_KEY } from "./clock";
+import { defaultUploadsRoot } from "./import/store";
 import { SEED_VERSION, seedDatabase } from "./seed";
 
 // Relative to the project root, which is the working directory for `next dev`, `next start`
 // and the scripts alike.
 const MIGRATIONS_FOLDER = "./src/server/db/migrations";
-const UPLOADS_DIR = "./data/uploads";
 
 async function tableNames(): Promise<string[]> {
   const res = await libsql.execute(
@@ -52,9 +52,10 @@ async function countRows(): Promise<Record<string, number>> {
 }
 
 async function emptyUploads() {
-  await mkdir(UPLOADS_DIR, { recursive: true });
-  for (const entry of await readdir(UPLOADS_DIR)) {
-    await rm(join(UPLOADS_DIR, entry), { recursive: true, force: true });
+  const dir = defaultUploadsRoot();
+  await mkdir(dir, { recursive: true });
+  for (const entry of await readdir(dir)) {
+    await rm(join(dir, entry), { recursive: true, force: true });
   }
 }
 

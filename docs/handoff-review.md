@@ -909,7 +909,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T5 · Medium: E2E can't be pointed at its own database
 
-- **Status:** Open
+- **Status:** Fixed. `playwright.config.ts` gives e2e its own `data/e2e.db` and `data/e2e-uploads` (`E2E_DATABASE_URL`, `E2E_UPLOADS_DIR`, read once in `e2e/storage.ts`) and starts the server on them as `DATABASE_URL` and the new `UPLOADS_DIR`, so a run never touches the demo database; the raw-SQL assertions stay for the Java API work.
 - **Where:** `e2e/api/helpers.ts` line 12
 - **What happens:** `openDb()` hard-codes `data/ucomp.db` and two helpers hard-code the uploads folder, so `DATABASE_URL` splits server and tests. Thirteen specs assert with raw SQL, which won't survive a Java backend.
 - **Fix:** One `E2E_DATABASE_URL` and uploads dir set in `playwright.config.ts` and read by the helpers; assert through the API where possible.
