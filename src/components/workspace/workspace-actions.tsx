@@ -18,7 +18,7 @@ import type { SubmitSummary } from "@/domain/submit-types";
 import type { ActionResult } from "@/domain/review-types";
 import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";
-import { useFocusTarget, usePreviewState, useRailOpen, useTabFailed, useWorkspaceSession } from "./session/workspace-session";
+import { useFocusTarget, usePreviewState, useRailOpen, useSaveStatus, useTabFailed, useWorkspaceSession } from "./session/workspace-session";
 import { TAB_BLOCKED } from "./tab-error";
 
 /**
@@ -58,6 +58,7 @@ export function EditButton({ templateId }: { templateId: string }) {
 /** Shown at the button when the draft's latest changes could not be saved, so submitting would freeze a stale copy. */
 const NOT_SAVED = "Your latest changes aren't saved yet.";
 const SUBMIT_FAILED = "Couldn't open the submit dialog. Try again.";
+const SUBMIT_CLASS = "px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3";
 
 /**
  * Sends the pending autosave, and says whether everything typed is saved: what the server reads next
@@ -106,17 +107,20 @@ function focusStatusRow(session: WorkspaceSession) {
  * Any other refusal ("Define or remove {{promo_code}} before submitting.") shows inside the dialog,
  * at that button, and the draft stays as it is. When the save itself failed, or the summary can't be
  * read, there is nothing safe to show: the page is editable again and the reason appears in a small
- * popover right under this button instead. On success the dialog closes and the action refreshes the
+ * popover right under this button instead. Once saving has stopped for good (`useSaveStatus().stopped`)
+ * the reason is known before any click, so the button shows disabled with it at the control
+ * (`BlockedButton`): no save would go out, and the page is held read-only. On success the dialog closes and the action refreshes the
  * page in place: the header reads In review, the document turns read-only for good, and this button
  * goes away with the draft (letting go of the page as it does); focus moves to the header's status
  * row (`focusStatusRow`), so it doesn't fall to the page.
  *
  * While the tab shows its error (`TabError`) there is no draft on screen to freeze: the button stays,
- * greyed, with the reason at the control.
+ * greyed, with the reason at the control. If saving has stopped as well, the tab's reason is the one it shows.
  */
 export function SubmitButton({ templateId }: { templateId: string }) {
   const session = useWorkspaceSession();
   const tabFailed = useTabFailed();
+  const { stopped, error: stopReason } = useSaveStatus();
   const [pending, startTransition] = useTransition();
   // The reason outlives its popover, so the text doesn't vanish while the popover fades out.
   const [reason, setReason] = useState<string | null>(null);
@@ -184,62 +188,57 @@ export function SubmitButton({ templateId }: { templateId: string }) {
     });
   }
 
-  if (tabFailed) {
-    return (
-      <BlockedButton
-        variant="default"
-        size="lg"
-        className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3"
-        aria-label="Submit for review"
-        reason={TAB_BLOCKED}
-      >
-        {/* The same label, closing up in the same steps as the live button, so the bar keeps its geometry. */}
-        <span>
-          Submit<span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden"> for review</span>
-        </span>
-      </BlockedButton>
-    );
-  }
+  // In the tightest tab bar (preview open on a 1280px window) the label closes up to "Submit". The bar's steps are in workspace-grid.ts.
+  const label = (
+    <span>
+      Submit<span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden"> for review</span>
+    </span>
+  );
+  // Two things can block the button; a tab that failed to load comes first, so only one reason shows.
+  const blockedReason = tabFailed ? TAB_BLOCKED : stopped ? (stopReason ?? NOT_SAVED) : null;
 
   return (
     <>
-      <Popover
-        open={open}
-        // Only a dismissal (Esc, a click elsewhere) comes through here; a refusal opens it itself.
-        onOpenChange={(next) => {
-          if (!next) setOpen(false);
-        }}
-      >
-        <PopoverTrigger
-          render={
-            <Button
-              ref={trigger}
-              size="lg"
-              className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3"
-              aria-label="Submit for review"
-              onClick={openDialog}
-              disabled={pending}
-            />
-          }
+      {blockedReason !== null ? (
+        <BlockedButton variant="default" size="lg" className={SUBMIT_CLASS} aria-label="Submit for review" reason={blockedReason}>
+          {label}
+        </BlockedButton>
+      ) : (
+        <Popover
+          open={open}
+          // Only a dismissal (Esc, a click elsewhere) comes through here; a refusal opens it itself.
+          onOpenChange={(next) => {
+            if (!next) setOpen(false);
+          }}
         >
-          {pending ? <Spinner data-icon="inline-start" aria-label="Opening" /> : null}
-          {/* In the tightest tab bar (preview open on a 1280px window) the label closes up to "Submit". The bar's steps are in workspace-grid.ts. */}
-          <span>
-            Submit<span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden"> for review</span>
-          </span>
-        </PopoverTrigger>
-        <PopoverContent
-          side="bottom"
-          align="end"
-          sideOffset={8}
-          initialFocus={false}
-          className="w-auto max-w-72 rounded-xl border border-hairline bg-popover px-3 py-2.5 shadow-pop ring-0"
-        >
-          <p role="alert" className="text-[13px] leading-5 text-text">
-            {reason}
-          </p>
-        </PopoverContent>
-      </Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                ref={trigger}
+                size="lg"
+                className={SUBMIT_CLASS}
+                aria-label="Submit for review"
+                onClick={openDialog}
+                disabled={pending}
+              />
+            }
+          >
+            {pending ? <Spinner data-icon="inline-start" aria-label="Opening" /> : null}
+            {label}
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="end"
+            sideOffset={8}
+            initialFocus={false}
+            className="w-auto max-w-72 rounded-xl border border-hairline bg-popover px-3 py-2.5 shadow-pop ring-0"
+          >
+            <p role="alert" className="text-[13px] leading-5 text-text">
+              {reason}
+            </p>
+          </PopoverContent>
+        </Popover>
+      )}
       <SubmitDialog
         summary={summary}
         open={dialogOpen}

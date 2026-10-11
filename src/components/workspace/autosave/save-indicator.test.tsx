@@ -36,6 +36,17 @@ describe("SaveIndicator", () => {
     expect(out).not.toContain("animate-");
   });
 
+  it("keeps the width of its widest state, in Saved as in Saving…, so nothing after it moves as a save lands (N10)", () => {
+    for (const status of ["saved", "saving", "unsaved"] as const) {
+      const out = html({ status });
+      expect(out).toContain(`data-widest="${saveIndicatorText("saving")}"`);
+      expect(out).toContain("after:content-[attr(data-widest)]");
+      expect(out).toContain("after:invisible");
+    }
+    // Only the status text is in the live region; the reserved width is CSS, not a second copy of the words.
+    expect(html({ status: "saved" }).match(/Saving…/g)).toHaveLength(1);
+  });
+
   it("marks an error so it isn't missed", () => {
     const out = html({ status: "error", error: "Your latest changes can't be saved — this draft changed elsewhere." });
     expect(out).toContain("text-danger-text");

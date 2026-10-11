@@ -82,7 +82,9 @@ the `render` prop, not `asChild`. A link styled as a button also needs `nativeBu
 <Button variant="ghost" render={<Link href={basePath as Route} scroll={false} />} nativeButton={false}>
 ```
 
-Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` is in `Providers`.
+Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` is in `Providers`, which also
+styles a toast's action (Undo) as an outline button through `toastOptions.classNames.actionButton`: a screen has
+one black button, and sonner's default is filled near-black.
 
 One generated file is edited on purpose. `ui/sidebar.tsx` has no window-level ⌘B / Ctrl+B listener: shadcn's
 toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` cookie, though the app's sidebar is
@@ -101,7 +103,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 | `TemplateId` | [template-id.tsx](primitives/template-id.tsx) | A template ID with a copy button (client). |
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
 | `useActionRun`, `runAction` | [use-action-run.ts](primitives/use-action-run.ts) | Running a server action: one at a time, in a transition, with the refusal's sentence (`error`) and `onOk` / `onRefused`. A call that throws becomes the code `failed` with the screen's sentence; Next's redirect is handed back to Next (client). |
-| `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, and Approve alone while an output hasn't been viewed; the Versions tab's passed sunset (client). |
+| `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, and Approve alone while an output hasn't been viewed; the Versions tab's passed sunset (client), the workspace's Submit for review once saving has stopped. |
 | `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon, New template's Document · Alert), `disabled` while what it switches is busy; an option's `done` draws a quiet check after its label (the review Preview's viewed outputs), its room kept while it is false so nothing moves; `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
 | `Tabs`, `TabList`, `Tab`, `TabPanel`, `TabUnderline` | [tabs.tsx](primitives/tabs.tsx), [tab-styles.ts](primitives/tab-styles.ts) | View switches in the page: Base UI Tabs in the workspace tab bar's look (15px text, the 2px underline sliding on a hairline, the ring round the label). Usage, the review's Document and Preview, the review queue. Links that look like tabs (`workspace/workspace-tabs.tsx`) and skeletons take the classes from `tab-styles.ts`, which a server component can import. Client. |
 | `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |

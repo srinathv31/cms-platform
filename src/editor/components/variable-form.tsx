@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { cx } from "../lib/cx";
 import { generatedKey, sampleForType, validateDraft, type DraftErrors, type DraftField, type VariableDraft } from "../model/draft";
 import { VARIABLE_TYPES, type Variable, type VariableType } from "../model/types";
-import { TYPE_META } from "../model/variables";
+import { MAX_VALUE_LENGTH, TYPE_META } from "../model/variables";
 import type { VariableResult } from "../state/variable-store";
 import { FIELD_FOCUS_RING, FOCUS_RING } from "./classes";
 import { TYPE_ICONS } from "./type-icon";
@@ -209,6 +209,7 @@ export function VariableForm({ mode, initial, takenKeys, onSubmit, onCancel, onD
           inputMode={INPUT_MODE[draft.type]}
           value={draft.sample}
           disabled={disabled}
+          maxLength={MAX_VALUE_LENGTH}
           onChange={(event) => update({ ...draft, sample: event.target.value })}
           autoComplete="off"
           aria-invalid={errors.sample ? true : undefined}

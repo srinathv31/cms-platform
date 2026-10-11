@@ -41,5 +41,7 @@ to their right and moves nothing.
 ## Consequences
 
 - An untouched draft now shows two greyed icons where it used to show none.
-- The status's own width can still change (the chevron moves as "Saving…" becomes "Saved"); nothing after it does.
+- The status keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the chevron after it doesn't
+  move as a save lands (handoff review N10), at the price of a small gap after "Saved". A long error message can
+  still lengthen it; nothing before it moves.
 - `UndoRedo` renders on the server, so the platform's shortcut (⌘ or Ctrl) is read after hydration, not during render.

@@ -144,6 +144,11 @@ test("Revert to v2 takes out what was typed, and Undo straight away puts it back
   expect(Math.abs((await canvasTop(page)) - top), "Revert to v2 doesn't scroll the page").toBeLessThanOrEqual(SLACK);
   await expectAutosaved(page);
 
+  // Undo is an outline button (N11): Submit for review is the screen's one black button.
+  const submitFill = await page.getByRole("button", { name: "Submit for review" }).evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect(toastUndo(page)).not.toHaveCSS("background-color", submitFill);
+  await expect(toastUndo(page)).toHaveCSS("border-top-width", "1px");
+
   await tap(toastUndo(page));
   await expect(documentEditor(page)).toContainText(BEFORE);
   await expect(revertToast(page)).toHaveCount(0);

@@ -13,7 +13,7 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { SampleSet, Variable, VariableType } from "@/editor/model/types";
 import { isDefaultSet } from "@/editor/model/sample-sets";
-import { formatValue } from "@/editor/model/variables";
+import { MAX_VALUE_LENGTH, formatValue } from "@/editor/model/variables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -240,6 +240,7 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
                   id={fieldId(key)}
                   {...(key === autofocusKey ? { [AUTOFOCUS_ATTR]: "" } : {})}
                   value={draft ?? stored}
+                  maxLength={MAX_VALUE_LENGTH}
                   onChange={(event) => type(variable, event.target.value)}
                   onBlur={() => commit(variable)}
                   onKeyDown={onFieldKeyDown(variable)}
