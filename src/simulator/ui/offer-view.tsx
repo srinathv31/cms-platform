@@ -6,9 +6,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ApiChannel } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
-import { getDeliveryView, saveMapping, sendToCustomers } from "@/simulator/actions";
+import { saveMapping, sendToCustomers } from "@/simulator/actions";
 import { simField } from "@/simulator/fields";
 import { blockedSentence } from "@/simulator/mapping";
+import { readDeliveryView } from "@/simulator/reads";
 import type { SimBatch, SimFieldPath, SimMappingRow, SimOfferPage } from "@/simulator/types";
 import { Mono, PageHeader, Pill, Strip } from "./bits";
 import { CustomerDrawer, type Arrival, type ViewState } from "./customer-drawer";
@@ -102,7 +103,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   const ensureView = (deliveryId: string) => {
     if (views[deliveryId]?.status === "ready") return;
     setViews((v) => ({ ...v, [deliveryId]: { status: "loading" } }));
-    void getDeliveryView({ deliveryId }).then((r) => setViews((v) => ({ ...v, [deliveryId]: r.ok ? { status: "ready", view: r.view } : { status: "error", reason: r.reason } })));
+    void readDeliveryView(deliveryId).then((r) => setViews((v) => ({ ...v, [deliveryId]: r.ok ? { status: "ready", view: r.view } : { status: "error", reason: r.reason } })));
   };
   const openView = (customerId: string, channel: ApiChannel) => {
     if (!viewing) trigger.current = document.activeElement as HTMLElement | null;
@@ -138,7 +139,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
     const what =
       link.pinnedState === "revoked" || link.revokedAt
         ? `v${link.pinnedVersion} was revoked${link.revokedAt ? ` on ${dayLabel(link.revokedAt)}` : ""}.`
-        : `v${link.pinnedVersion} stopped rendering${link.sunsetAt ? ` on ${dayLabel(link.sunsetAt)}` : ""}.`;
+        : `v${link.pinnedVersion} stopped rendering${link.sunsetDay ? ` on ${dayLabel(link.sunsetDay)}` : ""}.`;
     strip = (
       <Strip tone="bad" action={relinkAction}>
         <strong className="font-semibold">A send now fails. </strong>
@@ -163,7 +164,7 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
         ) : (
           "Nothing new to map."
         )}
-        {link.sunsetAt && !link.sunsetPassed ? ` v${link.pinnedVersion} stops rendering ${dayLabel(link.sunsetAt)}.` : null}
+        {link.sunsetDay && !link.sunsetPassed ? ` v${link.pinnedVersion} stops rendering ${dayLabel(link.sunsetDay)}.` : null}
       </Strip>
     );
   }

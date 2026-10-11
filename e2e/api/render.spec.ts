@@ -487,7 +487,13 @@ test.describe("version rules for consumers", () => {
     await withTemporarily(db, "versions", v.id, { sunset_at: sunset }, async () => {
       const { res } = await render(request, { templateId: v.templateId, body: bodyFor(v, v.channels[0]) });
       const error = await expectError(res, 410, "version_sunset", `Version ${v.number} was sunset on March 1, 2020. Version ${v.activeNumber} is active.`);
-      expect(error.details).toEqual({ version: v.number, activeVersion: v.activeNumber, at: "2020-03-01T05:00:00.000Z" });
+      expect(error.details).toEqual({
+        version: v.number,
+        activeVersion: v.activeNumber,
+        at: "2020-03-01T05:00:00.000Z",
+        sunsetDay: "2020-03-01",
+        zone: "America/New_York",
+      });
     });
   });
 

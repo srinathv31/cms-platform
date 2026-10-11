@@ -434,6 +434,10 @@ export interface VersionErrorDetails {
   activeVersion: number | null;
   /** ISO timestamp of the sunset or revoke, when there is one. */
   at?: string;
+  /** version_sunset: the sunset's day (YYYY-MM-DD) in the business time zone, the day the message names. */
+  sunsetDay?: string;
+  /** version_sunset: the business time zone `sunsetDay` is a day in. */
+  zone?: string;
 }
 
 export interface RenderError {

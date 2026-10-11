@@ -93,7 +93,12 @@ export interface ApiValueErrorDetails {
 export interface ApiVersionErrorDetails {
   version: number;
   activeVersion: number | null;
+  /** The instant of the sunset (version_sunset) or the revoke (version_revoked). */
   at?: string;
+  /** version_sunset only: the sunset's day, YYYY-MM-DD, as people read it in `zone`. The message names it. */
+  sunsetDay?: string;
+  /** version_sunset only: the business time zone `sunsetDay` is a day in. */
+  zone?: string;
 }
 
 export interface ApiErrorBody {
@@ -204,6 +209,13 @@ export interface ApiVersionSummary {
    * none is set.
    */
   sunsetAt: string | null;
+  /**
+   * The sunset's day, YYYY-MM-DD, as people read it in `zone`: the day to show, because `sunsetAt`'s UTC date
+   * is the day before for a zone ahead of UTC. Null when `sunsetAt` is.
+   */
+  sunsetDay: string | null;
+  /** The business time zone (an IANA id, "America/New_York") `sunsetDay` is a day in. Null when `sunsetAt` is. */
+  zone: string | null;
   /** True once `sunsetAt` has passed on the demo clock: renders now fail with version_sunset. */
   sunsetPassed: boolean;
   revokedAt: string | null;

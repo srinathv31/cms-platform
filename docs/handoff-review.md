@@ -215,7 +215,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N15 · Low: Coral drops a mapping on a rename and dates a sunset in UTC
 
-- **Status:** Open
+- **Status:** Fixed. `suggestMapping` takes the diff's changes and carries a mapping from a `key_renamed` change's `from` key to its `to` key when relinking, and `/api/v1` now sends `sunsetDay` and `zone` beside every sunset instant (each version, and the `version_sunset` 410's details) for Coral to show instead of the instant's UTC date ([decision 0038](decisions/0038-a-sunset-is-sent-with-its-day-and-zone.md)).
 - **Where:** `src/simulator/mapping.ts` (`suggestMapping`); `src/simulator/ui/format.tsx` (`dayLabel`)
 - **What happens:** Two gaps in the simulated consumer. Relinking keeps a field's mapping only under the same key, so after a variable rename the renamed variable starts unmapped, though `/api/v1` reports the rename as one `key_renamed` change ([D8](#d8--medium-variable-renames-are-lost-between-the-panel-and-submit)). And Coral shows a sunset as its instant's date in UTC. A sunset ends at 00:00 in the business time zone ([D6](#d6--medium-a-sunset-date-means-midnight-utc)), and every zone on the list is UTC or behind it, so the date is right today; a zone ahead of UTC would show the day before. Noticed while fixing D8 (PR #32) and D6 (PR #26).
 - **Fix:** Carry a mapping across a `key_renamed` change when relinking. Show a sunset's day in the business time zone, which needs `/api/v1` to send the zone or the day beside the instant.
@@ -247,7 +247,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N19 · Low: The simulator serves reads as server actions
 
-- **Status:** Open
+- **Status:** Fixed. `searchTemplates` and `getDeliveryView` are now `GET /sim/templates/search` and `GET /sim/deliveries/[deliveryId]/view`, so `src/simulator/actions.ts` holds only the four writes. Lint can't tell a read from a write inside a file, so the exemption stays for that file and `actions.test.ts` pins its exports to the writes ([decision 0019](decisions/0019-on-demand-reads-are-get-routes.md)).
 - **Where:** `src/simulator/actions.ts`; `eslint.config.mjs` (the `"use server"` rule's `ignores`)
 - **What happens:** [A6](#a6--medium-reads-are-exposed-as-server-actions) made on-demand reads GET routes and allowed `"use server"` only in `src/server/actions/`, but the simulator's actions file is exempt. Beside its four writes it serves two reads, `searchTemplates` and `getDeliveryView`, so they are public POST endpoints queued with the writes: the pattern A6 removed from Stencil. Noticed while fixing A6 (PR #29).
 - **Fix:** Serve the two reads from GET route handlers or server component props, and narrow the exemption to the writes.

@@ -16,9 +16,15 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
   notice) is when renders of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in
   Stencil's business time zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
   `2027-03-01T05:00:00.000Z`. Compare it with the time; don't take its UTC date as the day, which is the day
-  before for a zone ahead of UTC. A sunset notice also carries the day and the zone (`sunsetDay`, `zone`), and its
-  `message` and the 410's message name that day. Changing the zone doesn't move a sunset already announced
-  ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md)).
+  before for a zone ahead of UTC. Everywhere the API sends a sunset it sends the day and the zone beside the
+  instant, as `sunsetDay` (`YYYY-MM-DD`) and `zone` (an IANA id): on each `ApiVersionSummary` (null with no
+  sunset), on a `sunset_scheduled` or `sunset_passed` notice, and in the `details` of a `version_sunset` 410.
+  Show `sunsetDay`; the `message` of the notice and of the 410 name that day. On a notice they are the day and
+  zone as recorded when it was written; on a version and in the 410 they are the day in the zone in force now, so
+  after the platform changes its zone a sunset already set reads as the day it ends in the new one. Changing the
+  zone doesn't move a sunset already announced
+  ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md),
+  [0038](../../docs/decisions/0038-a-sunset-is-sent-with-its-day-and-zone.md)).
 
 ## Endpoints
 

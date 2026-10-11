@@ -55,8 +55,8 @@ export interface SimField {
 }
 
 // SIM_FIELDS: readonly SimField[]                                         (fields.ts)
-// suggestMapping(variables: readonly ApiVariable[], current?: Record<string, SimFieldPath>): Record<string, SimFieldPath>
-//   Keeps current mappings that still fit; then auto-maps by key (first_name → customer.firstName, last_name,
+// suggestMapping(variables: readonly ApiVariable[], current?: Record<string, SimFieldPath>, changes?: ApiContractChange[]): Record<string, SimFieldPath>
+//   Keeps current mappings that still fit, under the same key or the earlier key of a key_renamed change; then auto-maps by key (first_name → customer.firstName, last_name,
 //   purchase_apr, home_state, offer_end_date → offer.endsOn). Never auto-maps a key it isn't sure of
 //   (annual_fee stays unmapped: the person picks customer or offer).
 // missingRequired(variables: readonly ApiVariable[], mapping: Record<string, SimFieldPath | null>): ApiVariable[]
@@ -117,7 +117,8 @@ export interface SimLinkSummary {
   pinnedVersion: number;
   /** From GET /api/v1/templates/{id}: the pinned version's state today. */
   pinnedState: ApiVersionState;
-  sunsetAt: string | null;
+  /** The pinned version's sunset day (YYYY-MM-DD) in Stencil's business time zone, as the API sends it. Null when none is set. */
+  sunsetDay: string | null;
   sunsetPassed: boolean;
   revokedAt: string | null;
   /** False when a send would fail today (sunset passed, revoked). */
@@ -290,12 +291,17 @@ export interface SimLinkFlow {
   apiError: SimApiError | null;
 }
 
-// ── Actions (src/simulator/actions.ts, "use server"; each returns SimResult and calls refresh()) ────
+// ── Actions (src/simulator/actions.ts, "use server"; the writes: each returns SimResult and calls refresh()) ────
 
 export type SimResult<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; reason: string };
 
-// searchTemplates(input: { q: string }): Promise<SimResult<{ results: ApiTemplateSummary[] }>>
-//   GET /api/v1/templates?q=… (debounced by the UI; empty q lists every Active template).
+/**
+ * What a read model answers when a GET route serves it (src/simulator/read-response.ts): the data, or the
+ * sentence to show with the HTTP status that goes with it (400 the input didn't parse, 404 no such row, 502
+ * Stencil's /api/v1 failed). The browser gets a `SimResult`; the status is the route's.
+ */
+export type SimRead<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; reason: string; status: 400 | 404 | 502 };
+
 // linkTemplate(input: { offerId: string; templateId: string; version: number; channels: ApiChannel[];
 //                       mapping: Record<string, SimFieldPath | null> }): Promise<SimResult>
 //   Upserts sim_links (one per offer). Unmapped OPTIONAL keys are dropped; unmapped REQUIRED keys are
@@ -311,7 +317,10 @@ export type SimResult<T = Record<never, never>> = ({ ok: true } & T) | { ok: fal
 //   S3 addition (the offer page's mapping rows): merges into the link's mapping; null clears a key.
 //   Keys must be variables of the pinned version (re-read over /api/v1).
 // markNoticesRead(input: { noticeIds: string[] }): Promise<SimResult>   // inserts sim_notice_reads
-// getDeliveryView(input: { deliveryId: string }): Promise<SimResult<{ view: SimDeliveryView }>>
+// The two reads are GET routes, not actions (queries.ts, reads.ts):
+// searchSimTemplates(q): Promise<SimRead<{ results: ApiTemplateSummary[] }>>   GET /sim/templates/search?q=
+//   GET /api/v1/templates?q=… (debounced by the UI; empty q lists every Active template).
+// readSimDeliveryView(deliveryId): Promise<SimRead<{ view: SimDeliveryView }>> GET /sim/deliveries/{id}/view
 
 // Signatures re-exported for the UI's convenience.
 export type { ApiChannel, ApiTemplateSummary, ApiVariable };

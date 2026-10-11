@@ -79,6 +79,8 @@ const NOTE_V3 = "Added the annual fee.";
 const FEE_SENTENCE = " The annual fee is {{Annual fee";
 const SUNSET_DAYS = 14;
 const ADVANCE_DAYS = 15;
+/** A calendar day as Coral writes it: "Mar 4, 2027". */
+const coralDay = (day: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(day));
 
 let db: Client;
 let fixture: SpringFixture | null = null;
@@ -342,7 +344,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       const row = offerRow(page);
       await expect(row).toContainText("v3 available");
       await expect(row).toContainText("Superseded");
-      await expect(row).toContainText("sunset");
+      await expect(row, "Coral shows the sunset's day as Stencil sends it").toContainText(`sunset ${coralDay(sunsetDay)}`);
       await expect(row.getByText("v2", { exact: true })).toBeVisible();
       await beat(page, 900);
       await shoot(page, "simulator-v3-available");
@@ -390,7 +392,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await reactReady(page.getByRole("tab", { name: "Template" }));
       await expect(page.getByText("A send now fails.")).toBeVisible();
       await expect(page.getByText("Sunset passed", { exact: true }).first()).toBeVisible();
-      await expect(page.getByText(/v2 stopped rendering on /)).toBeVisible();
+      await expect(page.getByText(`v2 stopped rendering on ${coralDay(sunsetDay)}.`)).toBeVisible();
 
       await sendToTwo(page);
       await expect(resultsHeadline(page)).toHaveText("0 delivered, 6 failed", { timeout: 90_000 });

@@ -8,7 +8,10 @@ import { Mono, type Tone } from "./bits";
 const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const WHEN = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
-/** "Mar 4, 2027". */
+/**
+ * "Mar 4, 2027": an instant's UTC date, or a calendar day (YYYY-MM-DD) as it is. A sunset is shown by its
+ * `sunsetDay`, the day in Stencil's business time zone, never by its instant's UTC date.
+ */
 export const dayLabel = (iso: string) => DAY.format(new Date(iso));
 /** "Mar 4, 2:02 PM UTC". */
 export const whenLabel = (iso: string) => `${WHEN.format(new Date(iso))} UTC`;
@@ -99,7 +102,7 @@ export function linkStatus(link: SimLinkSummary | null): LinkStatus {
   if (link.pinnedState === "revoked" || link.revokedAt) return { tone: "bad", label: "Revoked", failing: true };
   if (link.sunsetPassed) return { tone: "bad", label: "Sunset passed", failing: true };
   if (link.pinnedState === "superseded") {
-    return { tone: "warn", label: link.sunsetAt ? `Superseded · sunset ${dayLabel(link.sunsetAt)}` : "Superseded", failing: !link.renders };
+    return { tone: "warn", label: link.sunsetDay ? `Superseded · sunset ${dayLabel(link.sunsetDay)}` : "Superseded", failing: !link.renders };
   }
   return { tone: "ok", label: "Live", failing: !link.renders };
 }

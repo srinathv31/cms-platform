@@ -43,6 +43,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0035](0035-sms-characters-and-length.md) | An SMS is written in GSM-7 (Ç, not ç), measured in parts against a budget, and never cut or transliterated | Accepted |
 | [0036](0036-message-previews-resolve-in-the-browser.md) | Push and SMS previews render in the browser on every keystroke, through the route's own `renderMessage`; no request | Accepted |
 | [0037](0037-an-approver-views-every-output-before-approving.md) | An approver views every output before approving (each channel, Push on both phones); the approve action is refused until they have, and the audit row records them | Accepted |
+| [0038](0038-a-sunset-is-sent-with-its-day-and-zone.md) | `/api/v1` sends a sunset with its day and zone beside the instant, wherever it sends one | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.

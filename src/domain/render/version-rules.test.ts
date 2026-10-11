@@ -46,7 +46,7 @@ describe("checkVersion", () => {
       error: {
         code: "version_sunset",
         message: "Version 1 was sunset on March 1, 2027. Version 2 is active.",
-        details: { version: 1, activeVersion: 2, at: "2027-03-01T05:00:00.000Z" },
+        details: { version: 1, activeVersion: 2, at: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE },
       },
     });
   });

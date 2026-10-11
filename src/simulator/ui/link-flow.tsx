@@ -7,10 +7,11 @@ import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import type { ApiChannel, ApiContractChange, ApiTemplateSummary } from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
-import { linkTemplate, searchTemplates } from "@/simulator/actions";
+import { linkTemplate } from "@/simulator/actions";
 import { simField } from "@/simulator/fields";
 import { KIND_CHANNELS, sendable } from "@/simulator/kinds";
 import { blockedSentence } from "@/simulator/mapping";
+import { readTemplateSearch } from "@/simulator/reads";
 import type { SimFieldPath, SimLinkFlow, SimMappingRow } from "@/simulator/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Btn, Mono, PageHeader, Panel, Pill, Strip, TD, btnClass, type Tone } from "./bits";
@@ -59,7 +60,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
     let cancelled = false;
     const timer = setTimeout(
       async () => {
-        const result = await searchTemplates({ q });
+        const result = await readTemplateSearch(q);
         if (cancelled) return;
         setResultsFor(q);
         if (result.ok) {
@@ -114,8 +115,8 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
   const title = relinking && candidate ? `Relink to v${candidate.version}` : "Link template";
   // The consequence, before the commitment: which version sends use from now on, and what happens to the old one.
   const stops =
-    current && candidate && !sameVersion && current.sunsetAt && !current.sunsetPassed && !current.revokedAt
-      ? ` v${current.pinnedVersion} stops rendering ${dayLabel(current.sunsetAt)}.`
+    current && candidate && !sameVersion && current.sunsetDay && !current.sunsetPassed && !current.revokedAt
+      ? ` v${current.pinnedVersion} stops rendering ${dayLabel(current.sunsetDay)}.`
       : "";
   const consequence = candidate && channels.length > 0 && !sameVersion ? `Sends use v${candidate.version} on ${channelList(channels)}.${stops}` : "";
   const blocker = sameVersion

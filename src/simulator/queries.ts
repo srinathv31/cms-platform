@@ -1,7 +1,8 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { connection } from "next/server";
-import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail } from "@/contracts/api-v1";
+import { z } from "zod";
+import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail, ApiTemplateSummary } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
 import { assertNever } from "./assert-never";
 import { simDb } from "./db";
@@ -22,6 +23,7 @@ import type {
   SimOfferPage,
   SimOfferRecord,
   SimPush,
+  SimRead,
   SimResultRow,
   SimSms,
   SimUpgrade,
@@ -80,7 +82,7 @@ export function linkSummaryOf(link: LinkRow, detail: ApiTemplateDetail | null): 
     templateName: detail?.name ?? link.templateName,
     pinnedVersion: link.pinnedVersion,
     pinnedState: pinned?.state ?? "active",
-    sunsetAt: pinned?.sunsetAt ?? null,
+    sunsetDay: pinned?.sunsetDay ?? null,
     sunsetPassed: pinned?.sunsetPassed ?? false,
     revokedAt: pinned?.revokedAt ?? null,
     // Unknown state (API down) is shown as rendering; the page carries apiError instead.
@@ -374,7 +376,7 @@ export async function getSimLinkFlow(offerId: string, templateId?: string | null
         template,
         version: template.activeVersion,
         variables: template.contract.variables,
-        mapping: suggestMapping(template.contract.variables, link?.mapping ?? {}),
+        mapping: suggestMapping(template.contract.variables, link?.mapping ?? {}, diff?.items ?? []),
         diff,
       };
     }
@@ -477,6 +479,24 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
     error: d.error ?? null,
     view,
   };
+}
+
+/** GET /sim/deliveries/{id}/view: the customer view of one delivery, or a 400 or 404 with the sentence to show. */
+export async function readSimDeliveryView(deliveryId: unknown): Promise<SimRead<{ view: SimDeliveryView }>> {
+  const parsed = z.string().min(1).max(64).safeParse(deliveryId);
+  const view = parsed.success ? await getSimDeliveryView(parsed.data) : null;
+  return view ? { ok: true, view } : { ok: false, reason: "That delivery doesn't exist.", status: parsed.success ? 404 : 400 };
+}
+
+/**
+ * GET /sim/templates/search?q=: the Active templates Stencil lists for `q` (every one for an empty `q`). The
+ * API's own sentence when it refuses or can't be reached.
+ */
+export async function searchSimTemplates(q: unknown): Promise<SimRead<{ results: ApiTemplateSummary[] }>> {
+  const parsed = z.string().max(200).safeParse(q ?? "");
+  if (!parsed.success) return { ok: false, reason: "Search for a template name or ID.", status: 400 };
+  const result = await (await ucompApi()).searchTemplates({ q: parsed.data, limit: 20 });
+  return result.ok ? { ok: true, results: result.data.results } : { ok: false, reason: result.error.message, status: 502 };
 }
 
 /** What /sim/deliveries/[id]/file serves: the stored output as the customer received it. */
