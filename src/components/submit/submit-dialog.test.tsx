@@ -78,6 +78,9 @@ const note = () => document.body.querySelector<HTMLTextAreaElement>("textarea")!
 const button = (name: RegExp) =>
   [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((b) => name.test(b.textContent ?? ""))!;
 
+/** The dialog moves focus to the note on a timer after it opens; run fake timers past it. */
+const settleFocus = () => act(async () => void (await vi.advanceTimersByTimeAsync(50)));
+
 async function typeNote(value: string) {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(note(), value);
@@ -104,6 +107,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 describe("what the dialog lists", () => {
@@ -167,8 +171,9 @@ describe("what the dialog lists", () => {
   });
 
   it("starts with focus in the note, which is labelled for reviewers", async () => {
+    vi.useFakeTimers();
     await render(summary());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    await settleFocus();
     expect(note().labels?.[0]?.textContent).toBe("Note to reviewers");
     expect(document.activeElement).toBe(note());
   });
@@ -244,8 +249,9 @@ describe("focus while the server works", () => {
 
   it("leaves focus in the note after a refusal from ⌘Enter", async () => {
     onSubmit.mockResolvedValueOnce({ ok: false, code: "field_missing", reason: "Add an email subject before submitting." });
+    vi.useFakeTimers();
     await render(summary());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    await settleFocus();
     note().focus();
     await press(note(), { key: "Enter", metaKey: true });
     expect(dialog()!.querySelector("[role='alert']")).not.toBeNull();

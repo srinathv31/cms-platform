@@ -31,7 +31,7 @@ const THREADS: ThreadAnchor[] = [
   { id: "t3", blockId: "p2", quote: "annual fee", status: "resolved" },
 ];
 
-const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 const BUBBLE_DELAY = 220; // BubbleMenu's update delay is 150 ms
 
 interface HarnessProps {
@@ -69,6 +69,7 @@ function Harness({ attach, ...initial }: HarnessProps) {
 }
 
 async function mount(props: HarnessProps = {}) {
+  vi.useFakeTimers();
   const host = document.createElement("div");
   document.body.appendChild(host);
   await act(async () => {
@@ -91,6 +92,7 @@ async function mount(props: HarnessProps = {}) {
 afterEach(async () => {
   await act(async () => root?.unmount());
   root = null;
+  vi.useRealTimers();
   document.getSelection()?.removeAllRanges();
   document.body.innerHTML = "";
 });
@@ -289,6 +291,7 @@ describe("the handle's thread methods", () => {
     const host = await mount({ threads: THREADS, attach: (h) => void (handle = (h as Required<DocumentEditorHandle>) ?? handle) });
     const destroyed = new Promise<void>((resolve) => liveEditor(host)!.on("destroy", () => queueMicrotask(resolve)));
     await act(async () => setMode("hidden"));
+    await vi.runOnlyPendingTimersAsync(); // TipTap's scheduled destruction of the hidden editor
     await destroyed;
     expect(() => {
       handle!.focusThread("t1");

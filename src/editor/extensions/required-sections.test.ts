@@ -3,7 +3,7 @@
 
 import type { JSONContent } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SECTIONS_DOC,
   blockPos,
@@ -21,7 +21,10 @@ import {
   type,
 } from "../testing/editor";
 
-afterEach(destroyEditors);
+afterEach(() => {
+  vi.useRealTimers();
+  destroyEditors();
+});
 
 const mount = (content: JSONContent = SECTIONS_DOC) => mountEditor(content);
 
@@ -219,6 +222,7 @@ describe("required-section guard: range operations keep the headings and apply t
 
 describe("the note", () => {
   it("is one note at a time, announced politely, gone after about two seconds", async () => {
+    vi.useFakeTimers();
     const editor = mount();
     caret(editor, 1, 2);
     type(editor, "x");
@@ -227,9 +231,9 @@ describe("the note", () => {
     expect(editor.view.dom.querySelectorAll("[data-required-note]")).toHaveLength(1);
     expect(noted(editor)).toBe("Rates and fees");
     const live = editor.view.dom.parentElement?.querySelector('[role="status"][aria-live="polite"]');
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.advanceTimersByTimeAsync(50);
     expect(live?.textContent).toBe("Required for disclosures");
-    await new Promise((resolve) => setTimeout(resolve, 2100));
+    await vi.advanceTimersByTimeAsync(2100);
     expect(note(editor)).toBeNull();
-  }, 5000);
+  });
 });

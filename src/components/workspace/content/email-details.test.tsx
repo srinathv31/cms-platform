@@ -24,7 +24,7 @@ const VARIABLES: Variable[] = [{ key: "first_name", label: "First name", type: "
 const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
 const SUBJECT: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Hi " }, chip("first_name")] }] };
 
-const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 let host: HTMLElement;
 let reactRoot: Root;
@@ -55,6 +55,7 @@ const keysIn = (doc: JSONContent | undefined): string[] =>
   (doc?.content ?? []).flatMap((node) => (node.type === "variable" ? [node.attrs?.key as string] : keysIn(node)));
 
 beforeEach(() => {
+  vi.useFakeTimers();
   session.save.mockClear();
   host = document.createElement("div");
   document.body.append(host);
@@ -65,6 +66,7 @@ afterEach(() => {
   act(() => reactRoot.unmount());
   host.remove();
   runtime = null;
+  vi.useRealTimers();
 });
 
 /** Mounts the group and waits for the subject's live editor (it swaps in after hydration). */

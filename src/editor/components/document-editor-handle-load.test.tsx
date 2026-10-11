@@ -37,7 +37,7 @@ describe("DocumentEditor when the block handle fails to load", () => {
   it("mounts the live editor without the handle, editable", async () => {
     const host = await mount();
     await vi.waitFor(async () => {
-      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+      await act(async () => {}); // let the failed load settle; waitFor polls until the editor is up
       expect(host.querySelector(".ProseMirror")?.getAttribute("contenteditable")).toBe("true");
     });
     expect(host.textContent).toContain("Hello there");
@@ -46,7 +46,7 @@ describe("DocumentEditor when the block handle fails to load", () => {
   it("a later editor (the load is retried, fails again) is editable too", async () => {
     const host = await mount();
     await vi.waitFor(async () => {
-      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+      await act(async () => {}); // let the failed load settle; waitFor polls until the editor is up
       expect(host.querySelector(".ProseMirror")?.getAttribute("contenteditable")).toBe("true");
     });
   });

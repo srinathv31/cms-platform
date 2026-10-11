@@ -34,7 +34,7 @@ const VARIABLES: Variable[] = [{ key: "first_name", label: "First name", type: "
 const CONTENT = doc(h2("Offer details", "offer_details"), p("Hello there"), { type: "table", content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p("Cell")] }] }] });
 const SUBJECT: JSONContent = doc({ type: "paragraph", content: [text("Hi "), { type: "variable", attrs: { key: "first_name" } }] });
 
-const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 let setMode: (mode: "visible" | "hidden") => void = () => {};
 let root: Root | null = null;
@@ -56,6 +56,7 @@ function Harness() {
 }
 
 async function mount() {
+  vi.useFakeTimers();
   errors = [];
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -84,6 +85,7 @@ async function mount() {
 afterEach(async () => {
   await act(async () => root?.unmount());
   root = null;
+  vi.useRealTimers();
   document.body.innerHTML = "";
 });
 
@@ -103,6 +105,7 @@ async function hideAndShow(host: HTMLElement, times = 1) {
     }>;
     const destroyed = new Promise<void>((resolve) => editors[0]?.on("destroy", () => queueMicrotask(resolve)));
     await act(async () => setMode("hidden"));
+    await vi.runOnlyPendingTimersAsync(); // TipTap's scheduled destruction of the hidden editor
     await destroyed;
     flushSync(() => setMode("visible"));
     await wait(30);

@@ -63,7 +63,7 @@ let root: Root;
 let container: HTMLElement;
 
 const render = (viewerId: string) => act(async () => root.render(<CommandPalette viewerId={viewerId} spaces={[coral]} />));
-const wait = (ms = 0) => act(async () => new Promise((resolve) => setTimeout(resolve, ms)));
+const wait = (ms = 0) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 const searchButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Search"))!;
 const options = () => [...document.body.querySelectorAll("[cmdk-item]")].map((el) => el.textContent ?? "");
 const listed = (name: string) => options().some((text) => text.includes(name));
@@ -96,6 +96,7 @@ function deferred() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   paletteRoute.mockReset();
   container = document.createElement("div");
   document.body.append(container);
@@ -106,6 +107,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 describe("CommandPalette", () => {
