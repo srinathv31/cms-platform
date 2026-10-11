@@ -28,6 +28,14 @@ const POSITION = { placement: "left", strategy: "absolute" } as const;
 const BUTTON =
   "flex size-6 items-center justify-center rounded-md text-text-subtle transition-colors duration-100 hover:bg-hover hover:text-text-muted";
 
+/**
+ * The handle is never wider than the gutter it hangs in (`--ucomp-doc-gutter`, as the document pads it). Its two
+ * buttons and their gap need about 3.4rem; in a narrower gutter (a window of 320px, where the host gives the
+ * gutter 2.25rem) the wrap puts them one above the other, the grip on top, instead of leaving the + off the
+ * screen's edge or over the text.
+ */
+const FIT_GUTTER = "w-max flex-wrap-reverse max-w-[var(--ucomp-doc-gutter,3.5rem)]";
+
 type Current = { node: PMNode | null; pos: number };
 
 export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMenuController }) {
@@ -185,7 +193,7 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
           }}
           onElementDragEnd={settleSelection}
         >
-          <div ref={bar} className="group/handle flex items-center gap-px pr-1.5 data-typing:invisible" onMouseLeave={hideWhenLeaving}>
+          <div ref={bar} className={`group/handle flex items-center gap-px pr-1.5 data-typing:invisible ${FIT_GUTTER}`} onMouseLeave={hideWhenLeaving}>
             <button
               type="button"
               tabIndex={-1}

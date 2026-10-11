@@ -29,6 +29,10 @@ import { RV } from "./review-grid";
 // released version approved after send-backs adds "· Approved on round 3".
 //
 // One grid for the real header and its skeleton, so they measure the same.
+//
+// The name and the byline each stay on one line, ending in an ellipsis with the full text in `title`, from 800px
+// up. Below 800px they wrap instead (WCAG 1.4.10, decision 0045): a window that narrow is a zoomed one, and an
+// ellipsis would hide what the reader zoomed in to read.
 
 const HEADER = "grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5";
 /**
@@ -84,11 +88,11 @@ export function ReviewHeader({
           <ChevronLeft aria-hidden strokeWidth={1.75} className="size-3.5" />
           Review
         </Link>
-        <h1 className="display-lg min-w-0 max-w-full truncate text-text" title={templateName}>
+        <h1 className="display-lg min-w-0 max-w-full truncate narrow:overflow-visible narrow:text-clip narrow:break-words narrow:whitespace-normal text-text" title={templateName}>
           {templateName}
         </h1>
       </div>
-      <div className="col-start-1 row-start-2 flex min-h-7 items-center gap-x-3 self-end">
+      <div className="col-start-1 row-start-2 flex min-h-7 items-center narrow:items-start gap-x-3 self-end">
         <m.span
           className="shrink-0"
           key={state}
@@ -98,7 +102,10 @@ export function ReviewHeader({
         >
           <StatusBadge state={state} sunsetDay={sunsetDay} sunsetPassed={sunsetPassed} now={nowIso} />
         </m.span>
-        <span data-slot="byline" className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
+        <span
+          data-slot="byline"
+          className="min-w-0 truncate narrow:overflow-visible narrow:text-clip narrow:break-words narrow:whitespace-normal text-[14px] leading-6 text-text-muted"
+        >
           {versionLabel(shown)} by {author.name} · {formatAgo(submittedAt, nowIso)}
           {approvedOn ? ` · ${approvedOn}` : null}
         </span>

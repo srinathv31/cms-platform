@@ -1,6 +1,7 @@
 # 0045. Stencil targets desktop Chrome and reflows for zoom
 
 Status: Accepted
+Amended 2026-10-11: the editor's block handle fits the document gutter at 320px (its two buttons stack there), and the review header's name and byline wrap below 800px instead of truncating (N27).
 Date: 2026-10-11
 
 ## Context

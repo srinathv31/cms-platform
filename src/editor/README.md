@@ -298,7 +298,8 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
 
 - **Block handle**: hovering a block shows + and ⋮⋮. + adds a line below and opens the `/` menu
   there (Esc right away takes the line back out). ⋮⋮ drags; clicked (no drag), it opens the block
-  menu. Required headings show the + only.
+  menu. Required headings show the + only. The handle is never wider than the gutter: in one narrower
+  than its two buttons side by side (the workspace's, at a 320px window) they stack, the grip above the +.
 - **Block menu** (⋮⋮ click, a second click closes it; or Alt+F10 from the caret: a focused button in
   the gutter, Enter opens it), named "Block options". For a numbered list: **Numbering** lists
   Default (the style by depth, previewed) and the ten styles, each previewed ("1. 2. 3.",
