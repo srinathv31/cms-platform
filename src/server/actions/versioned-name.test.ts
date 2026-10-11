@@ -1,8 +1,5 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
@@ -17,8 +14,7 @@ import { getLibraryRows } from "@/server/queries/library";
 import { searchPalette } from "@/server/queries/palette";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { runRender } from "@/server/render/render-template";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
 import { approveVersion, requestChanges, submitVersion } from "./review";
@@ -29,13 +25,11 @@ import { startDraft } from "./templates";
 // API and the notices, until the renamed version is approved and goes live. Balance Transfer from the
 // real seed: v1 Superseded, v2 Active, both rendered by Coral, so Coral gets its notices.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-versioned-name-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-versioned-name-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -48,20 +42,14 @@ const LIVE = "Balance Transfer Intro — Terms";
 const RENAMED = "Balance Transfer Intro — Card Terms";
 
 let db: Db;
-let libsql: Client;
 let templateId: string;
 const people: Record<string, Viewer> = {};
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  templateId = (await seedDatabase(db, { base: BASE })).templates["balance-transfer"]!;
+  ({ db } = await import("@/server/db/client"));
+  templateId = ids["balance-transfer"]!;
   for (const id of ["maya", "jordan"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
 let minute = 0;
@@ -111,14 +99,61 @@ async function rename(name: string) {
   expect(result).toMatchObject({ ok: true });
 }
 
+// The story, one stage at a time: each test builds the stages before it, so it runs alone.
+
+/** Maya opens a draft of v2. */
+async function openDraft() {
+  as("maya");
+  await startDraft({ templateId });
+}
+
+/** The draft is renamed. */
+async function renamedDraft() {
+  await openDraft();
+  await rename(RENAMED);
+}
+
+/** v3 is submitted under the new name (round 1); returns when Maya submitted it. */
+async function submittedV3() {
+  await renamedDraft();
+  const at = as("maya");
+  expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 1 });
+  return at;
+}
+
+/** Jordan sent v3 back: Maya has a draft with the new name. */
+async function sentBack() {
+  await submittedV3();
+  as("jordan");
+  expect(await requestChanges({ templateId, versionNumber: 3, round: 1, reason: "Keep the intro period on its own line." })).toEqual({
+    ok: true,
+  });
+}
+
+/** Maya resubmitted (round 2) and Jordan approved: the new name is live; returns when it went live. */
+async function approvedV3() {
+  await sentBack();
+  as("maya");
+  // Sent back, it comes back as round 2 of v3: consumers get v3, never a round.
+  expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 2 });
+  const at = as("jordan");
+  expect(await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: "2026-12-01", outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    ok: true,
+    wentLive: true,
+    number: 3,
+    round: 2,
+  });
+  return at;
+}
+
 describe("a rename in a draft goes live only with its version", () => {
   it("Maya opens a draft of v2: it starts with v2's name", async () => {
-    as("maya");
-    await startDraft({ templateId });
+    await openDraft();
     expect((await draft()).name).toBe(LIVE);
   });
 
   it("renaming the draft changes nothing a customer sees", async () => {
+    await openDraft();
     await rename(RENAMED);
     expect((await draft()).name).toBe(RENAMED);
     expect((await version(2)).name).toBe(LIVE);
@@ -134,6 +169,7 @@ describe("a rename in a draft goes live only with its version", () => {
   });
 
   it("the workspace header edits the draft's name, and gives the SHARE ring the Active version's", async () => {
+    await renamedDraft();
     as("maya");
     const header = await getWorkspaceHeader("coral-offers", templateId);
     expect({ name: header.name, activeName: header.activeName, editable: header.editable }).toEqual({ name: RENAMED, activeName: LIVE, editable: true });
@@ -141,6 +177,7 @@ describe("a rename in a draft goes live only with its version", () => {
 
   // The header binds autosave on every tab, so a rename on Versions saves too (handoff review I1).
   it("the workspace header names the draft autosave saves to, with its rev, only for someone who can edit it", async () => {
+    await renamedDraft();
     const open = await draft();
     as("maya");
     expect((await getWorkspaceHeader("coral-offers", templateId)).draft).toEqual({ versionId: open.id, rev: open.rev });
@@ -150,20 +187,21 @@ describe("a rename in a draft goes live only with its version", () => {
   });
 
   it("the CMS's lists show the draft's name", async () => {
+    await renamedDraft();
     as("maya");
     expect((await getLibraryRows("coral-offers")).find((r) => r.id === templateId)?.name).toBe(RENAMED);
     expect(await paletteName(templateId)).toBe(RENAMED);
   });
 
   it("the submit summary lists the rename against the Active version", async () => {
+    await renamedDraft();
     as("maya");
     const result = await getSubmitSummary(people.maya!, { templateId });
     expect(result.ok && { name: result.summary.name, baseline: result.summary.baseline?.name }).toEqual({ name: RENAMED, baseline: LIVE });
   });
 
   it("submitted, it is reviewed under its new name; customers still see the old one", async () => {
-    const at = as("maya");
-    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 1 });
+    const at = await submittedV3();
     expect((await version(3)).name).toBe(RENAMED);
     const sent = await db.select().from(notifications).where(eq(notifications.createdAt, at));
     expect(sent.map((n) => n.title)).toContain(`Maya Chen submitted ${RENAMED} v3 for review.`);
@@ -172,6 +210,7 @@ describe("a rename in a draft goes live only with its version", () => {
   });
 
   it("a comment on it notifies the author under the version's name", async () => {
+    await submittedV3();
     const at = as("jordan");
     const v3 = await version(3);
     const result = await addComment({ templateId, versionId: v3.id, blockId: DOCUMENT_THREAD, body: "Is the new name approved by Legal?" });
@@ -181,25 +220,13 @@ describe("a rename in a draft goes live only with its version", () => {
   });
 
   it("a change request hands the author a draft with the name it was sent back with", async () => {
-    as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 3, round: 1, reason: "Keep the intro period on its own line." })).toEqual({
-      ok: true,
-    });
+    await sentBack();
     expect((await draft()).name).toBe(RENAMED);
     expect((await apiName()).name).toBe(LIVE);
   });
 
   it("approved, the new name is live: its renders, the API, search and its notice; the old version keeps its own", async () => {
-    as("maya");
-    // Sent back, it comes back as round 2 of v3: consumers get v3, never a round.
-    expect(await submitVersion({ templateId, rev: (await draft()).rev })).toEqual({ ok: true, number: 3, round: 2 });
-    const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: "2026-12-01", outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
-      ok: true,
-      wentLive: true,
-      number: 3,
-      round: 2,
-    });
+    const at = await approvedV3();
 
     expect(await webTitle(3)).toBe(RENAMED);
     expect(await webTitle(2)).toBe(LIVE); // Superseded, still rendering until its sunset, under the name it went live with
@@ -219,6 +246,7 @@ describe("a rename in a draft goes live only with its version", () => {
   });
 
   it("the API's contract of an older version is titled with that version's name", async () => {
+    await approvedV3();
     const result = await getTemplateDetail(templateId, { version: 2 }, env.now);
     expect(result.ok && [result.detail.name, result.detail.contract?.jsonSchema.title]).toEqual([RENAMED, `${LIVE} v2: values`]);
   });

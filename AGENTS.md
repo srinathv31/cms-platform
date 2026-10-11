@@ -19,7 +19,7 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 | `npm run db:reset` | Drops and reseeds `data/ucomp.db` and empties `data/uploads`. Needed once after cloning. |
 | `npm run typecheck` | `next typegen && tsc --noEmit`. Run it after adding or renaming a route. |
 | `npm run lint` | ESLint, including the import boundaries below. |
-| `npm test` | Vitest, about 10 seconds. Never touches `data/ucomp.db`. |
+| `npm test` | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with. |
 | `npm run docs:check` | Fails on broken doc links and paths, and on a `src/` folder without a README. |
 | `npm run golden:update` | Regenerates the render golden files after an intended change to render output. Read the diff. |
 | `npm run build` | The production build. It is the only check that enforces the Cache Components rules. |
@@ -142,7 +142,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | Add an `/api/v1` route | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts) |
 | Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts) |
 | Format a count or a plural | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts) |
-| Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
+| Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts): a database of its own for every test (`seededDatabasePerTest`); each test builds the state it needs |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
 bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.

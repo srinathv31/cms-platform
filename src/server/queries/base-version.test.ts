@@ -1,46 +1,31 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { channelFieldValues } from "@/domain/channel-fields";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getBaseVersion } from "./base-version";
 
 // "Revert to v1" reads the base of the draft on the author's screen, named by its version id, against
 // a temporary database filled by the real seed: Annual Fee Waiver has v1 (Changes requested) and an
 // open draft started from it; Cash Back has v1 Superseded, v2 Active and v3 In review, and no draft.
 
-const env = vi.hoisted(() => ({ dir: "" }));
-
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-base-version-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-base-version-");
 });
 const { versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-  for (const id of ["maya", "eli"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+const ids = seededDatabasePerTest({ base: BASE });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["maya", "eli"]) people[id] = await loadPersona(db, id);
 });
 
 const version = (templateId: string, where: { number?: number; state?: "draft" }) =>

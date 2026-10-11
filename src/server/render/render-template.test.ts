@@ -1,18 +1,11 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { createClient, type Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ResolveError } from "@/domain/render";
 import type { EmailRender } from "@/domain/render/types";
 import type { JSONContent, Variable, Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/queries/find-round";
-import { seedDatabase } from "@/server/seed";
+import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import { renderFailure } from "./engine";
 import { extractPdf } from "./golden/extract-pdf";
 import { runRender, type RenderInput, type RenderResult } from "./render-template";
@@ -34,23 +27,7 @@ const { approvalStages, renderLog, versions, contentTypes } = schema;
 const DAY = 86_400_000;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
-let dir: string;
-let client: Client;
-let db: Db;
-let ids: Record<string, string>;
-
-beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ucomp-render-"));
-  client = createClient({ url: `file:${join(dir, "render.db")}` });
-  db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-}, 60_000);
-
-afterAll(() => {
-  client?.close();
-  rmSync(dir, { recursive: true, force: true });
-});
+const { db, libsql: client, ids } = standaloneDatabasePerTest({ base: BASE });
 
 function viewer(userId: string, teams: { id: string; roles: Viewer["memberships"][number]["roles"] }[]): Viewer {
   return {

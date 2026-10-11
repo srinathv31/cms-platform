@@ -81,10 +81,9 @@ The three items that needed an owner decision were decided: [D1](#d1--high-revok
 
 ### Alongside: tooling and hygiene
 
-Not logic or UI, and nothing to wait for. Take T4 and T3 first, since every fix relies on the checks; fit the rest in between the findings in [Found while fixing](#found-while-fixing).
+Not logic or UI, and nothing to wait for. Take T4 first, since every fix relies on the checks; fit the rest in between the findings in [Found while fixing](#found-while-fixing).
 
 - [T4 · High](#t4--high-no-ci-node-pin-or-environment-template): No CI, Node pin or `.env.example`. A workflow running e2e would have caught [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift).
-- [T3 · High](#t3--high-database-backed-unit-tests-depend-on-order): The database-backed tests still depend on their order.
 - [T5 · Medium](#t5--medium-e2e-cant-be-pointed-at-its-own-database): E2E can't point at its own database. Its raw-SQL assertions are part of [the Java API](#the-java-api) work.
 - [S8 · Medium](#s8--medium-design-mocks-and-labs-ship-in-production-builds): Design mocks and labs ship in production builds.
 - [G4 · Medium](#g4--medium-build-process-docs-and-artifacts-with-dead-paths): The git history still holds the removed reference images and the third-party product's name; whether the dev team gets it or a fresh repository is the owner's call at handoff.
@@ -893,7 +892,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T3 · High: Database-backed unit tests depend on order
 
-- **Status:** Partly fixed. The render, domain-render and editor tests pass in shuffled order (PR #6). The database-backed narrative tests listed here still don't.
+- **Status:** Fixed. Every database-backed test runs on a copy of a seeded database of its own (`src/lib/fresh-database.ts`, [decision 0048](decisions/0048-every-database-test-gets-its-own-database.md)); the narrative files build the state each test needs, and `vitest.config.mts` shuffles the tests in every run and prints the seed of a failure.
 - **Where:** `src/server/actions/review.test.ts` line 1; `src/simulator/actions.test.ts` line 1
 - **What happens:** With `--sequence.shuffle --sequence.seed=12345`, 31 tests fail in 9 files (simulator actions 8 of 11, review 8 of 25, access 5 of 20, access sweep 4 of 7). The files are written as narratives, so a single `-t` run fails too. Agents will copy the pattern.
 - **Fix:** A per-test fixture that copies a pre-seeded database in `beforeEach`, then shuffle in CI.

@@ -1,14 +1,12 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeActivity } from "@/domain/activity";
 import { sunsetDay } from "@/domain/business-zone";
 import { formatLongDate } from "@/domain/dates";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { freshDatabasePerTest } from "@/server/testing/review-fixtures";
 import { seedDatabase } from "@/server/seed";
 import { advanceClockAction } from "./actions/demo";
 import { NOTICE_SEQ_KEY } from "./effects";
@@ -17,17 +15,15 @@ import { runSunsetSweep } from "./sunset-sweep";
 // The sunset sweep against a temporary database filled by the real seed, with the demo clock moved by
 // hand. Seed facts it relies on: Balance Transfer v1 is Superseded with a sunset 21 days after the seed,
 // at 00:00 Eastern on that day, and it's the seed's only sunset; v2 is Active. Coral renders it (not as a
-// preview) up to the seed's day. No business zone is set (Eastern). beforeAll adds renders that shape the
+// preview) up to the seed's day. No business zone is set (Eastern). The database every test starts from adds renders that shape the
 // notice audience: Deposits Online within 90 days before the sunset (told), a third consumer only longer
 // ago than that or as a preview (not told).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-sunset-sweep-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-sunset-sweep-");
 });
 vi.mock("@/server/clock", () => ({
   now: vi.fn(async () => env.now),
@@ -43,7 +39,6 @@ const DAY = 86_400_000;
 const day = (n: number) => new Date(BASE.getTime() + n * DAY);
 
 let db: Db;
-let libsql: Client;
 let templateId: string;
 let v1: typeof versions.$inferSelect;
 
@@ -51,20 +46,18 @@ const passedRows = () => db.select().from(auditEvents).where(eq(auditEvents.acti
 const passedNotices = () =>
   db.select().from(consumerNotices).where(eq(consumerNotices.kind, "sunset_passed")).orderBy(consumerNotices.seq);
 const lastSeq = async () => (await db.select().from(settings).where(eq(settings.key, NOTICE_SEQ_KEY)))[0]?.value as number;
-/** Forget the sweep's work, as if it had never run: its rows and its notices. */
-async function unsweep() {
-  await db.delete(auditEvents).where(eq(auditEvents.action, "version.sunset_passed"));
-  await db.delete(consumerNotices).where(eq(consumerNotices.kind, "sunset_passed"));
+/** The sweep as it runs `n` days after the seed. */
+async function sweepAt(n: number) {
+  env.now = day(n);
+  return runSunsetSweep();
 }
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  templateId = (await seedDatabase(db, { base: BASE })).templates["balance-transfer"]!;
-  v1 = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) }))!;
+freshDatabasePerTest(async (built) => {
+  templateId = (await seedDatabase(built, { base: BASE })).templates["balance-transfer"]!;
+  v1 = (await built.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) }))!;
 
   const sunset = v1.sunsetAt!.getTime();
-  await db.insert(consumers).values({ id: "ledger", name: "Ledger", description: "Test consumer", clientName: "ledger" });
+  await built.insert(consumers).values({ id: "ledger", name: "Ledger", description: "Test consumer", clientName: "ledger" });
   const render = (id: string, consumerId: string, at: number, isPreview = false) => ({
     id,
     at: new Date(at),
@@ -77,16 +70,19 @@ beforeAll(async () => {
     correlationId: id,
     outcome: "ok" as const,
   });
-  await db.insert(renderLog).values([
+  await built.insert(renderLog).values([
     render("rl_deposits", "deposits-online", sunset - 30 * DAY),
     render("rl_ledger_old", "ledger", sunset - 91 * DAY),
     render("rl_ledger_preview", "ledger", sunset - DAY, true),
   ]);
-}, 60_000);
+});
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+});
+
+beforeEach(() => {
+  env.now = BASE;
 });
 
 describe("runSunsetSweep across the seed's sunset", () => {
@@ -101,8 +97,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
   });
 
   it("past the sunset: one row, by the system, dated at the sunset, with the day in the business zone", async () => {
-    env.now = day(22);
-    const passed = await runSunsetSweep();
+    const passed = await sweepAt(22);
     expect(passed.map((p) => p.versionId)).toEqual([v1.id]);
 
     const rows = await passedRows();
@@ -123,6 +118,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
   });
 
   it("and one sunset_passed notice per consumer that rendered the template in the 90 days before the sunset", async () => {
+    await sweepAt(22);
     const notices = await passedNotices();
     // Coral (the seed's renders) and Deposits Online (30 days before); not Ledger (91 days before, or a preview).
     expect(notices.map((n) => n.consumerId)).toEqual(["coral", "deposits-online"]);
@@ -152,12 +148,12 @@ describe("runSunsetSweep across the seed's sunset", () => {
   });
 
   it("is idempotent: a second sweep, now or later, writes nothing: no row, no notice", async () => {
+    await sweepAt(22);
     const audit = (await db.select().from(auditEvents)).length;
     const notices = (await db.select().from(consumerNotices)).length;
     const seq = await lastSeq();
     expect(await runSunsetSweep()).toEqual([]);
-    env.now = day(60);
-    expect(await runSunsetSweep()).toEqual([]);
+    expect(await sweepAt(60)).toEqual([]);
     expect((await db.select().from(auditEvents)).length).toBe(audit);
     expect((await db.select().from(consumerNotices)).length).toBe(notices);
     expect(await lastSeq()).toBe(seq);
@@ -166,6 +162,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
   });
 
   it("changes nothing on the version: the render rule alone decides that it stopped", async () => {
+    await sweepAt(22);
     const after = await db.query.versions.findFirst({ where: eq(versions.id, v1.id) });
     expect(after).toEqual(v1);
   });
@@ -173,10 +170,8 @@ describe("runSunsetSweep across the seed's sunset", () => {
 
 describe("a sweep that runs long after the sunset", () => {
   it("tells the same consumers, from the 90 days before the sunset, and the notice is created when it runs", async () => {
-    await unsweep();
     // 179 days after the sunset: nobody has rendered the template in the 90 days before now.
-    env.now = day(200);
-    expect((await runSunsetSweep()).map((p) => p.versionId)).toEqual([v1.id]);
+    expect((await sweepAt(200)).map((p) => p.versionId)).toEqual([v1.id]);
     const notices = await passedNotices();
     expect(notices.map((n) => n.consumerId)).toEqual(["coral", "deposits-online"]);
     expect(notices.map((n) => n.createdAt)).toEqual([day(200), day(200)]);
@@ -187,7 +182,6 @@ describe("a sweep that runs long after the sunset", () => {
 
 describe("two sweeps at once", () => {
   it("write the row, and each consumer's notice, once", async () => {
-    await unsweep();
     env.now = day(22);
     const [a, b] = await Promise.all([runSunsetSweep(), runSunsetSweep()]);
     expect([...a, ...b].map((p) => p.versionId)).toEqual([v1.id]);
@@ -198,8 +192,6 @@ describe("two sweeps at once", () => {
 
 describe("Advance clock", () => {
   it("runs the sweep after moving the clock", async () => {
-    await unsweep();
-    env.now = BASE;
     await advanceClockAction(22);
     expect(env.now).toEqual(day(22));
     expect((await passedRows()).map((r) => r.versionId)).toEqual([v1.id]);

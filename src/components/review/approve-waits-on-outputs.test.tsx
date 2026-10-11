@@ -173,16 +173,23 @@ describe("Approve waits on every output", () => {
   });
 
   it("works without storage: viewing still counts for the page's life", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
-    const screen = mount("ver_nostorage", ["email"]);
-    expect(blocked(screen.approve())).toBe(true);
-    screen.see("email");
-    expect(blocked(screen.approve())).toBe(false);
+    const denied = [
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("denied");
+      }),
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("denied");
+      }),
+    ];
+    try {
+      const screen = mount("ver_nostorage", ["email"]);
+      expect(blocked(screen.approve())).toBe(true);
+      screen.see("email");
+      expect(blocked(screen.approve())).toBe(false);
+    } finally {
+      // Storage works again for the next test, whatever order they run in.
+      for (const spy of denied) spy.mockRestore();
+    }
   });
 });
 

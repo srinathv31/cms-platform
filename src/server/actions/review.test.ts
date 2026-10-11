@@ -1,10 +1,9 @@
-import { readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
 import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
@@ -22,10 +21,9 @@ import { parseDraftPatchText } from "@/server/drafts/parse-patch";
 import { saveDraft } from "@/server/drafts/save-draft";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
-import { seedDatabase } from "@/server/seed";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { findRound } from "@/server/queries/find-round";
-import { createTemplateWithDraft, draftRev, loadPersona } from "@/server/testing/review-fixtures";
+import { createTemplateWithDraft, draftRev, loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getReviewScreen } from "@/server/queries/review";
 import { addComment } from "./comments";
@@ -43,13 +41,11 @@ import {
 // The review actions end to end against a temporary database filled by the real seed. Only the
 // database handle, the demo clock, the persona and Next's cache calls are swapped.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-review-actions-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-review-actions-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -79,22 +75,16 @@ const DAY = 86_400_000;
 
 let db: Db;
 let libsql: Client;
-let ids: Record<string, string>;
 const people: Record<string, Viewer> = {};
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
   for (const id of ["maya", "jordan", "alex", "priya", "sam", "morgan"]) people[id] = await loadPersona(db, id);
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
 });
 
-// Every step happens a minute after the last, so rows are easy to tell apart.
+// Every step happens a minute after the last, so rows are easy to tell apart. Every test starts from the
+// seed on a database of its own and builds the steps it needs, with the helpers below.
 let minute = 0;
 function as(userId: string) {
   minute += 1;
@@ -123,12 +113,26 @@ const blockIds = (doc: { content?: { attrs?: Record<string, unknown> }[] }) =>
 const submitNow = async (templateId: string, note?: string) =>
   submitVersion({ templateId, note, rev: await draftRev(db, templateId) });
 
+/** An autosave by this person, as the workspace sends it: a paragraph added to the open draft. */
+async function edit(userId: string, templateId: string, text: string) {
+  const at = as(userId);
+  const draft = (await draftOf(templateId))!;
+  const body = { ...draft.body, content: [...(draft.body.content ?? []), { type: "paragraph", content: [{ type: "text", text }] }] };
+  const saved = await applyDraftPatch(db, {
+    viewer: people[userId]!,
+    versionId: draft.id,
+    patch: { rev: draft.rev, sessionKey: `session-${userId}-${minute}`, body },
+    at,
+  });
+  expect(saved.ok, `${userId}'s save lands`).toBe(true);
+}
+
 // ── Scenario 3: the review loop ───────────────────────────────
 
 describe("the review loop (scenario 3)", () => {
   let templateId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
       teamId: "coral-offers",
       createdBy: "maya",
@@ -136,6 +140,43 @@ describe("the review loop (scenario 3)", () => {
       name: "Spring Travel Rewards — Terms",
     }));
   });
+
+  // The loop, one step at a time: each step builds the ones before it.
+  const settle = () => vi.mocked(refresh).mockClear();
+  /** Maya has submitted v1 with a note. */
+  async function submitted() {
+    as("maya");
+    expect(await submitNow(templateId, "  Ready for a look.  ")).toEqual({ ok: true, number: 1, round: 1 });
+    settle();
+  }
+  /** Jordan has sent v1 back. */
+  async function sentBack() {
+    await submitted();
+    as("jordan");
+    expect(
+      await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "The intro APR period doesn't match the product sheet." }),
+    ).toEqual({ ok: true });
+    settle();
+  }
+  /** Maya has resubmitted as round 2. */
+  async function resubmitted() {
+    await sentBack();
+    as("maya");
+    expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
+    settle();
+  }
+  /** Jordan has approved round 2: v1 is Active. */
+  async function approved() {
+    await resubmitted();
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+      ok: true,
+      wentLive: true,
+      number: 1,
+      round: 2,
+    });
+    settle();
+  }
 
   it("Maya submits v1 with a note; the team's approvers are asked to review", async () => {
     const at = as("maya");
@@ -163,6 +204,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("a second submit is refused and writes nothing", async () => {
+    await submitted();
     const at = as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: false, code: "already_in_review", reason: "This version is already in review." });
     expect(await auditAt(at)).toEqual([]);
@@ -170,6 +212,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("Maya can't approve or request changes on her own version", async () => {
+    await submitted();
     as("maya");
     expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
@@ -182,6 +225,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("a change request needs a reason", async () => {
+    await submitted();
     as("jordan");
     expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "   " })).toEqual({
       ok: false,
@@ -191,6 +235,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("Jordan requests changes: the decision, a new draft with the same block ids, and the reason as a thread", async () => {
+    await submitted();
     const at = as("jordan");
     const reason = "The intro APR period doesn't match the product sheet.";
     expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason })).toEqual({ ok: true });
@@ -232,6 +277,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("a second change request (a double click) is refused and writes nothing", async () => {
+    await sentBack();
     const at = as("jordan");
     expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Again" })).toEqual({
       ok: false,
@@ -243,6 +289,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("Maya resubmits as v1, round 2 (through the Phase 3 name, submitDraft): a send-back uses up no number", async () => {
+    await sentBack();
     const at = as("maya");
     expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
     expect((await version(templateId, 1, 2))?.state).toBe("in_review");
@@ -259,6 +306,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("approving round 1 after round 2 exists is refused: it isn't in review", async () => {
+    await resubmitted();
     const at = as("jordan");
     expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
@@ -273,6 +321,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("a round that doesn't exist is refused like a forbidden one", async () => {
+    await resubmitted();
     as("jordan");
     expect(await approveVersion({ templateId, versionNumber: 1, round: 3, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
@@ -282,6 +331,7 @@ describe("the review loop (scenario 3)", () => {
 
   // Decision 0037: the server works out the outputs from the round's own channels (PDF and Web here).
   it("approving before every output was viewed is refused with its code, and nothing is written", async () => {
+    await resubmitted();
     const at = as("jordan");
     const before = (await version(templateId, 1, 2))!;
     expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["pdf"], sampleSetsSeen: ["typical"] })).toEqual({
@@ -306,6 +356,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("Jordan approves v1, round 2: it goes live as v1 and Maya hears about it", async () => {
+    await resubmitted();
     const at = as("jordan");
     const result = await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["web", "pdf", "web"], sampleSetsSeen: ["typical", "long", "typical"] });
     expect(result).toEqual({ ok: true, wentLive: true, number: 1, round: 2 });
@@ -327,6 +378,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("a second approve is refused", async () => {
+    await approved();
     as("alex");
     expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
       ok: false,
@@ -335,6 +387,7 @@ describe("the review loop (scenario 3)", () => {
   });
 
   it("the database holds one released row per number: a second fails the index", async () => {
+    await approved();
     const v1 = (await version(templateId, 1))!;
     await expect(db.insert(versions).values({ ...v1, id: `v_dup_${templateId}`, round: 3, state: "superseded" })).rejects.toThrow();
     // And one row per round.
@@ -349,13 +402,13 @@ describe("resubmitting answers the change request", () => {
   let v1Id: string;
   let blockThreadId: string;
   let firstRequestId: string;
-  let resolvedAt: Date;
 
   const threadsOf = (id: string) => db.select().from(commentThreads).where(eq(commentThreads.templateId, id));
   const threadRow = (id: string) => db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
   const resolvedAudit = (at: Date) => auditAt(at).then((rows) => rows.filter((r) => r.action === "thread.resolved"));
 
-  beforeAll(async () => {
+  // Maya submitted; Jordan left a block comment and then asked for changes on the whole version.
+  beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
       teamId: "coral-offers",
       createdBy: "maya",
@@ -367,7 +420,6 @@ describe("resubmitting answers the change request", () => {
     const v1 = (await version(templateId, 1))!;
     v1Id = v1.id;
 
-    // Jordan leaves a block comment and then asks for changes on the whole version.
     as("jordan");
     const block = await addComment({
       templateId,
@@ -383,10 +435,15 @@ describe("resubmitting answers the change request", () => {
     expect(request).toMatchObject({ status: "open", resolvedBy: null, resolvedAt: null });
   });
 
-  it("Maya resubmits: the change request resolves as hers, at the submit time", async () => {
+  /** Maya resubmits as round 2; returns the submit time. */
+  async function resubmit() {
     const at = as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
-    resolvedAt = at;
+    return at;
+  }
+
+  it("Maya resubmits: the change request resolves as hers, at the submit time", async () => {
+    const at = await resubmit();
 
     expect(await threadRow(firstRequestId)).toMatchObject({
       blockId: DOCUMENT_THREAD,
@@ -398,6 +455,7 @@ describe("resubmitting answers the change request", () => {
   });
 
   it("writes a thread.resolved audit row about the round that asked, saying which round answered", async () => {
+    const resolvedAt = await resubmit();
     expect(await resolvedAudit(resolvedAt)).toEqual([
       expect.objectContaining({
         actorId: "maya",
@@ -413,6 +471,7 @@ describe("resubmitting answers the change request", () => {
   });
 
   it("leaves the block comment open", async () => {
+    await resubmit();
     expect(await threadRow(blockThreadId)).toMatchObject({
       status: "open",
       resolvedBy: null,
@@ -422,6 +481,7 @@ describe("resubmitting answers the change request", () => {
   });
 
   it("a second cycle resolves only the new change request", async () => {
+    const resolvedAt = await resubmit();
     as("jordan");
     expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "One more fix, please." })).toEqual({ ok: true });
     const second = (await threadsOf(templateId)).find((t) => t.blockId === DOCUMENT_THREAD && t.status === "open")!;
@@ -510,7 +570,7 @@ describe("approveVersion over an Active version", () => {
 // ── A two-stage chain ─────────────────────────────────────────
 
 describe("a two-stage chain", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
     await db.insert(approvalStages).values({
       id: "stage_test_legal",
       contentTypeId: "ct_disclosure",
@@ -518,9 +578,6 @@ describe("a two-stage chain", () => {
       name: "Legal",
       approverRule: { kind: "user", userId: "alex" },
     });
-  });
-  afterAll(async () => {
-    await db.delete(approvalStages).where(eq(approvalStages.id, "stage_test_legal"));
   });
 
   it("moves through the stages in order; only the named approver acts on Legal", async () => {
@@ -572,37 +629,17 @@ describe("a two-stage chain", () => {
 // Holding Author and Approver on one team is normal (approving an access request can add the role).
 // The seed gives nobody both, so Priya gets Approver on Coral Offers here, beside her Author role.
 describe("maker-checker: nobody decides a version they wrote", () => {
-  let priyaMembership: string;
-
-  beforeAll(async () => {
+  beforeEach(async () => {
     const [m] = await db
       .select({ id: memberships.id })
       .from(memberships)
       .where(and(eq(memberships.userId, "priya"), eq(memberships.teamId, "coral-offers")));
-    priyaMembership = m!.id;
-    await db.insert(membershipRoles).values({ membershipId: priyaMembership, role: "approver" });
+    await db.insert(membershipRoles).values({ membershipId: m!.id, role: "approver" });
     people.priya = await loadPersona(db, "priya");
   });
-  afterAll(async () => {
-    await db
-      .delete(membershipRoles)
-      .where(and(eq(membershipRoles.membershipId, priyaMembership), eq(membershipRoles.role, "approver")));
+  afterEach(async () => {
     people.priya = await loadPersona(db, "priya");
   });
-
-  /** An autosave by this person, as the workspace sends it. */
-  async function edit(userId: string, templateId: string, text: string) {
-    const at = as(userId);
-    const draft = (await draftOf(templateId))!;
-    const body = { ...draft.body, content: [...(draft.body.content ?? []), { type: "paragraph", content: [{ type: "text", text }] }] };
-    const saved = await applyDraftPatch(db, {
-      viewer: people[userId]!,
-      versionId: draft.id,
-      patch: { rev: draft.rev, sessionKey: `session-${userId}-${minute}`, body },
-      at,
-    });
-    expect(saved.ok, `${userId}'s save lands`).toBe(true);
-  }
 
   const wrote = { ok: false, ...REASONS.wroteVersion };
   const decisionsOn = async (templateId: string, number: number) =>
@@ -754,14 +791,6 @@ describe("setSunset", () => {
   // Platform Admin picks another: "Sunset on March 1" must not stop renders at 7 PM Eastern on February 28.
   describe("in the business time zone", () => {
     const templateId = () => ids["balance-transfer"]!;
-    let before: Date | null = null;
-    beforeAll(async () => {
-      before = (await version(templateId(), 1))!.sunsetAt;
-    });
-    afterEach(async () => {
-      await db.delete(settings).where(eq(settings.key, "business_zone"));
-      await db.update(versions).set({ sunsetAt: before }).where(and(eq(versions.templateId, templateId()), eq(versions.number, 1)));
-    });
 
     it("stores 00:00 Eastern on the day picked, and records the day and the zone", async () => {
       const at = as("alex");
@@ -850,6 +879,12 @@ describe("setSunset", () => {
 describe("the two-person revoke (scenario 6)", () => {
   const reason = "Wrong APR in legal notices.";
 
+  /** Jordan has started a revoke on Balance Transfer v1. */
+  async function jordanStartsRevoke() {
+    as("jordan");
+    expect(await startRevoke({ templateId: ids["balance-transfer"]!, versionNumber: 1, reason })).toEqual({ ok: true });
+  }
+
   it("Jordan starts a revoke on Balance Transfer v1 and can't confirm it himself", async () => {
     const templateId = ids["balance-transfer"]!;
     const at = as("jordan");
@@ -870,6 +905,7 @@ describe("the two-person revoke (scenario 6)", () => {
   });
 
   it("Alex confirms: v1 is Revoked, Coral is told, and a second confirm is refused", async () => {
+    await jordanStartsRevoke();
     const templateId = ids["balance-transfer"]!;
     const at = as("alex");
     expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: true });
@@ -941,7 +977,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
 
   // v1 goes live; v2 adds an optional promo code and replaces it, so v1 is Superseded with no sunset
   // and still renders; Coral renders v2; then v2 is revoked. Nothing is Active.
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
@@ -971,6 +1007,38 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     await revoke(2);
     expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: null });
   });
+
+  // From there, one step at a time: each step builds the ones before it.
+  /** Maya has started the corrected draft, from the revoked v2. */
+  async function correctedDraft() {
+    as("maya");
+    await startDraft({ templateId });
+  }
+  /** ...and added a required annual fee to it. */
+  async function draftWithFee() {
+    await correctedDraft();
+    as("maya");
+    await saveVariables("maya", (variables) => [...variables, FEE]);
+  }
+  /** ...and submitted it as v3. */
+  async function submittedV3() {
+    await draftWithFee();
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
+  }
+  /** ...and Jordan approved it: v3 is Active. */
+  async function liveV3() {
+    await submittedV3();
+    const at = as("jordan");
+    // There's no previous Active version for a sunset to land on: the date is ignored.
+    const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
+    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+      ok: true,
+      wentLive: true,
+      number: 3,
+      round: 1,
+    });
+  }
 
   it("offers Edit, which starts the corrected draft from the revoked version", async () => {
     as("maya");
@@ -1016,8 +1084,8 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   });
 
   it("compares the draft with v1, the newest version that still renders, in the workspace and the submit dialog", async () => {
+    await draftWithFee();
     as("maya");
-    await saveVariables("maya", (variables) => [...variables, FEE]);
     const v1 = (await version(templateId, 1))!;
 
     const document = await getWorkspaceDocument("coral-offers", templateId);
@@ -1029,6 +1097,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   });
 
   it("submit freezes the contract changes against v1, not the revoked v2", async () => {
+    await draftWithFee();
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
     const v3 = (await version(templateId, 3))!;
@@ -1039,6 +1108,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   });
 
   it("Jordan approves v3: it goes live over nothing, v2 stays Revoked, v1 keeps rendering, and Coral is told", async () => {
+    await submittedV3();
     const v1Before = (await version(templateId, 1))!;
     const v2Before = (await version(templateId, 2))!;
     const at = as("jordan");
@@ -1079,6 +1149,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   });
 
   it("with nothing left that renders, the corrected draft has no baseline, like a first version", async () => {
+    await liveV3();
     await revoke(3);
     // v1's sunset passes as well.
     const passed = new Date(env.now.getTime() - DAY);
@@ -1115,7 +1186,7 @@ describe("a variable renamed in a draft", () => {
   }
 
   // v1 goes live with `first_name`, and Coral renders it, so it hears about the next version.
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
     as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
@@ -1137,7 +1208,8 @@ describe("a variable renamed in a draft", () => {
     });
   });
 
-  it("is saved with the draft: renamed in one session and again after a reload, it is one rename against v1", async () => {
+  /** Maya has opened a draft and renamed `first_name` twice, in two sessions: it is now `name_on_card`. */
+  async function renamedDraft() {
     as("maya");
     await startDraft({ templateId });
     await editVariables("maya", (store) => store.getState().update("first_name", { key: "given_name" }));
@@ -1145,6 +1217,22 @@ describe("a variable renamed in a draft", () => {
 
     // A new page visit: the store opens on the saved list, and the next rename chains onto the first.
     await editVariables("maya", (store) => store.getState().update("given_name", { key: "name_on_card" }));
+  }
+  /** ...and submitted it as v2. */
+  async function submittedV2() {
+    await renamedDraft();
+    as("maya");
+    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+  }
+  /** ...and Jordan approved it: v2 is Active. */
+  async function liveV2() {
+    await submittedV2();
+    as("jordan");
+    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+  }
+
+  it("is saved with the draft: renamed in one session and again after a reload, it is one rename against v1", async () => {
+    await renamedDraft();
     const summary = await getSubmitSummary(people.maya!, { templateId });
     if (!summary.ok) throw new Error(summary.reason);
     expect(describeChanges(diffVariables(summary.summary.baseline!.variables, summary.summary.variables), 2)).toEqual([
@@ -1153,6 +1241,7 @@ describe("a variable renamed in a draft", () => {
   });
 
   it("submit stores one key_renamed with the old and the new key, not a removal and an addition", async () => {
+    await renamedDraft();
     const at = as("maya");
     expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
     expect((await version(templateId, 2))!.contractChanges).toEqual([
@@ -1165,6 +1254,7 @@ describe("a variable renamed in a draft", () => {
   });
 
   it("approved, the consumer notice carries the rename for Coral to map", async () => {
+    await submittedV2();
     const at = as("jordan");
     expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
     const [notice] = (await noticesAt(at)).filter((n) => n.kind === "new_version");
@@ -1189,6 +1279,7 @@ describe("a variable renamed in a draft", () => {
   });
 
   it("in the next version, a new variable under the old key is an addition, not the renamed one", async () => {
+    await liveV2();
     as("maya");
     await startDraft({ templateId });
     await editVariables("maya", (store) =>
@@ -1298,6 +1389,21 @@ describe("the writers backfill in the migration", () => {
       Object.fromEntries(
         (await db.select({ id: versions.id, writers: versions.writers }).from(versions)).map((v) => [v.id, [...v.writers].sort()]),
       );
+
+    // Versions the app wrote with more than one writer: Priya edits Maya's draft before Maya submits it, and
+    // the round Jordan sends back carries both writers on; Priya submits another template Maya created.
+    const edited = (await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE })).templateId;
+    await edit("priya", edited, "Priya's sentence.");
+    as("maya");
+    expect(await submitNow(edited)).toEqual({ ok: true, number: 1, round: 1 });
+    as("jordan");
+    expect(await requestChanges({ templateId: edited, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    await edit("maya", edited, "The APR is 21.99%.");
+    as("maya");
+    expect(await submitNow(edited)).toEqual({ ok: true, number: 1, round: 2 });
+    const submittedByPriya = (await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE })).templateId;
+    as("priya");
+    expect(await submitNow(submittedByPriya)).toEqual({ ok: true, number: 1, round: 1 });
 
     const recorded = await writersById();
     expect(Object.values(recorded).some((w) => w.length > 1), "some version has two writers").toBe(true);

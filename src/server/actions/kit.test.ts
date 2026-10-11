@@ -1,8 +1,5 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { COMMENT_REFUSALS, canComment } from "@/domain/comments";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
@@ -12,6 +9,7 @@ import type { Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import type { Db } from "@/server/db/client";
 import { settings } from "@/server/db/schema/ucomp";
+import { freshDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { check, permit, refuse, serverAction, type ActionSteps } from "./kit";
 
@@ -19,13 +17,11 @@ import { check, permit, refuse, serverAction, type ActionSteps } from "./kit";
 // migrated database; the clock and the viewer are swapped. The writes go to `settings`, a plain
 // key-value table, so a rolled-back write is easy to see.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-09T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-09T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-action-kit-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-action-kit-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -48,16 +44,11 @@ const author: Viewer = {
 };
 
 let db: Db;
-let libsql: Client;
+
+freshDatabasePerTest();
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-});
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 beforeEach(() => {

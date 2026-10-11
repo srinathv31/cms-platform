@@ -1,18 +1,15 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { sunsetDay } from "@/domain/business-zone";
 import type { ApiTemplateDetail } from "@/domain/golive-types";
 import type { VariableType } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
 import { compareCodePoints, readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
 import { BUSINESS_ZONE_KEY } from "@/server/business-zone";
 import { takeNoticeSeqs } from "@/server/effects";
+import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import {
   getTemplateDetail,
   listNotices,
@@ -30,13 +27,9 @@ import {
 //   - Holiday Points v1 Revoked, v2 Active; Annual Fee Waiver has nothing released;
 //   - Coral's notices: seeded payloads (new_version, sunset_scheduled, revoked).
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
-
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-consumer-api-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-consumer-api-");
 });
 
 const { consumerNotices, settings, templates, versions } = schema;
@@ -44,18 +37,11 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 
 let db: Db;
-let libsql: Client;
-let ids: Record<string, string>;
+
+const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  ids = (await seedDatabase(db, { base: BASE })).templates;
-}, 60_000);
-
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+  ({ db } = await import("@/server/db/client"));
 });
 
 const id = (key: string) => ids[key]!;

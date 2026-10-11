@@ -1,14 +1,10 @@
-import { rmSync } from "node:fs";
-import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { parseCsv } from "@/domain/audit";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
-import { loadPersona } from "@/server/testing/review-fixtures";
+import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getAuditExport, getAuditPage } from "./audit";
 
@@ -16,13 +12,11 @@ import { getAuditExport, getAuditPage } from "./audit";
 // (Coral Offers, Deposits, Card Statements), their memberships granted by Riley and the Team Admins,
 // platform-wide configuration events (team null), Chris's pending request and Devon's inactivity flag.
 
-const env = vi.hoisted(() => ({ dir: "", now: new Date("2026-10-04T12:00:00.000Z") }));
+const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  const temp = tempDatabase("ucomp-audit-queries-");
-  env.dir = temp.dir;
-  return temp;
+  return tempDatabase("ucomp-audit-queries-");
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
@@ -30,19 +24,13 @@ vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
-let libsql: Client;
 const people: Record<string, Viewer> = {};
 
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-  for (const id of ["taylor", "riley", "alex", "maya"]) people[id] = await loadPersona(db, id);
-}, 60_000);
+seededDatabasePerTest({ base: BASE });
 
-afterAll(() => {
-  libsql?.close();
-  rmSync(env.dir, { recursive: true, force: true });
+beforeAll(async () => {
+  ({ db } = await import("@/server/db/client"));
+  for (const id of ["taylor", "riley", "alex", "maya"]) people[id] = await loadPersona(db, id);
 });
 
 function as(userId: string) {

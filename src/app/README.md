@@ -285,7 +285,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 
 - **Route handlers:** co-located `route.test.ts` files under `api/`, run with `npx vitest run src/app/api`. The
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
-  database (`tempDatabase` in `src/server/testing/review-fixtures.ts`) and mock `@/server/clock`. The template
+  database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
+  database per test) and mock `@/server/clock`. The template
   reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
   with `getViewer` mocked to each persona, and so is the palette's search
   ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the

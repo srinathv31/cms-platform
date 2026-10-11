@@ -1,15 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { createClient, type Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { AccessEffect } from "@/domain/access-types";
-import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { seedDatabase } from "@/server/seed";
+import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import { accessHref, applyMembershipChange, resolveAccessRecipients, writeAccessEffects } from "./access-effects";
 import { inTransaction } from "./effects";
 
@@ -19,22 +12,7 @@ import { inTransaction } from "./effects";
 const { auditEvents, membershipRoles, memberships, notifications } = schema;
 const BASE = new Date("2027-02-01T12:00:00.000Z");
 
-let dir: string;
-let client: Client;
-let db: Db;
-
-beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ucomp-access-effects-"));
-  client = createClient({ url: `file:${join(dir, "access.db")}` });
-  db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
-  await seedDatabase(db, { base: BASE });
-}, 60_000);
-
-afterAll(() => {
-  client?.close();
-  rmSync(dir, { recursive: true, force: true });
-});
+const { db } = standaloneDatabasePerTest({ base: BASE });
 
 let tick = 0;
 const instant = () => new Date(BASE.getTime() + ++tick * 1000);
