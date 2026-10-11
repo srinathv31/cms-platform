@@ -36,7 +36,7 @@ function useRegister(mode: Mode) {
 }
 
 /**
- * Flow-style settings modal frame: a nav column on a tinted surface (`nav`, streamed), content on the right.
+ * Settings modal frame: a nav column on a tinted surface (`nav`, streamed), content on the right.
  * Used by the intercepted route (closes back to the page underneath) and by the hard-navigation
  * fallback (closes to the library). It lives in a layout, so it persists while sections change.
  */
