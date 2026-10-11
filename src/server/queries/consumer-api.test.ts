@@ -4,12 +4,14 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { sunsetDay } from "@/domain/business-zone";
 import type { ApiTemplateDetail } from "@/domain/golive-types";
 import type { VariableType } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seedDatabase } from "@/server/seed";
 import { compareCodePoints, readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
+import { BUSINESS_ZONE_KEY } from "@/server/business-zone";
 import { takeNoticeSeqs } from "@/server/effects";
 import {
   getTemplateDetail,
@@ -37,7 +39,7 @@ vi.mock("@/server/db/client", async () => {
   return temp;
 });
 
-const { consumerNotices, templates, versions } = schema;
+const { consumerNotices, settings, templates, versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 
@@ -290,6 +292,31 @@ describe("getTemplateDetail", () => {
   it("past its sunset a Superseded version no longer renders", async () => {
     const d = await detail("balance-transfer", {}, new Date(BASE.getTime() + 22 * DAY));
     expect(d.versions[1]).toMatchObject({ number: 1, sunsetPassed: true, renders: false });
+  });
+
+  it("sends a sunset's day and zone beside its instant, and nulls for a version with none", async () => {
+    const d = await detail("balance-transfer");
+    const sunset = d.versions[1]!;
+    expect(sunset.zone).toBe("America/New_York");
+    expect(sunset.sunsetDay, "the day in the zone, which the instant's UTC date can't be trusted for").toBe(sunsetDay(new Date(sunset.sunsetAt!), "America/New_York"));
+    expect(d.versions[0]).toMatchObject({ number: 2, sunsetAt: null, sunsetDay: null, zone: null });
+
+    // 00:00 on March 1 in Pacific is 08:00Z the same day; in Eastern, 05:00Z.
+    const versionOf = and(eq(versions.templateId, id("balance-transfer")), eq(versions.number, 1));
+    const before = sunset.sunsetAt;
+    await db.update(versions).set({ sunsetAt: new Date("2027-03-01T05:00:00.000Z") }).where(versionOf);
+    try {
+      expect((await detail("balance-transfer")).versions[1]).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" });
+      await db.insert(settings).values({ key: BUSINESS_ZONE_KEY, value: "America/Los_Angeles" });
+      expect((await detail("balance-transfer")).versions[1], "its day is read in the zone now in force (decision 0017)").toMatchObject({
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-02-28",
+        zone: "America/Los_Angeles",
+      });
+    } finally {
+      await db.delete(settings).where(eq(settings.key, BUSINESS_ZONE_KEY));
+      await db.update(versions).set({ sunsetAt: new Date(before!) }).where(versionOf);
+    }
   });
 
   it("a Revoked version is listed with its date, and its contract can still be read", async () => {

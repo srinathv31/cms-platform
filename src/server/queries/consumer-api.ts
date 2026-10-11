@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, eq, gt, inArray, type SQL } from "drizzle-orm";
+import { sunsetDay } from "@/domain/business-zone";
 import { apiBadRequest, QUERY_MESSAGES } from "@/domain/golive/api-errors";
 import { contractDiff } from "@/domain/golive/contract-diff";
 import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
@@ -170,6 +171,9 @@ function versionSummary(
     activatedAt: (v.activatedAt ?? v.createdAt).toISOString(),
     supersededAt: v.supersededAt?.toISOString() ?? null,
     sunsetAt: v.sunsetAt?.toISOString() ?? null,
+    // The day in the business zone as it is now, the one the 410's message names (decision 0038).
+    sunsetDay: v.sunsetAt ? sunsetDay(v.sunsetAt, zone) : null,
+    zone: v.sunsetAt ? zone : null,
     sunsetPassed: sunsetPassed(v, now),
     revokedAt,
     renders: checkVersion({

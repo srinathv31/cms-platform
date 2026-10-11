@@ -194,15 +194,15 @@ describe("version messages", () => {
     expect(versionSunset(1, sunsetAt, 2, "America/New_York")).toEqual({
       code: "version_sunset",
       message: "Version 1 was sunset on March 1, 2027. Version 2 is active.",
-      details: { version: 1, activeVersion: 2, at: "2027-03-01T05:00:00.000Z" },
+      details: { version: 1, activeVersion: 2, at: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" },
     });
     expect(versionSunset(1, sunsetAt, null, "America/New_York").message).toBe(
       "Version 1 was sunset on March 1, 2027. No version is active.",
     );
     // A zone ahead of UTC: 00:00 on March 1 in Kolkata is still February 28 in UTC.
-    expect(versionSunset(1, new Date("2027-02-28T18:30:00.000Z"), 2, "Asia/Kolkata").message).toBe(
-      "Version 1 was sunset on March 1, 2027. Version 2 is active.",
-    );
+    const kolkata = versionSunset(1, new Date("2027-02-28T18:30:00.000Z"), 2, "Asia/Kolkata");
+    expect(kolkata.message).toBe("Version 1 was sunset on March 1, 2027. Version 2 is active.");
+    expect(kolkata.details).toMatchObject({ at: "2027-02-28T18:30:00.000Z", sunsetDay: "2027-03-01", zone: "Asia/Kolkata" });
   });
 
   it("revoked, with and without a date", () => {

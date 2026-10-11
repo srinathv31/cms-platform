@@ -221,6 +221,12 @@ describe("POST …/render: superseded versions", () => {
       const res = await post("balance-transfer", { version: 1, channel: "web", values: CUSTOMER });
       const error = await expectError(res, 410, "version_sunset");
       expect(error.message).toMatch(/^Version 1 was sunset on \w+ \d+, \d{4}\. Version 2 is active\.$/);
+      expect(error.details, "the day and zone beside the instant").toMatchObject({
+        version: 1,
+        activeVersion: 2,
+        sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        zone: "America/New_York",
+      });
     } finally {
       env.now = saved;
     }

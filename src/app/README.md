@@ -107,6 +107,8 @@ persona; the mocks read their deep-link search params.
 | `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
 | `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Browser preview with `preview: true` ([render-preview.ts](../components/preview/render-preview.ts)); simulator and outside consumers with `X-Consumer-Id`. |
 | `GET /sim/deliveries/[deliveryId]/file` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts) | Simulator: the customer views' iframes and PDF. |
+| `GET /sim/deliveries/[deliveryId]/view` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/view/route.ts) | Simulator: the customer drawer, when it opens on a delivery ([offer-view.tsx](../simulator/ui/offer-view.tsx)). |
+| `GET /sim/templates/search?q=` | [route.ts](./(simulator)/sim/templates/search/route.ts) | Simulator: the link flow's template search, debounced ([link-flow.tsx](../simulator/ui/link-flow.tsx)). |
 
 ## Layouts and providers
 
@@ -196,6 +198,11 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
 answer, with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and
 plain text (audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful
 import read, on every template read and on the palette).
+
+**Coral's reads** (`/sim/templates/search`, `/sim/deliveries/[deliveryId]/view`) are the simulator's own, in the
+simulator's shape rather than Stencil's: `{ ok: true, … }` or `{ ok: false, reason }` (its `SimResult`) with a 400,
+404 or 502 and `Cache-Control: private, no-store` ([read-response.ts](../simulator/read-response.ts)). Coral's
+server actions are its writes only.
 
 **Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
 opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs

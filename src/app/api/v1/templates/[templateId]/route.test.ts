@@ -67,6 +67,15 @@ describe("GET /api/v1/templates/[templateId]: 200", () => {
     expect(body.changes).toBeUndefined();
   });
 
+  it("a Superseded version's sunset comes with its day and zone", async () => {
+    const body = (await (await get("balance-transfer")).json()) as ApiTemplateDetail;
+    const [active, superseded] = body.versions;
+    expect(active).toMatchObject({ number: 2, sunsetAt: null, sunsetDay: null, zone: null });
+    expect(superseded).toMatchObject({ number: 1, zone: "America/New_York", sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+    // 00:00 Eastern on that day, so the instant is 4 or 5 hours into the same UTC date.
+    expect(superseded!.sunsetAt).toMatch(new RegExp(`^${superseded!.sunsetDay}T0[45]:00:00\\.000Z$`));
+  });
+
   it("version and since", async () => {
     const body = (await (await get("balance-transfer", "?version=2&since=1")).json()) as ApiTemplateDetail;
     expect(body.contract!.version).toBe(2);

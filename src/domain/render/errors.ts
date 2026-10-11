@@ -172,13 +172,15 @@ export function versionNotReleased(
 
 /**
  * "Version 1 was sunset on March 1, 2027. Version 2 is active." / "… No version is active." The date is the
- * sunset's day in the business time zone (`zone`); `details.at` is the instant renders stopped.
+ * sunset's day in the business time zone (`zone`); `details.at` is the instant renders stopped, and
+ * `details.sunsetDay` and `details.zone` repeat the day and the zone for a consumer to read.
  */
 export function versionSunset(version: number, sunsetAt: Date, activeVersion: number | null, zone: string): RenderError {
+  const day = sunsetDay(sunsetAt, zone);
   return renderError(
     "version_sunset",
-    `Version ${version} was sunset on ${formatLongDate(sunsetDay(sunsetAt, zone))}. ${activeSentence(activeVersion, "No version is active.")}`,
-    versionDetails(version, activeVersion, sunsetAt),
+    `Version ${version} was sunset on ${formatLongDate(day)}. ${activeSentence(activeVersion, "No version is active.")}`,
+    { ...versionDetails(version, activeVersion, sunsetAt), sunsetDay: day, zone },
   );
 }
 

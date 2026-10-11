@@ -3,18 +3,20 @@
 import { eq, inArray } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import type { ApiChannel, ApiTemplateSummary } from "@/contracts/api-v1";
+import type { ApiChannel } from "@/contracts/api-v1";
 import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
 import { simDb, withBusyRetry } from "./db";
 import { isSimFieldPath } from "./fields";
 import { blockedSentence, missingRequired, valuesFor } from "./mapping";
-import { customerRecord, getSimDeliveryView, loadBatch, offerRecord } from "./queries";
+import { customerRecord, loadBatch, offerRecord } from "./queries";
 import { KIND_CHANNELS } from "./kinds";
-import type { SimApiError, SimBatch, SimDeliveryView, SimFieldPath, SimResult } from "./types";
+import type { SimApiError, SimBatch, SimFieldPath, SimResult } from "./types";
 import { ucompApi } from "./ucomp-api";
 
-// Coral's actions. Coral is an outside system acting as itself, so there is no UCOMP persona or
-// permission here: the API's X-Consumer-Id is the only identity. Mutations call refresh(); reads don't.
+// Coral's actions: its writes, and only its writes. Coral is an outside system acting as itself, so there is no
+// UCOMP persona or permission here: the API's X-Consumer-Id is the only identity. Each calls refresh(). A read
+// the browser asks for is a GET route (reads.ts, src/app/(simulator)/sim/), never an export of this file: every
+// export of a "use server" file is a public POST endpoint, queued with the writes (decision 0019).
 // Values never reach a log: nothing below prints customer data.
 
 const fail = (reason: string) => ({ ok: false as const, reason });
@@ -33,15 +35,6 @@ function cleanMapping(mapping: Readonly<Record<string, string | null>>): Record<
   const out: Record<string, SimFieldPath> = {};
   for (const [key, path] of Object.entries(mapping)) if (isSimFieldPath(path)) out[key] = path;
   return out;
-}
-
-// ── Search ───────────────────────────────────────────────────────────────────
-
-export async function searchTemplates(input: { q: string }): Promise<SimResult<{ results: ApiTemplateSummary[] }>> {
-  const parsed = z.object({ q: z.string().max(200) }).safeParse(input);
-  if (!parsed.success) return fail("Search for a template name or ID.");
-  const result = await (await ucompApi()).searchTemplates({ q: parsed.data.q, limit: 20 });
-  return result.ok ? { ok: true, results: result.data.results } : fail(result.error.message);
 }
 
 // ── Link / relink ────────────────────────────────────────────────────────────
@@ -230,13 +223,4 @@ export async function markNoticesRead(input: { noticeIds: string[] }): Promise<S
   await withBusyRetry(() => simDb.insert(simNoticeReads).values(rows).onConflictDoNothing());
   refresh();
   return { ok: true };
-}
-
-// ── Customer view ────────────────────────────────────────────────────────────
-
-export async function getDeliveryView(input: { deliveryId: string }): Promise<SimResult<{ view: SimDeliveryView }>> {
-  const parsed = z.object({ deliveryId: z.string().min(1).max(64) }).safeParse(input);
-  if (!parsed.success) return fail("That delivery doesn't exist.");
-  const view = await getSimDeliveryView(parsed.data.deliveryId);
-  return view ? { ok: true, view } : fail("That delivery doesn't exist.");
 }
