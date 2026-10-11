@@ -67,7 +67,7 @@ Feature folders:
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
 | `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round, opening on the two newest versions), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
-| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
+| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`; while it is on screen the tab bar's Edit, Submit for review, Preview and rail toggle are greyed with the reason, through the session's `failTab`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks
 
@@ -94,7 +94,7 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 
 | Export | File | Purpose |
 | --- | --- | --- |
-| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). A Superseded version's `sunsetDay` (the read model's YYYY-MM-DD, in the business time zone) shows as "Sunset Mar 1". Server-safe. |
+| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). A Superseded version's `sunsetDay` (the read model's YYYY-MM-DD, in the business time zone) shows as "Sunset Mar 1", and as "Sunset passed Mar 1" when the read model's `sunsetPassed` (the domain's one test) says it has: every screen that shows the badge passes both. Server-safe. |
 | `PageHeader` | [page-header.tsx](primitives/page-header.tsx) | Serif page title, optional caps eyebrow, a slot for the screen's one primary action. |
 | `Stream` | [stream.tsx](primitives/stream.tsx) | The streaming boundary: `Suspense` plus `ViewTransition`, skeleton out, content in. It catches no errors; the route's `error.tsx` does ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). |
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
@@ -232,6 +232,9 @@ The same store holds the workspace still (`makeInert`, read with `useInert`): Su
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
 A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the
 header's `SaveStopped` says why and offers Reload. Anything else that has to stop edits takes a hold the same way.
+The tab bar is in the layout, above a tab's error boundary, so it learns of a failed tab the same way: `TabError` takes
+a `failTab` hold while it is on screen (read with `useTabFailed`), and Edit, Submit for review, Preview and the rail
+toggle show as `BlockedButton`s with `TAB_BLOCKED` until the hold is let go (Try again worked, or the person left the tab).
 The session also holds the controls that code sends focus to (`session.focusTargets`): the name field, the header's
 status row, the Preview toggle and the rail's Original tab register themselves while mounted (`useFocusTarget`), and
 an Esc, a submit or a revert asks for them by name, or waits for one to mount, rather than querying the page by label

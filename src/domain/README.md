@@ -178,7 +178,8 @@ Every other date stays UTC. In [business-zone.ts](business-zone.ts):
   23:30 Eastern the next day is still a valid date. The picker's today is the same day (`SunsetCalendar` in
   [review-types.ts](review-types.ts)).
 - Passed is an instant comparison, `sunsetPassed` in [lifecycle.ts](lifecycle.ts), and the only one: the render
-  rule, the consumer API, the Versions and Usage screens, the count of pending sunsets and the sweep all ask it.
+  rule, the consumer API, the read models (they hand the status badge `sunsetPassed`, so it says "Sunset passed Mar 1"
+  rather than a date to come), the count of pending sunsets and the sweep all ask it.
 - `sweepSunsets` records each passed sunset once, as the system: a `version.sunset_passed` audit row dated at the
   sunset, naming its day in the zone at the sweep (`SunsetPassedDetails`), and a `sunset_passed` consumer notice
   with the instant, that day and zone, and the Active version to move to. A version revoked before its sunset isn't

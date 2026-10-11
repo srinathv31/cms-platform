@@ -49,6 +49,7 @@ export function ReviewHeader({
   round,
   state,
   sunsetDay,
+  sunsetPassed,
   author,
   submittedAt,
   nowIso,
@@ -65,6 +66,8 @@ export function ReviewHeader({
   state: VersionState;
   /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (its badge says "Sunset Mar 1"). */
   sunsetDay?: string | null;
+  /** That sunset has passed (the version's `sunsetPassed`): the badge says "Sunset passed Mar 1". */
+  sunsetPassed?: boolean;
   author: Person;
   submittedAt: string;
   nowIso: string;
@@ -93,7 +96,7 @@ export function ReviewHeader({
           animate={{ opacity: 1 }}
           transition={{ duration: duration.slow, ease: ease.outSoft }}
         >
-          <StatusBadge state={state} sunsetDay={sunsetDay} now={nowIso} />
+          <StatusBadge state={state} sunsetDay={sunsetDay} sunsetPassed={sunsetPassed} now={nowIso} />
         </m.span>
         <span data-slot="byline" className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
           {versionLabel(shown)} by {author.name} · {formatAgo(submittedAt, nowIso)}

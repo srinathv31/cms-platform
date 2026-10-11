@@ -14,10 +14,12 @@ import { rowsOf } from "./helpers/cleanup";
 //      sidebar and top bar stay.
 //   3. The frame itself fails (the demo clock's setting, which every part of the shell reads): the global
 //      error page replaces the document.
+//   4. A page of the simulator fails (a customer's stored account, which only Coral's Customers page reads): Coral's
+//      own error shows in its page, the strip, nav and Demo pill stay, and Back goes to /sim, not to Stencil's Library.
 //
-// Each shows one plain sentence, Try again and Back to library, and the error's digest; never the server's
+// Each shows one plain sentence, Try again and a way back, and the error's digest; never the server's
 // message. The value is then put back and Try again brings the screen back. afterEach puts back anything a
-// failed test left broken.
+// failed test left broken. On a failed tab the tab bar's Edit and Preview stay, greyed, with the reason (N9).
 //
 // These tests expect console errors (React and Next log the caught error), so they don't use the
 // scenario fixture that fails on them.
@@ -44,7 +46,7 @@ test.afterAll(() => {
 });
 
 /** Breaks one stored value until the returned function (or afterEach) puts back exactly what was there. */
-async function breakValue(table: "versions" | "settings", keyColumn: "id" | "key", key: string, column: string) {
+async function breakValue(table: "versions" | "settings" | "sim_customers", keyColumn: "id" | "key", key: string, column: string) {
   const [before] = await rowsOf(db, `SELECT ${column} FROM ${table} WHERE ${keyColumn} = ?`, [key]);
   if (!before) throw new Error(`${table} row ${key} doesn't exist.`);
   let restored = false;
@@ -103,6 +105,22 @@ async function settle(page: Page, frame: boolean) {
   await page.evaluate(() => document.fonts.ready);
 }
 
+/** No serious or critical axe violation, as in principles.spec.ts. */
+async function expectNoSeriousViolations(page: Page) {
+  const axe = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
+  const serious = axe.violations
+    .filter((v) => v.impact === "serious" || v.impact === "critical")
+    .map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => `${n.target.join(" ")} ${n.failureSummary ?? ""}`).join(" | ")})`);
+  expect(serious, "axe serious/critical violations").toEqual([]);
+}
+
+/** Next gives a server error a digest, the id its server log carries; the server's message never shows. */
+async function expectDigestOnly(page: Page) {
+  await expect(page.getByText(/^Error ID \S+$/)).toBeVisible();
+  const text = await page.locator("body").innerText();
+  expect(text, "the server's message stays on the server").not.toMatch(/JSON|SyntaxError|Unexpected|at \w+ \(/);
+}
+
 /** The error's sentence, its actions and its digest, and nothing of the server's message. */
 async function expectErrorScreen(page: Page, sentence: string, { frame }: { frame: boolean }) {
   await expect(page.getByText(sentence, { exact: true })).toBeVisible();
@@ -110,16 +128,8 @@ async function expectErrorScreen(page: Page, sentence: string, { frame }: { fram
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   // A Base UI Button rendered as a link has the button role.
   await expect(page.getByRole("button", { name: "Back to library" })).toHaveAttribute("href", `/${TEAM}/library`);
-  // Next gives a server error a digest, the id its server log carries.
-  await expect(page.getByText(/^Error ID \S+$/)).toBeVisible();
-  const text = await page.locator("body").innerText();
-  expect(text, "the server's message stays on the server").not.toMatch(/JSON|SyntaxError|Unexpected|at \w+ \(/);
-  // As in principles.spec.ts: no serious or critical axe violation.
-  const axe = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
-  const serious = axe.violations
-    .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => `${n.target.join(" ")} ${n.failureSummary ?? ""}`).join(" | ")})`);
-  expect(serious, "axe serious/critical violations").toEqual([]);
+  await expectDigestOnly(page);
+  await expectNoSeriousViolations(page);
 }
 
 test("a tab that fails keeps the workspace header, the tab bar and the frame", async ({ page }) => {
@@ -133,11 +143,22 @@ test("a tab that fails keeps the workspace header, the tab bar and the frame", a
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   // The tab bar keeps the workspace's black button (Edit, for Maya on an Active template), so Try again is outline.
   expect(await primaryButtons(page)).toEqual(["Edit"]);
+  // Its actions act on the tab that didn't load, so they stay but are greyed, each with the reason at the control.
+  const bar = page.locator('[data-slot="tab-bar"]');
+  const action = (name: string) => bar.getByRole("button", { name, exact: true });
+  for (const name of ["Edit", "Preview"]) {
+    await expect(action(name)).toBeVisible();
+    await expect(action(name)).toBeDisabled();
+    await expect(action(name)).toHaveAttribute("data-disabled", "");
+    await expect(action(name)).toHaveAccessibleDescription("Unavailable until this tab loads.");
+  }
 
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.locator(".ProseMirror").filter({ visible: true })).toBeVisible();
   await expect(page.getByText("This tab didn't load.")).toHaveCount(0);
+  // And live again.
+  for (const name of ["Edit", "Preview"]) await expect(action(name)).toBeEnabled();
 });
 
 test("a page that fails keeps the sidebar and the top bar", async ({ page }) => {
@@ -154,6 +175,37 @@ test("a page that fails keeps the sidebar and the top bar", async ({ page }) => 
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: CASH_BACK })).toBeVisible();
+  await expect(page.getByText("This page didn't load")).toHaveCount(0);
+});
+
+test("a page of the simulator that fails keeps Coral's frame and goes back to /sim", async ({ page }) => {
+  const [customer] = await rowsOf(db, "SELECT id FROM sim_customers ORDER BY id LIMIT 1");
+  if (!customer) throw new Error("This spec needs the fresh seed (npm run db:reset): Coral has no customers.");
+  const restore = await breakValue("sim_customers", "id", String(customer.id), "statement");
+
+  await page.goto("/sim/customers");
+  await expect(page.getByRole("heading", { level: 1, name: "This page didn't load" })).toBeVisible();
+  await settle(page, false);
+  // Coral's frame stays: the strip back to Stencil, its label, its nav. Not Stencil's global error page.
+  await expect(page.getByText("Coral — simulated", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Customers", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to library" })).toHaveCount(0);
+  // Back goes to Coral's home (a link: Coral draws its own buttons), not to a Stencil space's Library.
+  await expect(page.getByRole("link", { name: "Back to offers" })).toHaveAttribute("href", "/sim");
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expectDigestOnly(page);
+  await expectNoSeriousViolations(page);
+
+  await page.getByRole("link", { name: "Back to offers" }).click();
+  await expect(page).toHaveURL(/\/sim$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Offers" })).toBeVisible();
+
+  // Try again brings the page back once the value is.
+  await page.goto("/sim/customers");
+  await expect(page.getByRole("heading", { level: 1, name: "This page didn't load" })).toBeVisible();
+  await restore();
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeVisible();
   await expect(page.getByText("This page didn't load")).toHaveCount(0);
 });
 

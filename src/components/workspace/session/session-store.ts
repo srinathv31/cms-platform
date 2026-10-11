@@ -30,6 +30,9 @@
 //     holds it the same way, for as long as that draft stays bound (decision 0012).
 //   - the controls that code sends focus to (the name field, the status row, the Preview toggle, the
 //     rail's Original tab), registered by the components that own them (focus-targets.ts, decision 0027).
+//   - whether a tab is showing its error (`TabError`, mounted by the tab's error boundary): the tab bar
+//     is in the layout, above the boundary, so this is how its Edit, Submit for review and Preview
+//     know the tab they act on didn't load.
 //
 // One autosave session per draft version serves the whole workspace: body, variables, name and
 // channels all go through `save`. Two sessions on one version would fight over `rev`.
@@ -155,6 +158,8 @@ export interface WorkspaceSession {
   getOwnedFields: () => string;
   /** Something holds the page still (`makeInert`): nothing on it may change the draft. */
   getInert: () => boolean;
+  /** A tab of the workspace is showing its error (`failTab`): the tab bar's actions can't act on it. */
+  getTabFailed: () => boolean;
 
   /**
    * Which draft is editable, or null when the page is read-only. Idempotent per version: binding
@@ -224,6 +229,13 @@ export interface WorkspaceSession {
    */
   makeInert: () => () => void;
 
+  /**
+   * A tab shows its error until the returned function is called (the error view calls it when it goes
+   * away: Try again worked, or the person left the tab). Holds stack, like `makeInert`; letting go twice
+   * does nothing. Changes nothing about the draft: only the tab bar's actions read it.
+   */
+  failTab: () => () => void;
+
   /** Ref callback for the document editor. */
   setEditor: (handle: DocumentEditorHandle | null) => void;
   /** Moves the caret into the first required section's body. */
@@ -282,6 +294,8 @@ export function createWorkspaceSession(): WorkspaceSession {
   let editGeneration = 0;
   // How many holders keep the page inert (`makeInert`).
   let inertHolds = 0;
+  // How many error views are on screen (`failTab`).
+  let failedTabs = 0;
   let canRevert = false;
   let ownedFields = "";
   const targets = new Set<RestoreTarget>();
@@ -362,6 +376,7 @@ export function createWorkspaceSession(): WorkspaceSession {
     getOwnedFields: () => ownedFields,
     getEditGeneration: () => editGeneration,
     getInert: () => inertHolds > 0,
+    getTabFailed: () => failedTabs > 0,
 
     bind(next) {
       if (next === null) {
@@ -499,6 +514,18 @@ export function createWorkspaceSession(): WorkspaceSession {
         holding = false;
         inertHolds -= 1;
         if (inertHolds === 0) emit();
+      };
+    },
+
+    failTab() {
+      failedTabs += 1;
+      if (failedTabs === 1) emit();
+      let failed = true;
+      return () => {
+        if (!failed) return;
+        failed = false;
+        failedTabs -= 1;
+        if (failedTabs === 0) emit();
       };
     },
 

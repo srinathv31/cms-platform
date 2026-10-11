@@ -6,7 +6,7 @@ import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges, diffVariables } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS, contractBaseline, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline, renameBaseline, reviewBaseline, sunsetPassed } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
@@ -345,6 +345,7 @@ export const getReviewScreen = cache(
         submittedAt: iso(version.submittedAt ?? version.createdAt),
         submitNote: version.submitNote,
         sunsetDay: version.sunsetAt ? sunsetDay(version.sunsetAt, zone) : null,
+        sunsetPassed: sunsetPassed(version, nowDate),
         contractChanges,
         contractLines: describeChanges(contractChanges, number),
       },

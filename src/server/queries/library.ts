@@ -10,6 +10,7 @@ import { ALL_SPACE } from "@/domain/permissions";
 import { compareRounds, type RoundRow } from "@/domain/rounds";
 import type { VersionState } from "@/domain/types";
 import { formatAgo } from "@/domain/dates";
+import { sunsetPassed } from "@/domain/lifecycle";
 
 export interface LibraryRow {
   id: string;
@@ -21,6 +22,8 @@ export interface LibraryRow {
   status: VersionState;
   /** YYYY-MM-DD: the latest version's sunset day in the business time zone, for the badge. */
   sunsetDay: string | null;
+  /** The sunset has passed (`sunsetPassed`): the badge says "Sunset passed". False when none is set. */
+  sunsetPassed: boolean;
   /** Number of the Active version, if any. */
   activeNumber: number | null;
   lastEdited: string;
@@ -96,6 +99,7 @@ export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRo
         teamName: t.teamName,
         status: latest?.state ?? ("draft" as VersionState),
         sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
+        sunsetPassed: latest ? sunsetPassed(latest, nowDate) : false,
         activeNumber: active?.number ?? null,
         lastEdited: edited ? formatAgo(edited, nowDate) : "—",
         owner: { name: t.ownerName, initials: t.ownerInitials, hue: t.ownerHue },

@@ -25,6 +25,7 @@ const DRAFT: WorkspaceHeaderData = {
   teamName: "Coral Offers",
   status: "draft",
   sunsetDay: null,
+  sunsetPassed: false,
   versionLabel: "Based on v2",
   basedOn: { label: "v2", active: true },
   activeNumber: 2,

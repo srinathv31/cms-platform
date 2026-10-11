@@ -40,7 +40,7 @@ async function LibraryList({ params }: { params: TeamParams }) {
 /** Same geometry as the loaded list (toolbar, header row, six rows), so nothing shifts when it streams in. */
 function LibraryListSkeleton() {
   return (
-    <div aria-hidden style={statusColumn(false)}>
+    <div aria-hidden style={statusColumn("default")}>
       <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
         <Skeleton className="h-9 w-72 rounded-full" />
         <div className="flex gap-1">

@@ -207,3 +207,18 @@ describe("VersionEntry: rounds", () => {
     expect(shown[1].textContent).toContain("Jordan Ellis requested changes on Oct 6: “Say when the annual fee starts.”");
   });
 });
+
+describe("VersionEntry: the sunset on the badge", () => {
+  const badge = () => container.querySelector('[data-status="superseded"]')?.textContent;
+  const SUPERSEDED = { state: "superseded", sunsetDay: "2026-10-25", supersededAt: "2026-10-04T12:00:00.000Z" } as const;
+
+  it("reads a sunset to come as a date to come", async () => {
+    await render(entry({ ...SUPERSEDED, sunsetPassed: false }));
+    expect(badge()).toBe("Superseded· Sunset Oct 25");
+  });
+
+  it("reads a sunset that has passed as passed", async () => {
+    await render(entry({ ...SUPERSEDED, sunsetPassed: true }));
+    expect(badge()).toBe("Superseded· Sunset passed Oct 25");
+  });
+});

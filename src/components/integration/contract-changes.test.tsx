@@ -11,6 +11,7 @@ const v2: Since[number] = {
   number: 2,
   state: "superseded",
   sunsetDay: "2026-12-01",
+  sunsetPassed: false,
   diff: {
     breaking: true,
     items: [
@@ -19,7 +20,7 @@ const v2: Since[number] = {
     ],
   },
 };
-const v1: Since[number] = { number: 1, state: "revoked", sunsetDay: null, diff: { breaking: false, items: [] } };
+const v1: Since[number] = { number: 1, state: "revoked", sunsetDay: null, sunsetPassed: false, diff: { breaking: false, items: [] } };
 
 describe("ContractChanges", () => {
   it("names the version, marks breaking items and sets keys in mono", () => {
@@ -35,6 +36,12 @@ describe("ContractChanges", () => {
     const out = html([v2, v1]);
     expect(out).toContain("Compare with version");
     expect(out).toContain("What changed since v2");
+  });
+
+  it("words a sunset that has passed as passed on the version's badge", () => {
+    const text = (since: Since) => html(since).replace(/<[^>]+>/g, "");
+    expect(text([v2])).toContain("Sunset Dec 1");
+    expect(text([{ ...v2, sunsetPassed: true }])).toContain("Sunset passed Dec 1");
   });
 
   it("says so when the contract did not change", () => {

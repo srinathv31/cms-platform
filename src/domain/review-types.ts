@@ -375,6 +375,8 @@ export interface ReviewScreenData {
     submitNote: string | null;
     /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (the header's badge shows it). */
     sunsetDay?: string | null;
+    /** The sunset has passed (`sunsetPassed`): the header's badge says "Sunset passed". */
+    sunsetPassed: boolean;
     contractChanges: ContractChange[];
     /** Plain-English lines from domain/contract.ts: "v2 adds required `annual_fee` (Currency)." */
     contractLines: string[];

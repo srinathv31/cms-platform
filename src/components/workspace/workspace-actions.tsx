@@ -6,6 +6,7 @@ import { Eye, PanelRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { BlockedButton } from "@/components/primitives/blocked-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,21 +18,33 @@ import type { SubmitSummary } from "@/domain/submit-types";
 import type { ActionResult } from "@/domain/review-types";
 import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";
-import { useFocusTarget, usePreviewState, useRailOpen, useWorkspaceSession } from "./session/workspace-session";
+import { useFocusTarget, usePreviewState, useRailOpen, useTabFailed, useWorkspaceSession } from "./session/workspace-session";
+import { TAB_BLOCKED } from "./tab-error";
 
 /**
  * "Edit" on a template whose latest version is Active or Revoked: the one black button. It opens the
  * template's draft (creating it from that version if there isn't one), and the page then shows that
  * draft, editable. The action redirects, so the transition stays pending until the new page is up.
  * A refusal (a newer version went into review meanwhile, the viewer lost the Author role) shows its
- * sentence; a call that fails says so.
+ * sentence; a call that fails says so. While the tab shows its error (`TabError`) it stays, greyed,
+ * with the reason at the control.
  */
 export function EditButton({ templateId }: { templateId: string }) {
   const { pending, run } = useActionRun("Couldn't open a draft. Try again.");
+  const tabFailed = useTabFailed();
 
   function edit() {
     // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
     run(() => startDraft({ templateId }), { onRefused: ({ reason }) => toast.error(reason) });
+  }
+
+  if (tabFailed) {
+    return (
+      <BlockedButton variant="default" size="lg" className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3" reason={TAB_BLOCKED}>
+        <Pencil data-icon="inline-start" strokeWidth={1.75} />
+        Edit
+      </BlockedButton>
+    );
   }
 
   return (
@@ -97,9 +110,13 @@ function focusStatusRow(session: WorkspaceSession) {
  * page in place: the header reads In review, the document turns read-only for good, and this button
  * goes away with the draft (letting go of the page as it does); focus moves to the header's status
  * row (`focusStatusRow`), so it doesn't fall to the page.
+ *
+ * While the tab shows its error (`TabError`) there is no draft on screen to freeze: the button stays,
+ * greyed, with the reason at the control.
  */
 export function SubmitButton({ templateId }: { templateId: string }) {
   const session = useWorkspaceSession();
+  const tabFailed = useTabFailed();
   const [pending, startTransition] = useTransition();
   // The reason outlives its popover, so the text doesn't vanish while the popover fades out.
   const [reason, setReason] = useState<string | null>(null);
@@ -165,6 +182,23 @@ export function SubmitButton({ templateId }: { templateId: string }) {
         refuse(SUBMIT_FAILED);
       }
     });
+  }
+
+  if (tabFailed) {
+    return (
+      <BlockedButton
+        variant="default"
+        size="lg"
+        className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3"
+        aria-label="Submit for review"
+        reason={TAB_BLOCKED}
+      >
+        {/* The same label, closing up in the same steps as the live button, so the bar keeps its geometry. */}
+        <span>
+          Submit<span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden"> for review</span>
+        </span>
+      </BlockedButton>
+    );
   }
 
   return (
@@ -246,11 +280,13 @@ export function SubmitButton({ templateId }: { templateId: string }) {
  *
  * It is a `@container/bar` child: in the narrower column a preview leaves the tab bar (under about
  * 34rem, or 39rem while the rail toggle shows) the label gives way to the icon, and the button keeps
- * its name and pressed state.
+ * its name and pressed state. While the tab shows its error (`TabError`) it is greyed, with the reason
+ * at the control.
  */
 export function PreviewToggle({ className }: { className?: string }) {
   const segment = useSelectedLayoutSegment();
   const session = useWorkspaceSession();
+  const tabFailed = useTabFailed();
   const { open: widened, view } = usePreviewState();
   // Focus comes back here when the preview closes and would otherwise lose it (`closePreview`).
   const focusTarget = useFocusTarget("previewToggle");
@@ -264,6 +300,18 @@ export function PreviewToggle({ className }: { className?: string }) {
   }, [onContent, session]);
 
   if (!onContent) return null;
+  const classes = cn(
+    "px-3.5 aria-pressed:bg-selected @max-[34rem]/bar:w-9 @max-[34rem]/bar:px-0 @max-[53rem]/ws:@max-[39rem]/bar:w-9 @max-[53rem]/ws:@max-[39rem]/bar:px-0",
+    className,
+  );
+  if (tabFailed) {
+    return (
+      <BlockedButton size="lg" aria-label="Preview" aria-pressed={open} className={classes} reason={TAB_BLOCKED}>
+        <Eye data-icon="inline-start" strokeWidth={1.75} />
+        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">Preview</span>
+      </BlockedButton>
+    );
+  }
   // Named by aria-label and, for the icon-only width, a tooltip (keyboard focus opens it too).
   return (
     <Tooltip>
@@ -276,10 +324,7 @@ export function PreviewToggle({ className }: { className?: string }) {
             aria-label="Preview"
             aria-pressed={open}
             onClick={() => (open ? session.closePreview() : session.openPreview())}
-            className={cn(
-              "px-3.5 aria-pressed:bg-selected @max-[34rem]/bar:w-9 @max-[34rem]/bar:px-0 @max-[53rem]/ws:@max-[39rem]/bar:w-9 @max-[53rem]/ws:@max-[39rem]/bar:px-0",
-              className,
-            )}
+            className={classes}
           />
         }
       >
@@ -293,12 +338,14 @@ export function PreviewToggle({ className }: { className?: string }) {
 
 /**
  * Opens the rail (Channels and Variables) when the canvas is too narrow to show it beside the
- * document. Only on the Content tab, and only below the rail's breakpoint.
+ * document. Only on the Content tab, and only below the rail's breakpoint. Greyed, with the reason at the
+ * control, while the tab shows its error (`TabError`): the rail is part of the tab that didn't load.
  */
 export function RailToggle({ className }: { className?: string }) {
   const segment = useSelectedLayoutSegment();
   const session = useWorkspaceSession();
   const open = useRailOpen();
+  const tabFailed = useTabFailed();
   const onContent = segment === null;
 
   // Leaving the Content tab closes the overlay, so it isn't waiting open when the tab comes back.
@@ -307,6 +354,19 @@ export function RailToggle({ className }: { className?: string }) {
   }, [onContent, session]);
 
   if (!onContent) return null;
+  if (tabFailed) {
+    return (
+      <BlockedButton
+        size="icon-lg"
+        aria-label="Channels and variables"
+        aria-pressed={open}
+        className={cn("@min-[53rem]/ws:hidden", open && "bg-selected", className)}
+        reason={TAB_BLOCKED}
+      >
+        <PanelRight strokeWidth={1.75} />
+      </BlockedButton>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger

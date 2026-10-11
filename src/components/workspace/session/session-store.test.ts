@@ -677,3 +677,39 @@ describe("an inert page", () => {
     expect(session.replace({ body: body("v3") })).toEqual({ body: body("Opening") });
   });
 });
+
+describe("a tab that failed", () => {
+  it("is failed while an error view holds it, and tells subscribers when that starts and ends", () => {
+    const session = createWorkspaceSession();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    expect(session.getTabFailed()).toBe(false);
+
+    const letGo = session.failTab();
+    expect(session.getTabFailed()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    letGo();
+    expect(session.getTabFailed()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("stays failed until every hold is let go, and letting go twice changes nothing", () => {
+    const session = createWorkspaceSession();
+    const first = session.failTab();
+    const second = session.failTab();
+    first();
+    first();
+    expect(session.getTabFailed(), "the second view is still on screen").toBe(true);
+    second();
+    expect(session.getTabFailed()).toBe(false);
+  });
+
+  it("leaves the draft and the page's hold alone", () => {
+    const session = createWorkspaceSession();
+    session.bind({ versionId: "v_1", rev: 0 });
+    session.failTab();
+    expect(session.getInert()).toBe(false);
+    expect(session.getBinding()).toEqual({ versionId: "v_1", rev: 0 });
+  });
+});
