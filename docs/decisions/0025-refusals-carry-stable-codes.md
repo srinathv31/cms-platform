@@ -4,6 +4,9 @@ Status: Accepted
 Amended 2026-10-11: `startDraft` no longer throws `planDraftStart`'s blocked reason, as the last Consequences line
 below says it does: it returns it as a refusal, on the one kit every action now runs on
 ([0029](0029-every-action-runs-on-one-kit.md), handoff review A3, PR #39).
+Amended 2026-10-11: the last Consequences line no longer holds: import refusals are now `IMPORT_REFUSALS` entries with
+codes in the tables, and the autosave route and the audit export answer `{ ok: false, code, reason }` too
+([0041](0041-routes-refuse-in-the-actions-shape.md), A3); only `/api/v1` keeps its own error codes.
 Date: 2026-10-09
 
 ## Context

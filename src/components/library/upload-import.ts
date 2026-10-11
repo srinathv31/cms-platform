@@ -13,10 +13,10 @@ export const IMPORT_FAILED = "Couldn't import the file. Try again.";
 /** Why this file would be refused, from what the browser knows (name and size); null when it may go. */
 export function precheckImport(file: Pick<File, "name" | "size">): string | null {
   // A legacy Word file is the one refusal with a way forward.
-  if (/\.doc$/i.test(file.name.trim())) return IMPORT_REFUSALS.legacyDoc;
-  if (!ACCEPTED_NAME.test(file.name)) return IMPORT_REFUSALS.type;
-  if (file.size === 0) return IMPORT_REFUSALS.empty;
-  if (file.size > IMPORT_LIMITS.maxBytes) return IMPORT_REFUSALS.size;
+  if (/\.doc$/i.test(file.name.trim())) return IMPORT_REFUSALS.legacyDoc.reason;
+  if (!ACCEPTED_NAME.test(file.name)) return IMPORT_REFUSALS.type.reason;
+  if (file.size === 0) return IMPORT_REFUSALS.empty.reason;
+  if (file.size > IMPORT_LIMITS.maxBytes) return IMPORT_REFUSALS.size.reason;
   return null;
 }
 
@@ -40,12 +40,13 @@ export async function precheckImportBytes(file: Pick<Blob, "slice"> & { name: st
   }
   const magic = pdf ? PDF_MAGIC : ZIP_MAGIC;
   if (magic.every((byte, i) => head[i] === byte)) return null;
-  return pdf ? IMPORT_REFUSALS.notPdf : IMPORT_REFUSALS.notWord;
+  return (pdf ? IMPORT_REFUSALS.notPdf : IMPORT_REFUSALS.notWord).reason;
 }
 
 /**
  * Sends the file to be imported into a new template on `teamSlug`. A refusal comes back as
- * `{ ok: false, code, reason }`, with an import refusal code (`IMPORT_REFUSALS`, or `permission`).
+ * `{ ok: false, code, reason }` like every refusal (an `IMPORT_REFUSALS` code, or the permission
+ * refusal's); an answer that isn't one is `failed`, with `IMPORT_FAILED`.
  */
 export async function uploadImport(file: File, teamSlug: string): Promise<ImportResponse> {
   const form = new FormData();
@@ -53,8 +54,18 @@ export async function uploadImport(file: File, teamSlug: string): Promise<Import
   // The team goes in the query: the server checks the permission before it reads the body.
   const response = await fetch(`/api/imports?team=${encodeURIComponent(teamSlug)}`, { method: "POST", body: form });
   try {
-    return (await response.json()) as ImportResponse;
+    const answer: unknown = await response.json();
+    if (isImportResponse(answer)) return answer;
   } catch {
-    return { ok: false, code: "unreadable", reason: IMPORT_FAILED };
+    // Not JSON at all (a proxy's error page): the same as an answer that isn't the route's.
   }
+  return { ok: false, code: "failed", reason: IMPORT_FAILED };
+}
+
+/** The route's two answers: the new template (`href` to open), or a refusal with its `code` and the `reason` to show. */
+function isImportResponse(value: unknown): value is ImportResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.ok === true) return typeof v.templateId === "string" && typeof v.href === "string";
+  return v.ok === false && typeof v.code === "string" && typeof v.reason === "string";
 }

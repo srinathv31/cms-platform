@@ -271,7 +271,7 @@ describe("useDraftAutosave", () => {
 
     it("asks after saving has stopped for good: what wasn't saved is still on the page to copy", async () => {
       fetchMock.mockResolvedValue(
-        new Response(JSON.stringify({ ok: false, error: "conflict", rev: 9, message: "This draft changed elsewhere." }), {
+        new Response(JSON.stringify({ ok: false, code: "draft_changed", rev: 9, reason: "This draft changed. Try again." }), {
           status: 409,
           headers: { "Content-Type": "application/json" },
         }),
@@ -297,7 +297,7 @@ describe("useDraftAutosave", () => {
     await render(<Probe />);
     expect(api.stopped).toBe(false);
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: false, error: "not_draft", message: "This version is no longer a draft." }), {
+      new Response(JSON.stringify({ ok: false, code: "version_not_draft", reason: "This version is no longer a draft." }), {
         status: 409,
         headers: { "Content-Type": "application/json" },
       }),

@@ -1,9 +1,10 @@
 "use client";
 
 import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useRef, useState } from "react";
-import { DOCUMENT_THREAD, type ActionResult, type CommentView, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type ActionResult, type Person } from "@/domain/review-types";
 import { addComment, reopenThread, reply, resolveThread } from "@/server/actions/comments";
 import { cn } from "@/lib/utils";
+import type { CommentView, ThreadView } from "@/server/queries/threads";
 import { revealInScroller } from "./reveal";
 import { ComposeCard, ResolvedGroup, ThreadCard, type Outcome } from "./thread-card";
 import { groupThreads, isOptimistic, optimisticId, reduceThreads, type ThreadMutation } from "./thread-state";

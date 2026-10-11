@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { REDLINE_DOC } from "@/components/redline/redline-fixtures";
-import type { ThreadView } from "@/domain/review-types";
+import type { ThreadView } from "@/server/queries/threads";
 import { threadsForMarkers } from "./redline-view";
 
 const thread = (id: string, blockId: string): ThreadView => ({

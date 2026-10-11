@@ -1,6 +1,7 @@
 # 0014. Chart values are never hover-only, and series differ by hue
 
 Status: Accepted
+Amended 2026-10-11: a channel's phones (iPhone and Android push) share the channel's hue, the second one step fainter, and are told apart by name, as [0039](0039-the-render-log-keeps-a-pushs-platform.md) records (N22).
 Date: 2026-10-09
 
 ## Context

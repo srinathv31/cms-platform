@@ -50,17 +50,17 @@ Feature folders:
 | --- | --- | --- |
 | `access/` | Request-access cards and `RolePicker`. | `/request-access` |
 | `activity/` | The template's Activity tab. | `/[team]/templates/[templateId]/activity` |
-| `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
-| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block, or on a message to a channel field (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
+| `audit/` | Audit log view, filters, table, Export link (`ExportLink` fetches the CSV and shows a refusal's sentence in a toast). | `/[team]/audit` |
+| `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block of the body, or to a channel field: a message's whole content, or a document's email subject and preheader (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
 | `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
-| `library/` | Library view and browser (search, and a status filter that is a `Segmented`, counts in its labels), New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
+| `library/` | Library view and browser (search, and a status filter that is a `Segmented`, counts in its labels; each row's second line names the template's kind, Document or Alert, after its ID), New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, sample sets, and the output on its well. PDF, Web and Email come from the render route (`render-preview.ts`, `use-preview-render.ts`; pdf.js viewer in `pdf/`). Push and SMS render in the browser on every keystroke through the route's own `renderMessage` (`message-preview.ts`, [decision 0036](../../docs/decisions/0036-message-previews-resolve-in-the-browser.md)) and show on the phone kit (`phone-output.tsx`), with iPhone · Android and the Device options in the controls row (`phone-controls.tsx`). See [The preview](#the-preview). | `workspace/`, `review/` |
 | `redline/` | `RedlineDocument`, a version diff painted like the document; `FieldsDocument`, a version's channel fields painted as the composer shows them (a message's push and SMS under display headings, a document's email details under a caps label), clean or with their redline (`diffChannelFields`); and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
-| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. The Document view is a document's body under its email details, or a message's fields alone (`fields-view.tsx`), each with its redline and comments. `review-workspace.tsx` only lays the screen out; each kind of client state has a hook: `use-review-view.ts` (which view, `previewVisited`, the Preview's channels), `use-review-changes.ts`, `use-preview-sets.ts`, `use-review-comments.ts`, `use-review-decision.ts` (Approve, Request changes and their dialogs' props), `use-viewed-outputs.ts` (the outputs the approver has had on screen in the Preview, per viewer, version and round, kept in sessionStorage) and `use-go-live.ts`. The channel and phone platform picked in the Preview live in `preview-view.tsx`, which reports each output once it has rendered (`onViewed`) and each the route refuses (`onFailed`, kept in memory by `use-viewed-outputs.ts`). Approve waits until every output has been viewed: blocked with the domain's sentence (`outputsRefusal`, through `approveWaitsOn` in `decision-model.ts`: "Preview PDF first.", or "The PDF can't be shown. Request changes." for a refused one), while Request changes never waits ([decision 0037](../../docs/decisions/0037-an-approver-views-every-output-before-approving.md)). | `/[team]/review/[templateId]/[version]` |
+| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. The Document view is a document's body under its email details, or a message's fields alone; both kinds of field go through `fields-view.tsx` (a handle, markers and the hover comment button, as the body has), each with its redline and comments. The body keeps the editor's (or the redline's) handle, the fields their own: `use-review-comments.ts` asks whichever owns an anchor (`handleOf`). `review-workspace.tsx` only lays the screen out; each kind of client state has a hook: `use-review-view.ts` (which view, `previewVisited`, the Preview's channels), `use-review-changes.ts`, `use-preview-sets.ts`, `use-review-comments.ts`, `use-review-decision.ts` (Approve, Request changes and their dialogs' props), `use-viewed-outputs.ts` (the outputs the approver has had on screen in the Preview, per viewer, version and round, kept in sessionStorage) and `use-go-live.ts`. The channel and phone platform picked in the Preview live in `preview-view.tsx`, which reports each output once it has rendered (`onViewed`) and each the route refuses (`onFailed`, kept in memory by `use-viewed-outputs.ts`). Approve waits until every output has been viewed: blocked with the domain's sentence (`outputsRefusal`, through `approveWaitsOn` in `decision-model.ts`: "Preview PDF first.", or "The PDF can't be shown. Request changes." for a refused one), while Request changes never waits ([decision 0037](../../docs/decisions/0037-an-approver-views-every-output-before-approving.md)). | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows; a row links to its own round. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
@@ -135,7 +135,9 @@ The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.cs
 - **Charts** (`usage/charts.tsx`): amounts use the teal ramp `brand-1…4`; series (which channel, which version)
   use `series-1…5`, five hues in a fixed order, one per channel (a version chart uses the first four, then taupe),
   checked as a set for colour-blind separation
-  ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)). No value is hover-only: a chart's
+  ([decision 0014](../../docs/decisions/0014-chart-values-never-hover-only.md)); the phones of a push share Push's
+  hue, the second one step fainter ([0039](../../docs/decisions/0039-the-render-log-keeps-a-pushs-platform.md)),
+  and `usage/channel-series.ts` holds each channel's hue for both Usage screens. No value is hover-only: a chart's
   readable marks are one Tab stop with arrow keys between them (`usage/chart-keys.tsx`), and a chart whose values
   aren't printed is followed by an sr-only table of them.
 
@@ -166,7 +168,7 @@ The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.cs
 ## Server and client
 
 **Reads.** A page passes its `params` promise to an async server component here, inside `<Stream>`. That
-component awaits a query from `@/server/queries/*` and hands the read model (types from `src/domain/*-types.ts`)
+component awaits a query from `@/server/queries/*` and hands the read model (types from the query's module, `import type` from `@/server/queries/*`; the older settings, audit and usage ones from `src/domain/*-types.ts`)
 to a client component as props. Server components here include screen views (`audit/audit-view.tsx`,
 `review/review-screen.tsx`), settings bodies (`settings/team/bodies.tsx`), the `*-hole.tsx` files, most
 skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you the side
@@ -218,8 +220,11 @@ answer, which the caller shows as its own failure. The Compare panel (`versions/
 (`workspace/copilot/copilot-prompt.tsx`) and the SHARE panel (`workspace/workspace-share.tsx`) read this way.
 
 **Other paths.** Some client code `fetch`es other route handlers: autosave (`workspace/autosave/save-transport.ts`),
-the preview render for the document channels (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and
-the ⌘K palette. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
+the preview render for the document channels (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), the
+audit export (`audit/export-audit.ts`), and the ⌘K palette. Autosave, uploads and the audit export read a refusal as
+`{ ok: false, code, reason }` like a server action's, and branch on the `code`, never the sentence: the autosave
+scheduler decides by it whether saving stops (`stopsSaving`) and which message to show; uploads and the audit export
+show the `reason` where the person acted. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
 The Content page's draft as typed, ahead of autosave (each channel field and the sample sets), is another
 (`workspace/session/live-draft.ts`): the composer writes it on every keystroke, and the phone preview, the meta line
@@ -229,7 +234,9 @@ tab and a rename on Versions saves like one on Content; the Content page binds t
 The session's fields are the draft patch's (`SaveFields`): `body`, `variables`, `name`, `channels`, `sampleSets`, and
 one key per channel field, its id from the registry (`"email.subject"`, `src/domain/channel-fields.ts`), so a revert, a
 merge or an undo treats each channel field like any other field. `content/email-details.tsx` renders Email's fields
-from the registry.
+from the registry; they sit in the rail, so each carries its review comments at the end of its label
+(`content/field-comments.tsx`): a marker with the number of open comments on it, and a button, shown while the field
+is hovered or focused, that starts a thread on the field's id.
 The same store holds the workspace still (`makeInert`, read with `useInert`): Submit holds it from its click until its
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
 A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the

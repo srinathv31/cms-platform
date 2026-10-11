@@ -1,17 +1,19 @@
 import type { NextRequest } from "next/server";
 import { IMPORT_MIME } from "@/domain/import-types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { readResponse, refusal } from "@/server/api/reads";
 import { getImportOriginalFile } from "@/server/queries/import";
 import { getViewer } from "@/server/viewer";
 
 // An imported template's original, exactly as uploaded (the Original tab draws a PDF from it).
-// 404 when the upload doesn't exist or the viewer can't see the template's space. Request-time only:
-// it reads the persona cookie first.
+// 404 (`{ ok: false, code, reason }`, like every other refusal) when the upload doesn't exist or the
+// viewer can't see the template's space. Request-time only: it reads the persona cookie first.
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ uploadId: string }> }) {
   const viewer = await getViewer();
   const { uploadId } = await params;
   const found = await getImportOriginalFile(viewer, uploadId);
-  if (!found) return Response.json({ error: "not_found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!found) return readResponse(refusal(404, REQUEST_REFUSALS.uploadUnavailable));
 
   return new Response(found.bytes.slice().buffer, {
     status: 200,

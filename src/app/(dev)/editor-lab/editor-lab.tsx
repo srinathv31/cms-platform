@@ -10,17 +10,11 @@ import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import { VariablesPanel } from "@/editor/components/variables-panel";
-import type { JSONContent, RequiredSection, Variable } from "@/editor/model/types";
+import type { JSONContent, Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 import { FIXTURES, LAB_THREADS, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
 
 const JSON_DEBOUNCE_MS = 250;
-
-const LAB_SECTIONS: RequiredSection[] = [
-  { key: "offer_details", title: "Offer details" },
-  { key: "rates_and_fees", title: "Rates and fees" },
-  { key: "legal_notices", title: "Legal notices" },
-];
 
 interface LabState {
   doc: JSONContent;
@@ -187,7 +181,6 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
           key={fixtureId}
           variables={fixture.variables ?? LAB_VARIABLES}
           baseline={fixture.baseline ?? null}
-          requiredSections={LAB_SECTIONS}
           readOnly={readOnly}
           onVariablesChange={onVariablesChange}
         >

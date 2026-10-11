@@ -53,7 +53,9 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
   `@/editor` or `@/app`, and from `src/components` only `ui/`, `primitives/` and `motion/`.
 - `src/simulator` and `src/app/(simulator)` import nothing from `@/server`, `@/domain`, or `@/editor`, except
   `@/server/db/schema/sim`. Nothing outside them (but the seed and reset) imports simulator code or tables.
-- There is no `@/editor` barrel. Import each export from the module that defines it.
+- There is no `@/editor` barrel. Import each export from the module that defines it, and only from the modules the
+  editor README's Public API table lists (`EDITOR_PUBLIC_MODULES` in [eslint.config.mjs](eslint.config.mjs) is that
+  table; from `@/editor/schema` only `baseExtensions`, `BaseExtensionOptions` and `ensureBlockIds`).
 - `"use server"` appears only in `src/server/actions/` (and the simulator's `src/simulator/actions.ts`): server
   actions are for mutations. A read a screen loads on demand is a GET route under
   `src/app/api/templates/[templateId]/`.

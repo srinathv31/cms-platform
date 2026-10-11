@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JSONContent, Variable } from "@/domain/types";
-import { blockOptions, fieldOptions } from "./block-options";
+import { blockOptions, commentOptions, fieldOptions } from "./block-options";
 
 const variables = [{ key: "first_name", label: "First name", type: "text", required: true }] as unknown as Variable[];
 
@@ -96,6 +96,27 @@ describe("blockOptions", () => {
 
   it("has nothing to offer without blocks", () => {
     expect(blockOptions({ type: "doc" }, [])).toEqual([]);
+  });
+});
+
+describe("commentOptions", () => {
+  it("lists a document's email subject and preheader before its blocks, when Email is on", () => {
+    expect(commentOptions("document", body, ["pdf", "email"], variables).map((o) => o.id)).toEqual([
+      "email.subject",
+      "email.preheader",
+      "h1",
+      "p1",
+      "l1",
+      "long",
+      "t1",
+      "l2",
+    ]);
+    expect(commentOptions("document", body, ["email"], variables).slice(0, 2).map((o) => o.label)).toEqual(["Email subject", "Email preheader"]);
+  });
+
+  it("lists only the blocks of a document without Email, and only the fields of a message", () => {
+    expect(commentOptions("document", body, ["pdf", "web"], variables).map((o) => o.id)).toEqual(blockOptions(body, variables).map((o) => o.id));
+    expect(commentOptions("message", { type: "doc" }, ["push"], []).map((o) => o.id)).toEqual(["push.title", "push.subtitle", "push.body"]);
   });
 });
 

@@ -9,6 +9,10 @@
 // inlineFieldExtensions()  a channel field (email subject, push title, SMS message): text + chips only,
 //                          on one line, or keeping its line breaks as hard breaks; with the host's
 //                          text flags when it has any.
+//
+// Only `baseExtensions`, `BaseExtensionOptions` and `ensureBlockIds` are the editor's public API. The rest
+// is exported for the editor's own modules and tests, and ESLint refuses it to code outside src/editor
+// (`allowImportNames` for this module, in eslint.config.mjs).
 
 import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
@@ -133,7 +137,7 @@ const Kit = StarterKit.extend({
 });
 
 /** The only placeholder text in the product. */
-export const EMPTY_LINE_PLACEHOLDER = "Type / for blocks";
+const EMPTY_LINE_PLACEHOLDER = "Type / for blocks";
 
 export interface BaseExtensionOptions {
   /** Variables used to label chips in HTML output (static render, clipboard, render pipeline). */

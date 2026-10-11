@@ -113,6 +113,14 @@ export const ALL_CHANNEL_FIELDS: readonly ChannelField[] = CHANNELS.flatMap((cha
 /** Every field id, in the same order. */
 export const CHANNEL_FIELD_IDS: readonly ChannelFieldId[] = ALL_CHANNEL_FIELDS.map((field) => field.id);
 
+/**
+ * Whether `id` names a channel field ("email.subject") rather than a block of a body. A review thread's
+ * anchor is one or the other (`commentAnchors`), and a field is not in the body.
+ */
+export function isChannelFieldId(id: string): id is ChannelFieldId {
+  return (CHANNEL_FIELD_IDS as readonly string[]).includes(id);
+}
+
 /** One channel's fields, in the registry's order. */
 export function channelFieldsOf(channel: Channel): readonly ChannelField[] {
   return ALL_CHANNEL_FIELDS.filter((field) => field.channel === channel);

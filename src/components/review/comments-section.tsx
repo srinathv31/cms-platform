@@ -1,7 +1,8 @@
 "use client";
 
 import { ThreadList } from "@/components/comments";
-import type { Person, ReviewScreenData } from "@/domain/review-types";
+import type { Person } from "@/domain/review-types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 import { BlockCommentMenu } from "./block-comment-menu";
 import { SectionLabel } from "./rail-sections";
 import type { ReviewCommentsState } from "./use-review-comments";

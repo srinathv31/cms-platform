@@ -300,13 +300,13 @@ describe("applyDraftPatch: a document the check refuses is not saved, and says w
   ])("refuses %s", async (_, body, message) => {
     const before = await draft();
     const res = failure(await save({ body }));
-    expect(res).toEqual({ ok: false, error: "invalid", message });
+    expect(res).toEqual({ ok: false, code: "invalid_input", reason: message });
     expect(await draft()).toEqual(before);
   });
 
   it("refuses an email subject that isn't one line", async () => {
     const res = failure(await save({ "email.subject": doc(para("a"), { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "b" }] }) }));
-    expect(res.message).toBe("The email subject and preheader can hold only one line of text and variables.");
+    expect(res.reason).toBe("The email subject and preheader can hold only one line of text and variables.");
   });
 });
 
@@ -322,12 +322,12 @@ describe("applyDraftPatch: refusals change nothing", () => {
     return failure(res);
   }
 
-  it("not_found for an unknown version", async () => {
+  it("version_gone for an unknown version", async () => {
     const res = await expectUntouched(() => save({ body: doc(para("x")) }, { id: "v_missing" }));
-    expect(res.error).toBe("not_found");
+    expect(res.code).toBe("version_gone");
   });
 
-  it("forbidden for a viewer, an approver, a platform admin and a lapsed author", async () => {
+  it("the permission refusal for a viewer, an approver, a platform admin and a lapsed author", async () => {
     for (const who of [
       viewer("sam", ["viewer"]),
       viewer("jordan", ["approver"]),
@@ -336,58 +336,58 @@ describe("applyDraftPatch: refusals change nothing", () => {
       viewer("dee", ["author"], { status: "suspended" }),
     ]) {
       const res = await expectUntouched(() => save({ body: doc(para("x")) }, { by: who }));
-      expect(res).toMatchObject({ error: "forbidden", message: "You don't have access to do this." });
+      expect(res).toMatchObject({ code: "generic", reason: "You don't have access to do this." });
     }
   });
 
-  it("forbidden for an author of another team", async () => {
+  it("the permission refusal for an author of another team", async () => {
     const res = await expectUntouched(() => save({ body: doc(para("x")) }, { by: viewer("dee", ["author"], { team: "deposits" }) }));
-    expect(res.error).toBe("forbidden");
+    expect(res.code).toBe("generic");
   });
 
-  it("not_draft once the version has left draft", async () => {
+  it("version_not_draft once the version has left draft", async () => {
     for (const state of ["in_review", "changes_requested", "active", "superseded", "revoked"] as const) {
       await db.update(versions).set({ state, number: 1 }).where(eq(versions.id, "v_draft"));
       const res = await expectUntouched(() => save({ body: doc(para("x")) }));
-      expect(res.error).toBe("not_draft");
+      expect(res.code).toBe("version_not_draft");
     }
   });
 
-  it("conflict carries the current rev, for a stale rev and for a rev from the future", async () => {
+  it("draft_changed carries the current rev, for a stale rev and for a rev from the future", async () => {
     for (const rev of [4, 0, 6, 99]) {
       const res = await expectUntouched(() => save({ rev, body: doc(para("x")) }));
-      expect(res).toMatchObject({ error: "conflict", rev: 5 });
+      expect(res).toMatchObject({ code: "draft_changed", rev: 5 });
     }
   });
 
   it("checks the permission before the state and the state before the rev", async () => {
     await db.update(versions).set({ state: "active", number: 1 }).where(eq(versions.id, "v_draft"));
     const asViewer = await save({ rev: 0, body: doc(para("x")) }, { by: viewer("sam", ["viewer"]) });
-    expect(failure(asViewer).error).toBe("forbidden");
+    expect(failure(asViewer).code).toBe("generic");
     const asAuthor = await save({ rev: 0, body: doc(para("x")) });
-    expect(failure(asAuthor).error).toBe("not_draft");
+    expect(failure(asAuthor).code).toBe("version_not_draft");
   });
 
-  it("invalid for a name that is empty or too long", async () => {
+  it("invalid_input for a name that is empty or too long", async () => {
     for (const name of ["", "   ", "x".repeat(121)]) {
       const res = await expectUntouched(() => save({ name }));
-      expect(res.error).toBe("invalid");
+      expect(res.code).toBe("invalid_input");
     }
   });
 
-  it("invalid for a body the editor schema doesn't know", async () => {
+  it("invalid_input for a body the editor schema doesn't know", async () => {
     const res = await expectUntouched(() => save({ body: doc({ type: "iframe", attrs: { src: "https://example.com" } }) }));
-    expect(res.error).toBe("invalid");
+    expect(res.code).toBe("invalid_input");
   });
 
-  it("invalid for a channel the content type doesn't allow", async () => {
+  it("channel_unavailable for a channel the content type doesn't allow", async () => {
     const res = await expectUntouched(() => save({ channels: ["pdf", "email"] }));
-    expect(res.error).toBe("invalid");
+    expect(res.code).toBe("channel_unavailable");
   });
 
-  it("invalid for no channels at all, which the parse refuses too: the draft keeps its own", async () => {
+  it("no_channels for no channels at all, which the parse refuses too: the draft keeps its own", async () => {
     const res = await expectUntouched(() => save({ channels: [] }));
-    expect(res).toMatchObject({ error: "invalid", message: "Turn on at least one channel." });
+    expect(res).toMatchObject({ code: "no_channels", reason: "Turn on at least one channel." });
   });
 
   it("does not leave half a save behind when the name is the bad part", async () => {
@@ -399,10 +399,10 @@ describe("accessRefusal: who may save, before the body is read", () => {
   it("is null for an author of the draft's team, whatever the draft's state", async () => {
     expect(await accessRefusal(db, maya, "v_draft")).toBeNull();
     await db.update(versions).set({ state: "active", number: 1 }).where(eq(versions.id, "v_draft"));
-    expect(await accessRefusal(db, maya, "v_draft")).toBeNull(); // not_draft is the save's to answer
+    expect(await accessRefusal(db, maya, "v_draft")).toBeNull(); // version_not_draft is the save's to answer
   });
 
-  it("answers not_found and forbidden exactly as the save does", async () => {
+  it("answers version_gone and the permission refusal exactly as the save does", async () => {
     const cases: [Viewer, string][] = [
       [maya, "v_missing"],
       [viewer("sam", ["viewer"]), "v_draft"],
@@ -414,7 +414,7 @@ describe("accessRefusal: who may save, before the body is read", () => {
     for (const [who, id] of cases) {
       const refused = await accessRefusal(db, who, id);
       expect(refused, `${who.userId} ${id}`).toEqual(await save({ body: doc(para("x")) }, { by: who, id }));
-      expect(refused?.error).toBe(id === "v_missing" ? "not_found" : "forbidden");
+      expect(refused?.code).toBe(id === "v_missing" ? "version_gone" : "generic");
     }
   });
 });
@@ -556,8 +556,8 @@ describe("applyDraftPatch: the writers", () => {
   });
 
   it("leaves them alone when the save is refused", async () => {
-    expect(failure(await save({ rev: 4, body: doc(para("x")) }, { by: dee })).error).toBe("conflict");
-    expect(failure(await save({ body: doc(para("x")) }, { by: viewer("jordan", ["approver"]) })).error).toBe("forbidden");
+    expect(failure(await save({ rev: 4, body: doc(para("x")) }, { by: dee })).code).toBe("draft_changed");
+    expect(failure(await save({ body: doc(para("x")) }, { by: viewer("jordan", ["approver"]) })).code).toBe("generic");
     expect((await draft()).writers).toEqual(["maya"]);
   });
 });
@@ -603,7 +603,7 @@ describe("applyDraftPatch: a save whose response was lost", () => {
 
     for (const rev of [5, 6]) {
       const res = await save({ rev, body: doc(para("mine again", "p1")) });
-      expect(failure(res)).toMatchObject({ error: "conflict", rev: 7 });
+      expect(failure(res)).toMatchObject({ code: "draft_changed", rev: 7 });
     }
     expect((await draft()).body).toEqual(doc(para("theirs", "p1")));
     expect((await draft()).rev).toBe(7);
@@ -612,20 +612,20 @@ describe("applyDraftPatch: a save whose response was lost", () => {
   it("is still a conflict when another tab of the same person wrote in between", async () => {
     await save({ body: doc(para("tab one", "p1")) });
     await save({ rev: 6, sessionKey: OTHER_SESSION, body: doc(para("tab two", "p1")) }, { at: T2 });
-    expect(failure(await save({ body: doc(para("tab one again", "p1")) })).error).toBe("conflict");
+    expect(failure(await save({ body: doc(para("tab one again", "p1")) })).code).toBe("draft_changed");
   });
 
   it("is a conflict for another person who borrows the session key", async () => {
     await save({ body: doc(para("maya", "p1")) });
     const res = await save({ body: doc(para("dee", "p1")) }, { by: viewer("dee", ["author"]) });
-    expect(failure(res)).toMatchObject({ error: "conflict", rev: 6 });
+    expect(failure(res)).toMatchObject({ code: "draft_changed", rev: 6 });
     expect((await draft()).body).toEqual(doc(para("maya", "p1")));
   });
 
   it("is a conflict when a write that left no audit trail bumped the rev", async () => {
     await save({ body: doc(para("mine", "p1")) });
     await db.update(versions).set({ rev: 7 }).where(eq(versions.id, "v_draft"));
-    expect(failure(await save({ body: doc(para("again", "p1")) }))).toMatchObject({ error: "conflict", rev: 7 });
+    expect(failure(await save({ body: doc(para("again", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 7 });
   });
 
   it("is a conflict when the session's row has no rev (written before this existed)", async () => {
@@ -640,28 +640,28 @@ describe("applyDraftPatch: a save whose response was lost", () => {
       details: { saves: 15 },
       sessionKey: SESSION,
     });
-    expect(failure(await save({ rev: 4, body: doc(para("x", "p1")) }))).toMatchObject({ error: "conflict", rev: 5 });
+    expect(failure(await save({ rev: 4, body: doc(para("x", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 5 });
     expect((await audit())[0]?.details).toEqual({ saves: 15 });
   });
 
   it("is a conflict for a rev from the future, even from the session that wrote the current one", async () => {
     await save({ body: doc(para("mine", "p1")) });
-    expect(failure(await save({ rev: 9, body: doc(para("x", "p1")) }))).toMatchObject({ error: "conflict", rev: 6 });
+    expect(failure(await save({ rev: 9, body: doc(para("x", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 6 });
   });
 
   it("still refuses a resend that is invalid, and changes nothing", async () => {
     await save({ body: doc(para("mine", "p1")) });
     const before = await draft();
     const res = await save({ channels: ["email"] }); // rev 5 is behind, but the session owns rev 6
-    expect(failure(res).error).toBe("invalid");
+    expect(failure(res).code).toBe("channel_unavailable");
     expect(await draft()).toEqual(before);
     expect((await audit())[0]?.details).toMatchObject({ saves: 1, rev: 6 });
   });
 
-  it("still answers not_draft first once the version has left draft", async () => {
+  it("still answers version_not_draft first once the version has left draft", async () => {
     await save({ body: doc(para("mine", "p1")) });
     await db.update(versions).set({ state: "in_review", number: 1 }).where(eq(versions.id, "v_draft"));
-    expect(failure(await save({ body: doc(para("again", "p1")) })).error).toBe("not_draft");
+    expect(failure(await save({ body: doc(para("again", "p1")) })).code).toBe("version_not_draft");
   });
 
   it("lets only one of two resends through", async () => {
@@ -681,7 +681,7 @@ describe("applyDraftPatch: two saves at once", () => {
     ]);
     const wins = results.filter((r) => r.ok);
     expect(wins).toHaveLength(1);
-    expect(failure(results.find((r) => !r.ok)!)).toMatchObject({ error: "conflict", rev: 6 });
+    expect(failure(results.find((r) => !r.ok)!)).toMatchObject({ code: "draft_changed", rev: 6 });
     expect((await draft()).rev).toBe(6);
     expect((await audit())[0]?.details).toMatchObject({ saves: 1 });
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DOCUMENT_THREAD, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
+import type { ThreadView } from "@/server/queries/threads";
 import {
   groupThreads,
   insertThread,
@@ -132,6 +133,13 @@ describe("threads against the live document", () => {
       ["p9", true],
       ["zz", false],
     ]);
+  });
+
+  it("leaves a channel field out: an email subject's thread isn't removed content when the body changes", () => {
+    expect([...liveBlockPresence(doc("a"), ["email.subject", "a", "email.preheader"])]).toEqual([["a", true]]);
+    const threads = [thread("t1", "email.subject"), thread("t2", "a")];
+    const presence = liveBlockPresence(doc("zz"), ["email.subject", "a"]);
+    expect(withBlockPresence(threads, presence).map((t) => t.orphaned)).toEqual([false, true]);
   });
 
   it("compares two presences", () => {

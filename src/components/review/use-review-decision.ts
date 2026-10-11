@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { Route } from "next";
 import type { OutputKey } from "@/domain/review-outputs";
-import type { ReviewScreenData } from "@/domain/review-types";
 import { reviewPath } from "@/domain/rounds";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 import type { Approved } from "./approve-dialog";
 import { approvalStage, approveWaitsOn, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
 import type { NextRound } from "./decision-rail";

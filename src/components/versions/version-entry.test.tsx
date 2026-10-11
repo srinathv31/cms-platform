@@ -3,7 +3,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle";
-import type { Person, RoundHistoryItem, VersionTimelineItem } from "@/domain/review-types";
+import type { Person } from "@/domain/review-types";
+import type { RoundHistoryItem, VersionTimelineItem } from "@/server/queries/versions";
 
 // One version's entry on the Versions tab, as the label rule shows it (domain/rounds.ts): no round on a
 // version approved on its first try, "Approved on round 3" on one that took three, the round in the

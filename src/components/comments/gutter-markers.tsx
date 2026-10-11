@@ -11,9 +11,10 @@ import {
 } from "react";
 import { MessageSquare, MessageSquarePlus } from "lucide-react";
 import { plural } from "@/domain/plural";
-import { DOCUMENT_THREAD, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
+import type { ThreadView } from "@/server/queries/threads";
 
 /*
  * Comment markers in the document's right gutter: a speech bubble with the number of comments on the
@@ -63,6 +64,11 @@ export interface GutterMarkersProps {
   className?: string;
   /** What a marker is beside, in its label: a document's "block", or a message's "field" (its threads are on its fields). */
   noun?: "block" | "field";
+  /**
+   * The group's name for assistive technology. Default: "Comments in the document", or, for fields,
+   * "Comments on the message". A document with two groups (its email details above its body) names each.
+   */
+  label?: string;
   /**
    * What the hover marker can start a comment on: the elements, by selector, that carry their block's id in
    * `data-id`. A document's top-level blocks by default; the message composer's fields.
@@ -191,6 +197,7 @@ export function GutterMarkers({
   compact = false,
   className,
   noun = "block",
+  label,
   blocks = ".ucomp-doc > [data-id]",
 }: GutterMarkersProps) {
   const layer = useRef<HTMLDivElement>(null);
@@ -334,7 +341,7 @@ export function GutterMarkers({
       ) : null}
 
       {markers.length > 0 ? (
-        <div role="toolbar" aria-label={noun === "field" ? "Comments on the message" : "Comments in the document"} aria-orientation="vertical" onKeyDown={onKeyDown}>
+        <div role="toolbar" aria-label={label ?? (noun === "field" ? "Comments on the message" : "Comments in the document")} aria-orientation="vertical" onKeyDown={onKeyDown}>
           {markers.map((marker) => {
             const active = activeThreadId !== null && marker.threadIds.includes(activeThreadId);
             return (

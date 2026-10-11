@@ -6,20 +6,21 @@ import { addDays, formatShortDate } from "@/domain/dates";
 import { errorText } from "@/domain/golive/usage";
 import { formatCount } from "@/domain/numbers";
 import { plural } from "@/domain/plural";
-import { CHANNEL_LABELS } from "@/domain/render/errors";
+import { CHANNEL_LABELS, PLATFORM_LABELS } from "@/domain/render/errors";
 import type { TemplateUsageData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
 import { StatCard, StatLabel, StatTrend, StatValue } from "@/components/primitives/stat-card";
-import { Legend, SERIES, StackedBars, type StackSeries } from "./charts";
+import { ChannelMix, Legend, SERIES, StackedBars, type StackSeries } from "./charts";
+import { templateMixParts } from "./channel-series";
 import { ConsumersTable } from "./consumers-table";
 import { formatLastRender } from "./format";
 import { Panel, PanelHead } from "./panel";
 
 // The workspace's Usage tab: which consumers render which version of this template. One chart, two
-// numbers, one table, and the last failures when there are any. The same rows feed the consequence line
-// in the approve, sunset and revoke dialogs.
+// numbers, the channel split, one table, and the last failures when there are any. The same rows feed
+// the consequence line in the approve, sunset and revoke dialogs.
 //
 // Layout: this tab has no rail, so its cell takes the rail's reserved column too (the grid's second
 // column) and its left edge stays on the header's: the header is centred in column 1 at the document
@@ -35,6 +36,14 @@ export const USAGE_CELL = cn(
   "col-end-3 w-[min(calc(100%-var(--canvas-pad-x)),calc(var(--doc-width)+22.5rem-var(--canvas-pad-x)))] max-w-none justify-self-start ml-[max(0px,calc((100%-var(--doc-width)-22.5rem)/2))] @max-[51.25rem]/canvas:w-full",
 );
 export const USAGE_COLUMNS = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]";
+/**
+ * The channel card and the box its mix keeps, shared with the skeleton. The legend is one 20px line while the
+ * card is wide enough for its parts (at most four, "Push · not recorded" the longest) and two below that, so
+ * the mix keeps the height of the line count its width gives and the skeleton holds the same.
+ */
+export const MIX_CARD = "@container/mix mt-6";
+const MIX_BOX = "min-h-10 @max-[44rem]/mix:min-h-16";
+export const MIX_BOX_SKELETON = "h-10 @max-[44rem]/mix:h-16";
 
 // The newest version takes the first series hue, the one before it the second, and so on; past the
 // fourth, older versions are taupe (the fifth hue is the fifth channel's, decision 0014).
@@ -68,7 +77,10 @@ function RecentFailures({ errors, nowDate }: { errors: TemplateUsageData["recent
             <TableRow key={`${e.at}-${i}`} className="h-12 border-hairline hover:bg-hover/50">
               <TableCell className="font-medium text-text">{e.consumer.name}</TableCell>
               <TableCell className="font-mono text-[13px] text-text">{e.versionNumber === null ? "—" : `v${e.versionNumber}`}</TableCell>
-              <TableCell className="text-text">{CHANNEL_LABELS[e.channel]}</TableCell>
+              <TableCell className="text-text">
+                {CHANNEL_LABELS[e.channel]}
+                {e.platform ? ` · ${PLATFORM_LABELS[e.platform]}` : ""}
+              </TableCell>
               <TableCell className="whitespace-nowrap text-text-muted">{formatLastRender(e.at, nowDate)}</TableCell>
               <TableCell className="text-text">{errorText(e.code)}</TableCell>
             </TableRow>
@@ -150,6 +162,11 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
           </StatCard>
         </div>
       </div>
+
+      <Panel className={MIX_CARD}>
+        <PanelHead title="Renders by channel" size="md" aside="Last 30 days" />
+        <ChannelMix className={cn("mt-4", MIX_BOX)} parts={templateMixParts(d)} />
+      </Panel>
 
       <Panel className="@container/usage mt-6">
         <PanelHead title="Who renders it" size="md" />

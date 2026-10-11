@@ -3,7 +3,8 @@
 import { Activity } from "react";
 import { redlineSummary } from "@/components/redline";
 import { SampleSetSwitcher } from "@/components/preview/sample-sets";
-import type { Person, ReviewScreenData } from "@/domain/review-types";
+import type { Person } from "@/domain/review-types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 import { ApproveDialog } from "./approve-dialog";
 import { CommentsSection } from "./comments-section";
 import { DecisionBar } from "./decision-bar";
@@ -132,6 +133,7 @@ export function ReviewWorkspace({
           redline={changes.showChanges ? changes.redline : null}
           changesOnly={changes.showChanges && changes.changesOnly}
           editorRef={comments.editorRef}
+          fieldsRef={comments.fieldsRef}
           anchors={comments.threadsForEditor}
           activeThreadId={comments.editorActiveThreadId}
           threads={comments.threads}

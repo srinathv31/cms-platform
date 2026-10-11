@@ -202,11 +202,17 @@ describe("getAuditExport", () => {
     }
   });
 
-  it("refuses a space without audit.view (403) and an unknown team (404)", async () => {
-    expect(await getAuditExport(people.maya!, "coral-offers", {})).toMatchObject({ ok: false, status: 403 });
-    expect(await getAuditExport(people.alex!, "all", {})).toMatchObject({ ok: false, status: 403 });
-    expect(await getAuditExport(people.alex!, "deposits", {})).toMatchObject({ ok: false, status: 403 });
-    expect(await getAuditExport(people.taylor!, "nowhere", {})).toMatchObject({ ok: false, status: 404 });
+  it("refuses a space without audit.view (403, `generic`) and an unknown team (404, `space_unavailable`)", async () => {
+    const forbidden = { ok: false, status: 403, code: "generic", reason: "You don't have access to do this." };
+    expect(await getAuditExport(people.maya!, "coral-offers", {})).toEqual(forbidden);
+    expect(await getAuditExport(people.alex!, "all", {})).toEqual(forbidden);
+    expect(await getAuditExport(people.alex!, "deposits", {})).toEqual(forbidden);
+    expect(await getAuditExport(people.taylor!, "nowhere", {})).toEqual({
+      ok: false,
+      status: 404,
+      code: "space_unavailable",
+      reason: "This team isn't available to you.",
+    });
     const own = await getAuditExport(people.alex!, "coral-offers", {});
     expect(own.ok).toBe(true);
     const riley = await getAuditExport(people.riley!, "deposits", {});

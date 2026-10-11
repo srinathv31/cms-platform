@@ -342,6 +342,13 @@ test.describe("scenario 4: going live", () => {
       await expect(row).toHaveCount(1);
       await expect(row).toContainText("v2");
       await expect(row.getByRole("cell").nth(2), "renders").toHaveText("15");
+      // The split by channel: five of each of the three document channels, no phone for any.
+      await expect(usage.getByRole("heading", { name: "Renders by channel" })).toBeVisible();
+      const split = usage.getByRole("table", { name: "Renders by channel" });
+      for (const channel of ["PDF", "Web", "Email"]) {
+        await expect(split.getByRole("row").filter({ has: page.getByRole("rowheader", { name: channel, exact: true }) }).getByRole("cell"), channel).toHaveText(["5", "33%"]);
+      }
+      await expect(split.getByRole("row"), "a header and the three document channels").toHaveCount(4);
       await beat(page, 900);
       await shoot(page, "usage-template");
     });
@@ -360,7 +367,7 @@ test.describe("scenario 4: going live", () => {
 
       // The log's columns are metadata only.
       const columns = Object.keys(log[0]).sort();
-      expect(columns).toEqual(["at", "channel", "consumer_id", "correlation_id", "duration_ms", "error_code", "id", "is_preview", "outcome", "template_id", "version_id", "version_number"]);
+      expect(columns).toEqual(["at", "channel", "consumer_id", "correlation_id", "duration_ms", "error_code", "id", "is_preview", "outcome", "platform", "template_id", "version_id", "version_number"]);
 
       // None of the five customers' values is anywhere UCOMP wrote for this template: the log, the audit
       // events, the notifications, the consumer notices.

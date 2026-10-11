@@ -3,14 +3,17 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
 import { IMPORT_LIMITS, IMPORT_REFUSALS, JUST_IMPORTED_COOKIE, type ImportResponse } from "@/domain/import-types";
+import { refuse } from "@/domain/refusals";
 import { importPermission, importStatus, importTemplate } from "@/server/import/create";
 import { readBodyCapped } from "@/server/api/read-body";
 import { getViewer } from "@/server/viewer";
 
-// Import a file: POST /api/imports?team=<slug>, multipart/form-data { file } → ImportResponse. A
-// route handler rather than a server action because actions cap request bodies at 1 MB. On success
-// it sets the two one-shot cookies (the name is selected and the rail opens on Original on arrival)
-// and refreshes the Library; the client then navigates to `href`.
+// Import a file: POST /api/imports?team=<slug>, multipart/form-data { file } → ImportResponse: the new
+// template, or a refusal as every refusal is, `{ ok: false, code, reason }` (src/domain/refusals.ts),
+// with the status `importStatus` gives its code. A route handler rather than a server action because
+// actions cap request bodies at 1 MB. On success it sets the two one-shot cookies (the name is
+// selected and the rail opens on Original on arrival) and refreshes the Library; the client then
+// navigates to `href`.
 //
 // Nothing is read from the body until the viewer may create on the team (the team is in the query
 // for that reason), and the body is then read with a byte counter that stops past the size limit:
@@ -33,15 +36,16 @@ export async function POST(request: NextRequest) {
 
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
   const cap = IMPORT_LIMITS.maxBytes + MULTIPART_SLACK;
-  if (Number(request.headers.get("content-length")) > cap) return respond({ ok: false, code: "size", reason: IMPORT_REFUSALS.size });
+  const tooLarge = refuse(IMPORT_REFUSALS.size);
+  if (Number(request.headers.get("content-length")) > cap) return respond(tooLarge);
   const body = await readBodyCapped(request.body, cap);
-  if (!body.ok) return respond({ ok: false, code: "size", reason: IMPORT_REFUSALS.size });
+  if (!body.ok) return respond(tooLarge);
 
   let form: FormData;
   try {
     form = await new Response(body.bytes, { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData();
   } catch {
-    return respond({ ok: false, code: "unreadable", reason: IMPORT_REFUSALS.unreadable });
+    return respond(refuse(IMPORT_REFUSALS.unreadable));
   }
   const file = form.get("file");
 

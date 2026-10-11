@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { consequences } from "@/domain/consequences";
-import type { ActivityItem, ConsumerUsage, ReviewQueueRow } from "@/domain/review-types";
+import type { ConsumerUsage } from "@/domain/review-types";
 import { dayGroups } from "@/components/activity/day-groups";
 import { formatQueueRow } from "@/components/review-queue/format-row";
 import { lastActive } from "@/components/settings/team/format";
+import type { ActivityItem } from "@/server/queries/activity";
+import type { ReviewQueueRow } from "@/server/queries/review-models";
 import { formatLastRender, sunsetPhrase } from "./format";
 
 // "Today" and "yesterday" mean the same day on every screen (D9, decision 0028): the approve, sunset and

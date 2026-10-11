@@ -1,8 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { Panel } from "./panel";
-import { TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./template-usage";
+import { MIX_BOX_SKELETON, MIX_CARD, TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./template-usage";
 
-/** The Usage tab while it streams: the chart card, the two number cards and the table's card. */
+/** The Usage tab while it streams: the chart card, the two number cards, the channel card and the table's card. */
 export function TemplateUsageSkeleton() {
   return (
     <div data-slot="usage" aria-hidden className={USAGE_CELL}>
@@ -30,6 +31,13 @@ export function TemplateUsageSkeleton() {
           </Panel>
         </div>
       </div>
+      <Panel className={MIX_CARD}>
+        <div className="flex min-h-9 items-center justify-between">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+        <Skeleton className={cn("mt-4 w-full", MIX_BOX_SKELETON)} />
+      </Panel>
       <Panel className="mt-6">
         <div className="flex min-h-9 items-center">
           <Skeleton className="h-4 w-32" />

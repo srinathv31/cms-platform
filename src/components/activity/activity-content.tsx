@@ -2,10 +2,10 @@ import { Cog } from "lucide-react";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { cn } from "@/lib/utils";
 import { WS } from "@/components/workspace/workspace-grid";
-import type { ActivityItem } from "@/domain/review-types";
 import { formatAgo, formatStamp } from "@/domain/dates";
 import { now } from "@/server/clock";
 import { getActivity } from "@/server/queries/activity";
+import type { ActivityItem } from "@/server/queries/activity";
 import { Stamp } from "./stamp";
 import { dayGroups } from "./day-groups";
 

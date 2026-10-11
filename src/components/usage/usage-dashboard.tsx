@@ -5,11 +5,12 @@ import { plural } from "@/domain/plural";
 import { cn } from "@/lib/utils";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { UsageDashboard } from "@/domain/golive-types";
-import { CHANNELS, type Channel } from "@/domain/types";
+import { CHANNELS } from "@/domain/types";
 import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
 import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/components/primitives/stat-card";
-import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, SERIES, StackedBars, type RatePoint, type StackSeries } from "./charts";
+import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, StackedBars, type RatePoint } from "./charts";
+import { CHANNEL_SERIES } from "./channel-series";
 import { ConsumersCard } from "./consumers-card";
 import { sunsetPhrase } from "./format";
 import { BARS_HEIGHT, HEAT_FOOTER, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
@@ -19,19 +20,6 @@ import { UsageTabs } from "./usage-tabs";
 // /[team]/usage. Overview: three stat cards, Top templates beside the Daily renders heatmap, then
 // Renders over time and the failure rate. Consumers: renders by consumer and who renders what. The
 // numbers are `getUsageDashboard`'s; this file only lays them out. Reads inside the page's <Stream>.
-
-/**
- * Each channel's hue. The charts list the channels in `CHANNELS` order, and the channel mix colours its
- * parts in the order it gets them, so a channel has the same hue here and there.
- */
-const CHANNEL_HUE: Readonly<Record<Channel, (typeof SERIES)[number]>> = {
-  pdf: SERIES[0],
-  web: SERIES[1],
-  email: SERIES[2],
-  push: SERIES[3],
-  sms: SERIES[4],
-};
-const CHANNEL_SERIES: StackSeries[] = CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], ...CHANNEL_HUE[c] }));
 
 function Overview({ d }: { d: UsageDashboard }) {
   const { stats, onActive, heatmap } = d;

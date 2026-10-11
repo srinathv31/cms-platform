@@ -8,7 +8,7 @@ import { sectionTitleKey } from "@/editor/model/section-title";
 import { isValidKey, labelFromKey, toKey } from "@/editor/model/variables";
 import {
   IMPORT_LIMITS,
-  type ImportRefusalCode,
+  type ImportRefusalName,
   type DetectedPlaceholder,
   type FinishImportInput,
   type FinishedImport,
@@ -314,7 +314,7 @@ function clampName(text: string): string {
  * claims: a legacy .doc (there is a way forward), a "PDF" or "Word file" that isn't one, or a kind
  * we don't take at all. The browser makes the same call from the first bytes, before sending.
  */
-export function refusalForUnreadableKind(filename: string): ImportRefusalCode {
+export function refusalForUnreadableKind(filename: string): ImportRefusalName {
   const name = filename.trim();
   if (/\.doc$/i.test(name)) return "legacyDoc";
   if (/\.pdf$/i.test(name)) return "notPdf";

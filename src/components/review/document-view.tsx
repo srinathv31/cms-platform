@@ -2,14 +2,15 @@
 
 import { useMemo, type RefObject } from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
-import { FieldsDocument } from "@/components/redline/fields-document";
 import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot } from "@/editor/components/editor-root";
 import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import { isChannelFieldId } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
-import type { FieldRedline, FooterRedline, RedlineDoc, ThreadView } from "@/domain/review-types";
+import type { FieldRedline, FooterRedline, RedlineDoc } from "@/domain/review-types";
 import type { ChannelFamily } from "@/domain/types";
+import type { ThreadView } from "@/server/queries/threads";
 import { FieldsView } from "./fields-view";
 import { RedlineView } from "./redline-view";
 import { RV } from "./review-grid";
@@ -27,8 +28,9 @@ import { RV } from "./review-grid";
  *
  * Each channel's own fields show here too, as the composer shows them (redline/fields-document.tsx),
  * with their redline while Show changes is on. A document's (its email subject and preheader) sit above
- * its body. A message (an Alert) has no body: its fields are its whole content, with its comments beside
- * them (fields-view.tsx).
+ * its body. A message (an Alert) has no body: its fields are its whole content. Either way the fields
+ * take comments as the body does (a marker, the hover button, the scroll to a thread), through a handle of
+ * their own, `fieldsRef`, beside the body's `editorRef` (fields-view.tsx).
  */
 
 /** The version's variables, plus any the baseline had that this one dropped (a deleted chip needs its label). */
@@ -49,6 +51,7 @@ export function DocumentView({
   redline,
   changesOnly,
   editorRef,
+  fieldsRef,
   anchors,
   activeThreadId,
   threads,
@@ -71,7 +74,10 @@ export function DocumentView({
   /** Set while Show changes is on. */
   redline: RedlineDoc | null;
   changesOnly: boolean;
+  /** The body's handle: the live editor's, or the redline's while Show changes is on. */
   editorRef: RefObject<DocumentEditorHandle | null>;
+  /** The channel fields' handle (the email subject and preheader, or a message's fields). */
+  fieldsRef: RefObject<DocumentEditorHandle | null>;
   /** What the editor highlights: the open threads, and the comment being written. */
   anchors: readonly ThreadAnchor[];
   activeThreadId: string | null;
@@ -86,6 +92,8 @@ export function DocumentView({
   onRequestBlockComment?: (blockId: string) => void;
 }) {
   const labels = useMemo(() => labelsFor(variables, baselineVariables), [variables, baselineVariables]);
+  // The fields' markers are the threads on fields; the body's handle doesn't know them, nor theirs the body's.
+  const fieldThreads = useMemo(() => threads.filter((t) => isChannelFieldId(t.blockId)), [threads]);
 
   return (
     <div
@@ -95,31 +103,21 @@ export function DocumentView({
       data-slot="editor"
       className={RV.doc}
     >
-      {family === "message" ? (
-        <FieldsView
-          fields={fields}
-          variables={labels}
-          changesOnly={changesOnly}
-          footer={footer}
-          editorRef={editorRef}
-          anchors={anchors}
-          threads={threads}
-          activeThreadId={activeThreadId}
-          activeBlockId={activeBlockId}
-          onActivate={onActivate}
-          onRequestComment={onRequestComment}
-          onRequestBlockComment={onRequestBlockComment}
-        />
-      ) : (
-        <FieldsDocument
-          fields={fields}
-          variables={labels}
-          layout="details"
-          changesOnly={changesOnly}
-          align="start"
-          className="mb-6 border-b border-hairline pb-4"
-        />
-      )}
+      <FieldsView
+        layout={family === "message" ? "sections" : "details"}
+        fields={fields}
+        variables={labels}
+        changesOnly={changesOnly}
+        footer={footer}
+        handleRef={fieldsRef}
+        anchors={anchors}
+        threads={fieldThreads}
+        activeThreadId={activeThreadId}
+        activeBlockId={activeBlockId}
+        onActivate={onActivate}
+        onRequestComment={onRequestComment}
+        onRequestBlockComment={onRequestBlockComment}
+      />
       {family === "message" ? null : redline ? (
         <RedlineView
           doc={redline}

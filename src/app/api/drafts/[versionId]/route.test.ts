@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import type { DraftSaveResponse, Viewer } from "@/domain/types";
 import { MAX_BODY_SIZE } from "@/server/drafts/parse-patch";
 import { draftAccessRefusal, saveDraft } from "@/server/drafts/save-draft";
@@ -15,7 +17,7 @@ vi.mock("@/server/drafts/save-draft", () => ({ saveDraft: vi.fn(), draftAccessRe
 const viewer = { userId: "maya" } as Viewer;
 const SESSION = "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21";
 const good = { rev: 4, sessionKey: SESSION, name: "Annual fee waiver" };
-const TOO_LARGE = { ok: false, error: "invalid", message: "The draft is too large to save." };
+const TOO_LARGE = { ok: false, code: "draft_too_large", reason: "The draft is too large to save." };
 
 function requestOf(body: BodyInit, headers: Record<string, string> = {}, id = "v_abc") {
   return new Request(`http://localhost/api/drafts/${id}`, {
@@ -73,13 +75,13 @@ describe("PUT /api/drafts/[versionId]", () => {
   });
 
   it.each([
-    ["not_found", 404],
-    ["forbidden", 403],
-    ["not_draft", 409],
-    ["conflict", 409],
-    ["invalid", 400],
-  ] as const)("%s from the save becomes %i, with the body unchanged", async (error, status) => {
-    const body: DraftSaveResponse = { ok: false, error, message: "words", ...(error === "conflict" ? { rev: 9 } : {}) };
+    [REQUEST_REFUSALS.versionGone, 404],
+    [REASONS.generic, 403],
+    [REQUEST_REFUSALS.versionNotDraft, 409],
+    [REQUEST_REFUSALS.draftChanged, 409],
+    [REQUEST_REFUSALS.invalidInput("words"), 400],
+  ] as const)("%j from the save becomes %i, with the body unchanged", async (entry, status) => {
+    const body: DraftSaveResponse = { ...refuse(entry), ...(entry === REQUEST_REFUSALS.draftChanged ? { rev: 9 } : {}) };
     answerWith(body);
     const res = await put(good);
     expect(res.status).toBe(status);
@@ -89,16 +91,16 @@ describe("PUT /api/drafts/[versionId]", () => {
   it("400 invalid for a body that isn't JSON, without touching the save", async () => {
     const res = await put("{not json");
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ ok: false, error: "invalid", message: "The request body is not valid JSON." });
+    expect(await res.json()).toEqual({ ok: false, code: "invalid_input", reason: "The request body is not valid JSON." });
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
   it("400 invalid for a bad shape, naming the field", async () => {
     const res = await put({ ...good, rev: "four" });
     expect(res.status).toBe(400);
-    const json = (await res.json()) as { ok: boolean; error: string; message: string };
-    expect(json).toMatchObject({ ok: false, error: "invalid" });
-    expect(json.message).toMatch(/^rev /);
+    const json = (await res.json()) as { ok: boolean; code: string; reason: string };
+    expect(json).toMatchObject({ ok: false, code: "invalid_input" });
+    expect(json.reason).toMatch(/^rev /);
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
@@ -118,26 +120,26 @@ describe("PUT /api/drafts/[versionId]", () => {
 
 describe("PUT /api/drafts/[versionId]: access before the body", () => {
   it.each([
-    ["forbidden", 403, "You don't have access to do this."],
-    ["not_found", 404, "This draft no longer exists."],
-  ] as const)("%s is answered (%i) before a byte of the body is read", async (error, status, message) => {
-    vi.mocked(draftAccessRefusal).mockResolvedValue({ ok: false, error, message });
+    ["the permission refusal", REASONS.generic, 403, "You don't have access to do this."],
+    ["version_gone", REQUEST_REFUSALS.versionGone, 404, "This version no longer exists."],
+  ] as const)("%s is answered (%i) before a byte of the body is read", async (_, entry, status, reason) => {
+    vi.mocked(draftAccessRefusal).mockResolvedValue(refuse(entry));
     const { stream, pulled } = chunkedBody(64);
     const request = requestOf(stream, {}, "v_theirs");
     const res = await send(request, "v_theirs");
     expect(res.status).toBe(status);
-    expect(await res.json()).toEqual({ ok: false, error, message });
+    expect(await res.json()).toEqual({ ok: false, code: entry.code, reason });
     expect(draftAccessRefusal).toHaveBeenCalledWith(viewer, "v_theirs");
     expect(request.bodyUsed).toBe(false);
     expect(pulled.mb).toBeLessThanOrEqual(1); // at most what the stream queued up front
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
-  it("forbidden wins over a body that isn't JSON, and over one declared too large", async () => {
-    vi.mocked(draftAccessRefusal).mockResolvedValue({ ok: false, error: "forbidden", message: "You don't have access to do this." });
+  it("a refused viewer wins over a body that isn't JSON, and over one declared too large", async () => {
+    vi.mocked(draftAccessRefusal).mockResolvedValue(refuse(REASONS.generic));
     const notJson = await put("{not json");
     expect(notJson.status).toBe(403);
-    expect(await notJson.json()).toMatchObject({ error: "forbidden" });
+    expect(await notJson.json()).toMatchObject({ ok: false, code: "generic" });
     expect((await put(good, { "Content-Length": String(MAX_BODY_SIZE + 1) })).status).toBe(403);
     expect(saveDraft).not.toHaveBeenCalled();
   });

@@ -17,6 +17,7 @@ export async function writeRenderLog(db: Db, entry: RenderLogEntry, at: Date): P
     versionNumber: entry.versionNumber,
     consumerId: entry.isPreview ? null : entry.consumerId,
     channel: entry.channel,
+    platform: entry.platform,
     isPreview: entry.isPreview,
     correlationId: entry.correlationId,
     outcome: entry.outcome,

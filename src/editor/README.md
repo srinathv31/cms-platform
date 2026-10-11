@@ -7,7 +7,9 @@ personas or the template lifecycle: the host passes data in and receives events 
 
 **Status: Phase 2 complete, ready to lift; Phase 4 adds review-comment mechanics.** The public API
 below is frozen for Phase 2: later phases may add props and exports, but won't change or remove
-these. Phase 4 additions are marked as such.
+these. Phase 4 additions are marked as such. Three members that were accepted and never used are gone: the
+`renderThread` prop, the `requiredSections` prop (the document's `requiredKey` attributes carry the sections) and
+the root runtime's `dispose()`.
 
 Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composition) ·
 [Document contract](#document-contract-tiptap-json) · [Behavior](#behavior) ·
@@ -41,11 +43,22 @@ route compiles only the parts of the editor it uses. The entry modules:
 | `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
 | `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
 | `@/editor/model/normalize`, `model/document-check`, `model/table-grid`, `model/characters` | `normalizeDocument`, `normalizeField`, `normalizeFragment`, `HEADING_LEVELS`, `CELL_BLOCKS`, `MAX_SPLIT_COLUMNS`; `documentProblem`, `fieldProblem`, `normalizeAndCheckBody`, `normalizeAndCheckField`, `DOCUMENT_MESSAGES`; `tableGrid`, `linesUp`, `spanValue`, `MAX_TABLE_COLUMNS` (the one export); `LINE_BREAKS`, `CONTROL_CHARACTERS`, `cleanCharacters`, `CharacterRules` (the text rules save normalization and the resolver share; a message's fields keep invisible characters) |
+| `@/editor/model/links`, `model/list-markers`, `model/usage` | `normalizeLink`, `checkLink`, `LINK_SCHEMES`, `INVISIBLE_CHARACTERS`, `withoutInvisible` (the link check every channel shares); `formatMarker`, `resolveNumbering`, `bulletGlyph`, `MARKER_FORMATS`, `ORDERED_LIST_ATTRS` and the rest of the list markers every channel prints; `usageFromJSON`, `VariableUsage` (where each variable is used) |
+| `@/editor/extensions/list-markers` | `listMarkerAttrs`, `withListMarkers`, `listItemMarkers`, `LIST_MARKER_ATTR`, `ListItemStatus`: the same markers on static HTML (the review's redline draws its lists with them). No React |
+| `@/editor/lib/platform` | `isApple`, `modKey`: whether shortcuts read ⌘ or Ctrl, so a host that labels the editor's undo and redo agrees with the keys |
+| `@/editor/state/variable-store` | `createVariableStore`, `VariableStore`: the list behind `EditorRoot` (add, rename with identity kept, delete with tombstones), for code that edits a list the way the panel does, such as a test of autosave |
+| `@/editor/styles.css` | The document's typography and states, for a host that draws editor markup outside the editor (the redline) |
+| `@/editor/testing/editor` | For tests only: headless editors in happy-dom (`mountEditor`, `mountBodyEditor`, `destroyEditors`, `blocks`, …) |
 
 Server and domain code use only the server-safe ones: `schema`, `model/*` and `paste/*`.
 `model/*` and `paste/*` load no React at all; `schema` reaches only the chip's node view (through
-`extensions/variable-view.ts`). Domain rules use the pure model only (`@/editor/model/*`). ESLint
-(`eslint.config.mjs`) holds `src/domain` to the model and bans `@/editor` itself in `src/server`.
+`extensions/variable-view.ts`). Domain rules use the pure model only (`@/editor/model/*`).
+
+ESLint (`eslint.config.mjs`) holds all code outside `src/editor` to this table: importing any other module fails
+lint, and from `@/editor/schema` only `baseExtensions`, `BaseExtensionOptions` and `ensureBlockIds` may be imported
+(the file exports more for the editor's own modules). It holds `src/domain` to the pure model and bans `@/editor`
+itself in `src/server`. To make a module public, add it to this table and to `EDITOR_PUBLIC_MODULES` in
+`eslint.config.mjs`.
 
 ### Components
 
@@ -67,7 +80,6 @@ interface EditorRootProps {
   variables: Variable[];                          // read once; the root owns the list from then on
   onVariablesChange?: (variables: Variable[]) => void;  // after every list change; never on mount
   baseline?: Variable[] | null;                   // the list consumers render now: contract flags
-  requiredSections?: RequiredSection[];           // the content type's sections (for reference; see Behavior)
   readOnly?: boolean;                             // view only
   held?: boolean;                                 // read-only for a while: see Behavior → Held
   requiredNote?: string;                          // default "Required for disclosures"
@@ -83,7 +95,7 @@ interface DocumentEditorProps {
   ref?: Ref<DocumentEditorHandle>;                // { focus(target?), focusThread(id), ... }: see the handle below
   className?: string;
   // Standalone only (inside a root these come from the root and are ignored):
-  variables?: Variable[]; requiredSections?: RequiredSection[]; readOnly?: boolean;
+  variables?: Variable[]; readOnly?: boolean;
   onVariablesChange?: (variables: Variable[]) => void; requiredNote?: string;
   // Review comments (Phase 4; see Behavior → Comments):
   threads?: readonly ThreadAnchor[];              // open ones are highlighted; resolved ones aren't
@@ -91,7 +103,6 @@ interface DocumentEditorProps {
   onThreadClick?: (threadId: string) => void;     // a click on a highlight
   onCaretThreadChange?: (threadId: string | null) => void;  // the thread under the caret changed
   onRequestComment?: (anchor: CommentRequest) => void;      // turns commenting on (read-only too)
-  renderThread?: (thread: ThreadAnchor) => ReactNode;       // accepted, not drawn (the host places cards)
 }
 
 interface ThreadAnchor { id: string; blockId: string; quote?: string | null; status: "open" | "resolved" }
@@ -166,7 +177,7 @@ import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import { VariablesPanel } from "@/editor/components/variables-panel";
 
 <EditorRoot key={versionId} variables={version.variables} baseline={active?.variables ?? null}
-            requiredSections={contentType.sections} readOnly={!canEdit}
+            readOnly={!canEdit}
             onVariablesChange={saveVariables}>
   <InlineVariableField label="Email subject" value={version.channelFields.email?.subject ?? null} onChange={saveSubject} />
   <DocumentEditor content={version.body} onChange={saveBody} ref={editorRef} align="start" />
@@ -258,8 +269,7 @@ Legal notices) can't be deleted, renamed, retyped, reformatted or moved:
 - Content under a heading is free, and blocks move freely between sections (including above the
   first one). Enter at the start of a required heading adds a line above it; Backspace at its start
   removes an empty line above it.
-- Protection follows the document's `requiredKey` attributes; `requiredSections` is accepted for
-  the host's reference.
+- Protection follows the document's `requiredKey` attributes.
 
 ### Flags (inline fields)
 
@@ -512,7 +522,7 @@ ESLint enforces it too: no `next/*`, no app code).
 For anyone who wired the Phase 1 editor:
 
 - **New composition**: `<EditorRoot>` owns the variable list; `<VariablesPanel>` and
-  `<InlineVariableField>` render inside it. `DocumentEditor`'s `variables`, `requiredSections`,
+  `<InlineVariableField>` render inside it. `DocumentEditor`'s `variables`,
   `readOnly` and `onVariablesChange` are now for standalone use only (inside a root they're
   ignored). Standalone, `variables` is read once (Phase 1 re-synced it on every change).
 - **New props**: `align` on `DocumentEditor` and `StaticDocument`; `ref` (`DocumentEditorHandle`
@@ -521,7 +531,9 @@ For anyone who wired the Phase 1 editor:
   `diffVariables`, `flaggedKeys`, `isBreaking`, `labelFromKey`, `normalizePastedHtml`,
   `chipsInJSON`, `variableKeys`, and the contract types.
 - **Removed exports** (internal now): `editorExtensions`, `EditorExtensionOptions`,
-  `BLOCK_ID_TYPES`, `EMPTY_LINE_PLACEHOLDER`.
+  `BLOCK_ID_TYPES`, `EMPTY_LINE_PLACEHOLDER`. `schema.ts` still exports the first three (with
+  `inlineFieldExtensions`) for the editor's own modules, and ESLint refuses them outside `src/editor`;
+  `EMPTY_LINE_PLACEHOLDER` is not exported at all.
 - **Behavior**: required headings are locked (Phase 1 only kept their key unique); chips are
   interactive (popover, insert, delete); unknown chips use the warning tokens; section heads (H2)
   use the display serif and H3 is medium weight; Home/End move along the visual line; pasted Word
@@ -552,7 +564,6 @@ Phase 4 additions: review-comment mechanics (additive only; nothing above change
 
 - **New `DocumentEditor` props**: `activeThreadId`, `onThreadClick`, `onCaretThreadChange`; `threads`
   and `onRequestComment` (accepted since Phase 1) now work; `threads` takes a readonly array.
-  `renderThread` stays accepted and not drawn.
 - **New handle methods**: `focusThread`, `getBlockRect`, `getThreadRect`, `subscribeBlockRects`,
   `requestComment`.
 - **New `StaticDocument` props**: `threads`, `activeThreadId`.
@@ -670,7 +681,7 @@ paste/                    clipboard HTML normalizer, Markdown → HTML, `{{key}}
                           __fixtures__/ Word (Windows, Mac) and Google Docs clipboard HTML
 lib/                      small helpers (chip transforms, section positions, + insert, hooks,
                           thread anchors and quotes, block rects, platform keys, Tab order)
-testing/                  helpers for the tests (headless editors)
+testing/                  helpers for the tests (headless editors); `testing/editor` is public, for tests elsewhere
 ```
 
 Every custom extension and model module is covered by unit tests in the folder (`*.test.ts`, on

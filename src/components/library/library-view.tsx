@@ -63,7 +63,7 @@ function LibraryListSkeleton() {
           <div className={cn(ROW, "min-h-[4.25rem] py-3", COLUMNS)}>
             <span>
               <Skeleton className="h-4 w-48" />
-              <Skeleton className="mt-1.5 h-3 w-20" />
+              <Skeleton className="mt-1.5 h-3 w-36" />
             </span>
             <Skeleton className="h-[22px] w-24 rounded-md" />
             <Skeleton className="h-4 w-7" />

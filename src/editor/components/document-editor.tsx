@@ -108,7 +108,6 @@ export function DocumentEditor(props: DocumentEditorProps) {
   return (
     <EditorRoot
       variables={props.variables ?? NO_VARIABLES}
-      requiredSections={props.requiredSections}
       readOnly={props.readOnly}
       onVariablesChange={props.onVariablesChange}
       requiredNote={props.requiredNote}

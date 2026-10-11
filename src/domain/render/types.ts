@@ -468,6 +468,8 @@ export interface RenderLogEntry {
   versionNumber: number | null;
   consumerId: string | null; // null on previews
   channel: Channel;
+  /** Which phone a push was rendered for; null for every other channel. A setting of the request, not a value. */
+  platform: PushPlatform | null;
   isPreview: boolean;
   correlationId: string;
   outcome: "ok" | "error";

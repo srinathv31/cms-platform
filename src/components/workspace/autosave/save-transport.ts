@@ -1,7 +1,8 @@
 // The network half of autosave: PUT one patch to /api/drafts/[versionId] and read the answer.
 
 import { ALL_CHANNEL_FIELDS, normalizeAndCheckChannelField } from "@/domain/channel-fields";
-import type { DraftPatch, DraftSaveError, DraftSaveResponse } from "@/domain/types";
+import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
+import type { DraftPatch, DraftSaveResponse } from "@/domain/types";
 import { DOCUMENT_MESSAGES, normalizeAndCheckBody } from "@/editor/model/document-check";
 import type { Send } from "./autosave-scheduler";
 
@@ -15,18 +16,12 @@ import type { Send } from "./autosave-scheduler";
  */
 export const KEEPALIVE_LIMIT_BYTES = 60_000;
 
-const ERRORS: readonly DraftSaveError[] = ["conflict", "forbidden", "not_draft", "not_found", "invalid"];
-
+/** A save, or a refusal (`{ ok: false, code, reason }`). Which code it is isn't checked: the scheduler decides what each means. */
 function isSaveResponse(value: unknown): value is DraftSaveResponse {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
   if (v.ok === true) return typeof v.rev === "number" && typeof v.savedAt === "string";
-  return (
-    v.ok === false &&
-    typeof v.message === "string" &&
-    typeof v.error === "string" &&
-    (ERRORS as readonly string[]).includes(v.error)
-  );
+  return v.ok === false && typeof v.code === "string" && typeof v.reason === "string";
 }
 
 /**
@@ -42,7 +37,7 @@ function refusal(patch: DraftPatch): DraftSaveResponse | null {
     const value = patch[field.id];
     if (!problem && value) problem = normalizeAndCheckChannelField(field, value).problem;
   }
-  return problem ? { ok: false, error: "invalid", message: DOCUMENT_MESSAGES[problem] } : null;
+  return problem ? refuse(REQUEST_REFUSALS.invalidInput(DOCUMENT_MESSAGES[problem])) : null;
 }
 
 /**

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { threadBeganBy } from "@/domain/comments";
-import { DOCUMENT_THREAD, type CommentView, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import { asNumbered, nextRound, versionLabel, type RoundRef } from "@/domain/rounds";
 import { db } from "@/server/db/client";
 import { commentThreads, comments, versions } from "@/server/db/schema/ucomp";
@@ -14,6 +14,36 @@ import { anchorIdsOf, getPeople, iso, isoOrUndefined, personOf, requireTemplate 
 // id, "push.title": an alert's threads are on its fields), so a draft made from a version (same block ids)
 // shows the version's threads in its margin with no copying. A frozen round shows the threads that began
 // by it (`threadBeganBy` in domain/comments.ts).
+
+export interface CommentView {
+  id: string;
+  author: Person;
+  body: string;
+  kind: "comment" | "change_request";
+  createdAt: string;
+}
+
+/**
+ * A review thread. Threads belong to the template and anchor to a stable block id, so a draft made
+ * from a version (same block ids) carries them into the editor margin automatically.
+ */
+export interface ThreadView {
+  // The editor's ThreadAnchor fields (structurally compatible with `ThreadAnchor` in @/editor/types).
+  id: string;
+  blockId: string;
+  quote: string | null;
+  status: "open" | "resolved";
+  originVersionNumber: number | null;
+  /** The round of the version it began on; null when it began in the open draft. */
+  originRound: number | null;
+  /** The version it began on, for "on v3 · Round 1" (chrome, with history); null for the open draft. */
+  originLabel: string | null;
+  comments: CommentView[];
+  resolvedBy?: Person;
+  resolvedAt?: string;
+  /** The block isn't in the version being shown (deleted since). Listed after the anchored ones. */
+  orphaned: boolean;
+}
 
 export interface LoadThreadsOptions {
   /**

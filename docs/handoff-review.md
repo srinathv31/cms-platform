@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 10 | 12 | 25 |
-| Partly fixed | 0 | 4 | 4 | 3 | 11 |
-| Fixed | 1 | 19 | 26 | 24 | 70 |
+| Open | 0 | 3 | 8 | 8 | 19 |
+| Partly fixed | 0 | 4 | 3 | 3 | 10 |
+| Fixed | 1 | 19 | 29 | 29 | 78 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), and PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), and PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -271,7 +271,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N22 · Low: A template's Usage tab has no per-channel split
 
-- **Status:** Open
+- **Status:** Fixed. `getTemplateUsage` reads `byChannel` (last 30 days, from the cells it already groups by channel) and the content type's channels, and the tab draws them as "Renders by channel" with `ChannelMix`, one hue per channel, in a card whose skeleton has the same height ([decision 0039](decisions/0039-the-render-log-keeps-a-pushs-platform.md)).
 - **Where:** `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); `src/domain/golive-types.ts` (`TemplateUsageData`); `src/server/queries/usage.ts` (`getTemplateUsage`)
 - **What happens:** The team's Usage Overview splits renders by channel (`UsageDashboard.byChannel` and `weekly[].channels`, drawn as the channel mix and "Renders over time, by channel"). A template's own Usage tab splits them only by version ("Renders by version"): `TemplateUsageData` has no channel field, `getTemplateUsage` groups the render log by day, version and outcome, and a channel shows only on a failed render in "Recent failures". So for one template nobody can see how many renders were PDF, Web or Email (or, for an alert, Push or SMS), or that one channel is the one failing. Noticed while building push and SMS (PR #46).
 - **Fix:** Add `byChannel` (the last 30 days) to `TemplateUsageData`, grouped by `renderLog.channel` in `getTemplateUsage`, and draw it on the tab with `ChannelMix`, for the channels the template's content type allows, in the channel hues of [decision 0014](decisions/0014-chart-values-never-hover-only.md). Test the query beside `getTemplateUsage`'s cases in `src/server/queries/usage.test.ts`.
@@ -279,7 +279,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N23 · Low: The render log doesn't record which platform a push was for
 
-- **Status:** Open
+- **Status:** Fixed. `render_log.platform` (migration 0013, null for every channel but push and for older rows) is set by `runRender` and copied by `writeRenderLog`; the seed names a phone on every push, a template's Usage splits Push by iPhone and Android, and "Recent failures" names the phone. The team Overview's channel mix still shows Push as one share ([decision 0039](decisions/0039-the-render-log-keeps-a-pushs-platform.md)).
 - **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
 - **What happens:** A push is rendered for one platform, which the request names (`platform`, `ios` or `android`, `ApiPushPlatform` in `src/contracts/api-v1.ts`): iPhone shows a subtitle and Android never does, and the 4,096-byte limit is checked per platform (`push_payload_too_large` carries the platform). The log row keeps only `channel: "push"`, so Usage can't split pushes by iPhone and Android, and a failed push can't be traced to the platform it failed on. Rows already written can't gain it later. The platform is a setting, not a variable value, so the log's keys-only rule allows it. Noticed while building push and SMS (PR #46).
 - **Fix:** Add a nullable `platform` column to `render_log` (a migration; null for every channel but push) and `platform` to `RenderLogEntry`, set it where the render route builds the entry, and copy it by name in `writeRenderLog` like the other fields. Seed the push history with both platforms. Then show it wherever the channel split is drawn (the Push share, by iPhone and Android, with the split in N22) and in "Recent failures".
@@ -287,7 +287,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N24 · Low: The Library doesn't say which templates are alerts and which are documents
 
-- **Status:** Open
+- **Status:** Fixed. `getLibraryRows` joins the content type and returns each row's `family` (`contentTypeFamily`), and a Library row prints its `TEMPLATE_KIND_LABELS` word (Document or Alert) after the ID on its second line, with the skeleton's line sized to match. No kind filter: the toolbar already fills a line in a team with every status, so a second `Segmented` would wrap it.
 - **Where:** `src/server/queries/library.ts` (`LibraryRow`, `getLibraryRows`); `src/components/library/library-browser.tsx` (`TemplateRow`); `src/domain/types.ts` (`contentTypeFamily`, `TEMPLATE_KIND_LABELS`)
 - **What happens:** New template asks for a kind first, Document or Alert (`TEMPLATE_KIND_LABELS`), and a template keeps it for life (`contentTypeFamily`, from its content type's channels). A Library row shows the name, ID, status, active version, last edited and owner. `getLibraryRows` doesn't read the content type, so nothing tells a Push and SMS alert from a PDF, Web and Email document, and neither the search nor the status filter can narrow to one kind. The two are written, reviewed and rendered differently, so a team with both opens each template to find out which it is. Noticed while building push and SMS (PR #46).
 - **Fix:** Add the family to `LibraryRow` (`getLibraryRows` joins the content type and asks `contentTypeFamily`), print its `TEMPLATE_KIND_LABELS` word in the row's second line beside the ID, and, if the list wants it, add a second `Segmented` (All, Documents, Alerts) next to the status filter. Keep the row's height and columns as they are.
@@ -295,7 +295,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N25 · Low: An email's subject can't take a review comment in the UI
 
-- **Status:** Open
+- **Status:** Fixed. On the review screen `FieldsView` (now with a `details` layout) draws a document's email subject and preheader with a handle of their own and `GutterMarkers` (hover button, markers, scroll to a thread, the rail menu's "Email subject" and "Email preheader"), and `useReviewComments` sends each call to whichever handle owns the anchor. The workspace had the same gap, because the Email details sit in the rail: each field now carries its marker and a comment button (`field-comments.tsx`). A body edit no longer files a field's thread under "On removed content" (`liveBlockPresence`). The other channels' fields (push, SMS) were already wired.
 - **Where:** `src/components/review/document-view.tsx` (`DocumentView`, its `FieldsDocument layout="details"`); `src/components/redline/fields-document.tsx`; compare `src/components/review/fields-view.tsx`; `src/domain/comments.ts` (`commentAnchors`)
 - **What happens:** The domain lets a thread anchor to `email.subject` and `email.preheader`: `commentAnchors` lists the fields of every channel that is on, and `addComment` accepts them. The review screen takes comments on an alert's fields (`FieldsView` wraps `FieldsDocument` in a redline DOM handle and `GutterMarkers`) and on a document's body (its blocks and selected text). For a document, `DocumentView` draws the subject and preheader through a bare `FieldsDocument layout="details"`, outside both, so they have no Comment button and no gutter marker, and a thread on one would have no marker to open it from. A reviewer can comment on the body but not on the subject, which is customer-visible text approved with it. Noticed while building push and SMS (PR #46).
 - **Fix:** Give the document's subject and preheader what an alert's fields have: a handle and `GutterMarkers` over the `FieldsDocument`, as `FieldsView` does, with the field's id as the anchor, so they take, mark and scroll to comments like a block. Test it beside `src/components/redline/fields-document.test.tsx` and cover a comment on a subject in an e2e spec (`e2e/alerts.spec.ts` comments on an alert's fields).
@@ -308,6 +308,14 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 - **What happens:** The kit's clamps (iOS: title 1, body 4 on the lock screen, 2 in a banner, about 7 expanded; Android: 1 and 1, about 8 expanded) and its type ramps (Apple's Dynamic Type table, Material 3's roles with Android 14's font scaling) come from the platforms' published guides, not from measuring a phone. iOS text is also set in Inter, a little wider than SF, so a cut can move by a word. The previews' "cut after …" warnings (`onMeasure`) are built on those numbers, so if one is off, an author is shown the wrong cut point. The push that is delivered isn't affected: the phone cuts it, not Stencil. Noticed while building push and SMS (PR #46).
 - **Fix:** The owner checks on a real iPhone and a real Pixel: send pushes of known lengths to each screen (lock screen, banner, expanded) at the default and the larger text sizes, and compare the line counts, cut points and type sizes with the previews. Adjust `IOS_LINES`, `ANDROID_LINES` and the ramps where they differ, and note the devices and OS versions in the device kit's README.
 - **Evidence:** not yet measured
+
+#### N27 · Low: Below about 800px wide the always-open sidebar leaves a screen no room, the Usage tab included
+
+- **Status:** Open
+- **Where:** `src/components/app-shell/app-frame.tsx` (`<Sidebar collapsible="none">`, which keeps the shadcn sidebar's mobile sheet from ever opening); `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); [docs/reference/ui-checklist.md](reference/ui-checklist.md) (the 800px floor)
+- **What happens:** The sidebar is 16rem wide at every width and never collapses, so a narrow window gives the page what's left. At 390px the sidebar is 264px and the canvas 112px: a template's Usage tab (`section[data-slot="usage"]`) is 0px wide, its title wraps to four lines in 110px, and the charts and the 728px and 494px tables are clipped or scrolled inside a box with no width. Nothing scrolls the page (`scrollWidth` stays 390; the shell's `overflow-hidden` cuts the rest). The Library and every other screen clip the same way, so this is the shell's, not the Usage tab's, and it was there before the channel split (N22). The checklist asks for "no horizontal overflow at any width from 800px", so the prototype doesn't claim anything narrower. Noticed while fixing N22 (PR #59).
+- **Fix:** Decide whether narrow windows are in scope. If they are, collapse the sidebar off-canvas under the floor (`collapsible="offcanvas"` with a menu button in the top bar, which `ui/sidebar.tsx` already supports below 768px), then check the Usage tab and the other screens at 390px. If not, record 800px as the floor in a decision and in the checklist, and leave it.
+- **Evidence:** measured (390, 600, 768, 900 and 1024px wide, production build on the seeded database: sidebar 264px at every width; canvas 112, 322, 490, 622 and 746px; the Usage section 0, 206, 374, 506 and 630px)
 
 ## Waits for the enterprise work
 
@@ -443,7 +451,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 - **Status:** Open
 - **Where:** `src/app/api/drafts/[versionId]/route.ts` line 15
-- **What happens:** Server actions get an Origin check from Next.js; the autosave `PUT` and import `POST` rely on the cookie being SameSite=Lax. The drafts route also answers `not_found` before `forbidden`, which reveals whether a version id exists on another team.
+- **What happens:** Server actions get an Origin check from Next.js; the autosave `PUT` and import `POST` rely on the cookie being SameSite=Lax. The drafts route also answers `version_gone` (404) before the permission refusal `generic` (403), which reveals whether a version id exists on another team.
 - **Fix:** Check `Origin` or `Sec-Fetch-Site` in the BFF route handlers; answer the same way for unknown and forbidden.
 - **Evidence:** traced
 
@@ -761,7 +769,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A3 · Medium: Six error shapes, and some actions throw
 
-- **Status:** Partly fixed. Every server action but the demo tools now runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); still to do are the autosave route's `DraftSaveResponse` (`error`, `message`), import's own codes, the audit export's plain-text errors, and `/api/v1` problem details, which wait for the Java API ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)).
+- **Status:** Partly fixed. Every server action but the demo tools runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); the autosave route, import (its two reads included) and the audit export now refuse in that same `{ ok: false, code, reason }` shape too, with codes from the refusal tables ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md), [decision 0041](decisions/0041-routes-refuse-in-the-actions-shape.md)); only `/api/v1` problem details remain, and they wait for the Java API.
 - **Where:** `src/server/actions/templates.ts` line 57
 - **What happens:** `/api/v1` uses `{error: {code, message, details}}`; drafts, imports and palette each have their own; audit export returns text. `startDraft` and `createTemplate` throw, so in production the user sees a generic message instead of the domain's sentence.
 - **Fix:** One result kit for actions and RFC 9457 problem details for routes.
@@ -859,7 +867,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B6 · Medium: Server code imports from components
 
-- **Status:** Partly fixed. A lint rule now forbids `src/server` from importing `@/components`. `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. What is left is the screen view models in `src/domain/review-types.ts`, which still have to move to `server/read-models`.
+- **Status:** Fixed. A lint rule forbids `src/server` from importing `@/components`; `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. The review area's screen view models left `src/domain/review-types.ts` for the queries that build them: `ReviewScreenData`, `ReviewQueue` and `SunsetCalendar` in `src/server/queries/review-models.ts`, `VersionsData` and its items in `versions.ts`, `ThreadView` and `CommentView` in `threads.ts`, `ActivityItem` in `activity.ts` ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)). The read models in `access-types.ts`, `golive-types.ts` and `import-types.ts` stay in the domain for now.
 - **Where:** `src/server/queries/submit-summary.ts` line 12
 - **What happens:** `submit-summary.ts` takes the business function `listSets` from `components/preview/sample-sets`; `create-template.ts` and the imports route take cookie constants from components. `domain/review-types.ts` holds screen view models. No lint rule forbids it.
 - **Fix:** Add the rule; move `listSets` into `editor/model` and view models to `server/read-models`.
@@ -909,7 +917,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T6 · Medium: shadcn is a runtime dependency
 
-- **Status:** Open
+- **Status:** Fixed. `shadcn` is a devDependency (its CSS import resolves at build time) and `next-themes` is gone; `npm audit --omit=dev` went from 10 findings (7 high, 3 moderate) to 3 moderate, all in `mammoth`'s tree. `@expo-google-fonts/newsreader` stays: `pdf-fonts.ts` reads its font files at render time.
 - **Where:** `package.json` line 51
 - **What happens:** Its only use is a CSS import, but as a dependency it brings 7 high `npm audit` findings into the production tree. `next-themes` is never imported.
 - **Fix:** Move `shadcn` to devDependencies and remove `next-themes`.
@@ -975,7 +983,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### G5 · Medium: The editor's public API is enforced only in prose
 
-- **Status:** Open
+- **Status:** Fixed. ESLint now holds every file outside `src/editor` to the modules the README's Public API table lists (`EDITOR_PUBLIC_MODULES` in `eslint.config.mjs`), and to three names from `@/editor/schema`. The internals app code reached into (`lib/platform`, `model/usage`, `model/links`, `model/list-markers`, `extensions/list-markers`, `state/variable-store`, `styles.css`, `testing/editor`) are listed in the table; `EMPTY_LINE_PLACEHOLDER` is no longer exported, and `renderThread`, `requiredSections` (with the workspace's pass-through) and `dispose()` are gone ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)).
 - **Where:** `src/editor/README.md` line 1; `src/editor/schema.ts` line 34
 - **What happens:** With the barrel gone, nothing enforces the README's API table. App code already imports internals (`@/editor/lib/platform`, `@/editor/model/usage`), and `schema.ts` still exports symbols the README calls removed. The "frozen" API also has unused members (`renderThread`, `dispose()`, `requiredSections`).
 - **Fix:** A lint allowlist for `@/editor/*` imports outside the module, matching the README; remove or implement the unused members.
@@ -983,7 +991,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### G6 · Low: decisions.md is wrong in three places
 
-- **Status:** Open
+- **Status:** Fixed. The three lines in `docs/decisions/prototype-log.md` are corrected in place (the unknown-consumer code, the raw colors in `UserAvatar`, the formula guard's tab and CR), and its history banner now says later records and code may supersede it.
 - **Where:** `docs/decisions/prototype-log.md`
 - **What happens:** An unregistered consumer gets `unknown_consumer` (403), not `consumer_not_found`. Raw colors also appear in `user-avatar.tsx`. The formula guard also covers tab and CR.
 - **Fix:** Correct the three lines and add a history banner.

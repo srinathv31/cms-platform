@@ -17,6 +17,8 @@ const CORAL = [
   "Rate Change Heads-up",
   "Rate Change Notice",
 ];
+/** The Coral templates that are alerts (Push and SMS); every other template is a document. */
+const ALERTS = ["Card Used Abroad", "Payment Due Reminder", "Rate Change Heads-up"];
 const DEPOSITS = [
   "Everyday Checking — Fee Schedule",
   "High-Yield Savings — Rate Disclosure",
@@ -175,6 +177,8 @@ async function mainNavLabels(page: Page): Promise<string[]> {
 interface LibraryRow {
   name: string;
   id: string;
+  /** The kind the row names after its ID: Document or Alert. */
+  kind: string;
   status: string;
   active: string;
   href: string;
@@ -197,11 +201,13 @@ async function libraryRows(page: Page): Promise<LibraryRow[]> {
   for (let i = 0; i < count; i++) {
     const row = rows.nth(i);
     const lines = (await row.innerText()).split("\n").map((l) => l.trim()).filter(Boolean);
-    // name, id, [team,] status, active, last edited, owner initials, owner name
+    // name, "id · kind", [team,] status, active, last edited, owner initials, owner name
     const offset = hasTeamColumn ? 1 : 0;
+    const [id, kind] = lines[1]!.split(" · ");
     out.push({
       name: lines[0]!,
-      id: lines[1]!,
+      id: id!,
+      kind: kind!,
       team: hasTeamColumn ? lines[2]! : null,
       status: lines[2 + offset]!,
       active: lines[3 + offset]!,
@@ -324,6 +330,9 @@ test.describe("shell and library, per persona", () => {
       // Library rows belong only to the persona's spaces
       const rows = await libraryRows(page);
       expect(names(rows)).toEqual([...spec.rows].sort());
+      // Each row says which kind it is: the three Coral alerts are Alerts, every other template a Document.
+      expect(rows.filter((r) => r.kind === "Alert").map((r) => r.name).sort(), "the rows that say Alert").toEqual(ALERTS);
+      expect(rows.filter((r) => r.kind === "Document"), "every other row says Document").toHaveLength(rows.length - ALERTS.length);
       if (spec.landing.startsWith("/all/")) {
         expect(rows).toHaveLength(14);
         await expect(page.locator(".caps-label", { hasText: /^Team$/ }).filter({ visible: true })).toHaveCount(1);
@@ -884,6 +893,19 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     await settle(page);
     await report("workspace Annual Fee Waiver (hard load)", page);
   });
+
+  // The template's Usage tab streams in behind a skeleton with the final geometry, the channel card included:
+  // a document's mix (PDF, Web, Email) and an alert's (Push by phone, SMS) both land without moving anything.
+  for (const name of ["Balance Transfer", "Payment Due Reminder"]) {
+    test(`the Usage tab of ${name}, hard load`, async ({ page }) => {
+      await page.goto("/coral-offers/library");
+      const href = (await libraryRows(page)).find((r) => r.name.startsWith(name))!.href;
+      await page.goto(`${href}/usage`);
+      await expect(page.getByRole("heading", { name: "Renders by channel" })).toBeVisible();
+      await settle(page);
+      await report(`Usage tab, ${name} (hard load)`, page);
+    });
+  }
 
   // The save status ("Saving…", "Saved") is the Revert menu's trigger, with a chevron after the text:
   // the text keeps the width of its widest state, so the chevron stays put as each save lands (N10).

@@ -4,8 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle";
 import { REASONS } from "@/domain/permissions";
-import type { VersionTimelineItem } from "@/domain/review-types";
 import type { PermissionResult } from "@/domain/types";
+import type { VersionTimelineItem } from "@/server/queries/versions";
 
 // The actions at the head of a version's entry: which are shown, and how a blocked one reads. The
 // server actions are replaced; the read model's `can` results are given as the query decides them.
