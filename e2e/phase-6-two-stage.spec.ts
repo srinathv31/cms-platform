@@ -44,7 +44,11 @@ type Row = Record<string, InValue>;
 
 let db: Client;
 
+// The first test counts what waits on Jordan in the seed, so it starts from the seed: the specs that run before
+// this one (those that also turn the trace off) may leave versions of their own in review.
 test.beforeAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
   db = openDb();
 });
 
