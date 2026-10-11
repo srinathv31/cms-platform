@@ -2,7 +2,9 @@
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChannelFieldValues } from "@/domain/channel-fields";
 import { DOCUMENT_THREAD, type Person, type ThreadView } from "@/domain/review-types";
+import { fieldTextOf } from "./block-text";
 import { ThreadList, type ThreadListProps } from "./thread-list";
 import { useReviewThreads } from "./use-review-threads";
 
@@ -742,5 +744,82 @@ describe("ThreadList: a card about a whole block says what block", () => {
     act(() => root.render(<Block />));
     click(container.querySelector<HTMLElement>("[data-open]")!);
     expect(container.querySelector("[data-compose] [data-slot='block-snippet']")?.textContent).toBe("Annual percentage rate");
+  });
+});
+
+describe("ThreadList: a thread on a document's email subject", () => {
+  const SUBJECT_TEXT: Partial<ChannelFieldValues> = {
+    "email.subject": { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Your terms are ready" }] }] },
+  };
+  const onSubject = thread("subject", "email.subject", {
+    comments: [{ id: "c-s", author: JORDAN, body: "Is this a promise?", kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
+  });
+
+  /** The page's side: the shared hook, the field's text for the card, and a button that opens the composer on the subject. */
+  function SubjectPage({ initial = [onSubject] }: { initial?: ThreadView[] }) {
+    const review = useReviewThreads(initial);
+    return (
+      <>
+        <button data-open onClick={() => review.openComposer({ blockId: "email.subject" })}>
+          open
+        </button>
+        <ThreadList
+          {...base}
+          threads={review.threads}
+          onMutate={review.mutate}
+          activeThreadId={review.activeThreadId}
+          onActivate={review.setActive}
+          composer={review.composer}
+          onComposerClose={review.closeComposer}
+          blockText={(blockId) => fieldTextOf(SUBJECT_TEXT, blockId)}
+        />
+      </>
+    );
+  }
+
+  it("names the card by its field, and quotes the subject as typed where a quote would be", () => {
+    act(() => root.render(<SubjectPage />));
+    expect(card("subject").getAttribute("aria-label")).toBe("Comment on the email subject");
+    expect(card("subject").querySelector('[data-slot="block-snippet"]')?.textContent).toBe("Email subject: Your terms are ready");
+    expect(order()).toEqual(["subject"]);
+  });
+
+  it("starts a thread on the field's id with no quote, and names the box and the new card by the field", async () => {
+    const answer = deferred<{ ok: true; threadId: string }>();
+    actions.addComment.mockReturnValue(answer.promise);
+    act(() => root.render(<SubjectPage initial={[]} />));
+    click(container.querySelector<HTMLElement>("[data-open]")!);
+    const box = container.querySelector<HTMLElement>("[data-compose]")!;
+    expect(box.querySelector('[data-slot="block-snippet"]')?.textContent).toBe("Email subject: Your terms are ready");
+    typeInto(box.querySelector("textarea")!, "Say what changed.");
+    click(button(box, "Comment"));
+    await flush();
+    expect(actions.addComment).toHaveBeenCalledWith({
+      templateId: "UC-4F7K2Q",
+      versionId: "v_draft",
+      blockId: "email.subject",
+      quote: null,
+      body: "Say what changed.",
+    });
+    const created = container.querySelector<HTMLElement>('[data-thread^="optimistic-thread"]')!;
+    expect(created.getAttribute("aria-label")).toBe("Comment on the email subject");
+    expect(created.textContent).toContain("Say what changed.");
+    await act(async () => answer.resolve({ ok: true, threadId: "th_subject" }));
+  });
+
+  it("resolves it, and reopens it from Resolved", async () => {
+    actions.resolveThread.mockResolvedValue({ ok: true });
+    actions.reopenThread.mockResolvedValue({ ok: true });
+    act(() => root.render(<SubjectPage />));
+    click(button(card("subject"), "Resolve"));
+    await flush();
+    expect(actions.resolveThread).toHaveBeenCalledWith({ threadId: "subject" });
+    expect(order()).not.toContain("subject");
+    expect(container.textContent).toContain("Resolved (1)");
+    click(button(container, /Resolved \(1\)/));
+    click(button(card("subject"), "Reopen"));
+    await flush();
+    expect(actions.reopenThread).toHaveBeenCalledWith({ threadId: "subject" });
+    expect(order()).toEqual(["subject"]);
   });
 });

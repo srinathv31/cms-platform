@@ -9,8 +9,9 @@
 //   reopenThread   resolved → open
 //
 // What a thread anchors to. A block of the body, by its id, or a channel field, by its id ("push.title"):
-// a message (an Alert) has no body, so its fields are where its threads go (`commentAnchors`). A thread
-// on the whole version (a change request's reason) anchors to `DOCUMENT_THREAD`.
+// a message (an Alert) has no body, so its fields are where its threads go, and a document's email subject and
+// preheader take a thread as a block does (`commentAnchors`). A thread on the whole version (a change
+// request's reason) anchors to `DOCUMENT_THREAD`.
 //
 // Where a thread can be answered. Threads belong to the template and anchor to block ids, so one thread
 // shows on several versions. It is answered on a version that takes comments and shows it: the open

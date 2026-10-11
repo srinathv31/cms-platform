@@ -134,6 +134,13 @@ describe("threads against the live document", () => {
     ]);
   });
 
+  it("leaves a channel field out: an email subject's thread isn't removed content when the body changes", () => {
+    expect([...liveBlockPresence(doc("a"), ["email.subject", "a", "email.preheader"])]).toEqual([["a", true]]);
+    const threads = [thread("t1", "email.subject"), thread("t2", "a")];
+    const presence = liveBlockPresence(doc("zz"), ["email.subject", "a"]);
+    expect(withBlockPresence(threads, presence).map((t) => t.orphaned)).toEqual([false, true]);
+  });
+
   it("compares two presences", () => {
     expect(samePresence(new Map([["a", true]]), new Map([["a", true]]))).toBe(true);
     expect(samePresence(new Map([["a", true]]), new Map([["a", false]]))).toBe(false);

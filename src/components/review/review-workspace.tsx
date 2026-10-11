@@ -132,6 +132,7 @@ export function ReviewWorkspace({
           redline={changes.showChanges ? changes.redline : null}
           changesOnly={changes.showChanges && changes.changesOnly}
           editorRef={comments.editorRef}
+          fieldsRef={comments.fieldsRef}
           anchors={comments.threadsForEditor}
           activeThreadId={comments.editorActiveThreadId}
           threads={comments.threads}

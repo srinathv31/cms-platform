@@ -303,6 +303,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/autosave-session.spec.ts` | Autosave never drops an edit silently: a rename on the Versions tab saves, a conflict turns the page read-only with Reload, and leaving with a save out asks first. |
 | `e2e/comment-policy.spec.ts` | A reviewer comments on a version in review; an Active version's threads offer nothing to answer them with. |
 | `e2e/email-off-rename.spec.ts` | A variable renamed while Email is off is renamed in the subject too, and the draft submits. |
+| `e2e/email-subject-comments.spec.ts` | An email's subject and preheader take review comments: started from the Email details in the workspace and from the gutter on the review screen, listed under the field's name, marked, resolved and reopened. |
 | `e2e/focus-targets.spec.ts` | Where focus goes after Esc in the preview, the name and the rail, after a submit, and when an imported template's Original tab widens the rail. |
 | `e2e/list-numbering.spec.ts` | Numbering and Start at… from the block menu: the editor, the PDF and the Web preview show the same markers. |
 | `e2e/maker-checker.spec.ts` | Someone who edited a draft another author submitted can't approve it or send it back. |

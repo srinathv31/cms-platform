@@ -1,10 +1,11 @@
 // The document's blocks as a short list of names, for choosing which block to comment on without a
 // pointer: a heading is its text, a table its header cells ("Table: Rate or fee, What you pay"), a list
-// its first item ("List: Purchases must post…"), anything else its first words. A message's fields are
-// listed by name ("Push title"). Pure TypeScript.
+// its first item ("List: Purchases must post…"), anything else its first words. A channel's fields are
+// listed by name ("Push title", "Email subject"): a message has only those, and a document's email details
+// come before its blocks. Pure TypeScript.
 
 import { fieldName, fieldsOfChannels } from "@/domain/channel-fields";
-import type { Channel, JSONContent, Variable } from "@/domain/types";
+import type { Channel, ChannelFamily, JSONContent, Variable } from "@/domain/types";
 
 export interface BlockOption {
   id: string;
@@ -81,4 +82,18 @@ export function blockOptions(body: JSONContent, variables: readonly Variable[]):
 /** A message's fields that can carry a comment, by their full name ("Push title"): its channels', in registry order. */
 export function fieldOptions(channels: readonly Channel[]): BlockOption[] {
   return fieldsOfChannels(channels).map((field) => ({ id: field.id, label: fieldName(field), heading: false }));
+}
+
+/**
+ * What the rail's comment menu lists, in reading order: a message's fields; a document's email details (its
+ * subject and preheader, when Email is on) and then its blocks.
+ */
+export function commentOptions(
+  family: ChannelFamily,
+  body: JSONContent,
+  channels: readonly Channel[],
+  variables: readonly Variable[],
+): BlockOption[] {
+  const fields = fieldOptions(channels);
+  return family === "message" ? fields : [...fields, ...blockOptions(body, variables)];
 }

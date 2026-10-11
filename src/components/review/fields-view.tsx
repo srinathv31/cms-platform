@@ -8,20 +8,30 @@ import type { Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
 
 /**
- * A message's content on the review screen: its channel fields as the composer shows them, read-only
- * (FieldsDocument), with the redline against the baseline while Show changes is on, and comments beside
- * them. A message has no body, so its threads are on its fields (domain/comments.ts `commentAnchors`): a
- * field is to a message what a block is to a document. The markers, the scroll to a thread's field and the
- * comment on a whole field (the hover marker, the rail's menu) go through the redline's DOM handle, which
- * finds a field's frame by its `data-block-id` as it finds a block's. There is no text to select, so a
- * comment is always on a whole field.
+ * A version's channel fields on the review screen: as the composer shows them, read-only (FieldsDocument),
+ * with the redline against the baseline while Show changes is on, and comments beside them. A field is to
+ * the review what a block is to the body: a thread can anchor to it (domain/comments.ts `commentAnchors`).
+ * The markers, the scroll to a thread's field and the comment on a whole field (the hover marker, the
+ * rail's menu) go through the redline's DOM handle, which finds a field's frame by its `data-block-id` as it
+ * finds a block's. There is no text to select, so a comment is always on a whole field.
+ *
+ *   "sections"  a message's whole content, one section per channel (it has no body, so this is all there is)
+ *   "details"   a document's email subject and preheader, in a block above its body
+ *
+ * The body keeps its own handle (the live editor's, or the redline's); this view answers for the fields
+ * through `handleRef` (`useReviewComments` asks whichever owns an anchor).
  */
+
+/** The details block's spacing from the body under it. */
+const DETAILS = "mb-6 border-b border-hairline pb-4";
+
 export function FieldsView({
+  layout,
   fields,
   variables,
   changesOnly,
   footer,
-  editorRef,
+  handleRef,
   anchors,
   threads,
   activeThreadId,
@@ -30,14 +40,16 @@ export function FieldsView({
   onRequestComment,
   onRequestBlockComment,
 }: {
+  layout: "sections" | "details";
   fields: readonly FieldRedline[];
   variables: readonly Variable[];
   changesOnly: boolean;
   footer: FooterRedline | null;
-  editorRef: RefObject<DocumentEditorHandle | null>;
+  /** Where the fields' handle goes: what the markers, the scroll to a thread and the comment on a field ask. */
+  handleRef: RefObject<DocumentEditorHandle | null>;
   /** Every thread the screen can name, and the comment being written: what a thread id resolves to. */
   anchors: readonly ThreadAnchor[];
-  /** What the gutter marks. */
+  /** What the gutter marks: the threads on these fields (others are not found here, and get no marker). */
   threads: ThreadView[];
   activeThreadId: string | null;
   /** The field tinted: the one a thread is being read or written on. */
@@ -54,7 +66,7 @@ export function FieldsView({
     latest.current = { anchors, onRequestComment };
   });
   useImperativeHandle(
-    editorRef,
+    handleRef,
     () =>
       createRedlineHandle({
         root: () => wrapper.current?.querySelector<HTMLElement>("[data-fields-document]") ?? null,
@@ -69,19 +81,21 @@ export function FieldsView({
       <FieldsDocument
         fields={fields}
         variables={variables}
-        layout="sections"
+        layout={layout}
         changesOnly={changesOnly}
         activeBlockId={activeBlockId}
         footer={footer}
         align="start"
+        className={layout === "details" ? DETAILS : undefined}
       />
       <GutterMarkers
-        editor={editorRef}
+        editor={handleRef}
         threads={threads}
         activeThreadId={activeThreadId}
         onActivate={onActivate}
         onRequestBlockComment={onRequestBlockComment}
         noun="field"
+        label={layout === "details" ? "Comments on the email details" : undefined}
       />
     </div>
   );

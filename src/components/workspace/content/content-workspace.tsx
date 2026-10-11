@@ -8,7 +8,13 @@ import { openCount } from "@/components/comments/thread-state";
 import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
 import { phoneSenders } from "@/components/preview/preview-sender";
-import { CHANNEL_FIELD_IDS, channelFieldValues, type ChannelFieldValues, type ChannelFields } from "@/domain/channel-fields";
+import {
+  CHANNEL_FIELD_IDS,
+  channelFieldValues,
+  isChannelFieldId,
+  type ChannelFieldValues,
+  type ChannelFields,
+} from "@/domain/channel-fields";
 import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
@@ -24,11 +30,15 @@ import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
 import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
 import { EmailDetails } from "./email-details";
+import type { FieldComments } from "./field-comments";
 import { MessageComposer } from "./message-composer";
 import { Rail } from "./rail";
 
 /** The fields this page shows, which a revert can put back: every channel field among them, by id. */
 const CONTENT_FIELDS = ["body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
+
+/** Before any block's position on screen: where a thread on a document's email field slots in. */
+const FIELDS_FIRST = -1e9;
 
 /** The app's one scrolling element (AppFrame's canvas), which the document scrolls in. */
 const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
@@ -94,7 +104,9 @@ export interface ContentWorkspaceProps {
  * in its right gutter, the rail gets the thread list (a Comments view beside Variables, and in the
  * preview's header), and one `useReviewThreads` state ties them: the active thread, and the composer
  * the editor's Comment button opens. A click on a highlight or a marker brings the thread's card into
- * the rail (switching it to Comments); choosing a card scrolls the document to the quote.
+ * the rail (switching it to Comments); choosing a card scrolls the document to the quote. A document's
+ * email subject and preheader sit in the rail, not in the text: each carries its own marker and comment
+ * button (field-comments.tsx), and a message's fields have the gutter beside the composer.
  *
  * Undo and redo for the header's buttons come from the editor root (`HistoryBridge`). "Revert to when
  * you opened it" (the header's save status menu) puts this page's fields back to how they were when
@@ -248,6 +260,7 @@ export function ContentWorkspace({
     });
   }, [session, editable, opening, trackDocument, message]);
 
+  const composerBlockId = review.composer?.blockId ?? null;
   const open = openCount(review.threads);
   const hasComments = review.threads.length > 0 || review.composer !== null;
 
@@ -295,6 +308,8 @@ export function ContentWorkspace({
     (outcome?: ComposerOutcome) => {
       closeComposer();
       if (outcome === "posted") return;
+      // A box that came from a field in the rail isn't about the text: the list puts focus back where it began.
+      if (!message && composerBlockId !== null && isChannelFieldId(composerBlockId)) return;
       editorHandle.current?.focus();
       // The editor puts its selection back a frame later (TipTap focuses on the next animation frame): collapse it after that.
       requestAnimationFrame(() =>
@@ -306,9 +321,17 @@ export function ContentWorkspace({
         }),
       );
     },
-    [closeComposer],
+    [closeComposer, composerBlockId, message],
   );
-  const blockPosition = useCallback((blockId: string) => editorHandle.current?.getBlockRect(blockId)?.top ?? null, []);
+  // Where a block is on screen, to slot a new thread in among the others. A document's email fields come before
+  // its blocks (`commentAnchors`), in the registry's order, wherever the rail puts them.
+  const blockPosition = useCallback(
+    (blockId: string) =>
+      !message && isChannelFieldId(blockId)
+        ? FIELDS_FIRST + CHANNEL_FIELD_IDS.indexOf(blockId)
+        : (editorHandle.current?.getBlockRect(blockId)?.top ?? null),
+    [message],
+  );
   const labels = useMemo(() => new Map(shown.variables.map((v) => [v.key, v.label])), [shown.variables]);
   // A card about a whole block quotes the start of its text; one about a channel field, the field as typed.
   const blockText = useCallback(
@@ -321,6 +344,17 @@ export function ContentWorkspace({
     latestThreads.current = review.threadsForEditor;
   });
   const threadField = useCallback((id: string) => latestThreads.current.find((t) => t.id === id)?.blockId ?? null, []);
+
+  // The comments on the email fields, which sit in the rail: their markers and the button that starts a thread.
+  const fieldComments = useMemo<FieldComments>(
+    () => ({
+      threads: review.threads,
+      activeThreadId,
+      onActivate: showThread,
+      onRequestComment: canComment ? (fieldId) => requestComment({ blockId: fieldId }) : undefined,
+    }),
+    [review.threads, activeThreadId, showThread, canComment, requestComment],
+  );
 
   return (
     <EditorScope
@@ -424,7 +458,7 @@ export function ContentWorkspace({
           />
         }
         emailDetails={
-          <EmailDetails on={channels.includes("email")} editable={editable} values={shown} />
+          <EmailDetails on={channels.includes("email")} editable={editable} values={shown} comments={fieldComments} />
         }
         original={importOriginal !== null}
         takeArrival={takeArrival}
