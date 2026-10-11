@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
  * there is no stop that does nothing.
  *
  * It wraps the shadcn `Table`, whose own container would scroll first, so that container stops scrolling here
- * and this box does.
+ * and this box does, or a table drawn with `role="table"`. The box is `relative` so a visually hidden (absolutely
+ * placed) label inside it stays inside it, not out on the page where it widens the scroll area.
  *
  * `axis="y"` is the same for a box that scrolls up and down (a dialog's body, which fills the dialog's height): give
  * it one stable child that grows and shrinks with its content, since the box's own size doesn't change with it.
@@ -34,7 +35,7 @@ export function ScrollRegion({
       setScrolls(axis === "y" ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1),
     );
     observer.observe(el);
-    for (const child of axis === "y" ? el.children : el.querySelectorAll("table")) observer.observe(child);
+    for (const child of axis === "y" ? el.children : el.querySelectorAll("table, [role=table]")) observer.observe(child);
     return () => observer.disconnect();
   }, [axis]);
 
@@ -46,7 +47,7 @@ export function ScrollRegion({
       aria-label={scrolls ? label : undefined}
       tabIndex={scrolls ? 0 : undefined}
       className={cn(
-        "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
+        "relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
         axis === "y" ? "overflow-y-auto" : "overflow-x-auto",
         className,
       )}

@@ -26,7 +26,7 @@ async function Deliveries() {
         {batches.length === 0 ? (
           <p className="m-0 px-4 py-6 text-[13px] text-(--sim-muted)">Nothing sent yet.</p>
         ) : (
-          <TableWrap>
+          <TableWrap label="Sends">
             <table aria-label="Sends" className="w-full min-w-[40rem] border-collapse">
               <thead>
                 <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">

@@ -80,7 +80,7 @@ export function SendTab({
       <div className="@container">
         <div className="grid gap-5 @3xl:grid-cols-[minmax(0,1fr)_16rem]">
           <Panel title="Customers" right={<span className="text-[12px] text-(--sim-muted)">{selected.length} selected</span>} className="min-w-0">
-            <TableWrap>
+            <TableWrap label="Customers">
               <table aria-label="Customers" className="w-full min-w-[26rem] border-collapse">
                 <thead>
                   <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
@@ -245,7 +245,7 @@ function Results({ batch, onView, viewing }: { batch: SimBatch; onView: (custome
           </p>
         ) : null}
       </div>
-      <TableWrap>
+      <TableWrap label="Results">
         <table aria-label="Results" className="w-full min-w-[30rem] border-collapse">
           <thead>
             <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
