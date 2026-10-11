@@ -59,15 +59,16 @@ describe("createFetchSend", () => {
   });
 
   it("returns the route's refusals as answers, not errors", async () => {
-    for (const [status, error] of [
-      [400, "invalid"],
-      [403, "forbidden"],
-      [404, "not_found"],
-      [409, "conflict"],
-      [409, "not_draft"],
+    for (const [status, code] of [
+      [400, "invalid_input"],
+      [403, "generic"],
+      [404, "version_gone"],
+      [409, "draft_changed"],
+      [409, "version_not_draft"],
+      [413, "draft_too_large"],
     ] as const) {
-      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(status, { ok: false, error, message: "m", rev: 9 }));
-      await expect(sendWith(fetchImpl)(patch, { keepalive: false })).resolves.toEqual({ ok: false, error, message: "m", rev: 9 });
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(status, { ok: false, code, reason: "m", rev: 9 }));
+      await expect(sendWith(fetchImpl)(patch, { keepalive: false })).resolves.toEqual({ ok: false, code, reason: "m", rev: 9 });
     }
   });
 
@@ -79,13 +80,13 @@ describe("createFetchSend", () => {
     });
     await expect(sendWith(fetchImpl)({ ...patch, body: list(20_000) }, { keepalive: false })).resolves.toEqual({
       ok: false,
-      error: "invalid",
-      message: DOCUMENT_MESSAGES.listStart,
+      code: "invalid_input",
+      reason: DOCUMENT_MESSAGES.listStart,
     });
     const subject: JSONContent = { type: "doc", content: [{ type: "heading", attrs: { level: 1 } }, { type: "paragraph" }] };
     await expect(sendWith(fetchImpl)({ ...patch, "email.subject": subject }, { keepalive: false })).resolves.toMatchObject({
       ok: false,
-      error: "invalid",
+      code: "invalid_input",
     });
     expect(fetchImpl).not.toHaveBeenCalled();
 
@@ -101,7 +102,7 @@ describe("createFetchSend", () => {
   });
 
   it("rejects on a server error, even one with a JSON body", async () => {
-    for (const body of ["<html>Internal Server Error</html>", { ok: false, error: "conflict", message: "m" }]) {
+    for (const body of ["<html>Internal Server Error</html>", { ok: false, code: "draft_changed", reason: "m" }]) {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(500, body));
       await expect(sendWith(fetchImpl)(patch, { keepalive: false })).rejects.toThrow(/500/);
     }
@@ -113,7 +114,8 @@ describe("createFetchSend", () => {
       [200, { ok: true }],
       [200, { ok: true, rev: "4", savedAt: "x" }],
       [404, "<html>Not found</html>"],
-      [409, { ok: false, error: "teapot", message: "m" }],
+      [409, { ok: false, error: "conflict", message: "m" }], // the shape before decision 0041
+      [409, { ok: false, code: "draft_changed" }],
       [400, null],
     ] as const) {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(reply(status, body));

@@ -29,13 +29,15 @@ import {
   toCsv,
   withFilterValues,
 } from "@/domain/audit";
-import { ALL_SPACE, can, isCrossTeam } from "@/domain/permissions";
+import { ALL_SPACE, REASONS, can, isCrossTeam } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { Person } from "@/domain/review-types";
 import type { NumberedRound } from "@/domain/rounds";
 import type { VersionState, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
+import { refusal, type ReadRefusal } from "@/server/api/reads";
 import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
 import { getPeople, iso, personOf, type People } from "./review-shared";
 import { requireSpace } from "./spaces";
@@ -87,13 +89,12 @@ const auditPageFor = cache(async (spaceSlug: string, filtersKey: string): Promis
   return data;
 });
 
-export type AuditExport =
-  | { ok: true; filename: string; csv: string; count: number }
-  | { ok: false; status: 403 | 404; reason: string };
+export type AuditExport = { ok: true; filename: string; csv: string; count: number } | ReadRefusal;
 
 /**
  * The CSV of every event the filters match (no page limit), for the export route. A route answers
- * with a status instead of redirecting: unknown team → 404; no `audit.view` there → 403.
+ * with a refusal and its status instead of redirecting: unknown team → 404 `space_unavailable`; no
+ * `audit.view` there → 403 `generic`.
  */
 export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters: AuditFilters): Promise<AuditExport> {
   const scope = await auditScope(viewer, spaceSlug);
@@ -108,18 +109,15 @@ export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters:
   };
 }
 
-/** Who may read which space's audit, answered as a status (for the export route). */
-export async function auditScope(
-  viewer: Viewer,
-  spaceSlug: string,
-): Promise<{ ok: true; scope: AuditScope } | { ok: false; status: 403 | 404; reason: string }> {
-  const refused = { ok: false as const, status: 403 as const, reason: "You don't have access to this audit log." };
+/** Who may read which space's audit, answered as a refusal with its status (for the export route). */
+export async function auditScope(viewer: Viewer, spaceSlug: string): Promise<{ ok: true; scope: AuditScope } | ReadRefusal> {
+  const refused = refusal(403, REASONS.generic);
   if (spaceSlug === ALL_SPACE) {
     if (!isCrossTeam(viewer) || !can(viewer, "audit.view", { teamId: ALL_SPACE }).ok) return refused;
     return { ok: true, scope: { slug: ALL_SPACE, isAll: true, teamId: null, name: "All teams" } };
   }
   const team = await db.query.teams.findFirst({ where: eq(teams.slug, spaceSlug) });
-  if (!team) return { ok: false, status: 404, reason: "No such team." };
+  if (!team) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
   if (!can(viewer, "audit.view", { teamId: team.id }).ok) return refused;
   return { ok: true, scope: { slug: team.slug, isAll: false, teamId: team.id, name: team.name } };
 }

@@ -29,11 +29,13 @@ recompute lines as a person types. Most rules are here, but not all of them yet:
   No Node APIs, no `server-only`, no heavy dependencies.
 - **A refusal is a code and a sentence.** Every refusal is an entry in a table (`REASONS`, `REFUSALS`,
   `STAGE_REFUSALS`, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `OUTPUT_REFUSALS`,
-  `REQUEST_REFUSALS`) built with
+  `IMPORT_REFUSALS`, `REQUEST_REFUSALS`) built with
   `refusal(code, sentence)` from [refusals.ts](refusals.ts). The code is a snake_case identifier no other entry has;
   it is what code branches on and what a ported backend returns. The sentence is shown as is and can be reworded
-  freely: nothing compares it ([decision 0025](../../docs/decisions/0025-refusals-carry-stable-codes.md)).
-  `IMPORT_REFUSALS` keeps its own codes, its keys.
+  freely: nothing compares it ([decision 0025](../../docs/decisions/0025-refusals-carry-stable-codes.md)). The
+  browser's routes (autosave, import, the audit export) answer a refusal in this shape too, as `{ ok: false, code,
+  reason }` ([decision 0041](../../docs/decisions/0041-routes-refuse-in-the-actions-shape.md)). The keys of
+  `IMPORT_REFUSALS` are what the converters call a failure (`pdfLocked`); the wire code is the entry's own.
 - Domain inputs use `Date`; read models that cross into client components use ISO strings.
 - Messages and notice payloads never contain a submitted variable value.
 

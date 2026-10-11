@@ -50,7 +50,7 @@ Feature folders:
 | --- | --- | --- |
 | `access/` | Request-access cards and `RolePicker`. | `/request-access` |
 | `activity/` | The template's Activity tab. | `/[team]/templates/[templateId]/activity` |
-| `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
+| `audit/` | Audit log view, filters, table, Export link (`ExportLink` fetches the CSV and shows a refusal's sentence in a toast). | `/[team]/audit` |
 | `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block of the body, or to a channel field: a message's whole content, or a document's email subject and preheader (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
 | `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
@@ -220,8 +220,11 @@ answer, which the caller shows as its own failure. The Compare panel (`versions/
 (`workspace/copilot/copilot-prompt.tsx`) and the SHARE panel (`workspace/workspace-share.tsx`) read this way.
 
 **Other paths.** Some client code `fetch`es other route handlers: autosave (`workspace/autosave/save-transport.ts`),
-the preview render for the document channels (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), and
-the ⌘K palette. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
+the preview render for the document channels (`preview/render-preview.ts`), uploads (`library/upload-import.ts`), the
+audit export (`audit/export-audit.ts`), and the ⌘K palette. Autosave, uploads and the audit export read a refusal as
+`{ ok: false, code, reason }` like a server action's, and branch on the `code`, never the sentence: the autosave
+scheduler decides by it whether saving stops (`stopsSaving`) and which message to show; uploads and the audit export
+show the `reason` where the person acted. Push and SMS fetch nothing: they render in the browser (see [The preview](#the-preview)).
 State shared across subtrees is a small store read with `useSyncExternalStore` (`workspace/session/session-store.ts`).
 The Content page's draft as typed, ahead of autosave (each channel field and the sample sets), is another
 (`workspace/session/live-draft.ts`): the composer writes it on every keystroke, and the phone preview, the meta line

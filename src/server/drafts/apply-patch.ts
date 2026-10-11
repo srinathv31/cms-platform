@@ -4,7 +4,8 @@ import type { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { ALL_CHANNEL_FIELDS, withChannelFieldValues, type ChannelFieldsPatch } from "@/domain/channel-fields";
 import { draftChannelsRefusal, withWriter } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
-import type { DraftPatch, DraftSaveError, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS, refuse, type Refusal } from "@/domain/refusals";
+import type { DraftPatch, DraftSaveResponse, JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { auditEvents, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
 import { prepareBody, prepareField } from "@/server/documents/prepare";
@@ -15,31 +16,33 @@ import { NAME_MESSAGE, normalizeName } from "./parse-patch";
 // The database half of an autosave. `saveDraft` (save-draft.ts) supplies the real database and the
 // demo clock; this takes both as arguments so the tests can run it against a temporary database.
 // The body and the channel fields are stored as src/server/documents/prepare.ts makes them (normalized,
-// checked, with block ids); a document it refuses is `invalid` with the check's sentence. Every field,
+// checked, with block ids); a document it refuses is `invalid_input` with the check's sentence. Every field,
 // the name too, is the draft's own: nothing here changes another version or what customers see.
 
-type Refusal = Extract<DraftSaveResponse, { ok: false }>;
+type Refused = Extract<DraftSaveResponse, { ok: false }>;
 
-function fail(error: DraftSaveError, message: string, rev?: number): Refusal {
-  return rev === undefined ? { ok: false, error, message } : { ok: false, error, rev, message };
+/** A refusal as the answer, with the current `rev` when the answer is that the draft has moved on. */
+function fail(refusal: Refusal, rev?: number): Refused {
+  return rev === undefined ? refuse(refusal) : { ...refuse(refusal), rev };
 }
 
-const NOT_FOUND = "This draft no longer exists.";
+/** The patch is wrong, not the draft: the author fixes it by editing (the sentence is the check's own). */
+const invalid = (message: string) => fail(REQUEST_REFUSALS.invalidInput(message));
 
-/** `not_found` when there is no such version, `forbidden` when the viewer can't edit its team's drafts, else null. */
-function editRefusal(viewer: Viewer, version: { teamId: string } | undefined): Refusal | null {
-  if (!version) return fail("not_found", NOT_FOUND);
+/** `version_gone` when there is no such version, the permission refusal when the viewer can't edit its team's drafts, else null. */
+function editRefusal(viewer: Viewer, version: { teamId: string } | undefined): Refused | null {
+  if (!version) return fail(REQUEST_REFUSALS.versionGone);
   const allowed = can(viewer, "draft.edit", { teamId: version.teamId });
-  return allowed.ok ? null : fail("forbidden", allowed.reason);
+  return allowed.ok ? null : allowed;
 }
 
 /**
- * Whether the viewer may save to this version, from its id alone: the `not_found` or `forbidden`
- * answer `applyDraftPatch` would give, or null. The route asks this before it reads the body, so a
+ * Whether the viewer may save to this version, from its id alone: the `version_gone` or permission
+ * refusal `applyDraftPatch` would give, or null. The route asks this before it reads the body, so a
  * request from someone who can't edit the draft is answered without buffering or parsing a byte of
  * it. The save asks again inside its transaction.
  */
-export async function accessRefusal(db: Db, viewer: Viewer, versionId: string): Promise<Refusal | null> {
+export async function accessRefusal(db: Db, viewer: Viewer, versionId: string): Promise<Refused | null> {
   const version = await db
     .select({ teamId: templates.teamId })
     .from(versions)
@@ -83,22 +86,23 @@ export interface ApplyPatchArgs {
 
 /**
  * Saves a patch to a draft in one transaction.
- * Order of answers: not_found, forbidden, not_draft, conflict, then invalid (the checks that need
- * the database). A stale rev is a conflict unless the same session wrote the current rev (lost response). Shape problems are the route's 400 and never reach here.
+ * Order of answers: `version_gone`, the permission refusal, `version_not_draft`, `draft_changed`, then
+ * the check that needs the database (the channels). A stale rev is `draft_changed` unless the same
+ * session wrote the current rev (lost response). Shape problems are the route's 400 and never reach here.
  */
 export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: ApplyPatchArgs): Promise<DraftSaveResponse> {
   // Pure work first, so the write lock is held only for the reads and writes.
   let name: string | undefined;
   if (patch.name !== undefined) {
     const normalized = normalizeName(patch.name);
-    if (normalized === null) return fail("invalid", NAME_MESSAGE);
+    if (normalized === null) return invalid(NAME_MESSAGE);
     name = normalized;
   }
 
   let body: JSONContent | undefined;
   if (patch.body !== undefined) {
     const prepared = prepareBody(patch.body);
-    if (!prepared.ok) return fail("invalid", prepared.message);
+    if (!prepared.ok) return invalid(prepared.message);
     body = prepared.doc;
   }
 
@@ -112,7 +116,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       continue;
     }
     const prepared = prepareField(value, field);
-    if (!prepared.ok) return fail("invalid", prepared.message);
+    if (!prepared.ok) return invalid(prepared.message);
     fields[field.id] = prepared.doc;
   }
   const fieldsChanged = Object.keys(fields).length > 0;
@@ -138,11 +142,11 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       .limit(1)
       .then((rows) => rows[0]);
 
-    if (!row) return fail("not_found", NOT_FOUND);
+    if (!row) return fail(REQUEST_REFUSALS.versionGone);
     const forbidden = editRefusal(viewer, row);
     if (forbidden) return forbidden;
 
-    if (row.state !== "draft") return fail("not_draft", "This version is no longer a draft.");
+    if (row.state !== "draft") return fail(REQUEST_REFUSALS.versionNotDraft);
 
     // One audit row per editing session: the same actor, draft and session key.
     const existing = await tx
@@ -163,11 +167,11 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
     // then it is only missing its own saves (a lost response) and it is safe to carry on from the
     // current rev. A request that is ahead is always a conflict.
     if (patch.rev !== row.rev && !sessionOwnsRev(existing ?? null, row.rev, patch.rev)) {
-      return fail("conflict", "This draft changed elsewhere.", row.rev);
+      return fail(REQUEST_REFUSALS.draftChanged, row.rev);
     }
 
     const channelsRefused = patch.channels ? draftChannelsRefusal(patch.channels, row.allowedChannels) : null;
-    if (channelsRefused) return fail("invalid", channelsRefused.reason);
+    if (channelsRefused) return fail(channelsRefused);
 
     // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
     const set: SQLiteUpdateSetSource<typeof versions> = {
@@ -191,7 +195,7 @@ export async function applyDraftPatch(db: Db, { viewer, versionId, patch, at }: 
       .where(and(eq(versions.id, versionId), eq(versions.rev, row.rev), eq(versions.state, "draft")))
       .returning({ rev: versions.rev });
     const saved = updated[0];
-    if (!saved) return fail("conflict", "This draft changed elsewhere.", row.rev);
+    if (!saved) return fail(REQUEST_REFUSALS.draftChanged, row.rev);
 
     const merged = mergeDraftEdit(existing ?? null, changed, at, saved.rev);
     if (existing) {

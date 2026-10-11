@@ -47,7 +47,7 @@ const header = (draft: DraftBinding | null = { versionId: "v_draft", rev: 4 }) =
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const saved = (rev: number) => reply(200, { ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" });
-const conflict = () => reply(409, { ok: false, error: "conflict", rev: 9, message: "This draft changed elsewhere." });
+const conflict = () => reply(409, { ok: false, code: "draft_changed", rev: 9, reason: "This draft changed. Try again." });
 
 const sent = (index: number) => {
   const [url, init] = fetchMock.mock.calls[index]!;

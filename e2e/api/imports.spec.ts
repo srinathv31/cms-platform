@@ -173,10 +173,10 @@ test.describe("POST /api/imports", () => {
   test("refuses a legacy .doc (415), an empty file (400) and a file over 10 MB (413)", async ({ playwright, baseURL }) => {
     await asPersona(playwright, baseURL!, "maya", async (request) => {
       const doc = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]);
-      await expectRefusal(await upload(request, { name: "old.doc", mimeType: "application/msword", buffer: doc }), 415, "legacyDoc", REFUSALS.legacyDoc);
-      await expectRefusal(await upload(request, { name: "empty.txt", mimeType: "text/plain", buffer: Buffer.alloc(0) }), 400, "empty", REFUSALS.empty);
+      await expectRefusal(await upload(request, { name: "old.doc", mimeType: "application/msword", buffer: doc }), 415, "import_legacy_doc", REFUSALS.legacyDoc);
+      await expectRefusal(await upload(request, { name: "empty.txt", mimeType: "text/plain", buffer: Buffer.alloc(0) }), 400, "import_empty", REFUSALS.empty);
       const big = Buffer.alloc(10 * 1024 * 1024 + 1, 0x61);
-      await expectRefusal(await upload(request, { name: "big.txt", mimeType: "text/plain", buffer: big }), 413, "size", REFUSALS.size);
+      await expectRefusal(await upload(request, { name: "big.txt", mimeType: "text/plain", buffer: big }), 413, "import_too_large", REFUSALS.size);
     });
   });
 
@@ -195,12 +195,12 @@ test.describe("POST /api/imports", () => {
 
     const taylor = await chunked("taylor", 64);
     expect(taylor.status).toBe(403);
-    expect(JSON.parse(taylor.body)).toMatchObject({ ok: false, code: "permission" });
+    expect(JSON.parse(taylor.body)).toMatchObject({ ok: false, code: "generic" });
     expect(taylor.sentMb).toBeLessThan(64);
 
     const maya = await chunked("maya", 64);
     expect(maya.status).toBe(413);
-    expect(JSON.parse(maya.body)).toEqual({ ok: false, code: "size", reason: REFUSALS.size });
+    expect(JSON.parse(maya.body)).toEqual({ ok: false, code: "import_too_large", reason: REFUSALS.size });
     expect(maya.sentMb).toBeLessThan(64);
   });
 
@@ -210,7 +210,7 @@ test.describe("POST /api/imports", () => {
       await expectRefusal(
         await upload(request, { name: "notes.txt", mimeType: "text/plain", buffer: bytes }),
         403,
-        "permission",
+        "generic",
         "You don't have access to do this.",
       );
     });
@@ -220,8 +220,11 @@ test.describe("POST /api/imports", () => {
       return (await rowsFor(res.templateId)).upload.id;
     });
     await asPersona(playwright, baseURL!, "morgan", async (request) => {
-      expect((await request.get(`/api/imports/${uploadId}/view`)).status()).toBe(404);
-      expect((await request.get(`/api/imports/${uploadId}/file`)).status()).toBe(404);
+      for (const route of ["view", "file"]) {
+        const res = await request.get(`/api/imports/${uploadId}/${route}`);
+        expect(res.status()).toBe(404);
+        expect(await res.json()).toEqual({ ok: false, code: "upload_unavailable", reason: "This file isn't available." });
+      }
     });
     await asPersona(playwright, baseURL!, "taylor", async (request) => {
       expect((await request.get(`/api/imports/${uploadId}/view`)).status()).toBe(200);

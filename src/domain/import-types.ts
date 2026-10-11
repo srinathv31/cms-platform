@@ -7,6 +7,7 @@
 // `uploads` table and `versions.import_upload_id` already exist (0000_init). If something here is
 // wrong, make the smallest additive change and say so first in your report.
 
+import { refusal, type Refused } from "./refusals";
 import type { Channel, ChannelFamily, JSONContent, RequiredSection, Variable, VersionState } from "./types";
 
 // ── Files ────────────────────────────────────────────────────────────────────
@@ -38,33 +39,40 @@ export const IMPORT_MIME: Record<ImportKind, string> = {
 };
 
 /**
- * Why an import was refused: the one short line shown under the drop row (explain only when
- * blocked). Kinds are sniffed: docx = a zip holding word/document.xml; pdf = starts with "%PDF-";
- * txt = valid UTF-8 (a BOM is fine) with no NUL bytes and a .txt name. A legacy .doc is `legacyDoc`;
- * a file named .pdf or .docx whose bytes aren't one is `notPdf` / `notWord`; anything else is `type`.
+ * Why an import was refused: the code a screen can branch on and the one short line shown under the
+ * drop row (explain only when blocked). Kinds are sniffed: docx = a zip holding word/document.xml;
+ * pdf = starts with "%PDF-"; txt = valid UTF-8 (a BOM is fine) with no NUL bytes and a .txt name. A
+ * legacy .doc is `legacyDoc`; a file named .pdf or .docx whose bytes aren't one is `notPdf` /
+ * `notWord`; anything else is `type`. The keys are what the converters and the worker call a
+ * failure; the wire `code` is the entry's own (decision 0041).
  */
 export const IMPORT_REFUSALS = {
-  type: "Only .docx, .pdf and .txt files can be imported.",
+  type: refusal("import_unsupported_type", "Only .docx, .pdf and .txt files can be imported."),
   /** A legacy Word file (.doc): the one kind of refusal that has a way forward. */
-  legacyDoc: "Only .docx, .pdf and .txt files can be imported. Save it as .docx first.",
+  legacyDoc: refusal("import_legacy_doc", "Only .docx, .pdf and .txt files can be imported. Save it as .docx first."),
   /** Named .pdf, but the bytes aren't a PDF. */
-  notPdf: "This isn't a valid PDF.",
+  notPdf: refusal("import_not_pdf", "This isn't a valid PDF."),
   /** Named .docx, but the bytes aren't a Word file. */
-  notWord: "This isn't a valid Word file.",
-  size: "This file is larger than 10 MB.",
-  empty: "This file is empty.",
-  unreadable: "Couldn't read this file.",
-  tooLong: "This file has too much text to import.",
-  pdfNoText: "This PDF has no text to import.",
-  pdfLocked: "This PDF is password-protected.",
-  pdfPages: "This PDF has more than 50 pages.",
+  notWord: refusal("import_not_word", "This isn't a valid Word file."),
+  size: refusal("import_too_large", "This file is larger than 10 MB."),
+  empty: refusal("import_empty", "This file is empty."),
+  unreadable: refusal("import_unreadable", "Couldn't read this file."),
+  tooLong: refusal("import_too_long", "This file has too much text to import."),
+  pdfNoText: refusal("import_pdf_no_text", "This PDF has no text to import."),
+  pdfLocked: refusal("import_pdf_locked", "This PDF is password-protected."),
+  pdfPages: refusal("import_pdf_pages", "This PDF has more than 50 pages."),
   /**
    * The converted document fails the document check (docs/render-spec.md §3), e.g. a table whose
-   * merged cells don't line up. The response's reason is this line, then the check's own sentence.
+   * merged cells don't line up. The sentence is this line, then the check's own.
    */
-  content: "This file can't be imported as it is.",
+  content: refusal("import_content", (problem: string) => `This file can't be imported as it is. ${problem}`),
 } as const;
-export type ImportRefusalCode = keyof typeof IMPORT_REFUSALS;
+
+/**
+ * What a conversion can fail with: the key of a fixed entry of `IMPORT_REFUSALS`. (`content` comes
+ * after conversion, from the document check, with that check's sentence.)
+ */
+export type ImportRefusalName = Exclude<keyof typeof IMPORT_REFUSALS, "content">;
 
 /** Why Import a file isn't offered for an alert: a file's text becomes a body, and only a document has one. */
 export const IMPORT_DOCUMENTS_ONLY = "Only documents can be imported.";
@@ -198,7 +206,8 @@ export interface ConvertedFile {
   dropped: ImportDrop[];
 }
 
-export type ConvertResult = { ok: true; file: ConvertedFile } | { ok: false; code: ImportRefusalCode };
+/** `code` is the key of the `IMPORT_REFUSALS` entry the failure becomes, not that entry's wire code. */
+export type ConvertResult = { ok: true; file: ConvertedFile } | { ok: false; code: ImportRefusalName };
 
 /** The pure finishing step's output (src/domain/import.ts: `finishImport`). Block ids come after (server: ensureBlockIds). */
 export interface FinishedImport {
@@ -220,19 +229,19 @@ export interface FinishImportInput {
 // POST /api/imports?team=<team slug>   multipart/form-data { file: File } → ImportResponse
 //   A route handler, not a server action: actions cap bodies at 1 MB unless next.config changes.
 //   Permission: can(viewer, "template.create", { teamId }) first, before the body is read (403 with
-//   the refusal reason); then the body is read with a byte counter, refused (413) past 10 MB + 64 KB.
-//   Status: 200 ok · 400 refused (empty/unreadable/too long/no text/locked/pages/content) · 403 · 413 size · 415 type.
+//   the permission refusal); then the body is read with a byte counter, refused (413) past 10 MB + 64 KB.
+//   A refusal is { ok: false, code, reason } (src/domain/refusals.ts), the code an IMPORT_REFUSALS
+//   entry's or the permission refusal's. Status: 200 ok · 400 refused (empty/unreadable/too long/no
+//   text/locked/pages/content) · 403 · 413 too large · 415 type.
 //   On success it sets JUST_CREATED_COOKIE (the name is selected on arrival) and JUST_IMPORTED_COOKIE
 //   (the rail opens on Original on arrival), and revalidates the Library; the client then
 //   router.push(href). Audit: "template.created" with details { name, source: "import:<kind>", filename }.
 // GET /api/imports/{uploadId}/file      the original bytes (Content-Type IMPORT_MIME[kind],
-//   Content-Disposition inline with filename*=UTF-8''…, Cache-Control private, no-store); 404 when the
-//   viewer can't see the template's space.
-// GET /api/imports/{uploadId}/view      ImportOriginalView JSON (same permission).
+//   Content-Disposition inline with filename*=UTF-8''…, Cache-Control private, no-store); 404 with
+//   { ok: false, code: "upload_unavailable", reason } when the viewer can't see the template's space.
+// GET /api/imports/{uploadId}/view      ImportOriginalView JSON (same permission, same 404).
 
-export type ImportResponse =
-  | { ok: true; templateId: string; href: string }
-  | { ok: false; code: ImportRefusalCode | "permission"; reason: string };
+export type ImportResponse = { ok: true; templateId: string; href: string } | Refused;
 
 /** One-shot, like `ucomp_created` (src/domain/arrival-cookies.ts): holds the template id; max-age 60. */
 export const JUST_IMPORTED_COOKIE = "ucomp_imported";

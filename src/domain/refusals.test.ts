@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ACCESS_REFUSALS } from "./access";
 import { STAGE_REFUSALS } from "./approval-chain";
 import { COMMENT_REFUSALS } from "./comments";
+import { IMPORT_REFUSALS } from "./import-types";
 import { REFUSALS } from "./lifecycle";
 import { REASONS } from "./permissions";
 import { PLATFORM_REFUSALS } from "./platform-config";
@@ -22,6 +23,7 @@ const TABLES = {
   ACCESS_REFUSALS,
   PLATFORM_REFUSALS,
   OUTPUT_REFUSALS,
+  IMPORT_REFUSALS,
   REQUEST_REFUSALS,
 } as const;
 

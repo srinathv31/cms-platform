@@ -1,9 +1,10 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { finishImport, refusalForUnreadableKind } from "@/domain/import";
-import { IMPORT_LIMITS, IMPORT_MIME, IMPORT_REFUSALS, type ImportRefusalCode, type ImportResponse } from "@/domain/import-types";
+import { IMPORT_LIMITS, IMPORT_MIME, IMPORT_REFUSALS, type ImportRefusalName, type ImportResponse } from "@/domain/import-types";
 import { createDraft } from "@/domain/lifecycle";
 import { REASONS, can } from "@/domain/permissions";
+import { refuse, type Refused, type RefusalCode } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
 import { defaultSampleSets } from "@/editor/model/sample-sets";
 import { now } from "@/server/clock";
@@ -35,15 +36,25 @@ export interface ImportOptions {
   uploadsRoot?: string;
 }
 
-const refuse = (code: ImportRefusalCode): ImportResponse => ({ ok: false, code, reason: IMPORT_REFUSALS[code] });
+const refuseFile = (name: ImportRefusalName): ImportResponse => refuse(IMPORT_REFUSALS[name]);
 
-/** The HTTP status for an import's answer: 200 · 400 refused · 403 · 413 size · 415 type. */
+/** The statuses of the refusals that aren't a plain 400: the file is too large, or not a kind we take. */
+const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
+  [IMPORT_REFUSALS.size.code]: 413,
+  [IMPORT_REFUSALS.type.code]: 415,
+  [IMPORT_REFUSALS.legacyDoc.code]: 415,
+  [IMPORT_REFUSALS.notPdf.code]: 415,
+  [IMPORT_REFUSALS.notWord.code]: 415,
+};
+const IMPORT_CODES: ReadonlySet<string> = new Set(Object.values(IMPORT_REFUSALS).map((entry) => entry.code));
+
+/**
+ * The HTTP status for an import's answer: 200 · 400 the file is refused · 403 the viewer may not
+ * create here (any refusal that isn't about the file) · 413 too large · 415 not a kind we take.
+ */
 export function importStatus(response: ImportResponse): number {
   if (response.ok) return 200;
-  if (response.code === "permission") return 403;
-  if (response.code === "size") return 413;
-  if (response.code === "type" || response.code === "legacyDoc" || response.code === "notPdf" || response.code === "notWord") return 415;
-  return 400;
+  return IMPORT_STATUS[response.code] ?? (IMPORT_CODES.has(response.code) ? 400 : 403);
 }
 
 /**
@@ -53,10 +64,11 @@ export function importStatus(response: ImportResponse): number {
 export async function importPermission(
   viewer: Viewer,
   teamSlug: string,
-): Promise<{ ok: true; team: typeof teams.$inferSelect } | (ImportResponse & { ok: false })> {
+): Promise<{ ok: true; team: typeof teams.$inferSelect } | Refused> {
   const team = teamSlug ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) }) : undefined;
   const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
-  if (!allowed.ok || !team) return { ok: false, code: "permission", reason: allowed.ok ? REASONS.generic.reason : allowed.reason };
+  if (!allowed.ok) return allowed;
+  if (!team) return refuse(REASONS.generic);
   return { ok: true, team };
 }
 
@@ -70,15 +82,15 @@ export async function importTemplate(
   const { team } = permitted;
 
   const file = input.file;
-  if (!file) return refuse("unreadable");
-  if (file.bytes.byteLength === 0) return refuse("empty");
-  if (file.bytes.byteLength > IMPORT_LIMITS.maxBytes) return refuse("size");
+  if (!file) return refuseFile("unreadable");
+  if (file.bytes.byteLength === 0) return refuseFile("empty");
+  if (file.bytes.byteLength > IMPORT_LIMITS.maxBytes) return refuseFile("size");
 
   const kind = sniffKind(file.bytes, file.name);
-  if (!kind) return refuse(refusalForUnreadableKind(file.name));
+  if (!kind) return refuseFile(refusalForUnreadableKind(file.name));
 
   const converted = await convertFile(kind, file.bytes);
-  if (!converted.ok) return refuse(converted.code);
+  if (!converted.ok) return refuseFile(converted.code);
 
   // Import makes documents (`importUnavailable`): a file's text becomes the body.
   const chosen = await newTemplateType("document");
@@ -92,7 +104,7 @@ export async function importTemplate(
   });
   // A document the check refuses is never stored (it couldn't be rendered): nothing is written.
   const body = prepareBody(finished.body);
-  if (!body.ok) return { ok: false, code: "content", reason: `${IMPORT_REFUSALS.content} ${body.message}` };
+  if (!body.ok) return refuse(IMPORT_REFUSALS.content(body.message));
 
   const at = await now();
   const templateId = await freshTemplateId();

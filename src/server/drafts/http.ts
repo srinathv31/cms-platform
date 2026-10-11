@@ -1,24 +1,22 @@
 // How a save answer becomes an HTTP status. Pure TypeScript so the table is testable on its own.
 
-import type { DraftSaveError, DraftSaveResponse } from "@/domain/types";
-import { TOO_LARGE_MESSAGE } from "./parse-patch";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS, type RefusalCode } from "@/domain/refusals";
+import type { DraftSaveResponse } from "@/domain/types";
 
-export const DRAFT_SAVE_STATUS: Record<DraftSaveError, number> = {
-  invalid: 400,
-  forbidden: 403,
-  not_found: 404,
-  not_draft: 409,
-  conflict: 409,
+/**
+ * The status of each refusal an autosave gives. A refusal not named here is the patch itself being
+ * wrong (it doesn't parse, a document or the channels fail their check): 400.
+ */
+export const DRAFT_SAVE_STATUS: Partial<Record<RefusalCode, number>> = {
+  [REASONS.generic.code]: 403,
+  [REQUEST_REFUSALS.versionGone.code]: 404,
+  [REQUEST_REFUSALS.versionNotDraft.code]: 409,
+  [REQUEST_REFUSALS.draftChanged.code]: 409,
+  // A body over MAX_BODY_SIZE, declared or counted as it's read: 413, the status HTTP has for it.
+  [REQUEST_REFUSALS.draftTooLarge.code]: 413,
 };
 
 export function statusOf(response: DraftSaveResponse): number {
-  return response.ok ? 200 : DRAFT_SAVE_STATUS[response.error];
+  return response.ok ? 200 : (DRAFT_SAVE_STATUS[response.code] ?? 400);
 }
-
-/**
- * A body over MAX_BODY_SIZE, declared or counted as it's read: 413, the status HTTP has for it. The
- * body is an ordinary `invalid`, so the client shows the sentence and keeps the edits, as for any
- * other refused patch.
- */
-export const TOO_LARGE: DraftSaveResponse = { ok: false, error: "invalid", message: TOO_LARGE_MESSAGE };
-export const TOO_LARGE_STATUS = 413;

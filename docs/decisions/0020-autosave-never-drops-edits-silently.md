@@ -1,6 +1,9 @@
 # 0020. Autosave never drops an edit without saying so
 
 Status: Accepted
+Amended 2026-10-11: the refusals named in the second Context bullet (`conflict`, `forbidden`, `not_draft`, `not_found`)
+are now the codes `draft_changed`, `generic`, `version_not_draft` and `version_gone`, and the scheduler decides by code
+which refusals stop saving ([0041](0041-routes-refuse-in-the-actions-shape.md), A3).
 Date: 2026-10-09
 
 ## Context

@@ -100,7 +100,7 @@ decisions were in the product; they are recoverable from the `archive/design-moc
 | `GET /api/templates/[templateId]/submit-summary` | [route.ts](./api/templates/[templateId]/submit-summary/route.ts) | Browser: the submit dialog and its Refresh summary ([workspace-actions.tsx](../components/workspace/workspace-actions.tsx)). |
 | `GET /api/templates/[templateId]/copilot-prompt` | [route.ts](./api/templates/[templateId]/copilot-prompt/route.ts) | Browser: the Copilot prompt dialog ([copilot-prompt.tsx](../components/workspace/copilot/copilot-prompt.tsx)). |
 | `GET /api/templates/[templateId]/integration` | [route.ts](./api/templates/[templateId]/integration/route.ts) | Browser: the SHARE panel, on open and as a prefetch ([workspace-share.tsx](../components/workspace/workspace-share.tsx)). |
-| `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV). |
+| `GET /[team]/audit/export` | [route.ts](./(product)/[team]/audit/export/route.ts) | Browser: the Audit page's Export link (CSV; [export-link.tsx](../components/audit/export-link.tsx) shows a refusal). |
 | `GET /api/v1/templates?q=&limit=&after=` | [route.ts](./api/v1/templates/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/templates/[templateId]?version=&since=` | [route.ts](./api/v1/templates/[templateId]/route.ts) | Simulator and outside consumers. |
 | `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
@@ -196,11 +196,16 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
 - Render adds `X-Stencil-Template-Id`, `X-Stencil-Version`, `X-Stencil-Newer-Version` and `X-Stencil-Preview`,
   and a strict CSP on web HTML.
 
-**Internal routes** answer errors in five shapes: `DraftSaveResponse` (status from `statusOf`), `ImportResponse`
-(status from `importStatus`), `{ ok: false, code, reason }` (the `ActionResult` the template reads and the palette
-answer, with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and
-plain text (audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful
-import read, on every template read and on the palette).
+**Internal routes** (the browser's, under `/api` but `/api/v1`, and the audit export) refuse in one shape, the
+`ActionResult` a server action answers: `{ ok: false, code, reason }`, the code from a refusal table in
+`src/domain` and the status that suits it ([decision 0041](../../docs/decisions/0041-routes-refuse-in-the-actions-shape.md)).
+Autosave's status comes from `statusOf` ([drafts/http.ts](../server/drafts/http.ts); `draft_changed` also carries the
+current `rev`), import's from `importStatus` ([import/create.ts](../server/import/create.ts)), and the reads', the
+palette's and the audit export's from the `ReadRefusal` their query returns (`readResponse`,
+[server/api/reads.ts](../server/api/reads.ts)). The import file and view reads answer `upload_unavailable` with 404,
+and the audit export `generic` with 403 or `space_unavailable` with 404, never a file. Coral's delivery file route
+answers plain text; it is the simulator's. Every answer sends `Cache-Control: no-store` (`private, no-store` on the
+reads, the audit export's refusals, the palette and a successful import read).
 
 **Coral's reads** (`/sim/templates/search`, `/sim/deliveries/[deliveryId]/view`) are the simulator's own, in the
 simulator's shape rather than Stencil's: `{ ok: true, … }` or `{ ok: false, reason }` (its `SimResult`) with a 400,
@@ -225,8 +230,8 @@ carries templates; the palette asks this route when it opens and as the viewer t
 ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)).
 
 **Body caps.** Drafts: 2,000,000 bytes (`MAX_BODY_SIZE` in `src/server/drafts/parse-patch.ts`), 413 with the
-route's `invalid` body. Render: 1,000,000 bytes (`MAX_BODY_BYTES` in `src/domain/render/types.ts`), 413
-`body_too_large`. Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room, 413 `size`. Every one
+`draft_too_large`. Render: 1,000,000 bytes (`MAX_BODY_BYTES` in `src/domain/render/types.ts`), 413
+`body_too_large`. Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room, 413 `import_too_large`. Every one
 refuses a declared `Content-Length` over its cap before reading, then reads with `readBodyCapped`, which counts bytes
 and stops at the cap, because a declared length is only a hint and a chunked body has none. Drafts and imports
 check permission before any byte is read: drafts from the version id in the path (`draftAccessRefusal`), imports from
@@ -271,8 +276,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   Await `params` inside an async component instead.
 - **Permission logic in a page.** [request-access/page.tsx](./(product)/request-access/page.tsx) calls `can()`
   and picks a `REASONS` sentence itself. Let the query decide and return the result.
-- **A sixth error shape.** Internal routes already answer in five. A new public route uses `errorResponse`; a
-  new internal one reuses an existing shape (a read, `readResponse`).
+- **Another error shape.** Internal routes refuse as `{ ok: false, code, reason }`, with the code from a table in
+  `src/domain`; a new one reuses that (a read, `readResponse`). Only a new public route uses `errorResponse`.
 - **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated
   and exist only outside production builds.
 
@@ -284,7 +289,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
   with `getViewer` mocked to each persona, and so is the palette's search
   ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
-  server function and test only the HTTP mapping. The audit export and delivery file routes have no unit test.
+  server function and test only the HTTP mapping. The audit export's test ([route.test.ts](./(product)/[team]/audit/export/route.test.ts)) mocks the viewer and the
+  query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
   3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
   `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server

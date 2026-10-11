@@ -50,6 +50,7 @@ describe("GET /api/imports/[uploadId]/view", () => {
     vi.mocked(getImportOriginalView).mockResolvedValue(null);
     const res = await get();
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "not_found" });
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(await res.json()).toEqual({ ok: false, code: "upload_unavailable", reason: "This file isn't available." });
   });
 });
