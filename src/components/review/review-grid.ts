@@ -46,15 +46,18 @@ export const RV = {
   /**
    * The document or the output: the workspace's cell (text on the column's left edge, the gutter hanging left).
    * Below 800px (the sidebar a drawer, the canvas padding 1rem) it pads 1.5rem more on the right, as the workspace's
-   * does: with the grid's 1rem that is the 2.5rem the comment markers hang in.
+   * does: with the grid's 1rem that is the 2.5rem the comment markers hang in. Under 26rem of canvas the decision bar
+   * wraps to a height of its own (`--decision-bar-h`, which the bar publishes on the grid) and rests over the cell's
+   * last rows, so the cell pads at least that much, and a rem of air, below its text.
    */
-  doc: `${WS.doc} ${STACKED_PR}`,
+  doc: `${WS.doc} ${STACKED_PR} @max-[26rem]/canvas:pb-[max(3.5rem,40svh,calc(var(--decision-bar-h,0px)+1rem))]`,
 
   /**
    * The output: the document's cell, with a height of its own (the well scrolls inside it). Stacked, the
    * decision bar covers the bottom of the cell, so the well ends above it (the bar's 57px and 15px of air).
+   * Under 26rem of canvas the bar wraps to the height it publishes as `--decision-bar-h` (7.5rem until it has).
    */
-  output: `col-start-1 row-start-3 flex h-[max(30rem,calc(var(--ws-h)-10.5rem))] w-full min-w-0 max-w-(--doc-width) flex-col justify-self-center pt-2 pb-3 @max-[53rem]/ws:pb-[4.3rem] @max-[26rem]/canvas:pb-[7.5rem] ${STACKED_PR}`,
+  output: `col-start-1 row-start-3 flex h-[max(30rem,calc(var(--ws-h)-10.5rem))] w-full min-w-0 max-w-(--doc-width) flex-col justify-self-center pt-2 pb-3 @max-[53rem]/ws:pb-[4.3rem] @max-[26rem]/canvas:pb-[max(7.5rem,calc(var(--decision-bar-h,0px)+1rem))] ${STACKED_PR}`,
 
   /**
    * The rail. Wide: a sticky strip beside the whole main pane. Stacked: the grid's fourth row, flush to
