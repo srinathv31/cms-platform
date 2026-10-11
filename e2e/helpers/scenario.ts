@@ -1,7 +1,9 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
-import { demoCursor, glide, isDemo, moveTo } from "../media/demo";
+import { pacing } from "../media/pacing";
+import { demoStage } from "../media/stage";
 
-// Gate media (recording, stills, pacing) lives in ../media/demo.ts; the specs get it from here.
+// Gate media (recording, stills) lives in ../media; the specs get it from here. The helpers below act at test
+// speed. In the `demo` project the `demoStage` fixture swaps in the presentation pacing (../media/pacing.ts).
 export { beat, demoCursor, demoTimeout, isDemo, isShooting, moveTo, shoot } from "../media/demo";
 
 // Shared by the scenario specs that drive the workspace as a person would: a test that fails on any
@@ -31,20 +33,7 @@ export const test = base.extend<Fixtures>({
     },
     { auto: true },
   ],
-  demoStage: [
-    async ({ page }, use, testInfo) => {
-      const before = { UCOMP_DEMO: process.env.UCOMP_DEMO, UCOMP_STILLS: process.env.UCOMP_STILLS };
-      if (testInfo.project.metadata?.demo) process.env.UCOMP_DEMO = "1";
-      if (testInfo.project.metadata?.stills) process.env.UCOMP_STILLS = "1";
-      await demoCursor(page);
-      await use();
-      for (const [key, value] of Object.entries(before)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
-    },
-    { auto: true },
-  ],
+  demoStage: [demoStage, { auto: true }],
 });
 
 export { expect };
@@ -82,17 +71,17 @@ export async function asPersona(page: Page, id: string) {
 // ── The click counter ──
 
 /**
- * A human-paced click: a real press and release, about 90ms apart (longer in demo mode, so the press
- * shows in the recording). In demo mode the mouse first glides to the target.
+ * A click, at test speed. The specs go through here so the click counter sees every one, and so that the
+ * `demo` project can pace them for a recording (the mouse glides to the target, the press is slow).
  */
 export async function tap(target: Locator, options?: Parameters<Locator["click"]>[0]) {
-  await moveTo(target.page(), target, options?.position);
-  await target.click({ delay: isDemo() ? 140 : 90, ...options });
+  if (pacing.click) return pacing.click(target, options);
+  await target.click(options);
 }
 
 export interface ClickCounter {
   readonly count: number;
-  /** A natural press-and-release (Playwright's default releases within ~1ms), counted. */
+  /** A click through `tap`, counted. */
   click(target: Locator, options?: Parameters<Locator["click"]>[0]): Promise<void>;
 }
 
@@ -266,23 +255,14 @@ export async function pointInText(block: Locator, offset: number) {
 export async function dragRowTo(page: Page, row: Locator, target: { x: number; y: number }) {
   const box = (await row.boundingBox())!;
   const from = { x: box.x + 64, y: box.y + box.height / 2 };
-  if (isDemo()) {
-    // The same gesture, slowly enough to watch: glide to the row, lift off, glide over the target.
-    await glide(page, from);
-    await page.mouse.down();
-    await page.waitForTimeout(160);
-    await page.mouse.move(from.x - 12, from.y - 8, { steps: 6 });
-    await glide(page, target);
-    await page.waitForTimeout(240);
-    await page.mouse.up();
-    return;
-  }
+  if (pacing.dragRow) return pacing.dragRow(page, from, target);
   await page.mouse.move(from.x, from.y, { steps: 4 });
   await page.mouse.down();
-  await page.waitForTimeout(60);
+  // Playwright's first move after the press starts the drag, and returns once the page has seen `dragstart`.
   await page.mouse.move(from.x - 12, from.y - 8, { steps: 3 });
   await page.mouse.move(target.x, target.y, { steps: 12 });
-  await page.waitForTimeout(80);
+  // The editor draws where the drop will land; release once it shows.
+  await expect(page.locator(".ucomp-dropcursor"), "the editor shows where the drop lands").toBeVisible();
   await page.mouse.up();
 }
 
@@ -305,8 +285,9 @@ export const NAME = "Spring Travel Rewards — Terms";
 
 // ── Pacing and waiting (shared by the scenario specs) ──
 
-/** Types the way a person does: a little slower than the machine can. */
-export const typeSlowly = (page: Page, text: string) => page.keyboard.type(text, { delay: isDemo() ? 45 : 18 });
+/** Types the way a person does: a little slower than the machine can (slower still in the `demo` project). */
+export const typeSlowly = (page: Page, text: string) =>
+  pacing.type ? pacing.type(page, text) : page.keyboard.type(text, { delay: 18 });
 
 /**
  * The document itself. With Email on, the subject and the preheader are editors too (also

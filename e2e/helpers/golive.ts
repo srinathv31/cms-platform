@@ -2,7 +2,7 @@ import type { Client, InValue } from "@libsql/client";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { correlation, render, validValues, type Variable } from "../api/helpers";
-import { beat, expect, isDemo, tap, untilUncovered } from "./scenario";
+import { beat, expect, tap, untilUncovered } from "./scenario";
 
 // Shared by the going-live specs (scenarios 4, 5 and 6): the Spring Travel fixture, the cleanup that puts
 // the database back, the pieces of the simulator ("Coral — simulated") a person drives, and the persona
@@ -424,10 +424,12 @@ export async function selectCustomers(page: Page, customers: readonly { name: st
     const box = page.getByRole("checkbox", { name: `Select ${customer.name}`, exact: true });
     await reactReady(box);
     // A page that has just changed (a relink lands on Send) can reset the picker once more as it settles:
-    // a person would see the box still empty and press it again.
-    for (let attempt = 0; attempt < 4 && (await box.getAttribute("aria-checked")) !== "true"; attempt++) {
-      await click(box);
-      await page.waitForTimeout(350);
+    // a person would see the box still empty and press it again. Press until the tick is there after the
+    // page has painted twice, which is when a reset would have shown.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if ((await box.getAttribute("aria-checked")) !== "true") await click(box);
+      await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+      if ((await box.getAttribute("aria-checked")) === "true") break;
     }
     await expect(box).toHaveAttribute("aria-checked", "true");
   }
@@ -450,25 +452,8 @@ export async function send(page: Page) {
   await click(button);
 }
 
-// ── Demo-mode noise ──────────────────────────────────────────────────────────
-
-/**
- * In the `demo` project only, takes out the console lines the recording harness itself causes, so a
- * real error still fails the run:
- *  - "Blocked script execution" in a PDF frame (the harness's init scripts reach the PDF viewer's sandboxed frame);
- *  - "duplicate view-transition-name: ucomp-demo-cursor" and the aborted transition that follows it (the
- *    cursor dot named for view transitions, mounted twice by two overlapping injections after a full page load).
- * Call it from an afterEach: it runs before the `problems` fixture checks the list.
- */
-export function dropDemoNoise(problems: string[]) {
-  if (!isDemo()) return;
-  const noise = [
-    /Blocked script execution in '[^']*\/sim\/deliveries\/[^/']+\/file'/,
-    /Unexpected duplicate view-transition-name: ucomp-demo-cursor/,
-    /^pageerror: Transition was aborted because of invalid state/,
-  ];
-  for (let i = problems.length - 1; i >= 0; i--) if (noise.some((pattern) => pattern.test(problems[i]))) problems.splice(i, 1);
-}
+// The console lines the recording harness itself causes are dropped by `dropDemoNoise` (../media/demo.ts).
+export { dropDemoNoise } from "../media/demo";
 
 /**
  * The failed renders of the newest send: `count` failed cells, each with the API's status and code, and the

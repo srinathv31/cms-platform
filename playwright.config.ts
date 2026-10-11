@@ -20,7 +20,9 @@ process.env.UCOMP_OPT_IN_PROJECTS = requested;
 const wants = (name: string) => requested.split(",").includes(name);
 
 // Only the scenario specs and the whole demo script (Phase 7b): `scenario-02a` (the Phase 2 gate in short
-// form) is not a gate recording.
+// form) is not a gate recording. The demo script is for those two projects alone: `chromium` ignores it, so
+// `npm run e2e` never plays it (decision 0049). Run it with `npx playwright test --project=demo`.
+const DEMO_SCRIPT = /demo-script\.spec\.ts/;
 const SCENARIOS = /(scenario-\d+|demo-script)\.spec\.ts/;
 
 export default defineConfig({
@@ -35,7 +37,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "chromium", testIgnore: DEMO_SCRIPT, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
     ...(wants("demo")
       ? [
           {

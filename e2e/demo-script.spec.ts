@@ -69,6 +69,10 @@ import {
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
 
+// Opt-in, never in `npm run e2e`: `chromium` ignores this file (playwright.config.ts, decision 0049). It runs in the
+// `demo` project, which records it with presentation pacing (`npx playwright test --project=demo
+// e2e/demo-script.spec.ts`, or `npm run gate:media` with the stills), and in `stills-1280`.
+//
 // Phase 7 gate: the whole demo script (build plan, "Demo script", scenarios 1–11) as ONE story, in order,
 // on ONE database state, from a fresh `db:reset`. No fixtures and no resets or restores in between:
 // scenario 4 links the Spring Travel v1 that Maya and Jordan made through the UI in scenarios 2–3 (sent

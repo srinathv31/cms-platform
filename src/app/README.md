@@ -295,6 +295,12 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, which resets
   `data/ucomp.db`; `e2e/api/helpers.ts` also opens that file directly. To check against a running dev server
   without a reset: `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`.
+- **Pace and recording:** a functional spec clicks, types and drags at test speed. The helpers in `e2e/helpers/`
+  (`tap`, `typeSlowly`, `dragRowTo`) carry no pause and no recording code; waits are on a condition, never a
+  `waitForTimeout`. The demo recording lives in `e2e/media/`: the opt-in `demo` project (cursor, mouse glides,
+  slow clicks and typing, a video) and `stills-1280` (the 1280 stills). `chromium` never runs
+  `e2e/demo-script.spec.ts`; run it with `npx playwright test --project=demo e2e/demo-script.spec.ts`, and the
+  whole media set with `npm run gate:media` ([decision 0049](../../docs/decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
 
 | Spec | Covers |
 | --- | --- |
@@ -320,6 +326,6 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | `e2e/sunset-zone.spec.ts` | A sunset date ends at 00:00 in the business time zone, and changing the zone moves no sunset already set. |
 | `e2e/variable-rename.spec.ts` | A renamed variable reaches the submit dialog and the stored contract as one rename. |
 | `e2e/versioned-name.spec.ts` | A draft rename reaches customers only when its version is approved, and the review shows it. |
-| `e2e/demo-script.spec.ts` | The whole demo script on one database state. |
+| `e2e/demo-script.spec.ts` | The whole demo script on one database state. Only in the opt-in `demo` and `stills-1280` projects, never in `chromium`. |
 | `e2e/error-boundaries.spec.ts` | Each error boundary, reached by breaking a stored JSON value for one test: what it shows and keeps, and Try again once the value is back. |
 | `e2e/api/consumer.spec.ts`, `render.spec.ts`, `imports.spec.ts` | The `/api/v1` GET routes, the render route, and the import routes over HTTP. |
