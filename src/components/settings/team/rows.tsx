@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
+import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Strip } from "../strip";
 
@@ -196,7 +197,7 @@ export function RowTable({
   if (rows.length === 0) return empty ? <p className="py-6 text-[15px] text-text-muted">{empty}</p> : null;
 
   return (
-    <div className="overflow-x-auto overscroll-x-contain">
+    <ScrollRegion label={tableLabel ?? label} className="overscroll-x-contain">
       <div ref={table} role="table" aria-label={tableLabel ?? label} className="min-w-min">
         <div role="row" className="grid items-end gap-x-3 border-b border-hairline pb-2" style={{ gridTemplateColumns: grid }}>
           <span role="columnheader" className="caps-label">{label}</span>
@@ -263,7 +264,7 @@ export function RowTable({
           );
         })}
       </div>
-    </div>
+    </ScrollRegion>
   );
 }
 

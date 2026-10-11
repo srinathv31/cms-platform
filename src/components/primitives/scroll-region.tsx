@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
  * there is no stop that does nothing.
  *
  * It wraps the shadcn `Table`, whose own container would scroll first, so that container stops scrolling here
- * and this box does.
+ * and this box does, or a table drawn with `role="table"`. The box is `relative` so a visually hidden (absolutely
+ * placed) label inside it stays inside it, not out on the page where it widens the scroll area.
  */
 export function ScrollRegion({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
@@ -23,7 +24,7 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
     // observer's own, right after it starts watching.
     const observer = new ResizeObserver(() => setScrolls(el.scrollWidth > el.clientWidth + 1));
     observer.observe(el);
-    for (const child of el.querySelectorAll("table")) observer.observe(child);
+    for (const child of el.querySelectorAll("table, [role=table]")) observer.observe(child);
     return () => observer.disconnect();
   }, []);
 
@@ -34,7 +35,7 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
       aria-label={scrolls ? label : undefined}
       tabIndex={scrolls ? 0 : undefined}
       className={cn(
-        "overflow-x-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
+        "relative overflow-x-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&_[data-slot=table-container]]:overflow-visible",
         className,
       )}
     >

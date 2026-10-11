@@ -21,7 +21,7 @@ async function Customers() {
     <PageScroll>
       <PageHeader crumbs="Coral Offers" title="Customers" />
       <Panel>
-        <TableWrap>
+        <TableWrap label="Customers">
           <table aria-label="Customers" className="w-full min-w-[40rem] border-collapse">
             <thead>
               <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">

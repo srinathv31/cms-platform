@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { ScrollRegion } from "@/components/primitives/scroll-region";
 
 /*
  * Small pieces of Coral's console. They read the --sim-* palette from src/simulator/theme.css and never
@@ -112,7 +113,10 @@ export function Strip({ tone, children, action }: { tone: "bad" | "info" | "warn
 export const TH = "h-9 px-4 text-left text-[11px] font-semibold tracking-wider text-(--sim-muted) uppercase";
 export const TD = "px-4 py-2.5 align-middle text-[13px]";
 
-/** Wraps a table so a narrow main pane scrolls the table, never the page. */
-export function TableWrap({ children }: { children: React.ReactNode }) {
-  return <div className="overflow-x-auto">{children}</div>;
+/**
+ * Wraps a table so a narrow main pane scrolls the table, never the page. `label` names the box once it scrolls, when it
+ * is also a Tab stop (Stencil's ScrollRegion, which this is: reflow, decision 0045).
+ */
+export function TableWrap({ label, children }: { label: string; children: React.ReactNode }) {
+  return <ScrollRegion label={`${label} table`}>{children}</ScrollRegion>;
 }

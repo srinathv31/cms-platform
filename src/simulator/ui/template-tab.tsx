@@ -22,7 +22,7 @@ export function TemplateTab({ page }: { page: SimOfferPage }) {
   const linkHref = `/sim/offers/${offer.id}/link` as Route;
   const t = offer.terms;
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] items-start gap-5">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] items-start gap-5">
       <Panel
         title="Linked template"
         right={

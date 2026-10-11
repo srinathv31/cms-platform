@@ -14,7 +14,7 @@ import { blockedSentence } from "@/simulator/mapping";
 import { readTemplateSearch } from "@/simulator/reads";
 import type { SimFieldPath, SimLinkFlow, SimMappingRow } from "@/simulator/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Btn, Mono, PageHeader, Panel, Pill, Strip, TD, btnClass, type Tone } from "./bits";
+import { Btn, Mono, PageHeader, Panel, Pill, Strip, TableWrap, TD, btnClass, type Tone } from "./bits";
 import { channelList, CHANNEL_LABEL, dayLabel, withKeys } from "./format";
 import { MappingTable } from "./mapping-table";
 import { PageScroll } from "./page-frame";
@@ -147,7 +147,7 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       />
       {flow.apiError ? <Strip tone="bad">{flow.apiError.message}</Strip> : null}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-5 narrow:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-5">
           {!candidate ? (
             <Step n={1} title="Find a template">
@@ -202,32 +202,34 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
             <>
               {relinking && diff ? (
                 <Step n={1} title="What changed" right={<Mono className="text-(--sim-muted)">v{diff.since} to v{diff.to}</Mono>}>
-                  <table aria-label="Changes" className="w-full border-collapse">
-                    <tbody>
-                      {diff.items.map((item, i) => (
-                        <tr key={i} className="border-b border-(--sim-line)">
-                          <td className={cn(TD, "w-36")}>
-                            <Pill tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Pill>
-                          </td>
-                          <td className={cn(TD, "w-44")}>
-                            <Mono className="text-(--sim-text)">{item.key}</Mono>
-                          </td>
-                          <td className={cn(TD, "text-(--sim-muted)")}>{withKeys(item.text)}</td>
-                        </tr>
-                      ))}
-                      {unchanged.length > 0 ? (
-                        <tr>
-                          <td className={cn(TD, "w-36")}>
-                            <Pill>Same</Pill>
-                          </td>
-                          <td className={TD} colSpan={2}>
-                            <Mono className="text-(--sim-text)">{unchanged.map((v) => v.key).join(", ")}</Mono>
-                            <span className="text-(--sim-muted)"> · mapping kept</span>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </tbody>
-                  </table>
+                  <TableWrap label="Changes">
+                    <table aria-label="Changes" className="w-full border-collapse">
+                      <tbody>
+                        {diff.items.map((item, i) => (
+                          <tr key={i} className="border-b border-(--sim-line)">
+                            <td className={cn(TD, "w-36")}>
+                              <Pill tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Pill>
+                            </td>
+                            <td className={cn(TD, "w-44")}>
+                              <Mono className="text-(--sim-text)">{item.key}</Mono>
+                            </td>
+                            <td className={cn(TD, "text-(--sim-muted)")}>{withKeys(item.text)}</td>
+                          </tr>
+                        ))}
+                        {unchanged.length > 0 ? (
+                          <tr>
+                            <td className={cn(TD, "w-36")}>
+                              <Pill>Same</Pill>
+                            </td>
+                            <td className={TD} colSpan={2}>
+                              <Mono className="text-(--sim-text)">{unchanged.map((v) => v.key).join(", ")}</Mono>
+                              <span className="text-(--sim-muted)"> · mapping kept</span>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </TableWrap>
                 </Step>
               ) : (
                 <Step
