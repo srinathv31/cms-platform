@@ -1,9 +1,10 @@
 // A queue row as the list shows it: every string already made, so the client list only lays out. Pure.
 // Made on the server, where the demo clock is (relative times are against it, never the system clock).
 
-import type { Person, ReviewQueueRow } from "@/domain/review-types";
+import type { Person } from "@/domain/review-types";
 import { formatAgo } from "@/domain/dates";
 import { reviewPath, versionLabel } from "@/domain/rounds";
+import type { ReviewQueueRow } from "@/server/queries/review-models";
 
 export interface QueueRowView {
   key: string;

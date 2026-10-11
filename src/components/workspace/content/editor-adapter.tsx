@@ -2,7 +2,7 @@
 
 // The ONE file where the workspace touches the editor's composition API (src/editor/README.md):
 //
-//   <EditorRoot variables onVariablesChange baseline requiredSections readOnly>
+//   <EditorRoot variables onVariablesChange baseline readOnly>
 //     <DocumentEditor content onChange ref align />      the document column
 //     <VariablesPanel />                                   in the rail
 //     useEditorHistory()                                   the header's undo and redo
@@ -20,7 +20,7 @@ import { useLayoutEffect, type Ref } from "react";
 import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot, useEditorHistory } from "@/editor/components/editor-root";
 import { VariablesPanel } from "@/editor/components/variables-panel";
-import type { JSONContent, RequiredSection, Variable } from "@/editor/model/types";
+import type { JSONContent, Variable } from "@/editor/model/types";
 import type { CommentRequest, DocumentEditorHandle, EditorHistory, ThreadAnchor } from "@/editor/types";
 
 export interface EditorScopeProps {
@@ -28,7 +28,6 @@ export interface EditorScopeProps {
   variables: Variable[];
   /** The variables of the newest version that still renders, for contract flags on a draft; null when none does. */
   baseline: Variable[] | null;
-  requiredSections: RequiredSection[];
   readOnly: boolean;
   /** Read-only for now (the page is held): the variables panel keeps its layout, with its controls disabled. */
   held?: boolean;
@@ -40,7 +39,6 @@ export interface EditorScopeProps {
 export function EditorScope({
   variables,
   baseline,
-  requiredSections,
   readOnly,
   held = false,
   onVariablesChange,
@@ -51,7 +49,6 @@ export function EditorScope({
       variables={variables}
       onVariablesChange={onVariablesChange}
       baseline={baseline}
-      requiredSections={requiredSections}
       readOnly={readOnly}
       held={held}
     >

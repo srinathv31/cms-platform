@@ -7,13 +7,14 @@ import { DAY_MS } from "@/domain/dates";
 import { REFUSALS, revokePending, sunsetPassed } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import { refuse, type Refusal } from "@/domain/refusals";
-import type { CompareOption, RoundHistoryItem, VersionTimelineItem, VersionsData } from "@/domain/review-types";
+import type { ConsumerUsage, Person } from "@/domain/review-types";
 import { approvedOnRound, asNumbered, compareRounds, headOf, roundsOf, versionLabel } from "@/domain/rounds";
 import type { ContractChange, PermissionResult, RevokeRecord, VersionState, Viewer } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, renderLog, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
+import type { SunsetCalendar } from "./review-models";
 import {
   getPeople,
   iso,
@@ -25,6 +26,83 @@ import {
 // The Versions tab: the template's versions as a timeline, with what the viewer may do on each. A number
 // is one entry, its head (domain/rounds.ts `headOf`: the released row, else the latest round), carrying
 // every round of it as its review history.
+
+/** One round of a number in the Versions tab's review history, and how it was decided. */
+export interface RoundHistoryItem {
+  id: string;
+  round: number;
+  state: VersionState;
+  submittedAt?: string;
+  submittedBy: Person;
+  /** The round's closing decision (its last approvals row); none while it is in review. */
+  decision?: { kind: "approved" | "changes_requested"; by: Person; at: string; stageName: string; reason?: string };
+}
+
+/**
+ * One entry of the Versions tab: the open draft, or a number shown as its head (its released row, else
+ * its latest round), with every round of it in `rounds`.
+ */
+export interface VersionTimelineItem {
+  id: string;
+  number: number | null; // null for the open draft
+  /** The head's round; null for the open draft. */
+  round: number | null;
+  /** "v3 · Round 2" (chrome, no history: `versionLabel`); null for the open draft. */
+  label: string | null;
+  /** "Approved on round 3" (`approvedOnRound`); null unless released after a send-back. */
+  approvedOnRound: string | null;
+  /** Every round of the number, newest first; null when it has one round (or for the open draft). */
+  rounds: RoundHistoryItem[] | null;
+  state: VersionState;
+  createdAt: string;
+  author: Person;
+  submittedAt?: string;
+  submitNote?: string | null;
+  activatedAt?: string;
+  supersededAt?: string;
+  /** YYYY-MM-DD: the sunset's day in the business time zone (it stops renders at 00:00 then). */
+  sunsetDay?: string;
+  sunsetPassed: boolean;
+  revoke?: {
+    reason: string;
+    startedBy: Person;
+    startedAt: string;
+    confirmedBy?: Person;
+    confirmedAt?: string;
+  };
+  contractLines: string[];
+  /** The same lines, one per change, each flagged breaking or not (`contractLines` stays for compatibility). */
+  contractItems: { text: string; breaking: boolean }[];
+  decisions: { kind: "approved" | "changes_requested"; stageName: string; by: Person; at: string; reason?: string }[];
+  /** Non-preview renders. */
+  lastRenderAt: string | null;
+  renders30d: number;
+  /** What the viewer may do on this version right now (the reason is shown when blocked). */
+  can: { setSunset: PermissionResult; startRevoke: PermissionResult; confirmRevoke: PermissionResult; cancelRevoke: PermissionResult };
+}
+
+/** One version Compare can pick: any row, every round included. */
+export interface CompareOption {
+  id: string;
+  /** "Draft" for the open draft, else `versionLabel` (chrome, with history): "v2", "v3 · Round 1". */
+  label: string;
+  state: VersionState;
+  /**
+   * The row the Versions timeline shows for its number (its head: the released row, else the latest
+   * round), or the open draft. Compare opens on the two newest of these; the other rounds stay selectable.
+   */
+  head: boolean;
+}
+
+export interface VersionsData {
+  template: { id: string; name: string; teamSlug: string };
+  items: VersionTimelineItem[]; // newest first; the open draft first when there is one
+  /** Every row, rounds included, newest first, "Draft" first when there is one. */
+  compareOptions: CompareOption[];
+  consumerUsage: ConsumerUsage[];
+  /** The sunset dialog's picker. */
+  sunsetCalendar: SunsetCalendar;
+}
 
 /**
  * What the viewer may do on one version right now: the permission (with its code and reason) first,

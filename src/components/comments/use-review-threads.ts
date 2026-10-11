@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState } from "react";
-import { DOCUMENT_THREAD, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
+import type { ThreadView } from "@/server/queries/threads";
 import {
   liveBlockPresence,
   reduceThreads,

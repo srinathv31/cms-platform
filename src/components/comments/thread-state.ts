@@ -1,8 +1,9 @@
 // The pure side of the comment list: how a mutation changes a list of threads (the optimistic
 // update), and how a list is grouped for the rail. No React here.
 
-import { DOCUMENT_THREAD, type CommentView, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
+import type { CommentView, ThreadView } from "@/server/queries/threads";
 
 /** A change the author just made, applied to the list at once while the server catches up. */
 export type ThreadMutation =

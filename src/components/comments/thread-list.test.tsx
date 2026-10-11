@@ -2,7 +2,8 @@
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DOCUMENT_THREAD, type Person, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
+import type { ThreadView } from "@/server/queries/threads";
 import { ThreadList, type ThreadListProps } from "./thread-list";
 import { useReviewThreads } from "./use-review-threads";
 

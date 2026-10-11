@@ -10,13 +10,14 @@ import { REFUSALS, contractBaseline, renameBaseline, reviewBaseline, sunsetPasse
 import { canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
-import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
+import type { ApprovalStage, VersionStage } from "@/domain/review-types";
 import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
 import type { ChannelFamily, ContractChange, PermissionResult, Variable, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
+import type { ReviewQueue, ReviewQueueRow, ReviewScreenData } from "./review-models";
 import {
   anchorIdsOf,
   chainFor,

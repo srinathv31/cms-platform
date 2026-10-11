@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ReviewQueueRow } from "@/domain/review-types";
+import type { ReviewQueueRow } from "@/server/queries/review-models";
 import { defaultTab, formatQueueRow, parseTab, queueTabs, TAB_META } from "./format-row";
 
 const NOW = new Date("2026-10-04T15:00:00.000Z");

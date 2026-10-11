@@ -166,7 +166,7 @@ The one dark set is the phone kit's: `--device-*` tokens (section 4 of tokens.cs
 ## Server and client
 
 **Reads.** A page passes its `params` promise to an async server component here, inside `<Stream>`. That
-component awaits a query from `@/server/queries/*` and hands the read model (types from `src/domain/*-types.ts`)
+component awaits a query from `@/server/queries/*` and hands the read model (types from the query's module, `import type` from `@/server/queries/*`; the older settings, audit and usage ones from `src/domain/*-types.ts`)
 to a client component as props. Server components here include screen views (`audit/audit-view.tsx`,
 `review/review-screen.tsx`), settings bodies (`settings/team/bodies.tsx`), the `*-hole.tsx` files, most
 skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you the side

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { findSet, resolveSetValues, type SampleSetSwitcherHandle } from "@/components/preview/sample-sets";
 import { listSets } from "@/editor/model/sample-sets";
-import type { ReviewScreenData } from "@/domain/review-types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 
 /**
  * The sample sets the Preview renders with: the version's own, which one is chosen (in the tab bar), the values

@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPOSER_THREAD_ID, blockTextOf, fieldTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
 import { channelFieldValues } from "@/domain/channel-fields";
 import { commentAnchors } from "@/domain/comments";
-import { DOCUMENT_THREAD, type ReviewScreenData } from "@/domain/review-types";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 
 /**
  * The review screen's comments: the threads (`useReviewThreads`), the comment box, and where focus and scroll

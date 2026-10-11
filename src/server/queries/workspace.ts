@@ -17,7 +17,6 @@ import {
   type ChannelFamily,
   type JSONContent,
   type PermissionResult,
-  type RequiredSection,
   type SampleSet,
   type Variable,
   type VersionState,
@@ -28,9 +27,9 @@ import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
 import { anchorIdsOf } from "./review-shared";
 import { loadThreads } from "./threads";
-import type { ThreadView } from "@/domain/review-types";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import { getImportOriginalRef } from "./import";
+import type { ThreadView } from "./threads";
 
 export interface WorkspaceHeaderData {
   id: string;
@@ -204,7 +203,6 @@ export interface WorkspaceDocumentData {
   sampleSets: SampleSet[];
   /** The demo clock's date, YYYY-MM-DD: date samples are generated from it. */
   today: string;
-  requiredSections: RequiredSection[];
   /** Only an open draft is editable, and only by an author on the template's team. */
   editable: boolean;
   /** The template's review threads, anchored against the shown version's blocks (the editor margin). */
@@ -228,7 +226,6 @@ export const getWorkspaceDocument = cache(
     const tpl = await db
       .select({
         teamId: templates.teamId,
-        requiredSections: contentTypes.requiredSections,
         allowedChannels: contentTypes.allowedChannels,
         smsFooter: contentTypes.smsFooter,
         smsMaxParts: contentTypes.smsMaxParts,
@@ -286,7 +283,6 @@ export const getWorkspaceDocument = cache(
       channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,
       today,
-      requiredSections: tpl.requiredSections,
       editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
       threads,
       // The workspace is the team's: whoever a review stage names comments from the review screen.

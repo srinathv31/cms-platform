@@ -9,10 +9,8 @@ import { generateJSON } from "@tiptap/html";
 import type { JSONContent } from "@/editor/model/types";
 import { chipsInJSON } from "@/editor/paste/chips";
 import { markdownToHtml } from "@/editor/paste/markdown";
-import { baseExtensions, editorExtensions } from "@/editor/schema";
-import { createChipPopoverStore } from "@/editor/state/chip-popover";
-import { createEditorRootRuntime } from "@/editor/state/editor-root";
-import { blocks, destroyEditors, doc as editorDoc, h2, mountEditor, p as line } from "@/editor/testing/editor";
+import { baseExtensions } from "@/editor/schema";
+import { blocks, destroyEditors, doc as editorDoc, h2, mountBodyEditor, p as line } from "@/editor/testing/editor";
 import { buildCopilotPrompt, documentToMarkdown } from "@/domain/copilot";
 
 const text = (value: string, marks?: JSONContent["marks"]): JSONContent => (marks ? { type: "text", text: value, marks } : { type: "text", text: value });
@@ -87,10 +85,7 @@ describe("prompt headings → answer → section paste", () => {
     // Copilot answers with exactly those headings; the author selects all and pastes.
     const answer = headings.map((heading, i) => `${heading}\n\nNew section ${i + 1}.`).join("\n\n");
     // The document editor's paste path (Markdown, chips, the section merge), as in section-paste.test.ts.
-    const root = createEditorRootRuntime({ variables: [] });
-    root.registerField({ id: "body", label: "Document", kind: "body" });
-    const binding = { fieldId: "body", kind: "body" as const, root, chip: createChipPopoverStore() };
-    const editor = mountEditor(draft, { extensions: editorExtensions({ store: root.variables, binding }) });
+    const editor = mountBodyEditor(draft);
     editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)));
     const clipboard = new DataTransfer();
     clipboard.setData("text/plain", answer);

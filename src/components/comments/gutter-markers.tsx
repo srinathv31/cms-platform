@@ -11,9 +11,10 @@ import {
 } from "react";
 import { MessageSquare, MessageSquarePlus } from "lucide-react";
 import { plural } from "@/domain/plural";
-import { DOCUMENT_THREAD, type ThreadView } from "@/domain/review-types";
+import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
+import type { ThreadView } from "@/server/queries/threads";
 
 /*
  * Comment markers in the document's right gutter: a speech bubble with the number of comments on the

@@ -859,7 +859,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B6 · Medium: Server code imports from components
 
-- **Status:** Partly fixed. A lint rule now forbids `src/server` from importing `@/components`. `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. What is left is the screen view models in `src/domain/review-types.ts`, which still have to move to `server/read-models`.
+- **Status:** Fixed. A lint rule forbids `src/server` from importing `@/components`; `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. The review area's screen view models left `src/domain/review-types.ts` for the queries that build them: `ReviewScreenData`, `ReviewQueue` and `SunsetCalendar` in `src/server/queries/review-models.ts`, `VersionsData` and its items in `versions.ts`, `ThreadView` and `CommentView` in `threads.ts`, `ActivityItem` in `activity.ts` ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)). The read models in `access-types.ts`, `golive-types.ts` and `import-types.ts` stay in the domain for now.
 - **Where:** `src/server/queries/submit-summary.ts` line 12
 - **What happens:** `submit-summary.ts` takes the business function `listSets` from `components/preview/sample-sets`; `create-template.ts` and the imports route take cookie constants from components. `domain/review-types.ts` holds screen view models. No lint rule forbids it.
 - **Fix:** Add the rule; move `listSets` into `editor/model` and view models to `server/read-models`.
@@ -975,7 +975,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### G5 · Medium: The editor's public API is enforced only in prose
 
-- **Status:** Open
+- **Status:** Fixed. ESLint now holds every file outside `src/editor` to the modules the README's Public API table lists (`EDITOR_PUBLIC_MODULES` in `eslint.config.mjs`), and to three names from `@/editor/schema`. The internals app code reached into (`lib/platform`, `model/usage`, `model/links`, `model/list-markers`, `extensions/list-markers`, `state/variable-store`, `styles.css`, `testing/editor`) are listed in the table; `EMPTY_LINE_PLACEHOLDER` is no longer exported, and `renderThread`, `requiredSections` (with the workspace's pass-through) and `dispose()` are gone ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)).
 - **Where:** `src/editor/README.md` line 1; `src/editor/schema.ts` line 34
 - **What happens:** With the barrel gone, nothing enforces the README's API table. App code already imports internals (`@/editor/lib/platform`, `@/editor/model/usage`), and `schema.ts` still exports symbols the README calls removed. The "frozen" API also has unused members (`renderThread`, `dispose()`, `requiredSections`).
 - **Fix:** A lint allowlist for `@/editor/*` imports outside the module, matching the README; remove or implement the unused members.

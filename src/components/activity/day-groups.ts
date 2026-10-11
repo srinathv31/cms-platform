@@ -1,5 +1,5 @@
 import { formatAgo, utcDay } from "@/domain/dates";
-import type { ActivityItem } from "@/domain/review-types";
+import type { ActivityItem } from "@/server/queries/activity";
 
 // Groups the activity list (newest first) by calendar day, with a label for each: "Today",
 // "Yesterday", then "Mar 5" (with the year when it isn't this one). Days are UTC days, the same days

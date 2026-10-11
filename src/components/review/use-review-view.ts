@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { ReviewScreenData } from "@/domain/review-types";
 import type { Channel } from "@/domain/types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 import type { ReviewView } from "./view-tabs";
 
 /**

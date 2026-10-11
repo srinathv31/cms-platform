@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { addCounts, diffChannelFields, diffDocuments, nameChange } from "@/domain/redline";
-import type { ReviewScreenData } from "@/domain/review-types";
+import type { ReviewScreenData } from "@/server/queries/review-models";
 
 /**
  * The Document view's redline: the two switches (Show changes, Changes only) and what the version differs

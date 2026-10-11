@@ -2,10 +2,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ActionResult, CompareOption } from "@/domain/review-types";
+import type { ActionResult } from "@/domain/review-types";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, ChannelFamily } from "@/domain/types";
 import type { ComparePair, CompareVersion } from "@/server/queries/compare";
+import type { CompareOption } from "@/server/queries/versions";
 
 // The Compare dialog's panel reads each pair of versions from GET /api/templates/[templateId]/compare:
 // the redline when both arrive (the name, each channel's fields, the body), "Couldn't load these

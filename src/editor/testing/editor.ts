@@ -1,11 +1,15 @@
-// Test helpers for headless editors (happy-dom). Not part of the public API; used by *.test.ts.
+// Test helpers for headless editors (happy-dom), used by *.test.ts. Tests outside src/editor that need a
+// live editor import this module (it is on the README's list of public modules, for tests only).
 // Keys go through ProseMirror's own handleKeyDown chain, text through handleTextInput: the same
 // paths a browser takes.
 
 import { Editor, type Extensions, type JSONContent } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { SlashRender } from "../extensions/slash-command";
+import type { Variable } from "../model/types";
 import { editorExtensions } from "../schema";
+import { createChipPopoverStore } from "../state/chip-popover";
+import { createEditorRootRuntime } from "../state/editor-root";
 import { createVariableStore } from "../state/variable-store";
 
 export const text = (value: string): JSONContent => ({ type: "text", text: value });
@@ -48,6 +52,17 @@ export function mountEditor(content: JSONContent = SECTIONS_DOC, options: { slas
   });
   mounted.push(editor);
   return editor;
+}
+
+/**
+ * The document's editor as the page builds it: registered with a root as its body field, so paste (Markdown,
+ * `{{key}}` chips, the section merge) and the variable store work as live. `variables` is the root's list.
+ */
+export function mountBodyEditor(content: JSONContent = SECTIONS_DOC, variables: Variable[] = []): Editor {
+  const root = createEditorRootRuntime({ variables });
+  root.registerField({ id: "body", label: "Document", kind: "body" });
+  const binding = { fieldId: "body", kind: "body" as const, root, chip: createChipPopoverStore() };
+  return mountEditor(content, { extensions: editorExtensions({ store: root.variables, binding }) });
 }
 
 export const flush = () => new Promise((resolve) => setTimeout(resolve, 0));

@@ -22,7 +22,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
 import { firstRequiredSection } from "../lib/sections";
 import { removeChips, rewriteChipKeys } from "../lib/chips";
-import type { JSONContent, RequiredSection, Variable } from "../model/types";
+import type { JSONContent, Variable } from "../model/types";
 import {
   mergeUsage,
   reconcileUsage,
@@ -50,7 +50,6 @@ export interface RootConfig {
   /** Read-only for now only (never true when truly read-only): the panel keeps its editing layout, disabled. */
   held: boolean;
   baseline: readonly Variable[] | null;
-  requiredSections: readonly RequiredSection[];
   /** Shown at a required heading when an edit to it is blocked. */
   requiredNote: string;
 }
@@ -73,7 +72,6 @@ export interface HistoryAvailability {
 export interface RootInit {
   variables: readonly Variable[];
   baseline?: readonly Variable[] | null;
-  requiredSections?: readonly RequiredSection[];
   readOnly?: boolean;
   held?: boolean;
   requiredNote?: string;
@@ -127,7 +125,6 @@ export interface EditorRootRuntime {
   /** Once the root has rendered, fields that mount later register in an effect, not during render. */
   markCommitted: () => void;
   isCommitted: () => boolean;
-  dispose: () => void;
 }
 
 interface FieldRecord extends FieldInfo {
@@ -139,7 +136,6 @@ interface FieldRecord extends FieldInfo {
 }
 
 const EMPTY_USAGE: FieldUsage = new Map();
-const NO_SECTIONS: readonly RequiredSection[] = [];
 const NO_HISTORY: HistoryAvailability = { canUndo: false, canRedo: false };
 
 export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
@@ -149,7 +145,6 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     readOnly: (init.readOnly ?? false) || (init.held ?? false),
     held: (init.held ?? false) && !init.readOnly,
     baseline: init.baseline ?? null,
-    requiredSections: init.requiredSections ?? NO_SECTIONS,
     requiredNote: init.requiredNote ?? DEFAULT_REQUIRED_NOTE,
   }));
   const history = createStore<HistoryAvailability>()(() => NO_HISTORY);
@@ -161,7 +156,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   let frame: number | null = null;
   let committed = false;
 
-  const unsubscribe = variables.subscribe((state, prev) => {
+  variables.subscribe((state, prev) => {
     if (state.variables !== prev.variables) listener?.([...state.variables]);
   });
 
@@ -240,7 +235,7 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     if (prev.canUndo !== canUndo || prev.canRedo !== canRedo) history.setState({ canUndo, canRedo });
   };
 
-  const unsubscribeConfig = config.subscribe((state, prev) => {
+  config.subscribe((state, prev) => {
     if (state.readOnly !== prev.readOnly) publishHistory();
   });
 
@@ -382,14 +377,6 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
 
     setListener(next) {
       listener = next;
-    },
-
-    dispose() {
-      cancelFrame();
-      unsubscribe();
-      unsubscribeConfig();
-      listener = null;
-      fields.clear();
     },
   };
 
