@@ -40,7 +40,7 @@ export function defaultSampleSets(variables: readonly Variable[], today: string)
  * Values are passed through as given; the render route validates them.
  */
 export function sampleSetValues(set: SampleSet, variables: readonly Variable[], today: string): VariableValues {
-  const kind: DefaultSampleSetId = isDefaultId(set.id) ? set.id : "typical";
+  const kind: DefaultSampleSetId = isDefaultSet(set.id) ? set.id : "typical";
   let day: Day | null = null;
   const out: VariableValues = {};
   for (const v of variables) {
@@ -50,11 +50,24 @@ export function sampleSetValues(set: SampleSet, variables: readonly Variable[], 
   return out;
 }
 
-// ── Defaults ─────────────────────────────────────────────────────────────────
-
-function isDefaultId(id: string): id is DefaultSampleSetId {
+/** Whether `id` is one of the three default sets, which can't be renamed or deleted. */
+export function isDefaultSet(id: string): id is DefaultSampleSetId {
   return DEFAULT_SAMPLE_SETS.some((s) => s.id === id);
 }
+
+/**
+ * The stored sets plus any default set that is missing (generated with `defaultSampleSets`).
+ * The defaults come first, in order (typical, long, minimum); custom sets follow in stored order.
+ * A stored default keeps its own values. `today` is YYYY-MM-DD.
+ */
+export function listSets(stored: readonly SampleSet[], variables: readonly Variable[], today: string): SampleSet[] {
+  const generated = defaultSampleSets(variables, today);
+  const defaults = generated.map((set) => stored.find((s) => s.id === set.id) ?? set);
+  const customs = stored.filter((s) => !isDefaultSet(s.id));
+  return [...defaults, ...customs];
+}
+
+// ── Defaults ─────────────────────────────────────────────────────────────────
 
 function isPresent(value: VariableValue | null | undefined): value is VariableValue {
   return value !== undefined && value !== null && String(value).trim() !== "";

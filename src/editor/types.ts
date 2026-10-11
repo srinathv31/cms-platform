@@ -80,6 +80,13 @@ export interface EditorRootProps {
   /** View only: no toolbar, handles, `/` or `{{` menus, and no panel editing. */
   readOnly?: boolean;
   /**
+   * Held still for a while, then editable again (a host is reading or freezing the saved draft).
+   * Nothing can be edited, as with `readOnly`, but the variables panel keeps its editing layout
+   * with its controls disabled, and a variable form left open stays open with what was typed in it.
+   * `readOnly` wins when both are set.
+   */
+  held?: boolean;
+  /**
    * The short note shown at a required heading when an edit to it is blocked (delete, rename,
    * retype, move). Default "Required for disclosures".
    */

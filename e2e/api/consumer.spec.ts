@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { ApiNoticeList, ApiTemplateDetail, ApiTemplateSearch } from "@/contracts/api-v1";
+import { sunsetDay } from "@/domain/business-zone";
 import { JUNK, allVersions, expectError, openDb, pick, type SeedVersion, type VariableType } from "./helpers";
 
 // The consumer API gate (phase 5): the three GET routes a consumer (Coral) reads, called the way a
@@ -156,7 +157,13 @@ test.describe("GET /api/v1/templates/{id}", () => {
     expect(body).toMatchObject({ id: active.templateId, name: active.templateName, activeVersion: active.number });
     const released = (await versions()).filter((v) => v.templateId === active.templateId && RELEASED.includes(v.state));
     expect(body.versions.map((v) => v.number)).toEqual(released.map((v) => v.number).sort((a, b) => b! - a!));
-    expect(body.versions.find((v) => v.number === old.number)).toMatchObject({ state: "superseded", supersededAt: expect.any(String) });
+    const superseded = body.versions.find((v) => v.number === old.number)!;
+    expect(superseded).toMatchObject({ state: "superseded", supersededAt: expect.any(String) });
+    // A sunset comes with its day and zone: the instant's UTC date is not the day for a zone ahead of UTC.
+    if (superseded.sunsetAt) {
+      expect(superseded.zone).toEqual(expect.any(String));
+      expect(superseded.sunsetDay).toBe(sunsetDay(new Date(superseded.sunsetAt), superseded.zone!));
+    } else expect(superseded).toMatchObject({ sunsetDay: null, zone: null });
     expect(body.changes).toBeUndefined();
 
     const contract = body.contract!;

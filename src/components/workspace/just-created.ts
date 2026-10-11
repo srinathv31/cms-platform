@@ -1,17 +1,14 @@
 // "This template was just made from a starter": the one-shot handoff from `createTemplate` (which
 // sets it as it redirects) to the workspace's name field (which takes it on arrival and selects the
-// name). Shared by the server action and the client, so this module stays free of both directives.
+// name). The cookie's name and lifetime are in `@/domain/arrival-cookies`, which the server action and the
+// imports route read too; this module is the browser's half.
 //
 // It is a cookie, not a URL parameter. The action redirects straight to the template's own address,
 // so nothing has to tidy the address bar afterwards: an address rewritten under the router while the
 // redirect navigation is still settling can turn Next's late commit of that navigation into a second
 // history entry (Back then needs two presses to reach the Library).
 
-/** Holds the id of the template just created. Readable by the page; gone once taken, or after a minute. */
-export const JUST_CREATED_COOKIE = "ucomp_created";
-
-/** Long enough to outlast the redirect on a slow connection, short enough not to linger if never taken. */
-export const JUST_CREATED_MAX_AGE = 60;
+import { JUST_CREATED_COOKIE } from "@/domain/arrival-cookies";
 
 /**
  * True once, on the first arrival at the template the cookie names; the cookie is cleared as it is

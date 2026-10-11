@@ -1,6 +1,8 @@
 # 0013. Errors are caught per route, not per streamed section
 
 Status: Accepted
+Amended 2026-10-11: a fourth boundary, `(simulator)/error.tsx`, now shows Coral's own view of an error on a simulator
+page, so `global-error.tsx` catches the simulator's layout only (handoff review N9, PR #53).
 Date: 2026-10-09
 
 ## Context

@@ -19,7 +19,6 @@ export const simLibsql =
 if (process.env.NODE_ENV !== "production") globalForSim.__simLibsqlSerialized = simLibsql;
 
 export const simDb = drizzle(simLibsql, { schema: sim });
-export type SimDb = typeof simDb;
 
 function isBusy(error: unknown): boolean {
   const text = `${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`;

@@ -7,8 +7,8 @@ rendered from its one body) or a message (an Alert, rendered to a push notificat
 fields), never both ([decision 0034](decisions/0034-message-channels-families-and-the-fields-registry.md)).
 
 It is one Next.js 16 app (App Router, Cache Components) on one local SQLite file. Three things share the app: the
-CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and a set of
-dev-only design mocks. It is a working prototype on its way to production. The production backend isn't decided:
+CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and two
+dev-only labs (the editor and the PDF viewer). It is a working prototype on its way to production. The production backend isn't decided:
 either the existing Spring Boot "UCOMP API" with this app as its BFF, or this app's own server code. Changes should
 keep both open, which mostly means: rules in `src/domain`, database access only in `src/server`.
 
@@ -41,12 +41,15 @@ keep both open, which mostly means: rules in `src/domain`, database access only 
   src/editor/model       (the editor itself: react, TipTap, @/components/ui only; no next/*, no app code)
 
   src/app/(product), src/app/api, src/components  -->  server, domain, editor, lib, contracts   (never simulator data)
-  src/server                                     -->  domain, editor modules (not bare @/editor), lib   (never simulator data)
+  src/server                                     -->  domain, editor modules (not bare @/editor), lib   (never simulator data, never @/components)
   src/server/seed, src/server/reset.ts           -->  may also write the simulator's tables
 ```
 
 Every rule above is lint-enforced in [eslint.config.mjs](../eslint.config.mjs). Flat config replaces the rule per
 file, so its blocks cover disjoint globs; when you add a rule, list everything that applies to those files.
+
+What a screen and the server both need lives below them both: types and constants (the `ucomp_created` cookie, `SubmitSummary`)
+in `src/domain`, pure helpers (`listSets`) in `@/editor/model/*`.
 
 Conventions that nothing enforces yet, and where the code already breaks them:
 
@@ -55,8 +58,6 @@ Conventions that nothing enforces yet, and where the code already breaks them:
   Boot backend would replace.
 - **New business rules go in `src/domain`.** About a dozen live in actions, queries, and components today; the
   [domain README](../src/domain/README.md#rules-that-live-outside-srcdomain) lists them.
-- **`src/server` doesn't import `src/components`.** Two files do (`queries/submit-summary.ts`,
-  `actions/create-template.ts`).
 - **Components get permissions decided.** Read models carry `can` results; a few components still call `can()`
   themselves.
 
@@ -220,7 +221,6 @@ Facts about the code today. Each line goes away in the PR that fixes it.
 
 - No real authentication: the persona cookie, failing open to Maya, identifies every request.
 - Demo controls are ungated: reset, advance clock, and persona switch work in any build, for anyone.
-- `/design/*`, `/editor-lab`, and `/pdf-lab` are prerendered into production builds and answer by URL.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
   run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops

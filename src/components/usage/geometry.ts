@@ -7,6 +7,12 @@ export const BARS_HEIGHT = 220;
 export const LEGEND_ROW = "mt-3 h-5";
 /** The legend row's height with its top margin, in px (mt-3 + h-5). */
 export const LEGEND_HEIGHT = 32;
+/**
+ * The heatmap card's footer: the key, with the ranges it prints, then the span of days, 20px each and 8px
+ * apart. The key sits above the dates rather than beside them because its ranges don't fit a half-width card
+ * with the dates on the same line. The key wraps only if its numbers are very long, and the footer grows then.
+ */
+export const HEAT_FOOTER = "flex min-h-12 flex-col gap-2";
 /** The failure card's chart and its caption row together are as tall as the bars and their legend. */
 export const RATE_HEIGHT = BARS_HEIGHT + LEGEND_HEIGHT;
 /** A stat card's floor, so the three read as one row whatever they hold. */

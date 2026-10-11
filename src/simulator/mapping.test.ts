@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ApiVariable } from "@/contracts/api-v1";
+import type { ApiContractChange, ApiVariable } from "@/contracts/api-v1";
 import { SIM_FIELDS, isSimFieldPath, simField } from "./fields";
 import { blockedSentence, fieldValue, missingRequired, suggestMapping, valuesFor } from "./mapping";
 import type { SimCustomerRecord, SimOfferRecord } from "./types";
@@ -107,6 +107,45 @@ describe("suggestMapping", () => {
 
   it("does not auto-map a known key when the type doesn't fit", () => {
     expect(suggestMapping([v("first_name", "First name", "date")])).toEqual({});
+  });
+
+  describe("across a renamed variable", () => {
+    const renamed = (from: string, to: string): ApiContractChange => ({ kind: "key_renamed", key: to, breaking: true, from, to, text: `Renames \`${from}\`.` });
+    const NOW = [v("first_name", "First name", "text"), v("state", "State", "us_state"), v("annual_fee", "Annual fee", "currency")];
+
+    it("carries the mapping of the earlier key to the renamed one", () => {
+      const current = { first_name: "customer.fullName", home_state: "customer.homeState" } as const;
+      expect(suggestMapping(NOW, current)).toEqual({ first_name: "customer.fullName" });
+      expect(suggestMapping(NOW, current, [renamed("home_state", "state")])).toEqual({ first_name: "customer.fullName", state: "customer.homeState" });
+    });
+
+    it("carries a choice the person made, not what Coral would have auto-mapped", () => {
+      const given = [v("given", "Given name", "text")];
+      expect(suggestMapping(given, { first_name: "customer.fullName" }, [renamed("first_name", "given")])).toEqual({ given: "customer.fullName" });
+    });
+
+    it("keeps a mapping already under the new key, and drops a carried one that no longer fits the type", () => {
+      const current = { home_state: "customer.homeState", state: "customer.homeState", annual_fee: "offer.annualFee" } as const;
+      expect(suggestMapping(NOW, current, [renamed("home_state", "state")])).toEqual({
+        first_name: "customer.firstName",
+        state: "customer.homeState",
+        annual_fee: "offer.annualFee",
+      });
+      const retyped = [v("state", "State", "date")];
+      expect(suggestMapping(retyped, { home_state: "customer.homeState" }, [renamed("home_state", "state")])).toEqual({});
+    });
+
+    it("auto-maps the new key when the earlier one had no mapping, and ignores other kinds of change", () => {
+      const to = [v("first_name", "First name", "text"), v("full_name", "Full name", "text")];
+      expect(suggestMapping(to, {}, [renamed("name", "full_name")])).toEqual({ first_name: "customer.firstName", full_name: "customer.fullName" });
+      const retyped: ApiContractChange = { kind: "type_changed", key: "state", breaking: true, from: "text", to: "us_state", text: "Retyped." };
+      expect(suggestMapping(NOW, { home_state: "customer.homeState" }, [retyped])).toEqual({ first_name: "customer.firstName" });
+    });
+
+    it("follows a chain the API folded into one change", () => {
+      // a renamed to b in one version and b to c in the next arrives as a single change from a to c.
+      expect(suggestMapping([v("c", "C", "text")], { a: "customer.email" }, [renamed("a", "c")])).toEqual({ c: "customer.email" });
+    });
   });
 
   it("ignores unknown field paths in the current mapping", () => {

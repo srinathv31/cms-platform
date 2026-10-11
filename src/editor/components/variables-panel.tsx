@@ -5,6 +5,10 @@
 // rows also drag into the document. The pencil (revealed on hover and focus) opens the same compact
 // form as Create, with Delete. With a `baseline`, contract changes are flagged on their rows.
 //
+// Read-only, it shows counts and Required states without controls. Held (read-only for a while, the
+// root's `held`), it keeps the editing layout with every control disabled, and an open form stays
+// mounted with what was typed in it: nothing moves when the hold starts or lets go.
+//
 // Rows subscribe to their own usage count, so typing re-renders nothing here; a row re-renders
 // only when its own numbers change.
 
@@ -87,7 +91,10 @@ function usesText(count: number): string {
 export function VariablesPanel({ className }: VariablesPanelProps) {
   const root = useEditorRoot("VariablesPanel");
   const variables = useStore(root.variables, (s) => s.variables);
-  const readOnly = useStore(root.config, (s) => s.readOnly);
+  // `readOnly` is true held or not; `held` is read-only for now, and keeps the layout.
+  const frozen = useStore(root.config, (s) => s.readOnly);
+  const held = useStore(root.config, (s) => s.held);
+  const readOnly = frozen && !held;
   const baseline = useStore(root.config, (s) => s.baseline);
   const headingId = useId();
 
@@ -180,6 +187,7 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
                   focusRow(variable.key);
                 }}
                 onDelete={() => requestDelete(variable)}
+                disabled={held}
               />
             </li>
           ) : (
@@ -189,6 +197,7 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
               variable={variable}
               flags={flags.get(variable.key)}
               readOnly={readOnly}
+              held={held}
               onEdit={setEditingKey}
             />
           ),
@@ -211,6 +220,7 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
                 setCreatingOpen(false);
                 focusNew();
               }}
+              disabled={held}
             />
           </li>
         ) : null}
@@ -223,6 +233,7 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
           ref={newButtonRef}
           type="button"
           variant="ghost"
+          disabled={held}
           onClick={() => {
             setEditingKey(null);
             setCreatingOpen(true);
@@ -277,11 +288,14 @@ interface VariableRowProps {
   root: EditorRootRuntime;
   variable: Variable;
   flags: RowFlag[] | undefined;
+  /** Display only: no controls at all. */
   readOnly: boolean;
+  /** Held: the same layout as editing, every control disabled. */
+  held: boolean;
   onEdit: (key: string) => void;
 }
 
-const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly, onEdit }: VariableRowProps) {
+const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly, held, onEdit }: VariableRowProps) {
   const count = useLiveStore(root.usage, (s) => s.byKey.get(variable.key)?.count ?? 0);
   // Before any field registered (the panel rendered ahead of the document), counts are unknown:
   // leave them out rather than mute every row. They fill in on the same line, so nothing shifts.
@@ -335,9 +349,9 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
     <li
       data-variable-row={variable.key}
       data-unused={unused ? "" : undefined}
-      draggable={!readOnly}
-      onDragStart={readOnly ? undefined : onDragStart}
-      className={cx("group/row relative flex items-center gap-1 rounded-lg pr-2", !readOnly && "hover:bg-hover")}
+      draggable={!readOnly && !held}
+      onDragStart={readOnly || held ? undefined : onDragStart}
+      className={cx("group/row relative flex items-center gap-1 rounded-lg pr-2", !readOnly && !held && "hover:bg-hover")}
     >
       {readOnly ? (
         <div className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5">{content}</div>
@@ -345,6 +359,7 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
         <button
           type="button"
           data-row-insert=""
+          disabled={held}
           aria-label={`Insert ${variable.label}`}
           aria-describedby={metaId}
           onClick={() => root.insertVariable(variable.key)}
@@ -359,6 +374,7 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
           variant="ghost"
           size="icon-xs"
           aria-label={`Edit ${variable.label}`}
+          disabled={held}
           onClick={() => onEdit(variable.key)}
           className={cx(
             "text-text-muted opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-selected hover:text-text focus-visible:opacity-100",
@@ -376,6 +392,7 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
           size="sm"
           checked={variable.required}
           aria-label={`${variable.label} required`}
+          disabled={held}
           onCheckedChange={(required) => root.updateVariable(variable.key, { required })}
           className={cx("ml-1", SWITCH_TRACK, FOCUS_RING)}
         />

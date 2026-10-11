@@ -226,11 +226,6 @@ export function threadHighlights(state: EditorState): Array<{ threadId: string; 
     .sort((a, b) => a.from - b.from || a.to - b.to);
 }
 
-/** The active thread as the editor shows it. */
-export function activeThreadOf(state: EditorState): string | null {
-  return reviewThreadsKey.getState(state)?.activeId ?? null;
-}
-
 /** Hands the editor new threads and/or a new active thread (not an edit: no undo step). */
 export function setReviewThreads(view: EditorView, meta: ThreadsMeta) {
   if (view.isDestroyed) return;

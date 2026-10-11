@@ -8,19 +8,23 @@ import { RV } from "./review-grid";
 // The stacked layout's decision bar. Below 53rem the decision rail sits under the whole document, so
 // Approve would be a long scroll away: this bar sticks to the bottom of the main pane with the same two
 // decisions, under the same rules (open; greyed but focusable when blocked, with the reason beside them
-// describing both; absent for a viewer who isn't an approver). Once the viewer has decided here it says so in a line, since the rail's
+// describing both; Approve alone greyed, its reason beside it, until every output has been viewed;
+// absent for a viewer who isn't an approver). Once the viewer has decided here it says so in a line, since the rail's
 // own line (the live status, and where focus goes) is a long scroll below; for a version that was decided
 // before, or isn't in review, there is no bar. Beside the rail it is hidden (CSS, in the grid), and the
 // rail's own pair is the one. It leaves the window's bottom right clear for the Demo pill.
 
 export function DecisionBar({
   access,
+  approveBlocked = null,
   row,
   decidedHere,
   onApprove,
   onRequest,
 }: {
   access: DecisionAccess;
+  /** Approve alone waits, with this reason: an output of the round not viewed yet in the Preview. */
+  approveBlocked?: string | null;
   /** Anything but buttons: the version has been decided, or isn't in review, and there is nothing to press. */
   row: DecisionRow;
   /** The viewer made the decision on this screen: the bar confirms it. */
@@ -55,12 +59,24 @@ export function DecisionBar({
       </div>
     );
   }
+  const waitId = "decision-bar-waits";
   return (
     <div data-slot="decision-bar" role="group" aria-label="Decide" className={RV.bar}>
-      <Button onClick={(event) => onApprove(event.currentTarget)}>Approve</Button>
+      {approveBlocked ? (
+        <BlockedButton variant="default" reason={approveBlocked} describedBy={waitId}>
+          Approve
+        </BlockedButton>
+      ) : (
+        <Button onClick={(event) => onApprove(event.currentTarget)}>Approve</Button>
+      )}
       <Button variant="outline" className="bg-surface" onClick={(event) => onRequest(event.currentTarget)}>
         Request changes
       </Button>
+      {approveBlocked ? (
+        <p id={waitId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted" title={approveBlocked}>
+          {approveBlocked}
+        </p>
+      ) : null}
     </div>
   );
 }

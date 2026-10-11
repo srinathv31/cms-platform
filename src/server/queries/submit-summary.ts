@@ -11,8 +11,8 @@ import { REFUSALS, contractBaseline } from "@/domain/lifecycle";
 import { can } from "@/domain/permissions";
 import { nextRound } from "@/domain/rounds";
 import { CHANNELS, type Viewer } from "@/domain/types";
-import { listSets } from "@/components/preview/sample-sets/model";
-import type { SubmitSummary } from "@/components/submit/types";
+import { listSets } from "@/editor/model/sample-sets";
+import type { SubmitSummary } from "@/domain/submit-types";
 
 // A read, not a change: what the submit dialog lists, taken from the saved draft, served by
 // GET /api/templates/[templateId]/submit-summary. The dialog sits in the tab bar, a separate subtree

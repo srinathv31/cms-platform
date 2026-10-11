@@ -1,9 +1,9 @@
 # `src/app`: routes, layouts, and route handlers
 
-The Next.js App Router tree for Stencil, the Coral simulator, and the dev mocks. Files here are thin: a page
+The Next.js App Router tree for Stencil, the Coral simulator, and two dev labs. Files here are thin: a page
 renders static chrome and a `<Stream>` around a server component from `src/components/` that reads the request;
 a route handler parses HTTP and calls `src/server/`. No server actions live here (lint allows `"use server"` only
-in `src/server/actions/`), and outside `(dev)` the only client components are the three error boundaries, which
+in `src/server/actions/`), and outside `(dev)` the only client components are the four error boundaries, which
 Next requires to be client components. Business rules belong in `src/domain/` and `src/server/`.
 
 ## Rules
@@ -32,8 +32,8 @@ and every request-bound part streams. Reading request data outside `<Suspense>` 
    never `new Date()` or `Date.now()` in server code. `now()` awaits `connection()` and reads the database, so
    it is request data too.
 5. A database read that runs before any request API needs `await connection()` first. libSQL resolves in
-   microtasks, so without it the read can land in the prerender. See `getAllTeams` in
-   [queries/teams.ts](../server/queries/teams.ts) and the simulator's
+   microtasks, so without it the read can land in the prerender. See `getSimCustomers` in
+   [ui/lists.ts](../simulator/ui/lists.ts) and the simulator's
    [delivery file route](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts). The `/api/v1` GET handlers
    get the same effect by reading their headers before touching the database.
 6. `export const instant = false` appears only on the two settings pages. It opts them out of Next's
@@ -74,17 +74,16 @@ writes the route types and the global `PageProps`, `LayoutProps` and `RouteConte
 | `/sim/offers/[offerId]/link` | [link/page.tsx](./(simulator)/sim/offers/[offerId]/link/page.tsx) | Link or relink a template (`?template=`). |
 | `/sim/customers`, `/sim/deliveries`, `/sim/notices` | [customers](./(simulator)/sim/customers/page.tsx), [deliveries](./(simulator)/sim/deliveries/page.tsx), [notices](./(simulator)/sim/notices/page.tsx) | Coral's customers, sends, and notices from Stencil. |
 
-### `(dev)`: mocks and labs
+### `(dev)`: labs
 
-Nothing gates these: there is no `(dev)` layout, environment check or proxy. They ship in production builds and
-answer by URL, though nothing in the app links to them. They use fixtures only, never the database or the
-persona; the mocks read their deep-link search params.
+Two labs for working on the editor and the PDF viewer. Each page calls `notFound()` when
+`process.env.NODE_ENV === "production"`, so they answer in `next dev` and 404 in a production build. There is no
+`(dev)` layout or proxy, nothing in the app links to them, and they use fixtures only, never the database or the
+persona. The `/design/*` variant mocks (and the second stand-in renderer they carried) were removed once their
+decisions were in the product; they are recoverable from the `archive/design-mocks` tag.
 
 | URL | What it is |
 | --- | --- |
-| `/design` | Design-system sample: type, color, surfaces, the SHARE ring. `/design/sample-sets` is a harness for the sample-set switcher. |
-| `/design/audit`, `/comments`, `/preview`, `/review`, `/settings`, `/simulator`, `/usage-dashboard`, `/workspace` | Static mocks of one screen on fixture data, with a dev bar. Each page's header comment lists its deep-link params. |
-| `/design/device` | The phone kit ([src/components/device](../components/device/README.md)) on fixtures: every push and SMS view on iPhone and Android at 1:1 and in the 469px preview well, and a mock of the rail's controls for message channels. |
 | `/editor-lab` | The live editor on fixtures, beside a server-rendered `StaticDocument`. |
 | `/pdf-lab` | The PDF viewer, fed from a file input or `?src=`. |
 
@@ -107,6 +106,8 @@ persona; the mocks read their deep-link search params.
 | `GET /api/v1/consumers/[consumerId]/notices?after=&templateId=&limit=` | [route.ts](./api/v1/consumers/[consumerId]/notices/route.ts) | Simulator and outside consumers. |
 | `POST /api/v1/templates/[templateId]/render` | [route.ts](./api/v1/templates/[templateId]/render/route.ts) | Browser preview with `preview: true` ([render-preview.ts](../components/preview/render-preview.ts)); simulator and outside consumers with `X-Consumer-Id`. |
 | `GET /sim/deliveries/[deliveryId]/file` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/file/route.ts) | Simulator: the customer views' iframes and PDF. |
+| `GET /sim/deliveries/[deliveryId]/view` | [route.ts](./(simulator)/sim/deliveries/[deliveryId]/view/route.ts) | Simulator: the customer drawer, when it opens on a delivery ([offer-view.tsx](../simulator/ui/offer-view.tsx)). |
+| `GET /sim/templates/search?q=` | [route.ts](./(simulator)/sim/templates/search/route.ts) | Simulator: the link flow's template search, debounced ([link-flow.tsx](../simulator/ui/link-flow.tsx)). |
 
 ## Layouts and providers
 
@@ -144,7 +145,7 @@ requests in about 3 seconds on the Library and on a workspace.
 
 ## Errors
 
-Three error boundaries catch a throw by route, not by `<Stream>`
+Four error boundaries catch a throw by route, not by `<Stream>`
 ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). An error boundary
 doesn't cover the layout beside it, so each keeps what its segment's layouts render:
 
@@ -152,13 +153,17 @@ doesn't cover the layout beside it, so each keeps what its segment's layouts ren
 | --- | --- | --- | --- |
 | [(product)/error.tsx](./(product)/error.tsx) | Pages inside `AppFrame`, `TeamGuard`, the `@modal` slot, the workspace layout. | `PageError`: "This page didn't load" as the page title. | Sidebar and top bar. |
 | [templates/[templateId]/error.tsx](./(product)/[team]/templates/[templateId]/error.tsx) | A workspace tab's page. | `TabError` in the document's grid cell. | Workspace header and tab bar. |
-| [global-error.tsx](global-error.tsx) | `AppFrame`'s streamed parts, the root layout, and `(simulator)`. | `GlobalErrorView`: the canvas panel with `PageError`. | Nothing. It renders its own `<html>` with `globals.css` and the fonts, and no providers. |
+| [(simulator)/error.tsx](./(simulator)/error.tsx) | A page under `/sim`. | `SimError` ([simulator/ui/error-view.tsx](../simulator/ui/error-view.tsx)): "This page didn't load" as Coral's page title, in Coral's look. | Coral's layout: the Back to Stencil strip, its nav and the Demo pill. |
+| [global-error.tsx](global-error.tsx) | `AppFrame`'s streamed parts, the root layout, and the layouts of `(simulator)`. | `GlobalErrorView`: the canvas panel with `PageError`. | Nothing. It renders its own `<html>` with `globals.css` and the fonts, and no providers. |
 
-The views live in [route-error.tsx](../components/app-shell/route-error.tsx) and
-[tab-error.tsx](../components/workspace/tab-error.tsx). Each offers Try again, which calls Next's `retry` (a
-refetch of the route), and Back to library (the URL's space, or `/`), and shows the error's `digest` when Next gives
-one. None shows the error's message or logs it; Next logs it already. Try again is the black button, except on
-`TabError`, where the tab bar keeps the workspace's black button.
+The views live in [route-error.tsx](../components/app-shell/route-error.tsx),
+[tab-error.tsx](../components/workspace/tab-error.tsx) and, for Coral, [error-view.tsx](../simulator/ui/error-view.tsx)
+(built from Coral's own pieces, because the simulator imports nothing from Stencil's server, domain or editor and draws
+in its own palette). Each offers Try again, which calls Next's `retry` (a refetch of the route), and a way back:
+Back to library (the URL's space, or `/`), or, in Coral, Back to offers (`/sim`). Each shows the error's `digest` when
+Next gives one. None shows the error's message or logs it; Next logs it already. Try again is the black button, except
+on `TabError`, where the tab bar keeps the workspace's black button: greyed, with the reason at the control, while the
+error is on screen, because the tab it acts on didn't load.
 
 A `notFound()` or `redirect()` passes through these boundaries to Next's own handling.
 
@@ -196,6 +201,11 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
 answer, with the status their query's `ReadResult` gives), `{ error: "not_found" }` with 404 (import reads), and
 plain text (audit export, delivery file). All send `Cache-Control: no-store` (`private, no-store` on a successful
 import read, on every template read and on the palette).
+
+**Coral's reads** (`/sim/templates/search`, `/sim/deliveries/[deliveryId]/view`) are the simulator's own, in the
+simulator's shape rather than Stencil's: `{ ok: true, … }` or `{ ok: false, reason }` (its `SimResult`) with a 400,
+404 or 502 and `Cache-Control: private, no-store` ([read-response.ts](../simulator/read-response.ts)). Coral's
+server actions are its writes only.
 
 **Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
 opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs
@@ -263,8 +273,8 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   and picks a `REASONS` sentence itself. Let the query decide and return the result.
 - **A sixth error shape.** Internal routes already answer in five. A new public route uses `errorResponse`; a
   new internal one reuses an existing shape (a read, `readResponse`).
-- **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated and ship in
-  production.
+- **Linking to `(dev)` routes from the app, or giving them real data.** They are unauthenticated
+  and exist only outside production builds.
 
 ## Testing
 
@@ -283,7 +293,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 | Spec | Covers |
 | --- | --- |
 | `e2e/principles.spec.ts` | Every product screen as each persona that can see it, the settings modal sections, every `/sim` page, and the tabs and filters inside pages. Checks: one primary button per canvas or dialog, status words only in `StatusBadge`, no placeholders, no serious axe violations, CLS 0. The simulator gets only the last three. |
-| `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, `/design`, `/editor-lab`, router prefetch. |
+| `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, router prefetch. |
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
 | `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |
 | `e2e/scenario-02.spec.ts` … `scenario-10.spec.ts`, `e2e/phase-6-two-stage.spec.ts` | Demo scenarios: create (workspace), review loop, going live and breaking change (workspace Usage, `/sim`), revoke (Versions), teams and audit export, access, import, copilot prompt, two-stage approval. |

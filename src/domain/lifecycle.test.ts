@@ -1,3 +1,4 @@
+import { OUTPUT_KEYS } from "./review-outputs";
 import { describe, expect, it } from "vitest";
 import {
   BLANK_STARTER_KEY,
@@ -1101,6 +1102,7 @@ const tryApprove = (version: ReviewVersion) =>
     sunsetPrevious: null,
     zone: ZONE,
     sampleSetsSeen: ["typical"],
+    outputsViewed: OUTPUT_KEYS,
     templateName: TEMPLATE.name,
   });
 const trySetSunset = (version: ReviewVersion) =>
@@ -1355,6 +1357,7 @@ describe("approve", () => {
       sunsetPrevious: null,
       zone: ZONE,
       sampleSetsSeen: ["typical", "long"],
+      outputsViewed: OUTPUT_KEYS,
       templateName: TEMPLATE.name,
       ...over,
     });
@@ -1362,7 +1365,7 @@ describe("approve", () => {
   const activated = (supersedes: number | null, stage = "Team approver") => ({
     kind: "audit",
     action: "version.activated",
-    details: { number: 2, round: 1, supersedes, stage },
+    details: { number: 2, round: 1, supersedes, stage, outputsViewed: ["pdf", "web", "email"] },
   });
   const superseded = { kind: "audit", action: "version.superseded", versionId: "v_1", details: { number: 1, supersededBy: 2 } };
   const live = {
@@ -1443,7 +1446,7 @@ describe("approve", () => {
   it("goes live on a later round as the version consumers know: v2, with the round on the audit row only", () => {
     const result = run({ version: { ...v2, id: "v_2r3", round: 3 } });
     expect(result.ok && result.effects).toEqual([
-      { ...activated(1), details: { number: 2, round: 3, supersedes: 1, stage: "Team approver" } },
+      { ...activated(1), details: { number: 2, round: 3, supersedes: 1, stage: "Team approver", outputsViewed: ["pdf", "web", "email"] } },
       superseded,
       live,
       { ...newVersion, versionId: "v_2r3" },
@@ -1512,6 +1515,48 @@ describe("approve", () => {
     expect(result.ok && result.effects).toEqual([activated(1), superseded, newVersion]);
   });
 
+  // Decision 0037: every output of the version, rendered on the approver's screen, before Approve.
+  describe("the outputs the approver viewed", () => {
+    it("refuses a document version while an output is unviewed, naming what's left", () => {
+      expect(run({ outputsViewed: ["pdf"] })).toEqual({
+        ok: false,
+        code: "output_not_viewed",
+        reason: "Preview Web and Email first.",
+      });
+      expect(run({ outputsViewed: [] })).toMatchObject({ ok: false, code: "output_not_viewed" });
+    });
+
+    it("counts a push on each phone: an alert needs iPhone, Android and SMS", () => {
+      const alert: ReviewVersion = { ...v2, channels: ["push", "sms"] };
+      expect(run({ version: alert, outputsViewed: ["push.ios", "sms"] })).toEqual({
+        ok: false,
+        code: "output_not_viewed",
+        reason: "Preview Push (Android) first.",
+      });
+      const approved = run({ version: alert, outputsViewed: ["sms", "push.android", "push.ios"] });
+      expect(approved.ok && approved.effects[0]).toMatchObject({
+        action: "version.activated",
+        details: { outputsViewed: ["push.ios", "push.android", "sms"] },
+      });
+    });
+
+    it("a single channel needs only its own output", () => {
+      expect(run({ version: { ...v2, channels: ["pdf"] }, outputsViewed: ["pdf"] }).ok).toBe(true);
+    });
+
+    it("gates every stage, not only the last", () => {
+      expect(run({ chain: CHAIN_2, outputsViewed: ["pdf", "web"] })).toMatchObject({ ok: false, code: "output_not_viewed" });
+    });
+
+    it("never gates Request changes", () => {
+      expect(tryRequestChanges(v2).ok).toBe(true);
+    });
+
+    it("refuses maker-checker first: someone who wrote the version hears that, not the outputs", () => {
+      expect(run({ actorId: "maya", outputsViewed: [] })).toEqual({ ok: false, ...REASONS.ownVersion });
+    });
+  });
+
   describe("with two stages", () => {
     it("moves the first stage's approval on to the next stage, and asks it to review", () => {
       expect(run({ chain: CHAIN_2 })).toEqual({
@@ -1533,7 +1578,7 @@ describe("approve", () => {
           {
             kind: "audit",
             action: "version.stage_approved",
-            details: { number: 2, round: 1, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
+            details: { number: 2, round: 1, stage: "Team approver", stagePosition: 0, next: "Legal reviewer", outputsViewed: ["pdf", "web", "email"] },
           },
           {
             kind: "notification",
@@ -1562,7 +1607,7 @@ describe("approve", () => {
         {
           kind: "audit",
           action: "version.stage_approved",
-          details: { number: 2, round: 2, stage: "Team approver", stagePosition: 0, next: "Legal reviewer" },
+          details: { number: 2, round: 2, stage: "Team approver", stagePosition: 0, next: "Legal reviewer", outputsViewed: ["pdf", "web", "email"] },
         },
         expect.objectContaining({ title: "Spring Travel Rewards — Terms v2, round 2 is waiting on Legal reviewer.", link: review }),
         expect.objectContaining({ title: "Jordan Ellis approved Spring Travel Rewards — Terms v2, round 2 for Team approver.", link: review }),
@@ -2216,6 +2261,7 @@ describe("scenario 3: the review loop", () => {
       sunsetPrevious: null,
       zone: ZONE,
       sampleSetsSeen: ["typical"],
+      outputsViewed: OUTPUT_KEYS,
       templateName: TEMPLATE.name,
     };
   }
@@ -2258,6 +2304,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       sunsetPrevious: null,
       zone: ZONE,
       sampleSetsSeen: [],
+      outputsViewed: OUTPUT_KEYS,
       templateName: TEMPLATE.name,
     }),
     requestChanges: requestChanges({

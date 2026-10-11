@@ -2,7 +2,7 @@
 
 import { TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
-import { findSet, listSets, resolveSetValues } from "@/components/preview/sample-sets/model";
+import { findSet, resolveSetValues } from "@/components/preview/sample-sets/model";
 import { createRedlineHandle } from "@/components/redline/dom-handle";
 import {
   channelFieldsHeading,
@@ -21,6 +21,7 @@ import type { MessageTypeRules } from "@/domain/platform-config";
 import type { Channel, JSONContent } from "@/domain/types";
 import { useContractState } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
+import { listSets } from "@/editor/model/sample-sets";
 import type { DocumentEditorHandle, TextFlagger } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import { useLiveFields, useLiveSampleSets, type LiveDraft } from "../session/live-draft";

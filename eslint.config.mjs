@@ -9,6 +9,11 @@ const noSimulatorData = {
   group: ["**/schema/sim", "@/server/db/schema/sim", "@/simulator", "@/simulator/*"],
   message: "UCOMP code must not read simulator (Coral) data.",
 };
+const noComponents = {
+  group: ["@/components", "@/components/*"],
+  message:
+    "src/server must not import the React UI. Shared types and constants go in src/domain; pure helpers a screen and the server both use go in @/editor/model/*.",
+};
 const noEditorBarrel = {
   name: "@/editor",
   message:
@@ -78,21 +83,22 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // Server code doesn't read the simulator's tables either, and takes the editor's server-safe modules
-    // directly. The "@/editor" barrel was removed (it compiled the whole editor UI into every route that
-    // reached it); this rule keeps one from coming back here.
+    // Server code doesn't read the simulator's tables either, takes the editor's server-safe modules
+    // directly, and never imports the React UI (what a screen and the server both need goes in
+    // src/domain, or in @/editor/model/*). The "@/editor" barrel was removed (it compiled the whole
+    // editor UI into every route that reached it); this rule keeps one from coming back here.
     // (domain/ is held tighter above: the editor's pure model only.)
     files: ["src/server/**/*"],
     ignores: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noSimulatorData] }],
+      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noSimulatorData, noComponents] }],
     },
   },
   {
-    // The seed and the reset write the simulator's tables, so only the editor rule applies to them.
+    // The seed and the reset write the simulator's tables, so the simulator rule doesn't apply to them.
     files: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [noEditorBarrel] }],
+      "no-restricted-imports": ["error", { paths: [noEditorBarrel], patterns: [noComponents] }],
     },
   },
   {
@@ -107,7 +113,9 @@ const eslintConfig = defineConfig([
     // takes any input and runs one at a time with the page's other actions. Only mutations are server
     // actions, and they live in src/server/actions/, each parsing its input with zod. A read the browser
     // asks for is a GET route handler (src/app/api/templates/[templateId]/) or props from a server component.
-    // The simulator, a separate app, keeps its own actions in src/simulator/actions.ts.
+    // The simulator, a separate app, keeps its own writes in src/simulator/actions.ts and nothing else: lint
+    // can't tell a read from a write inside a file, so actions.test.ts pins the file's exports to the four
+    // writes. Its reads are GET routes (src/app/(simulator)/sim/templates/search, .../deliveries/[id]/view).
     files: ["src/**/*.{ts,tsx,js,jsx,mjs}"],
     ignores: ["src/server/actions/**", "src/simulator/actions.ts"],
     rules: {

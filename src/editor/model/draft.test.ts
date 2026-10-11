@@ -98,6 +98,16 @@ describe("create form", () => {
     });
   });
 
+  it("refuses a sample over 1,000 characters, and takes one of exactly 1,000", () => {
+    const none = new Set<string>();
+    const draft = newDraft("Note", none);
+    expect(validateDraft({ ...draft, sample: "a".repeat(1000) }, { takenKeys: none })).toMatchObject({ ok: true });
+    expect(validateDraft({ ...draft, sample: "a".repeat(1001) }, { takenKeys: none })).toMatchObject({
+      ok: false,
+      errors: { sample: "Use 1,000 characters or fewer" },
+    });
+  });
+
   it("keeps a sample across a type change only when it still fits", () => {
     expect(sampleForType("2027-03-04", "currency")).toBe("");
     expect(sampleForType("1,000", "number")).toBe("1000");

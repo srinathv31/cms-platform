@@ -19,6 +19,7 @@ vi.mock("@/server/actions/templates", () => ({ startDraft: server.startDraft }))
 vi.mock("@/server/actions/review", () => ({ submitVersion: vi.fn() }));
 
 const { EditButton } = await import("./workspace-actions");
+const { WorkspaceSessionProvider } = await import("./session/workspace-session");
 
 const TEMPLATE = "UC-4F7K2Q";
 let root: Root;
@@ -33,7 +34,13 @@ beforeEach(async () => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  await act(async () => root.render(<EditButton templateId={TEMPLATE} />));
+  await act(async () =>
+    root.render(
+      <WorkspaceSessionProvider>
+        <EditButton templateId={TEMPLATE} />
+      </WorkspaceSessionProvider>,
+    ),
+  );
 });
 
 afterEach(async () => {

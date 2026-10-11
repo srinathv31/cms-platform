@@ -1,6 +1,9 @@
 # 0019. Reads a screen loads on demand are GET routes; only mutations are server actions
 
 Status: Accepted
+Amended 2026-10-11: the simulator's two reads are now GET routes too (`/sim/templates/search` and
+`/sim/deliveries/[deliveryId]/view`) and `src/simulator/actions.ts` holds its four writes only, so the last
+Consequences line below no longer holds (handoff review N19, PR #52).
 Date: 2026-10-09
 
 ## Context

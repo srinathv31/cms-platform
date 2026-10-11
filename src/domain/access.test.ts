@@ -32,6 +32,7 @@ import {
   startRecertConsequence,
   suspendInactive,
   sweepAccess,
+  validateAccessReason,
   validateDecisionNote,
   validateRoles,
 } from "./access";
@@ -339,6 +340,16 @@ describe("requestAccess", () => {
     expect(requestAccess({ ...base, reason: "   " })).toEqual({ ok: false, code: "request_reason_missing", reason: "Add a reason." });
     expect(requestAccess({ ...base, reason: "x".repeat(501) })).toEqual({ ok: false, ...ACCESS_REFUSALS.reasonTooLong });
     expect(requestAccess({ ...base, reason: "x".repeat(500) }).ok).toBe(true);
+  });
+
+  it("validateAccessReason is the check requestAccess refuses with: empty first, then too long", () => {
+    expect(validateAccessReason("")).toBe(ACCESS_REFUSALS.giveReason);
+    expect(validateAccessReason("  \n ")).toBe(ACCESS_REFUSALS.giveReason);
+    expect(validateAccessReason(`  ${"x".repeat(501)}  `)).toBe(ACCESS_REFUSALS.reasonTooLong);
+    expect(validateAccessReason("x".repeat(500))).toBeNull();
+    // Spaces around the reason don't count toward the limit, as requestAccess trims first.
+    expect(validateAccessReason(`  ${"x".repeat(500)}  `)).toBeNull();
+    expect(validateAccessReason("Drafting the spring promotions.")).toBeNull();
   });
 
   it("allows one pending request per team", () => {

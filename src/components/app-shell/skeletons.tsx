@@ -16,6 +16,10 @@ export function TeamSwitcherSkeleton() {
   );
 }
 
+/**
+ * A nav row as the real link draws it, label and all (the labels are static, so there is nothing to hide).
+ * Drawn at full contrast: dimmed to 60% its label measured 4.39:1, under WCAG's 4.5:1, while the sidebar streams in.
+ */
 function StaticRow({
   icon: Icon,
   label,
@@ -27,7 +31,7 @@ function StaticRow({
 }) {
   return (
     <li className="relative">
-      <div className={cn("flex w-full items-center", NAV_ROW, "opacity-60", className)}>
+      <div className={cn("flex w-full items-center", NAV_ROW, className)}>
         <Icon aria-hidden strokeWidth={NAV_ICON_STROKE} />
         <span>{label}</span>
       </div>

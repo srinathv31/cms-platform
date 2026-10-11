@@ -1,6 +1,8 @@
 # 0007. Maker-checker covers everyone who wrote a version
 
 Status: Accepted
+Amended 2026-10-11: the edit transition the Decision names `editActive` is `editLatest` now, and it also opens a draft
+from a Revoked version ([0009](0009-correct-a-revoked-version-from-its-content.md), handoff review D1, PR #16).
 Date: 2026-10-08
 
 ## Context

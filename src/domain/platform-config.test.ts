@@ -6,6 +6,7 @@ import {
   PLATFORM_REFUSALS,
   RESERVED_SLUGS,
   approverProblem,
+  cannotBeFirstTeamAdmin,
   channelOffConsequences,
   channelRuleRefusal,
   conformToSections,
@@ -35,6 +36,8 @@ const NOW = new Date("2026-10-05T12:00:00.000Z");
 const riley = { id: "riley", name: "Riley Brooks" };
 const alex = { id: "alex", name: "Alex Kim" };
 const dana = { id: "dana", name: "Dana Park" };
+const alexAdmin = { ...alex, platformRole: null };
+const taylorAuditor = { id: "taylor", name: "Taylor Nguyen", platformRole: "auditor" as const };
 const people = [riley, alex, dana, { id: "jordan", name: "Jordan Ellis" }];
 const EXISTING = [
   { slug: "coral-offers", name: "Coral Offers" },
@@ -58,7 +61,7 @@ describe("createTeam", () => {
       name: "Home Loans",
       description: "Mortgage disclosures.",
       icon: "home",
-      admin: alex,
+      admin: alexAdmin,
       actor: riley,
       now: NOW,
       existing: EXISTING,
@@ -117,6 +120,19 @@ describe("createTeam", () => {
     expect(run({ icon: "skull" })).toEqual({ ok: false, ...PLATFORM_REFUSALS.icon });
   });
 
+  it("refuses an Auditor as the first Team Admin, before it looks at the team", () => {
+    const refused = { ok: false, code: "auditor_cant_be_admin", reason: "Taylor Nguyen is an Auditor and can't be a Team Admin." };
+    expect(run({ admin: taylorAuditor })).toEqual(refused);
+    expect(run({ admin: taylorAuditor, name: "  " })).toEqual(refused);
+    expect(run({ admin: { ...alexAdmin, platformRole: "platform_admin" } }).ok).toBe(true);
+  });
+
+  it("cannotBeFirstTeamAdmin: an Auditor can't, anyone else can", () => {
+    expect(cannotBeFirstTeamAdmin(taylorAuditor)).toEqual(PLATFORM_REFUSALS.auditorCantBeAdmin("Taylor Nguyen"));
+    expect(cannotBeFirstTeamAdmin(alexAdmin)).toBeNull();
+    expect(cannotBeFirstTeamAdmin({ ...alex, platformRole: "platform_admin" })).toBeNull();
+  });
+
   it("refuses a name whose slug is a top-level route: every top-level segment under src/app is reserved", () => {
     expect(run({ name: "SIM" })).toEqual({ ok: false, code: "team_name_reserved", reason: '"SIM" can\'t be used as a team name.' });
     // Route groups "(x)" are looked through; dynamic "[x]", private "_x" and files are not segments.
@@ -125,7 +141,7 @@ describe("createTeam", () => {
         .filter((e) => e.isDirectory() && !e.name.startsWith("[") && !e.name.startsWith("_") && !e.name.startsWith("@"))
         .flatMap((e) => (e.name.startsWith("(") ? segments(join(dir, e.name)) : [e.name]));
     const top = segments(join(process.cwd(), "src/app"));
-    expect(top).toEqual(expect.arrayContaining(["api", "sim", "request-access", "design"]));
+    expect(top).toEqual(expect.arrayContaining(["api", "sim", "request-access", "editor-lab"]));
     expect(top.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
   });
 });
@@ -157,7 +173,7 @@ describe("validateNewTeam (the Create team form, as the admin types)", () => {
     for (const over of cases) {
       const { problem } = check(over);
       expect(problem).not.toBeNull();
-      const created = createTeam({ name: "Home Loans", description: "", icon: "home", admin: alex, actor: riley, now: NOW, existing: EXISTING, ...over });
+      const created = createTeam({ name: "Home Loans", description: "", icon: "home", admin: alexAdmin, actor: riley, now: NOW, existing: EXISTING, ...over });
       expect(created).toEqual({ ok: false, ...problem });
     }
     expect(check({ name: "coral offers" }).problem).toEqual({ code: "team_name_taken", reason: "A team called Coral Offers already exists." });
@@ -772,6 +788,28 @@ describe("describeChainChange (the Now / After cards)", () => {
       ],
       changed: true,
     });
+  });
+
+  it("says a person reviews every team once, though two new stages name them", () => {
+    const lines = describeChainChange({
+      contentTypeName: "Disclosure",
+      current: [TEAM],
+      next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }, LEGAL, { name: "Final sign-off", rule: LEGAL.rule }],
+      people,
+    }).lines;
+    const everyTeam = lines.filter((line) => line.includes("from every team"));
+    expect(everyTeam).toEqual(["Dana Park will review Disclosure submissions from every team, including teams they aren't a member of."]);
+    // The stages themselves are still each described.
+    expect(lines.filter((line) => line.includes("will also wait on"))).toHaveLength(2);
+
+    // Two different people newly named each get their own line.
+    const two = describeChainChange({
+      contentTypeName: "Disclosure",
+      current: [TEAM],
+      next: [LEGAL, { name: "Final sign-off", rule: { kind: "user", userId: "alex" } }],
+      people,
+    }).lines.filter((line) => line.includes("from every team"));
+    expect(two.map((line) => line.split(" will review")[0])).toEqual(["Dana Park", "Alex Kim"]);
   });
 
   it("marks removed, renamed and moved stages, with the waiting count on a removal", () => {

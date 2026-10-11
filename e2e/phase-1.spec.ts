@@ -823,37 +823,6 @@ test.describe("overlays", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// Dev pages
-// ───────────────────────────────────────────────────────────────────────────
-
-test.describe("dev pages", () => {
-  test("/design renders the design system sample", async ({ page }) => {
-    await page.goto("/design");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    // Every lifecycle status is shown with the one badge.
-    for (const state of ["draft", "in_review", "changes_requested", "active", "superseded", "revoked"]) {
-      await expect(page.locator(`[data-status='${state}']`).first()).toBeVisible();
-    }
-    await expect(page.locator("[data-slot='share-ring']").first()).toBeVisible();
-  });
-
-  test("/editor-lab mounts the editor and the slash menu works", async ({ page }) => {
-    await page.goto("/editor-lab");
-    await expect(page.getByRole("heading", { level: 1, name: "Editor lab" })).toBeVisible();
-    const ed = (await liveEditor(page)).first();
-    await expect(ed).toBeVisible();
-    await expect(ed).toHaveAttribute("contenteditable", "true");
-    await caretAtEndOf(page, ed.locator("p").last());
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("/");
-    await expect(page.getByRole("option").first()).toBeVisible();
-    await expect(page.getByRole("option", { name: /Heading 2/ })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("option")).toHaveCount(0);
-  });
-});
-
-// ───────────────────────────────────────────────────────────────────────────
 // Performance: layout shift on library and workspace
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -914,6 +883,32 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     await expect(editor(page)).toHaveAttribute("contenteditable", "true");
     await settle(page);
     await report("workspace Annual Fee Waiver (hard load)", page);
+  });
+
+  // The save status ("Saving…", "Saved") is the Revert menu's trigger, with a chevron after the text:
+  // the text keeps the width of its widest state, so the chevron stays put as each save lands (N10).
+  // Not a threshold: any shift counts, since the one it caught measured 0.000002.
+  test("typing into a draft shifts nothing as each save lands", async ({ page }) => {
+    await page.goto("/coral-offers/library");
+    await openTemplate(page, "Annual Fee Waiver — Terms");
+    const ed = await liveEditor(page);
+    await expect(ed).toHaveAttribute("contenteditable", "true");
+    await settle(page);
+    const status = page.locator("[data-status][aria-live='polite']").filter({ visible: true });
+    const before = (await readCls(page)).shifts.length;
+
+    // Two saves, each landing well after the last keystroke (a shift within 500 ms of input isn't counted).
+    // In the first paragraph, so the page doesn't scroll the status away: a shift out of view isn't reported.
+    for (const text of ["First save.", "Second save."]) {
+      await caretAtEndOf(page, ed.locator("p").first());
+      await page.keyboard.type(` ${text}`);
+      await expect(status).toHaveText("Saving…");
+      await expect(status).toHaveText("Saved", { timeout: 15_000 });
+      await expect(status, "the status is on screen, where a shift would be reported").toBeInViewport();
+    }
+    await page.waitForTimeout(1000);
+    const { shifts } = await readCls(page);
+    expect(shifts.slice(before), "layout shifts after typing, while each save landed").toEqual([]);
   });
 
   test("library → workspace → library by clicking (soft navigation)", async ({ page }) => {

@@ -1,6 +1,9 @@
 # 0012. Submit freezes only what it showed
 
 Status: Accepted
+Amended 2026-10-11: while the hold is on, the variables panel now keeps its editing layout with every control disabled
+(the editor root's `held` prop), and an open variable form stays open with what was typed in it, so the first and last
+Consequences lines below no longer hold (handoff review N5, PR #47).
 Date: 2026-10-09
 
 ## Context

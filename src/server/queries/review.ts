@@ -4,15 +4,15 @@ import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/domain/approval-chain";
 import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
-import { describeChanges } from "@/domain/contract";
+import { describeChanges, diffVariables } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS, renameBaseline, reviewBaseline } from "@/domain/lifecycle";
+import { REFUSALS, contractBaseline, renameBaseline, reviewBaseline, sunsetPassed } from "@/domain/lifecycle";
 import { canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, ReviewQueue, ReviewQueueRow, ReviewScreenData, VersionStage } from "@/domain/review-types";
 import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
-import type { ChannelFamily, ContractChange, PermissionResult, VersionState } from "@/domain/types";
+import type { ChannelFamily, ContractChange, PermissionResult, Variable, VersionState } from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
 import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
@@ -242,6 +242,12 @@ async function loadBaseline(
   return row ? { id: base.id, number: base.number, state: base.state, ...row } : null;
 }
 
+/** The variable list of one stored version: what a version's contract changes are worked out against. */
+async function loadVariables(versionId: string): Promise<Variable[]> {
+  const row = await db.query.versions.findFirst({ columns: { variables: true }, where: eq(versions.id, versionId) });
+  return row?.variables ?? [];
+}
+
 /**
  * Everything `/{team}/review/{templateId}/{n}?round=N` shows: that round, or without a round (null) the
  * number's head, its released row or else its latest round. 404 when the round doesn't exist or isn't
@@ -302,6 +308,14 @@ export const getReviewScreen = cache(
     // the Active one, unless that is this version's own release.
     const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
     const active = others.find((v) => v.state === "active");
+    // With nothing Active (after a revoke), the version consumers move from is the newest that still
+    // renders: the Approve dialog names its consumers and what they have to map (N3). The contract changes
+    // stored at submit were diffed against whatever was Active then, which may be a version revoked since
+    // (submitted while v2 was Active, v2 revoked during review), so they are worked out again here against
+    // the version that renders now, with the diff submit uses.
+    const renders = active ? null : contractBaseline(others, nowDate);
+    const rendersNow = renders && renders.number !== null && renders.number !== number ? { ...renders, number: renders.number } : null;
+    const mapFrom = rendersNow ? diffVariables(await loadVariables(rendersNow.id), version.variables) : [];
     // A sent-back round that was resubmitted is a record: where its work went is the number's head, linked
     // when the viewer may open it (a stage reviewer from another team may not).
     const head = replacedBy(others, shown);
@@ -331,11 +345,15 @@ export const getReviewScreen = cache(
         submittedAt: iso(version.submittedAt ?? version.createdAt),
         submitNote: version.submitNote,
         sunsetDay: version.sunsetAt ? sunsetDay(version.sunsetAt, zone) : null,
+        sunsetPassed: sunsetPassed(version, nowDate),
         contractChanges,
         contractLines: describeChanges(contractChanges, number),
       },
       baseline,
       previousNumber: active && active.number !== number ? active.number : null,
+      stillRenders: rendersNow
+        ? { number: rendersNow.number, sunsetDay: rendersNow.sunsetAt ? sunsetDay(rendersNow.sunsetAt, zone) : null, contractChanges: mapFrom }
+        : null,
       replacedBy: next ? { ...next, label: versionLabel(next, { style: "sentence" }) } : null,
       liveName: renamedFrom?.name ?? null,
       steps: stepperState(

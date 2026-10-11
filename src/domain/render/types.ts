@@ -14,7 +14,7 @@ import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/
 import type { ChannelFieldKey } from "../channel-fields";
 import type { SmsEncoding } from "../messages/gsm7";
 import type { PushPlatform } from "../messages/push";
-import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType, VariableValues } from "../types";
+import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType } from "../types";
 
 export type { BulletStyle, MarkerDelimiter, MarkerFormat };
 
@@ -265,42 +265,6 @@ export interface ResolveContext {
   values: CanonicalValues;
 }
 
-// ── The route: POST /api/v1/templates/{templateId}/render ────────────────────
-
-/**
- * Request body.
- *
- * Headers:
- *   X-Consumer-Id     required unless `preview` (a registered consumer id: "coral", "deposits-online")
- *   X-Correlation-Id  optional; generated when absent; echoed on every response and in render_log
- *
- * A consumer pins a version number. `"draft"` (the open draft) is allowed only with `preview`.
- * `preview` is the CMS's own preview: the persona cookie must be able to view the template, any
- * version state renders (version rules are skipped), and the render_log row is tagged as a preview
- * with no consumer, so it never counts toward usage.
- *
- * The body is at most MAX_BODY_BYTES, and each value at most MAX_VALUE_LENGTH characters.
- */
-export interface RenderRequestBody {
-  version: number | "draft";
-  channel: Channel;
-  /** Required with channel push, refused with any other: the platform the push is for. */
-  platform?: PushPlatform;
-  /** key → value, canonical ("21.99", "2027-03-04", "NJ") or friendly ("21.99%", "3/4/2027", "New Jersey"). Unknown keys are ignored. */
-  values: VariableValues;
-  /**
-   * Opt-in for consumers that can't take binary: the body comes back as JSON with base64 content. PDF,
-   * web and email only; push and SMS are JSON already, and refuse it.
-   */
-  encoding?: "base64";
-  preview?: boolean;
-  /**
-   * CMS preview only; ignored without `preview`. Which round of `version` to render (`?round=` on the
-   * review screen). Without it a number is its head: the released row, else its latest round.
-   */
-  round?: number;
-}
-
 /**
  * The largest body the route reads, in bytes. A larger one is 413 body_too_large, whether its
  * Content-Length says so or the count passes it while the body is read (a chunked body has no length).
@@ -308,12 +272,11 @@ export interface RenderRequestBody {
 export const MAX_BODY_BYTES = 1_000_000;
 
 /**
- * The most characters one value may have, as sent, counted in Unicode code points (what JSON Schema's
- * `maxLength` counts; Java: `codePointCount`). A longer value is invalid_values, never cut: values
- * print exactly as sent. A variable holds a name, an amount, a sentence or an address, not a document
- * (docs/decisions/0011-cap-each-render-value.md).
+ * The most characters one value may have, as sent: 1,000, counted in Unicode code points. A longer value
+ * is invalid_values, never cut (docs/decisions/0011-cap-each-render-value.md). It is defined in the
+ * editor's value module, beside `validateValue`, so the sample inputs can hold to the same limit.
  */
-export const MAX_VALUE_LENGTH = 1_000;
+export { MAX_VALUE_LENGTH } from "@/editor/model/variables";
 
 /**
  * Success. Every 200 carries these headers:
@@ -470,6 +433,10 @@ export interface VersionErrorDetails {
   activeVersion: number | null;
   /** ISO timestamp of the sunset or revoke, when there is one. */
   at?: string;
+  /** version_sunset: the sunset's day (YYYY-MM-DD) in the business time zone, the day the message names. */
+  sunsetDay?: string;
+  /** version_sunset: the business time zone `sunsetDay` is a day in. */
+  zone?: string;
 }
 
 export interface RenderError {

@@ -202,9 +202,6 @@ export interface PermissionResource {
 /** Allowed, or refused with a stable `code` to branch on and the sentence to show (domain/refusals.ts). */
 export type PermissionResult = { ok: true } | Refused;
 
-// ── Rendering ─────────────────────────────────────────────────
-export type RenderOutcome = "ok" | "error";
-
 // ── Drafts (autosave: PUT /api/drafts/[versionId]) ────────────
 /**
  * Body of an autosave. Only the fields that changed since the last save are sent.

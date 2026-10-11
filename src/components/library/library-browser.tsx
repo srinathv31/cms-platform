@@ -4,16 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Search, X } from "lucide-react";
+import { Segmented } from "@/components/primitives/segmented";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { statusLabel } from "@/domain/status";
 import { VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
-import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn } from "./columns";
+import { COLUMNS, COLUMNS_TEAM, FOLDS, ROW, TEAM_IN_SUBLINE, statusColumn, type StatusBadgeWidth } from "./columns";
 import { StarterGallery } from "./starter-gallery";
 
 type Filter = "all" | VersionState;
@@ -21,6 +21,13 @@ type Filter = "all" | VersionState;
 /** Case-insensitive match on the template's name or its ID (UC-4F7K2Q). */
 function matches(row: LibraryRow, needle: string): boolean {
   return row.name.toLowerCase().includes(needle) || row.id.toLowerCase().includes(needle);
+}
+
+/** The widest status badge among the rows, which sizes the status column. */
+function widestBadge(rows: LibraryRow[]): StatusBadgeWidth {
+  const sunsets = rows.filter((row) => row.status === "superseded" && row.sunsetDay !== null);
+  if (sunsets.some((row) => row.sunsetPassed)) return "sunset-passed";
+  return sunsets.length > 0 ? "sunset" : "default";
 }
 
 function ListHeader({ showTeam }: { showTeam: boolean }) {
@@ -60,7 +67,7 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         </span>
         {showTeam ? <span className={cn("truncate text-text-muted", FOLDS)}>{row.teamName}</span> : null}
         <span>
-          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} now={nowIso} />
+          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} sunsetPassed={row.sunsetPassed} now={nowIso} />
         </span>
         <span className="text-text tabular-nums">
           {row.activeNumber !== null ? `v${row.activeNumber}` : <span className="text-text-subtle">—</span>}
@@ -135,7 +142,7 @@ export function LibraryBrowser({
         : `No ${statusLabel(activeFilter).toLowerCase()} templates.`;
 
   return (
-    <div style={statusColumn(rows.some((row) => row.status === "superseded" && row.sunsetDay !== null))}>
+    <div style={statusColumn(widestBadge(rows))}>
       <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
         <InputGroup className="h-9 w-72 rounded-full border-hairline bg-surface">
           <InputGroupAddon>
@@ -171,27 +178,16 @@ export function LibraryBrowser({
         </InputGroup>
 
         {present.length > 1 ? (
-          <ToggleGroup
-            aria-label="Filter by status"
-            spacing={1}
-            value={[activeFilter]}
-            // Pressing the pressed filter again clears it: back to All.
-            onValueChange={(value) => setFilter((value[0] as Filter | undefined) ?? "all")}
-          >
-            {(["all", ...present] as Filter[]).map((state) => (
-              <ToggleGroupItem
-                key={state}
-                value={state}
-                className="h-8 gap-1.5 rounded-full px-3 text-[13px] font-normal text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text data-pressed:bg-selected data-pressed:text-text"
-              >
-                {state === "all" ? "All" : statusLabel(state)}
-                {/* Subtle on the canvas; full text on the pressed pill (bg-selected), where subtle and muted fall under 4.5:1. */}
-                <span className="text-text-subtle tabular-nums in-aria-pressed:text-text in-data-pressed:text-text">
-                  {state === "all" ? rows.length : counts[state]}
-                </span>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <Segmented
+            label="Filter by status"
+            value={activeFilter}
+            onChange={setFilter}
+            options={(["all", ...present] as Filter[]).map((state) => ({
+              value: state,
+              // The name with its count: "Draft 3".
+              label: state === "all" ? `All ${rows.length}` : `${statusLabel(state)} ${counts[state]}`,
+            }))}
+          />
         ) : null}
       </div>
 

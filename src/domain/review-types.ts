@@ -289,8 +289,17 @@ export type ConsequenceAction =
   | {
       kind: "approve";
       newNumber: number;
+      /** The Active version this one replaces: it becomes Superseded. Null when nothing is Active. */
       previousNumber: number | null;
+      /** YYYY-MM-DD: the sunset date chosen for `previousNumber`, or null. */
       sunsetAt: string | null;
+      /**
+       * With nothing Active (after a revoke), the newest version that still renders (`contractBaseline`):
+       * its consumers move from it to the new one, and `breakingKeys` are the new version's changes against it.
+       * Nothing becomes Superseded. `sunsetAt` is its own sunset day (YYYY-MM-DD), or null. Read only
+       * when `previousNumber` is null; null or absent for a first version.
+       */
+      stillRenders?: { number: number; sunsetAt: string | null } | null;
       /**
        * The keys a consumer has to map before it can move to the new version (its breaking contract
        * changes: a required variable added, a key renamed, a type changed, an optional one made required).
@@ -366,6 +375,8 @@ export interface ReviewScreenData {
     submitNote: string | null;
     /** YYYY-MM-DD in the business time zone: the day a Superseded version stops rendering (the header's badge shows it). */
     sunsetDay?: string | null;
+    /** The sunset has passed (`sunsetPassed`): the header's badge says "Sunset passed". */
+    sunsetPassed: boolean;
     contractChanges: ContractChange[];
     /** Plain-English lines from domain/contract.ts: "v2 adds required `annual_fee` (Currency)." */
     contractLines: string[];
@@ -396,6 +407,15 @@ export interface ReviewScreenData {
    * nothing of.
    */
   previousNumber: number | null;
+  /**
+   * With nothing Active (after a revoke), the newest version that still renders (`contractBaseline`): the
+   * version its consumers move from, which the Approve dialog's consequences name (N3), with its sunset day
+   * in the business time zone when it has one. `contractChanges` are this version's against it, worked out
+   * when the screen loads with `diffVariables` (what submit stores is against whatever was Active at
+   * submit, which may be a version revoked during review): the breaking ones are what its consumers have
+   * to map. Null when a version is Active, when nothing renders, and when it is this version's own number.
+   */
+  stillRenders: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
   /**
    * Where this round's work went (`replacedBy`), when it is a sent-back round that was resubmitted: its
    * number's head, a later round or the release, with its label ("v3, round 2", or "v3" once released).

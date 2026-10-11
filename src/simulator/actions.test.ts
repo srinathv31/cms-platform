@@ -48,15 +48,17 @@ const V2_VARS = [
   variable("offer_end_date", "Offer end date", "date", false),
 ];
 const V3_VARS = [...V2_VARS, variable("annual_fee", "Annual fee", "currency")];
+const RENAMED_VARS = V3_VARS.map((v) => (v.key === "home_state" ? { ...v, key: "state" } : v));
 
-const ucomp = { active: 2, v2Sunset: false, inFlight: 0, maxInFlight: 0, renders: [] as { body: Record<string, unknown>; headers: Headers }[] };
+// `rename`: v3 sends `home_state` as `state`, as one key_renamed change.
+const ucomp = { active: 2, v2Sunset: false, rename: false, inFlight: 0, maxInFlight: 0, renders: [] as { body: Record<string, unknown>; headers: Headers }[] };
 
 function contract(version: number): ApiContract {
   return {
     version,
     state: version === ucomp.active ? "active" : "superseded",
     channels: ["pdf", "web", "email"],
-    variables: version === 3 ? V3_VARS : V2_VARS,
+    variables: version === 3 ? (ucomp.rename ? RENAMED_VARS : V3_VARS) : V2_VARS,
     jsonSchema: {} as ApiContract["jsonSchema"],
   };
 }
@@ -76,7 +78,10 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
       state: n === ucomp.active ? "active" : "superseded",
       activatedAt: "2026-09-01T00:00:00.000Z",
       supersededAt: n === ucomp.active ? null : "2026-10-01T00:00:00.000Z",
-      sunsetAt: n === ucomp.active ? null : "2027-03-01T00:00:00.000Z",
+      // 00:00 on March 1 in Kolkata, a zone ahead of UTC: the instant's UTC date is February 28.
+      sunsetAt: n === ucomp.active ? null : "2027-02-28T18:30:00.000Z",
+      sunsetDay: n === ucomp.active ? null : "2027-03-01",
+      zone: n === ucomp.active ? null : "Asia/Kolkata",
       sunsetPassed: n === 2 && ucomp.v2Sunset,
       revokedAt: null,
       renders: !(n === 2 && ucomp.v2Sunset),
@@ -89,8 +94,13 @@ function detail(version: number | null, since: number | null): ApiTemplateDetail
             since,
             to: target,
             breaking: true,
-            items: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }],
-            newRequired: ["annual_fee"],
+            items: [
+              ...(ucomp.rename
+                ? [{ kind: "key_renamed" as const, key: "state", breaking: true as const, from: "home_state", to: "state", text: "v3 renames `home_state` to `state`." }]
+                : []),
+              { kind: "added" as const, key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." },
+            ],
+            newRequired: ucomp.rename ? ["state", "annual_fee"] : ["annual_fee"],
           },
         }
       : {}),
@@ -114,7 +124,7 @@ function alertDetail(): ApiTemplateDetail {
     contentType: { key: "alert", name: "Alert" },
     asOf: "2026-10-05T12:00:00.000Z",
     activeVersion: 1,
-    versions: [{ number: 1, state: "active", activatedAt: "2026-10-05T00:00:00.000Z", supersededAt: null, sunsetAt: null, sunsetPassed: false, revokedAt: null, renders: true, channels }],
+    versions: [{ number: 1, state: "active", activatedAt: "2026-10-05T00:00:00.000Z", supersededAt: null, sunsetAt: null, sunsetDay: null, zone: null, sunsetPassed: false, revokedAt: null, renders: true, channels }],
     contract: { version: 1, state: "active", channels, variables: ALERT_VARS, jsonSchema: {} as ApiContract["jsonSchema"] },
   };
 }
@@ -240,10 +250,31 @@ const V2_MAPPING = { first_name: "customer.firstName", last_name: "customer.last
 
 // ── Tests (in order: link → send → upgrade → sunset → relink) ────────────────
 
-describe("searchTemplates", () => {
-  it("returns the API's results", async () => {
-    const result = await actions.searchTemplates({ q: "spring" });
+describe("actions.ts", () => {
+  // Every export of a "use server" file is a public POST endpoint queued with the page's other actions, so
+  // only Coral's writes may be exported from it: the reads are GET routes (decision 0019, finding N19).
+  it("exports only the writes", () => {
+    expect(Object.keys(actions).sort()).toEqual(["linkTemplate", "markNoticesRead", "saveMapping", "sendToCustomers"]);
+  });
+});
+
+describe("searchSimTemplates", () => {
+  it("returns the API's results; an empty search lists them all", async () => {
+    const result = await queries.searchSimTemplates("spring");
     expect(result.ok && result.results.map((r) => r.id)).toEqual([TPL]);
+    expect((await queries.searchSimTemplates(null)).ok).toBe(true);
+    expect((await queries.searchSimTemplates("")).ok).toBe(true);
+  });
+
+  it("refuses a search too long to be a name, with a 400", async () => {
+    expect(await queries.searchSimTemplates("x".repeat(201))).toEqual({ ok: false, reason: "Search for a template name or ID.", status: 400 });
+  });
+
+  it("answers with a sentence and a 502 when Stencil can't be reached", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("fetch failed"));
+    const result = await queries.searchSimTemplates("spring");
+    expect(result).toMatchObject({ ok: false, status: 502 });
+    expect(!result.ok && result.reason).toBeTruthy();
   });
 });
 
@@ -308,7 +339,7 @@ describe("sendToCustomers", () => {
     expect(Buffer.from(file!.body as Uint8Array).toString()).toBe("%PDF-1.7 fake");
     expect((await queries.loadDeliveryFile(email.deliveryId))?.body).toBe("<p>Email</p>");
 
-    const view = await actions.getDeliveryView({ deliveryId: email.deliveryId });
+    const view = await queries.readSimDeliveryView(email.deliveryId);
     expect(view.ok && view.view).toMatchObject({
       customer: { name: "Olivia Bennett", email: "olivia.bennett@example.com" },
       offerName: "Spring Travel Rewards",
@@ -318,9 +349,10 @@ describe("sendToCustomers", () => {
       status: "delivered",
       view: { kind: "inbox", src: `/sim/deliveries/${email.deliveryId}/file`, subject: "Your Spring Travel terms", preheader: "Read before you spend" },
     });
-    const phone = await actions.getDeliveryView({ deliveryId: web.deliveryId });
+    const phone = await queries.readSimDeliveryView(web.deliveryId);
     expect(phone.ok && phone.view.view).toEqual({ kind: "phone", src: `/sim/deliveries/${web.deliveryId}/file` });
-    expect(await actions.getDeliveryView({ deliveryId: "dlv_nope" })).toEqual({ ok: false, reason: "That delivery doesn't exist." });
+    expect(await queries.readSimDeliveryView("dlv_nope")).toEqual({ ok: false, reason: "That delivery doesn't exist.", status: 404 });
+    expect(await queries.readSimDeliveryView("d".repeat(65))).toEqual({ ok: false, reason: "That delivery doesn't exist.", status: 400 });
   });
 
   it("refuses with nothing to send", async () => {
@@ -335,7 +367,7 @@ describe("upgrade, sunset and relink", () => {
     ucomp.active = 3;
     const home = await queries.getSimHome();
     const card = home.offers.find((o) => o.id === "offer_spring_travel")!;
-    expect(card.link).toMatchObject({ pinnedVersion: 2, pinnedState: "superseded", sunsetAt: "2027-03-01T00:00:00.000Z", renders: true });
+    expect(card.link).toMatchObject({ pinnedVersion: 2, pinnedState: "superseded", sunsetDay: "2027-03-01", renders: true });
     expect(card.upgrade).toMatchObject({ toVersion: 3, diff: { since: 2, newRequired: ["annual_fee"] } });
     expect(card.lastSend).toMatchObject({ delivered: 6, failed: 0 });
     expect(home.offers.find((o) => o.id === "offer_cash_back")).toMatchObject({ link: null, upgrade: null, lastSend: null });
@@ -390,6 +422,32 @@ describe("upgrade, sunset and relink", () => {
     const result = await actions.sendToCustomers({ offerId: "offer_spring_travel", customerIds: ["cust_01", "cust_10"] });
     expect(result.ok && result.batch.counts).toEqual({ delivered: 6, failed: 0 });
     expect(ucomp.renders.every((r) => r.body.version === 3 && (r.body.values as Record<string, string>).annual_fee === "95")).toBe(true);
+  });
+
+  it("carries a mapping across a renamed variable when relinking", async () => {
+    // A second offer pinned to v2 and mapped by v2's keys; v3 sends `home_state` as `state`, one key_renamed change.
+    await simDb.insert(simLinks).values({
+      id: "lnk_rename",
+      offerId: "offer_cash_back",
+      templateId: TPL,
+      templateName: NAME,
+      pinnedVersion: 2,
+      channels: ["pdf"],
+      mapping: { ...V2_MAPPING },
+      linkedAt: new Date(),
+    });
+    try {
+      const before = await queries.getSimLinkFlow("offer_cash_back", TPL);
+      expect(before?.candidate?.mapping, "no rename yet: the keys match").toMatchObject({ home_state: "customer.homeState" });
+      ucomp.rename = true;
+      const flow = await queries.getSimLinkFlow("offer_cash_back", TPL);
+      expect(flow?.candidate?.diff?.items.map((i) => i.kind)).toEqual(["key_renamed", "added"]);
+      expect(flow?.candidate?.mapping).toMatchObject({ first_name: "customer.firstName", last_name: "customer.lastName", purchase_apr: "customer.purchaseApr", state: "customer.homeState" });
+      expect(flow?.candidate?.mapping).not.toHaveProperty("home_state");
+    } finally {
+      ucomp.rename = false;
+      await simDb.delete(simLinks).where(eq(simLinks.id, "lnk_rename"));
+    }
   });
 
   it("an unknown template in the flow is reported with the API's message", async () => {

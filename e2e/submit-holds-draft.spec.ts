@@ -22,9 +22,12 @@ import {
 // last saves are still on their way to the server:
 //
 //   1. From the click, the page is read-only (the document, the channels, the name, the variables panel)
-//      while the pending saves go out; what she typed can't change under the summary.
+//      while the pending saves go out; what she typed can't change under the summary. The panel keeps its
+//      layout with its controls disabled, and a variable form she left open stays open, disabled, with
+//      what she typed in it (N5).
 //   2. The dialog lists the variable she added just before the click: the summary is read after the saves.
-//   3. Cancel: everything is editable again, Undo included, and she keeps typing.
+//   3. Cancel: everything is editable again, Undo included, the open form still holds what she typed,
+//      and she keeps typing.
 //   4. Another tab saves the draft while the dialog is open: Submit is refused as stale, and the dialog
 //      offers Refresh summary. Refreshed, it submits; v3 holds both sentences and the variable.
 //
@@ -63,6 +66,7 @@ const held = {
   name: (page: Page) => page.locator('textarea[aria-label="Template name"]').filter({ visible: true }),
   channels: (page: Page) => page.locator('[aria-label="Channels"] button').filter({ visible: true }),
   newVariable: (page: Page) => page.locator("button").filter({ hasText: /^New variable$/, visible: true }),
+  formLabel: (page: Page) => page.locator('form[aria-label="New variable"] input').filter({ visible: true }).first(),
 };
 
 /** Clicks at the end of the document's first paragraph and types `text` after a space. */
@@ -78,8 +82,11 @@ async function typeAtEndOfFirstParagraph(page: Page, text: string) {
   await expect(documentEditor(page)).toContainText(text);
 }
 
-/** Everything that edits the draft, as it should be: editable, or held read-only. */
-async function expectEditable(page: Page, editable: boolean) {
+/**
+ * Everything that edits the draft, as it should be: editable, or held read-only. With a variable form open
+ * (`formOpen`) the New variable button is the form instead, in both states.
+ */
+async function expectEditable(page: Page, editable: boolean, formOpen = false) {
   await expect(held.document(page)).toHaveAttribute("contenteditable", String(editable));
   await expect(held.name(page)).toHaveJSProperty("readOnly", !editable);
   await expect(held.channels(page)).toHaveCount(3);
@@ -87,7 +94,17 @@ async function expectEditable(page: Page, editable: boolean) {
     if (editable) await expect(toggle).not.toHaveAttribute("data-disabled");
     else await expect(toggle).toHaveAttribute("data-disabled");
   }
-  await expect(held.newVariable(page)).toHaveCount(editable ? 1 : 0);
+  // Held, the panel keeps its layout: New variable (or the form) is there, disabled.
+  await expect(held.newVariable(page)).toHaveCount(formOpen ? 0 : 1);
+  if (!formOpen) {
+    if (editable) await expect(held.newVariable(page)).toBeEnabled();
+    else await expect(held.newVariable(page)).toBeDisabled();
+  }
+  await expect(held.formLabel(page)).toHaveCount(formOpen ? 1 : 0);
+  if (formOpen) {
+    if (editable) await expect(held.formLabel(page)).toBeEnabled();
+    else await expect(held.formLabel(page)).toBeDisabled();
+  }
 }
 
 test("Submit holds the draft still while it reads the summary, Cancel lets go, and a stale summary is refreshed", async ({ page }) => {
@@ -122,11 +139,17 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await page.keyboard.press("Enter");
     await expect(form).toBeHidden();
     await expect(panelRow(page, "gift_card")).toBeVisible();
+    // A second form, left open with something typed in it that she hasn't applied.
+    await tap(newVariable(page));
+    await expect(held.formLabel(page)).toBeFocused();
+    await page.keyboard.type("Half typed");
+    await expect(held.formLabel(page)).toHaveValue("Half typed");
     await expect(saveIndicator(page)).not.toHaveText("Saved");
 
     await tap(submitButton(page));
     await expect(submitButton(page)).toBeDisabled();
-    await expectEditable(page, false);
+    await expectEditable(page, false, true);
+    await expect(held.formLabel(page), "the open form keeps what she typed").toHaveValue("Half typed");
     // Typing into the document changes nothing now.
     const before = await documentEditor(page).textContent();
     await documentEditor(page).locator("p").first().click({ delay: 90 });
@@ -138,6 +161,8 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
 
   await test.step("The dialog lists what she added just before the click", async () => {
     await expect(dialog).toBeVisible({ timeout: 20_000 });
+    await expectEditable(page, false, true);
+    await expect(held.formLabel(page)).toHaveValue("Half typed");
     await expect(dialog).toContainText("v3 adds required gift_card (Text).");
     await expect(saveIndicator(page)).toHaveText("Saved");
     const [draft] = await rows(db, "SELECT body, variables FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
@@ -150,6 +175,9 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
   await test.step("Cancel: the page is editable again, Undo too, and she keeps typing", async () => {
     await tap(dialog.getByRole("button", { name: "Cancel" }));
     await expect(dialog).toBeHidden();
+    await expectEditable(page, true, true);
+    await expect(held.formLabel(page), "what she typed is still there").toHaveValue("Half typed");
+    await tap(page.getByRole("form", { name: "New variable" }).getByRole("button", { name: "Cancel" }));
     await expectEditable(page, true);
     await expect(undoButton(page)).not.toHaveAttribute("data-disabled");
     await typeAtEndOfFirstParagraph(page, SECOND);

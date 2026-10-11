@@ -3,6 +3,11 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { openDb, render, validValues } from "./api/helpers";
 import { SPRING_NAME, TEAM, click, createSpringTravel, reactReady, removeTemplate, rows, type SpringFixture } from "./helpers/golive";
 import { asPersona, expect, expectAutosaved, hydrated, liveEditor, nameField, tap, test } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
+
+// Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
+// scripts into them ("Blocked script execution").
+test.use({ trace: "off" });
 
 // A draft rename goes live only with its version (handoff review I5; docs/decisions/0016-the-name-is-versioned.md).
 //
@@ -117,6 +122,7 @@ test("a draft rename reaches customers only when its version is approved, and th
 
   await test.step("4. He approves: v3 goes live under the new name; v2 keeps the old one", async () => {
     const approve = decision(page).getByRole("button", { name: "Approve", exact: true });
+    await viewEveryOutput(page);
     await expect(approve).toBeEnabled();
     await tap(approve);
     const dialog = page.getByRole("dialog", { name: "Approve v3" });

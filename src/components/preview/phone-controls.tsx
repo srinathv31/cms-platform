@@ -20,8 +20,7 @@ import { cn } from "@/lib/utils";
 
 // The right slot of the controls row on Push and SMS: which phone (iPhone · Android), and a 32px
 // Device button whose popover sets the rest: the screen a push is on, the phone's appearance, its
-// previews setting, its text size and its width. Settled on the phone kit's design page at the
-// tightest well (469px). A row that doesn't apply to what is on screen stays in place, greyed, with
+// previews setting, its text size and its width. Sized for the tightest well (469px). A row that doesn't apply to what is on screen stays in place, greyed, with
 // why under it ("Push only"), and does nothing. The popover's geometry is the same in every state: the
 // reason sits in the gap under its control, out of flow, so picking Banner (which blocks Previews) moves
 // no row under the pointer, and Push and SMS open the same popover.
@@ -53,10 +52,16 @@ export function PhoneControls({
   channel,
   view,
   onChange,
+  viewed,
 }: {
   channel: "push" | "sms";
   view: PhoneView;
   onChange: (next: Partial<PhoneView>) => void;
+  /**
+   * The review Preview, on Push: the phones the approver has viewed the push on, each with a quiet check
+   * (decision 0037). Absent in the workspace and on SMS (one output, whichever phone): no checks.
+   */
+  viewed?: readonly DevicePlatform[];
 }) {
   const set = (patch: Partial<DeviceSettings>) => onChange({ settings: { ...view.settings, ...patch } });
   return (
@@ -64,8 +69,9 @@ export function PhoneControls({
       <Segmented
         label="Phone"
         value={view.settings.platform}
-        options={PUSH_PLATFORMS.map((value) => ({ value, label: PLATFORM_LABELS[value] }))}
+        options={PUSH_PLATFORMS.map((value) => ({ value, label: PLATFORM_LABELS[value], done: viewed ? viewed.includes(value) : undefined }))}
         onChange={(platform) => set({ platform })}
+        doneLabel="Viewed"
       />
       <DeviceOptions channel={channel} view={view} onChange={onChange} />
     </div>

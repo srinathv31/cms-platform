@@ -22,11 +22,12 @@ export function EditorRoot({
   baseline = null,
   requiredSections = NO_SECTIONS,
   readOnly = false,
+  held = false,
   requiredNote = DEFAULT_REQUIRED_NOTE,
   children,
 }: EditorRootProps) {
   const [runtime] = useState(() =>
-    createEditorRootRuntime({ variables, baseline, requiredSections, readOnly, requiredNote }),
+    createEditorRootRuntime({ variables, baseline, requiredSections, readOnly, held, requiredNote }),
   );
 
   // List changes only come from interaction after mount, so wiring the listener in an effect is in time.
@@ -37,16 +38,18 @@ export function EditorRoot({
   // Config can change after mount (a permission flip, a new Active version).
   useLayoutEffect(() => {
     const current = runtime.config.getState();
+    const nextHeld = held && !readOnly;
     if (
-      current.readOnly === readOnly &&
+      current.readOnly === (readOnly || held) &&
+      current.held === nextHeld &&
       current.baseline === baseline &&
       current.requiredSections === requiredSections &&
       current.requiredNote === requiredNote
     ) {
       return;
     }
-    runtime.config.setState({ readOnly, baseline, requiredSections, requiredNote });
-  }, [runtime, readOnly, baseline, requiredSections, requiredNote]);
+    runtime.config.setState({ readOnly: readOnly || held, held: nextHeld, baseline, requiredSections, requiredNote });
+  }, [runtime, readOnly, held, baseline, requiredSections, requiredNote]);
 
   useEffect(() => {
     runtime.markCommitted();

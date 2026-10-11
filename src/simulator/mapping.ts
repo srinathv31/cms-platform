@@ -1,7 +1,7 @@
 // Mapping template variables to Coral's fields. Pure TypeScript (no server code), tested in
 // mapping.test.ts. Values leave here as canonical strings; UCOMP validates them on render.
 
-import type { ApiVariable } from "@/contracts/api-v1";
+import type { ApiContractChange, ApiVariable } from "@/contracts/api-v1";
 import { simField } from "./fields";
 import type { SimCustomerRecord, SimFieldPath, SimOfferRecord } from "./types";
 
@@ -31,17 +31,27 @@ function fits(path: string | null | undefined, variable: ApiVariable): path is S
 }
 
 /**
- * A mapping for `variables`: current mappings that still fit their variable's type are kept, then
- * known keys are auto-mapped. Keys that aren't variables are dropped; uncertain keys stay unmapped.
+ * A mapping for `variables`: a current mapping that still fits its variable's type is kept, under the same
+ * key or, when `changes` (the API's diff since the pinned version) say the variable was renamed
+ * (`key_renamed`), under its earlier key; then known keys are auto-mapped. Keys that aren't variables are
+ * dropped; uncertain keys stay unmapped.
  */
 export function suggestMapping(
   variables: readonly ApiVariable[],
   current: Readonly<Record<string, SimFieldPath | string | null>> = {},
+  changes: readonly ApiContractChange[] = [],
 ): Record<string, SimFieldPath> {
+  // New key → the key it was sent under before.
+  const renamedFrom = new Map<string, string>();
+  for (const change of changes) if (change.kind === "key_renamed") renamedFrom.set(change.to, change.from);
+
+  const mapped = (key: string | undefined) => (key !== undefined && Object.hasOwn(current, key) ? current[key] : null);
   const out: Record<string, SimFieldPath> = {};
   for (const variable of variables) {
-    const kept = Object.hasOwn(current, variable.key) ? current[variable.key] : null;
+    const kept = mapped(variable.key);
+    const carried = mapped(renamedFrom.get(variable.key));
     if (fits(kept, variable)) out[variable.key] = kept;
+    else if (fits(carried, variable)) out[variable.key] = carried;
     else if (Object.hasOwn(AUTO, variable.key) && fits(AUTO[variable.key], variable)) out[variable.key] = AUTO[variable.key];
   }
   return out;

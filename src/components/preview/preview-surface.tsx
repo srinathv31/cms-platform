@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef } from "react";
 import { useContractState } from "@/editor/components/editor-root";
+import { listSets } from "@/editor/model/sample-sets";
 import type { SampleSet } from "@/editor/model/types";
 import { OriginalView } from "@/components/import/original-view";
 import { channelFieldsFrom } from "@/domain/channel-fields";
@@ -20,7 +21,7 @@ import { renderMessagePreview } from "./message-preview";
 import { PreviewPane } from "./preview-pane";
 import { phoneClock, phoneSenders, recipientOf, senderOf } from "./preview-sender";
 import { RailHeader, railHeaderViews } from "./rail-header";
-import { findSet, listSets, resolveSetValues } from "./sample-sets/model";
+import { findSet, resolveSetValues } from "./sample-sets/model";
 import { SampleSetSwitcher, type SampleSetSwitcherHandle } from "./sample-sets/sample-set-switcher";
 import { usePreviewRender } from "./use-preview-render";
 

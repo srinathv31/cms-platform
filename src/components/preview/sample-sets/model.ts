@@ -1,34 +1,16 @@
 // The sample-set list as plain data: what the switcher shows and what an edit produces. Pure
-// TypeScript (no React), so the preview, the review screen and the server can share it. Every
-// function returns new arrays and objects; nothing mutates its input.
+// TypeScript (no React), so the preview and the review screen share it. Every function returns new
+// arrays and objects; nothing mutates its input. Which sets exist (the three defaults, `isDefaultSet`,
+// `listSets`) is the editor's model, `@/editor/model/sample-sets`, which server code reads too.
 //
 // The model imports the editor's pure model directly (`@/editor/model/*`, as the editor's README
 // allows for code that must not load React or TipTap).
 
 import type { SampleSet, Variable, VariableValue, VariableValues } from "@/editor/model/types";
-import { DEFAULT_SAMPLE_SETS, defaultSampleSets, sampleSetValues } from "@/editor/model/sample-sets";
+import { defaultSampleSets, isDefaultSet, sampleSetValues } from "@/editor/model/sample-sets";
 import { validateValue } from "@/editor/model/variables";
 
-// ── Which sets exist ─────────────────────────────────────────────────────────
-
-/** The ids of the three default sets, in switcher order. They can't be renamed or deleted. */
-export const DEFAULT_SET_IDS: readonly string[] = DEFAULT_SAMPLE_SETS.map((set) => set.id);
-
-export function isDefaultSet(id: string): boolean {
-  return DEFAULT_SET_IDS.includes(id);
-}
-
-/**
- * The stored sets plus any default set that is missing (generated with `defaultSampleSets`).
- * The defaults come first, in order (typical, long, minimum); custom sets follow in stored order.
- * A stored default keeps its own values. `today` is YYYY-MM-DD.
- */
-export function listSets(stored: readonly SampleSet[], variables: readonly Variable[], today: string): SampleSet[] {
-  const generated = defaultSampleSets(variables, today);
-  const defaults = generated.map((set) => stored.find((s) => s.id === set.id) ?? set);
-  const customs = stored.filter((s) => !isDefaultSet(s.id));
-  return [...defaults, ...customs];
-}
+// ── Finding a set ────────────────────────────────────────────────────────────
 
 export function findSet(sets: readonly SampleSet[], id: string): SampleSet | undefined {
   return sets.find((set) => set.id === id);

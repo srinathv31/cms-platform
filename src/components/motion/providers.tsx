@@ -21,6 +21,19 @@ function useIgnoreAbortedViewTransitions() {
   }, []);
 }
 
+/**
+ * A toast's action (Undo) is an outline button, like the rest of the app's secondary actions: a screen has one
+ * black button, and sonner draws an action filled in the toast's text color, near black. Sonner's own styles are
+ * outside Tailwind's layers, so the utilities that override them are marked important.
+ * `toast` repeats ui/sonner.tsx's class: `toastOptions` here replaces that one whole.
+ */
+const TOAST_OPTIONS = {
+  classNames: {
+    toast: "cn-toast",
+    actionButton: "border! border-border! bg-surface! text-text! hover:bg-hover!",
+  },
+};
+
 export function Providers({ children }: { children: React.ReactNode }) {
   useIgnoreAbortedViewTransitions();
   return (
@@ -29,7 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <LazyMotion features={domMax} strict>
         <TooltipProvider delay={300}>
           {children}
-          <Toaster position="bottom-center" />
+          <Toaster position="bottom-center" toastOptions={TOAST_OPTIONS} />
         </TooltipProvider>
       </LazyMotion>
     </MotionConfig>

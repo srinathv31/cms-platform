@@ -1,6 +1,8 @@
 # 0030. Shared UI building blocks have one home, and a test keeps it so
 
 Status: Accepted
+Amended 2026-10-11: the Library's status filter is a `Segmented` too, and `one-copy.test.ts` also fails on a pressed
+pill written inline (handoff review N13, PR #55).
 Date: 2026-10-09
 
 ## Context

@@ -47,6 +47,7 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - `src/domain` imports no React, Next.js, Drizzle, `@/server`, `@/components`, `@/app`, or `@/simulator`, and from
   the editor only `@/editor/model/*`.
 - `src/editor` imports no `next/*` and no app code; from `src/components`, only `@/components/ui/*`.
+- `src/server` imports nothing from `@/components`. Shared types and constants go in `src/domain`.
 - `src/contracts` imports nothing.
 - `src/components/device` (the phone kit, shared with Coral) imports nothing from `@/domain`, `@/server`,
   `@/editor` or `@/app`, and from `src/components` only `ui/`, `primitives/` and `motion/`.
@@ -61,7 +62,6 @@ Not enforced yet; follow them anyway:
 
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
 - Only `src/server` imports the database client.
-- `src/server` doesn't import `src/components`. Shared types go in `src/domain`.
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
 
@@ -143,7 +143,7 @@ Next.js API; Next's own note about it is at the end of this file.
 | Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts) |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
-bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are design mocks on fixture data.
+bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.
 
 ## Keeping the docs true
 

@@ -129,22 +129,6 @@ const SCREENS = [
       await p.getByRole("dialog").waitFor();
     },
   },
-  { name: "design-top", persona: "maya", path: "/design", ready: (p) => p.getByRole("heading", { level: 1 }).waitFor() },
-  {
-    name: "editor-lab-slash",
-    persona: "maya",
-    path: "/editor-lab",
-    run: async (p) => {
-      await liveEditor(p);
-      const ed = p.locator(".ProseMirror").filter({ visible: true }).first();
-      const last = ed.locator("p").last();
-      const box = await last.boundingBox();
-      await last.click({ position: { x: box.width - 3, y: box.height - 9 }, delay: 90 });
-      await p.keyboard.press("Enter");
-      await p.keyboard.type("/");
-      await p.getByRole("option").first().waitFor();
-    },
-  },
 ];
 
 const only = process.argv[2];

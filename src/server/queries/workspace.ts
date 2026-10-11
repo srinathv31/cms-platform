@@ -6,7 +6,7 @@ import { db } from "@/server/db/client";
 import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { contractBaseline, planDraftStart, smsFooterOf } from "@/domain/lifecycle";
+import { contractBaseline, planDraftStart, smsFooterOf, sunsetPassed } from "@/domain/lifecycle";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config";
@@ -43,6 +43,8 @@ export interface WorkspaceHeaderData {
   status: VersionState;
   /** YYYY-MM-DD: the latest version's sunset day in the business time zone, for the badge. */
   sunsetDay: string | null;
+  /** The latest version's sunset has passed (`sunsetPassed`): the badge says "Sunset passed". */
+  sunsetPassed: boolean;
   /**
    * What sits beside the status badge. The badge already says the state, so the label never
    * repeats it: "v2" (or "v3 · Round 2", rounds.ts) on a version with a number, "Based on v2" (or
@@ -121,6 +123,7 @@ export const getWorkspaceHeader = cache(
     const active = list.find((v) => v.state === "active");
     const review = list.find((v) => v.state === "in_review" && v.number !== null);
     const zone = await getBusinessZone();
+    const at = await now();
 
     const isDraft = !latest || latest.state === "draft";
     // A draft is numbered as its submit will number it: the next version, or the next round of the one sent back.
@@ -143,6 +146,7 @@ export const getWorkspaceHeader = cache(
       teamName: tpl.teamName,
       status: latest?.state ?? "draft",
       sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
+      sunsetPassed: latest ? sunsetPassed(latest, at) : false,
       versionLabel,
       basedOn: baseRound ? { label: labelOf(baseRound, { style: "sentence" }), active: baseRound.state === "active" } : null,
       activeNumber: active?.number ?? null,

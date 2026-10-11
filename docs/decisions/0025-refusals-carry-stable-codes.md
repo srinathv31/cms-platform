@@ -1,6 +1,9 @@
 # 0025. Every refusal carries a stable code, and code branches on the code
 
 Status: Accepted
+Amended 2026-10-11: `startDraft` no longer throws `planDraftStart`'s blocked reason, as the last Consequences line
+below says it does: it returns it as a refusal, on the one kit every action now runs on
+([0029](0029-every-action-runs-on-one-kit.md), handoff review A3, PR #39).
 Date: 2026-10-09
 
 ## Context

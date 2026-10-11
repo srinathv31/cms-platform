@@ -14,12 +14,12 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status | Critical | High | Medium | Low | Total |
 | --- | --- | --- | --- | --- | --- |
-| Open | 0 | 3 | 12 | 27 | 42 |
-| Partly fixed | 0 | 4 | 3 | 2 | 9 |
-| Fixed | 1 | 19 | 25 | 5 | 50 |
+| Open | 0 | 3 | 10 | 12 | 25 |
+| Partly fixed | 0 | 4 | 4 | 3 | 11 |
+| Fixed | 1 | 19 | 26 | 24 | 70 |
 | Deferred | 1 | 2 | 1 | 0 | 4 |
 
-Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), and PRs #9–#40 (the Fix first list, October 2026).
+Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), and PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving).
 
 The findings not yet fixed fall into three groups: what the fixes turned up, in [Found while fixing](#found-while-fixing); tooling and hygiene, in [Alongside: tooling and hygiene](#alongside-tooling-and-hygiene); and findings that [wait for the enterprise work](#waits-for-the-enterprise-work): real sign-in, the Java API, the enterprise font and the removal of the demo tools.
 
@@ -119,7 +119,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N3 · Low: After a revoke, Approve's consequences read as a first version
 
-- **Status:** Open
+- **Status:** Fixed. With nothing Active, the review screen passes the newest version that still renders (`contractBaseline`, as `stillRenders`) as the one consumers move from, and `consequences` has an approve case for it: "v3 becomes Active." with no "becomes Superseded" line, then its consumers ("Coral keeps rendering v1 until it relinks.") and what each has to map. What they have to map is worked out when the screen loads, with `diffVariables` (the diff submit uses), of the version under review against that version (`stillRenders.contractChanges`), because the changes stored at submit are against whatever was Active then, which may be a version revoked during review. With a version Active, the dialog reads the stored changes, as before. The redline's baseline (decision 0031) is unchanged.
 - **Where:** `src/domain/consequences.ts` (`approveLines`); `src/server/queries/review.ts` (`getReviewScreen`'s `previousNumber`, which `src/components/review/review-workspace.tsx` passes to the dialog)
 - **What happens:** The approve dialog takes its previous version from the Active one. With nothing Active, after a revoke, it says "v3 becomes Active." and "Consumers can start using it right away.", as for a first version. Consumers still pinned to a Superseded version that renders aren't named, nor are the keys they have to map before they move ("Coral has to map `annual_fee` before it moves to v3."), though the version's contract changes were worked out against that version. Noticed while fixing D1 (PR #16).
 - **Fix:** When nothing is Active, pass the newest version that still renders (`contractBaseline`) as the version consumers move from, with an approve case for it in `consequences`: no "becomes Superseded" line, and the mapping lines for its consumers.
@@ -127,7 +127,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N4 · Low: A passed sunset still reads as a date to come on the status badge
 
-- **Status:** Open
+- **Status:** Fixed. `StatusBadge` takes `sunsetPassed` and reads "Superseded · Sunset passed Oct 1"; every read model that feeds it (Versions, Usage's consumers, the workspace header, the Library, the review header, the integration panel's "since") now decides `sunsetPassed` with the domain's one test, and the Library sizes its status column for the longer wording.
 - **Where:** `src/components/primitives/status-badge.tsx` (`StatusBadge`)
 - **What happens:** A Superseded version with a sunset date reads "Superseded · Sunset Oct 1" whether the day is ahead or has passed. Once it has passed the version no longer renders, but the badge still reads like a date to come, wherever it shows one: Versions, Usage and the review header among them. Versions adds "Sunset passed Oct 1" to the entry's dates; the badge beside it doesn't change. Noticed while fixing D2 (PR #9).
 - **Fix:** Pass the badge whether the sunset has passed (the Versions and Usage read models already work out `sunsetPassed`) and word it for that, for example "Superseded · Sunset passed Oct 1".
@@ -135,7 +135,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N5 · Low: Submit's hold rearranges the variables panel and closes an open form
 
-- **Status:** Open
+- **Status:** Fixed. A held root (`EditorRoot`'s `held`, set from `useInert`) keeps the variables panel's layout with every control disabled, and a variable form left open stays mounted, disabled, with what was typed in it.
 - **Where:** `src/editor/components/variables-panel.tsx` (`readOnly`); `src/components/workspace/content/content-workspace.tsx` (`useInert`)
 - **What happens:** From the Submit click until the dialog closes, the page is held read-only ([I8](#i8--medium-submit-can-freeze-content-the-dialog-didnt-list)), and the variables panel switches to its read-only layout: no insert buttons, no New variable, no open form. The rail rearranges under the dialog. A variable form that was open closes, and what was typed in it and not yet applied is gone when the hold lets go, on Submit or Cancel. Noticed while fixing I8 (PR #22).
 - **Fix:** Keep the panel's editing layout while the page is held, with its controls disabled rather than removed, and keep an open form with what was typed in it.
@@ -143,7 +143,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N6 · Low: An unparsed drop, then a block move, strips the block's ids
 
-- **Status:** Open
+- **Status:** Fixed. `PanelDrop` also takes and swallows a drop with no text, no HTML and no `view.dragging`, so UniqueID never marks it and the next block moved by its grip keeps its id.
 - **Where:** `src/editor/extensions/field-binding.ts` (`PanelDrop`)
 - **What happens:** UniqueID marks every drop from outside the editor so that the next `transformPasted` strips the dropped blocks' ids, and only `transformPasted` clears the mark. A drop ProseMirror can't parse into content, a file for example, never reaches `transformPasted`, so the mark outlives it and the next block moved by its ⋮⋮ grip loses its id. Its comment threads fall to "On removed content", as in [I4](#i4--high-a-panel-drop-followed-by-a-block-move-orphans-comment-threads). `PanelDrop` goes ahead of UniqueID for panel rows only; the mark itself is upstream behavior. Noticed while fixing I4 (PR #18).
 - **Fix:** Have `PanelDrop` also take, and swallow, a drop that carries no text, no HTML and no `view.dragging`, so UniqueID never marks it. Report the mark's lifetime upstream.
@@ -151,7 +151,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N7 · Low: Sample values have no 1,000-character limit where they're typed
 
-- **Status:** Open
+- **Status:** Fixed. `maxLength` is `MAX_VALUE_LENGTH` (now defined beside `validateValue`) on the sample-set value inputs and the variable form's Sample field, `validateValue` refuses a longer value for every type, and autosave answers "A sample value can be at most 1,000 characters." instead of zod's message ([decision 0011](decisions/0011-cap-each-render-value.md)).
 - **Where:** `src/components/preview/sample-sets/values-editor.tsx`; `src/editor/components/variable-form.tsx` (Sample); `src/server/drafts/parse-patch.ts`
 - **What happens:** Autosave refuses a sample value over 1,000 characters, the limit [S6](#s6--medium-body-size-limits-trust-the-declared-content-length) put on every render value, but the sample-set value inputs and the variable form's Sample field take any length, and `validateValue` doesn't check it. Past it, the save is refused and the status shows zod's message with its path: `Not saved. sampleSets.0.values.first_name Too big: expected string to have <=1000 characters`. Noticed while fixing S6 (PR #20).
 - **Fix:** A 1,000-character `maxLength` on those inputs, and a plain sentence for the refusal.
@@ -159,7 +159,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N8 · Low: Submit stays available after saving stops
 
-- **Status:** Open
+- **Status:** Fixed. Once saving has stopped, `SubmitButton` renders a `BlockedButton` with the stop's reason as its tooltip and accessible description, instead of a live button and a popover after the click.
 - **Where:** `src/components/workspace/workspace-actions.tsx` (`SubmitButton`)
 - **What happens:** Once saving has stopped for good ([I6](#i6--medium-after-a-save-conflict-the-editor-stays-editable-but-nothing-saves)), Submit for review still looks available. Pressing it tries the save again, then shows the stop's reason in a popover under the button, though the reason was known before the click. Noticed while fixing I6 (PR #31).
 - **Fix:** Show Submit disabled while saving is stopped, with the reason at the control (`BlockedButton`), as the rule for unavailable controls asks.
@@ -167,7 +167,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N9 · Low: The error boundaries leave three loose ends
 
-- **Status:** Open
+- **Status:** Fixed. `TabError` takes a `failTab` hold on the workspace session while it is on screen, and the tab bar's Edit, Submit for review, Preview and rail toggle show as `BlockedButton`s with the reason; `src/app/(simulator)/error.tsx` shows Coral's own `SimError` with Back to offers (`/sim`); the sidebar skeleton's rows are drawn at full contrast.
 - **Where:** `src/components/workspace/workspace-tab-bar.tsx`; `src/app/global-error.tsx`; `src/components/app-shell/skeletons.tsx` (`StaticRow`)
 - **What happens:** When a workspace tab fails, its error takes the document's cell and the header and tab bar stay, with the tab bar's Edit, Submit for review and Preview still enabled, though the tab they act on didn't load. The simulator has no error boundary of its own, so a failure under `/sim` shows Stencil's global error page, whose Back to library goes to `/`. And the sidebar's skeleton, on screen while the sidebar streams in, dims its labels to 60% opacity, which axe measures at 4.39:1, under 4.5:1. Noticed while fixing I7 (PR #23).
 - **Fix:** Disable the tab bar's actions while the tab shows its error, with the reason; give `src/app/(simulator)` its own `error.tsx` that goes back to `/sim`; draw the skeleton's labels at full contrast.
@@ -175,7 +175,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N10 · Low: The save status's chevron moves as a save lands
 
-- **Status:** Open
+- **Status:** Fixed. `SaveIndicator` keeps the width of its widest text ("Saving…"), so the chevron doesn't move as a save lands, and phase-1.spec's layout-shift tests now type into a draft and check that nothing shifts ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
 - **Where:** `src/components/workspace/save-status.tsx` (`RevertMenu`'s trigger)
 - **What happens:** On a draft with something to revert to, the save status is the Revert menu's trigger, with its chevron after the text. The text changes width from "Saving…" to "Saved", so the chevron moves about 11px as each save lands: a layout shift of about 0.000002, more than 500 ms after the last keystroke, so the zero-shift rule counts it. No e2e test types into a draft and then checks layout shift, so nothing catches it. [T1](#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift)'s What happens credits the undo and redo buttons; the shift it measured came from this trigger appearing on hydration, as its Status says. Noticed while fixing T1 (PR #12).
 - **Fix:** Give the status text the width of its widest state, or put the chevron before it, and add a layout-shift check after typing to an e2e spec.
@@ -183,7 +183,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N11 · Low: The revert toast's Undo is a second black button
 
-- **Status:** Open
+- **Status:** Fixed. `Providers` sets `toastOptions.classNames.actionButton` so a toast's action is an outline button, and revert-undo.spec checks the revert toast's Undo isn't filled.
 - **Where:** `src/components/workspace/save-status.tsx` (`offerUndo`); `src/components/motion/providers.tsx` (the `Toaster`)
 - **What happens:** The toast after a revert has an Undo action, which sonner draws by default as a filled button in the toast's text color, near black. On the workspace, Submit for review is already the screen's one black button. Noticed while fixing I2 (PR #15).
 - **Fix:** Style toast actions as outline buttons through the `Toaster`'s `toastOptions.classNames.actionButton`, set where it is mounted rather than in `src/components/ui/sonner.tsx`.
@@ -191,7 +191,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N12 · Low: The heatmap legend is hover-only, and HBars color by rank
 
-- **Status:** Open
+- **Status:** Fixed. The heatmap's key prints each shade's renders a day in its own swatch ("2–9", spoken as "2 to 9") under a "Renders in a day" list label and leaves out a shade no day can wear, with the date span moved under it so the card's footer keeps one fixed height; every `HBars` bar is one color. Tests in `charts.test.tsx`.
 - **Where:** `src/components/usage/charts.tsx` (`HeatLegend`, `HBars`)
 - **What happens:** The heatmap legend's swatches give the range each shade means ("2 to 9 renders in a day") only in a hover tooltip. They're `aria-hidden` and take no focus, so keyboard and screen-reader users never get the ranges. HBars draws the first row in the darkest brand step and the rest in a lighter one, so color encodes rank, which the bars' lengths already show, and reads as a category. Noticed while fixing I13 (PR #24).
 - **Fix:** Print the ranges with the legend, or add them as sr-only text, and draw every bar in one color.
@@ -199,7 +199,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N13 · Low: The Library's status filter is a third selected style
 
-- **Status:** Open
+- **Status:** Fixed. The filter is a `Segmented` (each count is part of its option's label, "Draft 3"), [decision 0030](decisions/0030-shared-primitives-have-one-home.md) records it, and `one-copy.test.ts` now also fails on a pill written inline that fills `bg-selected` when pressed.
 - **Where:** `src/components/library/library-browser.tsx` (the status filter's `ToggleGroupItem`)
 - **What happens:** H3 gave the segmented control and the tabs one look each in `src/components/primitives/`. The Library's status filter shows its pressed item a third way: rounded pills with no track, filled `bg-selected` when pressed, with the classes inline. `src/components/primitives/one-copy.test.ts` doesn't look for it. Noticed while fixing H3 (PR #40).
 - **Fix:** Use `Segmented` for the filter, or make the pill a primitive if the Library keeps pills on purpose, and record which in [decision 0030](decisions/0030-shared-primitives-have-one-home.md).
@@ -207,7 +207,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N14 · Low: A chain change repeats a line for a person named on two stages
 
-- **Status:** Open
+- **Status:** Fixed. `describeChainChange` keeps the people it has already announced, so a person newly named on two stages gets the line once; a test names one person on two new stages.
 - **Where:** `src/domain/platform-config.ts` (`describeChainChange`)
 - **What happens:** It adds "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of." once per stage that names a new person, so a person newly named on two stages gets the line twice. `validateChain` refuses a person on two stages, and the chain editor shows no lines while Save is blocked, so nobody sees it today; a caller that shows the lines without validating first would. Noticed while fixing D4 (PR #14).
 - **Fix:** Add each person's line once.
@@ -215,7 +215,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N15 · Low: Coral drops a mapping on a rename and dates a sunset in UTC
 
-- **Status:** Open
+- **Status:** Fixed. `suggestMapping` takes the diff's changes and carries a mapping from a `key_renamed` change's `from` key to its `to` key when relinking, and `/api/v1` now sends `sunsetDay` and `zone` beside every sunset instant (each version, and the `version_sunset` 410's details) for Coral to show instead of the instant's UTC date ([decision 0038](decisions/0038-a-sunset-is-sent-with-its-day-and-zone.md)).
 - **Where:** `src/simulator/mapping.ts` (`suggestMapping`); `src/simulator/ui/format.tsx` (`dayLabel`)
 - **What happens:** Two gaps in the simulated consumer. Relinking keeps a field's mapping only under the same key, so after a variable rename the renamed variable starts unmapped, though `/api/v1` reports the rename as one `key_renamed` change ([D8](#d8--medium-variable-renames-are-lost-between-the-panel-and-submit)). And Coral shows a sunset as its instant's date in UTC. A sunset ends at 00:00 in the business time zone ([D6](#d6--medium-a-sunset-date-means-midnight-utc)), and every zone on the list is UTC or behind it, so the date is right today; a zone ahead of UTC would show the day before. Noticed while fixing D8 (PR #32) and D6 (PR #26).
 - **Fix:** Carry a mapping across a `key_renamed` change when relinking. Show a sunset's day in the business time zone, which needs `/api/v1` to send the zone or the day beside the instant.
@@ -223,7 +223,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N16 · Low: Two refusal rules still live outside the domain
 
-- **Status:** Open
+- **Status:** Fixed. `validateAccessReason` (`src/domain/access.ts`) is the one reason check: the request form and `requestAccess` both use it. The domain's `createTeam` refuses an Auditor as the first Team Admin (`cannotBeFirstTeamAdmin` in `src/domain/platform-config.ts`), the `createTeam` action relies on it, and the platform read model's picker asks the same function. Every code and sentence is unchanged.
 - **Where:** `src/components/access/request-access.tsx` (the reason check); `src/server/actions/platform.ts` (`createTeam`); `src/server/queries/platform.ts`
 - **What happens:** H2 moved the settings screens' checks into the domain; two rules outside them are still copies. Request access checks the reason itself (empty, then longer than `ACCESS_REASON_MAX`), repeating the ladder of the domain's `requestAccess`, and H2's test covers settings components only. And "an Auditor can't be a team's first Team Admin" is written twice in `src/server`: the `createTeam` action refuses it, and the platform read model leaves Auditors out of the picker. The domain's `createTeam` doesn't know it, so a port would miss it. Noticed while fixing H2 (PR #28).
 - **Fix:** Export one domain check for the request's reason and use it in the form and in `requestAccess`; move the Auditor rule into the domain's `createTeam` and have the read model ask it. Both shrink [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain).
@@ -231,7 +231,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N17 · Low: The review actions keep a private copy of draftRow
 
-- **Status:** Open
+- **Status:** Fixed. `requestChanges` writes its new draft with the shared `draftRow` from `src/server/templates/create.ts`; the private copy in `src/server/actions/review.ts` and its Don't copy entry are gone.
 - **Where:** `src/server/actions/review.ts` (`draftRow`)
 - **What happens:** `requestChanges` builds its new draft row with a private copy of `draftRow`, the same as the one `src/server/templates/create.ts` exports and `src/server/actions/templates.ts` uses. A column added to versions has to be added to both, and the server README lists the copy under Don't copy. Noticed while fixing A3 (PR #39).
 - **Fix:** Import the shared `draftRow`, delete the copy, and drop its Don't copy entry.
@@ -239,15 +239,15 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N18 · Low: readBodyCapped lives in the import folder
 
-- **Status:** Open
-- **Where:** `src/server/import/read-body.ts`
+- **Status:** Fixed. `readBodyCapped` and its test moved to `src/server/api/read-body.ts`, beside `http.ts`; the import, autosave and `/api/v1` render routes and the server README point there.
+- **Where:** `readBodyCapped`, in the `src/server/import/` folder
 - **What happens:** The byte-capped body reader serves three route handlers (import, autosave and the `/api/v1` render route), but it lives under `src/server/import/`, so the other two reach into the import feature for it, and someone looking beside the other HTTP helpers won't find it. Noticed while fixing S6 (PR #20).
 - **Fix:** Move it to `src/server/api/`, beside `http.ts`, and update the three routes and the server README.
 - **Evidence:** traced
 
 #### N19 · Low: The simulator serves reads as server actions
 
-- **Status:** Open
+- **Status:** Fixed. `searchTemplates` and `getDeliveryView` are now `GET /sim/templates/search` and `GET /sim/deliveries/[deliveryId]/view`, so `src/simulator/actions.ts` holds only the four writes. Lint can't tell a read from a write inside a file, so the exemption stays for that file and `actions.test.ts` pins its exports to the writes ([decision 0019](decisions/0019-on-demand-reads-are-get-routes.md)).
 - **Where:** `src/simulator/actions.ts`; `eslint.config.mjs` (the `"use server"` rule's `ignores`)
 - **What happens:** [A6](#a6--medium-reads-are-exposed-as-server-actions) made on-demand reads GET routes and allowed `"use server"` only in `src/server/actions/`, but the simulator's actions file is exempt. Beside its four writes it serves two reads, `searchTemplates` and `getDeliveryView`, so they are public POST endpoints queued with the writes: the pattern A6 removed from Stencil. Noticed while fixing A6 (PR #29).
 - **Fix:** Serve the two reads from GET route handlers or server component props, and narrow the exemption to the writes.
@@ -263,11 +263,51 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N21 · Low: Three decision records have lines later decisions superseded
 
-- **Status:** Open
+- **Status:** Fixed. Records 0002, 0007 and 0025 keep their text and carry an "Amended 2026-10-11" line under Status naming the later record and what it changed ([0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md), [0009](decisions/0009-correct-a-revoked-version-from-its-content.md), [0029](decisions/0029-every-action-runs-on-one-kit.md)).
 - **Where:** `docs/decisions/0002-a-passed-sunset-is-final.md`; `docs/decisions/0007-maker-checker-covers-every-writer.md`; `docs/decisions/0025-refusals-carry-stable-codes.md`
 - **What happens:** Three accepted records state something a later record changed. [0002](decisions/0002-a-passed-sunset-is-final.md) says five other places still test "sunset passed" themselves; there is one test now, `sunsetPassed` ([decision 0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)). [0007](decisions/0007-maker-checker-covers-every-writer.md) names the edit transition `editActive`; it is `editLatest` ([decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md)). [0025](decisions/0025-refusals-carry-stable-codes.md) says `startDraft` throws `planDraftStart`'s blocked reason; it returns it ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)). Accepted records aren't rewritten, so someone reading one of them alone is misled. They went stale with D7 (PR #36), D1 (PR #16) and A3 (PR #39).
 - **Fix:** Under each record's Status, add a line naming the later record and what it changed, and leave the rest as written (or mark it "Superseded by" where the later record replaces it, as the decisions README describes).
 - **Evidence:** verified
+
+#### N22 · Low: A template's Usage tab has no per-channel split
+
+- **Status:** Open
+- **Where:** `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); `src/domain/golive-types.ts` (`TemplateUsageData`); `src/server/queries/usage.ts` (`getTemplateUsage`)
+- **What happens:** The team's Usage Overview splits renders by channel (`UsageDashboard.byChannel` and `weekly[].channels`, drawn as the channel mix and "Renders over time, by channel"). A template's own Usage tab splits them only by version ("Renders by version"): `TemplateUsageData` has no channel field, `getTemplateUsage` groups the render log by day, version and outcome, and a channel shows only on a failed render in "Recent failures". So for one template nobody can see how many renders were PDF, Web or Email (or, for an alert, Push or SMS), or that one channel is the one failing. Noticed while building push and SMS (PR #46).
+- **Fix:** Add `byChannel` (the last 30 days) to `TemplateUsageData`, grouped by `renderLog.channel` in `getTemplateUsage`, and draw it on the tab with `ChannelMix`, for the channels the template's content type allows, in the channel hues of [decision 0014](decisions/0014-chart-values-never-hover-only.md). Test the query beside `getTemplateUsage`'s cases in `src/server/queries/usage.test.ts`.
+- **Evidence:** traced
+
+#### N23 · Low: The render log doesn't record which platform a push was for
+
+- **Status:** Open
+- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
+- **What happens:** A push is rendered for one platform, which the request names (`platform`, `ios` or `android`, `ApiPushPlatform` in `src/contracts/api-v1.ts`): iPhone shows a subtitle and Android never does, and the 4,096-byte limit is checked per platform (`push_payload_too_large` carries the platform). The log row keeps only `channel: "push"`, so Usage can't split pushes by iPhone and Android, and a failed push can't be traced to the platform it failed on. Rows already written can't gain it later. The platform is a setting, not a variable value, so the log's keys-only rule allows it. Noticed while building push and SMS (PR #46).
+- **Fix:** Add a nullable `platform` column to `render_log` (a migration; null for every channel but push) and `platform` to `RenderLogEntry`, set it where the render route builds the entry, and copy it by name in `writeRenderLog` like the other fields. Seed the push history with both platforms. Then show it wherever the channel split is drawn (the Push share, by iPhone and Android, with the split in N22) and in "Recent failures".
+- **Evidence:** traced
+
+#### N24 · Low: The Library doesn't say which templates are alerts and which are documents
+
+- **Status:** Open
+- **Where:** `src/server/queries/library.ts` (`LibraryRow`, `getLibraryRows`); `src/components/library/library-browser.tsx` (`TemplateRow`); `src/domain/types.ts` (`contentTypeFamily`, `TEMPLATE_KIND_LABELS`)
+- **What happens:** New template asks for a kind first, Document or Alert (`TEMPLATE_KIND_LABELS`), and a template keeps it for life (`contentTypeFamily`, from its content type's channels). A Library row shows the name, ID, status, active version, last edited and owner. `getLibraryRows` doesn't read the content type, so nothing tells a Push and SMS alert from a PDF, Web and Email document, and neither the search nor the status filter can narrow to one kind. The two are written, reviewed and rendered differently, so a team with both opens each template to find out which it is. Noticed while building push and SMS (PR #46).
+- **Fix:** Add the family to `LibraryRow` (`getLibraryRows` joins the content type and asks `contentTypeFamily`), print its `TEMPLATE_KIND_LABELS` word in the row's second line beside the ID, and, if the list wants it, add a second `Segmented` (All, Documents, Alerts) next to the status filter. Keep the row's height and columns as they are.
+- **Evidence:** traced
+
+#### N25 · Low: An email's subject can't take a review comment in the UI
+
+- **Status:** Open
+- **Where:** `src/components/review/document-view.tsx` (`DocumentView`, its `FieldsDocument layout="details"`); `src/components/redline/fields-document.tsx`; compare `src/components/review/fields-view.tsx`; `src/domain/comments.ts` (`commentAnchors`)
+- **What happens:** The domain lets a thread anchor to `email.subject` and `email.preheader`: `commentAnchors` lists the fields of every channel that is on, and `addComment` accepts them. The review screen takes comments on an alert's fields (`FieldsView` wraps `FieldsDocument` in a redline DOM handle and `GutterMarkers`) and on a document's body (its blocks and selected text). For a document, `DocumentView` draws the subject and preheader through a bare `FieldsDocument layout="details"`, outside both, so they have no Comment button and no gutter marker, and a thread on one would have no marker to open it from. A reviewer can comment on the body but not on the subject, which is customer-visible text approved with it. Noticed while building push and SMS (PR #46).
+- **Fix:** Give the document's subject and preheader what an alert's fields have: a handle and `GutterMarkers` over the `FieldsDocument`, as `FieldsView` does, with the field's id as the anchor, so they take, mark and scroll to comments like a block. Test it beside `src/components/redline/fields-document.test.tsx` and cover a comment on a subject in an e2e spec (`e2e/alerts.spec.ts` comments on an alert's fields).
+- **Evidence:** traced
+
+#### N26 · Low: The phone previews' line counts and type sizes haven't been checked on a real phone
+
+- **Status:** Open
+- **Where:** `src/components/device/ios/notification-card.tsx` (`IOS_LINES`); `src/components/device/android/notification-card.tsx` (`ANDROID_LINES`); `src/components/device/ios/type.ts` and `src/components/device/android/type.ts` (`RAMP`); `src/components/device/geometry.ts`
+- **What happens:** The kit's clamps (iOS: title 1, body 4 on the lock screen, 2 in a banner, about 7 expanded; Android: 1 and 1, about 8 expanded) and its type ramps (Apple's Dynamic Type table, Material 3's roles with Android 14's font scaling) come from the platforms' published guides, not from measuring a phone. iOS text is also set in Inter, a little wider than SF, so a cut can move by a word. The previews' "cut after …" warnings (`onMeasure`) are built on those numbers, so if one is off, an author is shown the wrong cut point. The push that is delivered isn't affected: the phone cuts it, not Stencil. Noticed while building push and SMS (PR #46).
+- **Fix:** The owner checks on a real iPhone and a real Pixel: send pushes of known lengths to each screen (lock screen, banner, expanded) at the default and the larger text sizes, and compare the line counts, cut points and type sizes with the previews. Adjust `IOS_LINES`, `ANDROID_LINES` and the ramps where they differ, and note the devices and OS versions in the device kit's README.
+- **Evidence:** not yet measured
 
 ## Waits for the enterprise work
 
@@ -372,7 +412,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 - **Status:** Fixed. Both routes read the body with `readBodyCapped` and answer 413 past the cap, chunked or not; autosave checks access from the version id before reading a byte; and each render value is at most 1,000 characters in validation and the published schema ([decision 0011](decisions/0011-cap-each-render-value.md)).
 - **Where:** `src/app/api/drafts/[versionId]/route.ts` line 18; `src/app/api/v1/templates/[templateId]/render/route.ts` line 127
 - **What happens:** Both routes compare the `Content-Length` header, then call `request.text()`. A chunked body has no length, so the whole body is buffered. The autosave route reads the body before any permission check and never checks the size after reading; the render route is anonymous. Render values have no length cap either: one 100,000-word value costs about a second of main-thread CPU in the PDF.
-- **Fix:** Reuse `readBodyCapped` from `src/server/import/read-body.ts`, authorize before reading, and add a `maxLength` per value in validation and the schema.
+- **Fix:** Reuse `readBodyCapped` from `src/server/api/read-body.ts`, authorize before reading, and add a `maxLength` per value in validation and the schema.
 - **Evidence:** verified
 
 #### S7 · Medium: Comments are accepted on any version state
@@ -385,7 +425,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S8 · Medium: Design mocks and labs ship in production builds
 
-- **Status:** Open
+- **Status:** Fixed. The `/design/*` mocks and the second stand-in renderer are deleted (recoverable from the `archive/design-mocks` tag); `/editor-lab` and `/pdf-lab` stay and call `notFound()` in a production build.
 - **Where:** `src/app/(dev)`
 - **What happens:** `/design/*`, `/editor-lab` and `/pdf-lab` have no production gate and are prerendered by `next build`. About 16.3k lines, roughly a fifth of non-test source, including a second stand-in renderer (`design/preview/render-doc.tsx`) that behaves differently from the real one.
 - **Fix:** Delete the variant mocks (their decisions are in the product now) or move them to a tag. Gate the labs with `notFound()` when `NODE_ENV === "production"`.
@@ -819,7 +859,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B6 · Medium: Server code imports from components
 
-- **Status:** Open
+- **Status:** Partly fixed. A lint rule now forbids `src/server` from importing `@/components`. `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. What is left is the screen view models in `src/domain/review-types.ts`, which still have to move to `server/read-models`.
 - **Where:** `src/server/queries/submit-summary.ts` line 12
 - **What happens:** `submit-summary.ts` takes the business function `listSets` from `components/preview/sample-sets`; `create-template.ts` and the imports route take cookie constants from components. `domain/review-types.ts` holds screen view models. No lint rule forbids it.
 - **Fix:** Add the rule; move `listSets` into `editor/model` and view models to `server/read-models`.
@@ -1001,16 +1041,16 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H7 · Low: Dead code
 
-- **Status:** Open
-- **Where:** `src/components/app-shell/page-placeholder.tsx` line 1
+- **Status:** Fixed. Deleted the unimported `page-placeholder.tsx` and `queries/teams.ts`, the stale `pdfjs-worker.d.ts`, eight unused generated `ui/` components, and the exports with no references; the compile-time contract checks `_DriftChecks` and `platformConfig` stay.
+- **Where:** `src/components/app-shell` and `src/components/ui`
 - **What happens:** 16 exports with no references, one component file nothing imports, a likely stale `pdfjs-worker.d.ts`, and 7 generated ui components that are never used.
 - **Fix:** Delete them.
 - **Evidence:** traced
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Open
-- **Where:** `src/components/review/review-workspace.tsx` line 56
+- **Status:** Partly fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines; the other oversized files and the store choice remain.
+- **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.
 - **Evidence:** traced
@@ -1030,7 +1070,7 @@ Rendering is already in this shape: `src/server/render/engine.ts` runs with no d
 
 ## Follow-ups from the render work
 
-- **Approver views the output before approving.** The next PR: an approver must look at every enabled channel's output before Approve is available, in a way that stays quick to use.
+- **Approver views the output before approving.** Done: Approve waits until every output of the round (each channel, Push on both phones) has rendered on the approver's screen in the Preview; the approve action refuses `output_not_viewed` until it has, an output the render refuses is blocked with `output_cannot_show` ("The PDF can't be shown. Request changes."), and the audit row records the outputs viewed ([decision 0037](decisions/0037-an-approver-views-every-output-before-approving.md)).
 - **Word import keeps the source's numbering.** Import and paste restart lists at 1 with the default style; map Word's numbering formats and start numbers into the per-list styles.
 - **The enterprise font.** Swap it into `src/server/render/channels/pdf-fonts.ts`, fixing the findings listed under [The enterprise font](#the-enterprise-font) at the same time, then `npm run golden:update` refreshes the Node-only PDF files.
 - **PDF cell detection for Java.** The parity test finds PDF table cells from the rules the Node adapter draws; a Java engine needs its own way, as `docs/render-spec.md` notes.

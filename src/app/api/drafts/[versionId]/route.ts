@@ -3,7 +3,7 @@ import type { DraftSaveResponse } from "@/domain/types";
 import { TOO_LARGE, TOO_LARGE_STATUS, statusOf } from "@/server/drafts/http";
 import { MAX_BODY_SIZE, parseDraftPatchText } from "@/server/drafts/parse-patch";
 import { draftAccessRefusal, saveDraft } from "@/server/drafts/save-draft";
-import { readBodyCapped } from "@/server/import/read-body";
+import { readBodyCapped } from "@/server/api/read-body";
 import { getViewer } from "@/server/viewer";
 
 // Autosave. A route handler rather than a server action because actions run one at a time per

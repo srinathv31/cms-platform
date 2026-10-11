@@ -4,6 +4,8 @@ import { m } from "motion/react";
 import type { DeviceClock } from "@/components/device";
 import type { Variable } from "@/editor/model/types";
 import { assertNever } from "@/domain/assert-never";
+import { PUSH_PLATFORMS, type PushPlatform } from "@/domain/messages/push";
+import { channelOutputs, outputKey, type OutputKey } from "@/domain/review-outputs";
 import type { Channel } from "@/domain/types";
 import { duration, ease } from "@/components/motion/presets";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
@@ -52,6 +54,17 @@ export interface PreviewPaneProps {
   senders: PhoneSenders;
   /** The phone's clock: the lock screen's date is the demo clock's day. */
   clock: DeviceClock;
+
+  /**
+   * The review Preview: the outputs the approver has viewed (decision 0037), shown as quiet checks on the
+   * channel and phone controls. Absent in the workspace.
+   */
+  viewed?: readonly OutputKey[];
+  /**
+   * The PDF is as good as shown: pdf.js has drawn the document the route returned, or it couldn't and the
+   * approver downloaded the bytes from the viewer's fallback (they are exactly what consumers get).
+   */
+  onPdfShown?: () => void;
 }
 
 /**
@@ -84,8 +97,13 @@ export function PreviewPane({
   message,
   senders,
   clock,
+  viewed,
+  onPdfShown,
 }: PreviewPaneProps) {
   const messageChannel = channel === "push" || channel === "sms";
+  // A channel is checked once all its outputs are viewed (Push: on both phones); Push's phones each on their own.
+  const viewedChannels = viewed ? channels.filter((c) => channelOutputs(c).every((key) => viewed.includes(key))) : undefined;
+  const viewedPhones = viewed && channel === "push" ? PUSH_PLATFORMS.filter((p) => viewed.includes(outputKey("push", p))) : undefined;
   const output = messageChannel ? null : (slot?.output ?? null);
   const error = messageChannel ? (message && !message.ok ? message.error : null) : (slot?.error ?? null);
   // The address the web frame shows: the team's own domain (the email's sender domain).
@@ -104,7 +122,7 @@ export function PreviewPane({
         data-slot="preview-controls"
         className="@container/controls flex h-8 shrink-0 items-center justify-between gap-3"
       >
-        <ChannelTabs channels={channels} value={channel} onChange={onChannel} />
+        <ChannelTabs channels={channels} value={channel} onChange={onChannel} viewed={viewedChannels} />
         <ChannelControl
           channel={channel}
           output={error ? null : output}
@@ -112,6 +130,7 @@ export function PreviewPane({
           onDevice={onDevice}
           phone={phone}
           onPhone={onPhone}
+          viewedPhones={viewedPhones}
         />
       </div>
 
@@ -146,6 +165,7 @@ export function PreviewPane({
               onPhone={onPhone}
               senders={senders}
               clock={clock}
+              onPdfShown={onPdfShown}
             />
           )}
         </m.div>
@@ -166,6 +186,7 @@ function Output({
   onPhone,
   senders,
   clock,
+  onPdfShown,
 }: {
   channel: Channel;
   output: PreviewSlot["output"];
@@ -178,6 +199,7 @@ function Output({
   onPhone: PreviewPaneProps["onPhone"];
   senders: PhoneSenders;
   clock: DeviceClock;
+  onPdfShown?: () => void;
 }) {
   switch (channel) {
     case "pdf": {
@@ -187,6 +209,8 @@ function Output({
         <PdfViewer
           data={pdf?.bytes ?? null}
           fileName={pdf?.filename ?? ""}
+          onLoad={onPdfShown}
+          onFallbackDownload={onPdfShown}
           className="min-h-full bg-transparent"
           contentClassName={WELL_INSET}
         />
@@ -244,6 +268,7 @@ function ChannelControl({
   onDevice,
   phone,
   onPhone,
+  viewedPhones,
 }: {
   channel: Channel;
   output: PreviewSlot["output"];
@@ -251,6 +276,7 @@ function ChannelControl({
   onDevice: (device: PreviewDevice) => void;
   phone: PhoneView;
   onPhone: PreviewPaneProps["onPhone"];
+  viewedPhones: PushPlatform[] | undefined;
 }) {
   switch (channel) {
     case "pdf":
@@ -261,7 +287,7 @@ function ChannelControl({
       return null;
     case "push":
     case "sms":
-      return <PhoneControls channel={channel} view={phone} onChange={onPhone} />;
+      return <PhoneControls channel={channel} view={phone} onChange={onPhone} viewed={viewedPhones} />;
     default:
       return assertNever(channel, "channel");
   }

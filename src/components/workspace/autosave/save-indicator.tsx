@@ -21,6 +21,13 @@ export function saveIndicatorText(status: SaveStatus, error?: string): string {
   }
 }
 
+/**
+ * The widest of the two texts that follow each other as people type ("Saving…" is wider than "Saved").
+ * The indicator is always at least this wide, so what sits after it (the revert menu's chevron) stays
+ * put as a save lands.
+ */
+const WIDEST = saveIndicatorText("saving");
+
 /** Quiet text beside the title: Saved, Saving…, or why it didn't save. No spinner. */
 export function SaveIndicator({ status, error, className }: SaveIndicatorProps) {
   return (
@@ -28,7 +35,13 @@ export function SaveIndicator({ status, error, className }: SaveIndicatorProps) 
       aria-live="polite"
       aria-atomic="true"
       data-status={status}
-      className={cn("text-[13px] leading-5", status === "error" ? "text-danger-text" : "text-text-muted", className)}
+      // An empty, invisible line holding WIDEST gives the box that width without adding text to the live region.
+      data-widest={WIDEST}
+      className={cn(
+        "inline-flex flex-col text-[13px] leading-5 after:invisible after:block after:h-0 after:overflow-hidden after:content-[attr(data-widest)]",
+        status === "error" ? "text-danger-text" : "text-text-muted",
+        className,
+      )}
     >
       {saveIndicatorText(status, error)}
     </span>

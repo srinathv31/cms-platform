@@ -1,6 +1,9 @@
 # 0017. A sunset date ends at 00:00 in the business time zone
 
 Status: Accepted
+Amended 2026-10-11: `/api/v1` now sends the sunset's day and zone beside the instant
+([0038](0038-a-sunset-is-sent-with-its-day-and-zone.md)), and Coral shows that day where it showed the instant's UTC
+date, so the last Consequences line below no longer holds (PR #52).
 Date: 2026-10-09
 
 ## Context

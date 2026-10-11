@@ -11,34 +11,15 @@
 // numbers over as their exact source text (`parseJsonWithNumberText`), so they arrive here as strings;
 // a JS number from an internal caller is read as its JSON text (`String(n)`, see `validateValue`).
 
-import { validateValue } from "@/editor/model/variables";
+import { MAX_VALUE_LENGTH, longerThan, validateValue } from "@/editor/model/variables";
 import type { Variable } from "../types";
 import { valuesError } from "./errors";
-import { MAX_VALUE_LENGTH, type CanonicalValues, type InvalidValue, type RenderError } from "./types";
+import type { CanonicalValues, InvalidValue, RenderError } from "./types";
 
 export type ValidateResult = { ok: true; values: CanonicalValues } | { ok: false; error: RenderError };
 
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
-}
-
-/**
- * True when `text` has more than `max` characters, counted in code points as JSON Schema's `maxLength`
- * counts them (an emoji is one). Stops counting at `max + 1`, so a huge value costs no more than that.
- */
-function longerThan(text: string, max: number): boolean {
-  if (text.length <= max) return false; // never more code points than UTF-16 units
-  let count = 0;
-  for (let i = 0; i < text.length; i++) {
-    // A surrogate pair is one code point; a lone surrogate counts as one, as the string iterator does.
-    const unit = text.charCodeAt(i);
-    if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
-      const next = text.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) i++;
-    }
-    if (++count > max) return true;
-  }
-  return false;
 }
 
 export function validateValues(

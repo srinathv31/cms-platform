@@ -103,9 +103,10 @@ export interface ContentWorkspaceProps {
  *
  * While the session is inert (Submit is reading or freezing the saved draft, or saving stopped for
  * good), an editable page shows read-only without remounting: the editor root (the document, the
- * email fields, the variables panel, undo and redo), the channels and the sample sets. Text can still
- * be selected and copied. It stays bound, so autosave keeps sending what was typed before, and it is
- * editable again, history and all, when the hold is let go.
+ * email fields, the variables panel, undo and redo), the channels and the sample sets. The variables
+ * panel keeps its layout, its controls disabled, and a variable form left open stays open (the root's
+ * `held`). Text can still be selected and copied. It stays bound, so autosave keeps sending what was
+ * typed before, and it is editable again, history and all, when the hold is let go.
  */
 export function ContentWorkspace({
   templateId,
@@ -327,7 +328,8 @@ export function ContentWorkspace({
       variables={shown.variables}
       baseline={baseline}
       requiredSections={requiredSections}
-      readOnly={!editing}
+      readOnly={!editable}
+      held={editable && inert}
       onVariablesChange={onVariablesChange}
     >
       {editable ? <HistoryBridge onChange={session.setHistory} /> : null}

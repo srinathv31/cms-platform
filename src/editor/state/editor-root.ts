@@ -45,7 +45,10 @@ export interface FieldInfo {
 export const BODY_FIELD_LABEL = "Document";
 
 export interface RootConfig {
+  /** Nothing can be edited: truly read-only, or held. */
   readOnly: boolean;
+  /** Read-only for now only (never true when truly read-only): the panel keeps its editing layout, disabled. */
+  held: boolean;
   baseline: readonly Variable[] | null;
   requiredSections: readonly RequiredSection[];
   /** Shown at a required heading when an edit to it is blocked. */
@@ -72,6 +75,7 @@ export interface RootInit {
   baseline?: readonly Variable[] | null;
   requiredSections?: readonly RequiredSection[];
   readOnly?: boolean;
+  held?: boolean;
   requiredNote?: string;
 }
 
@@ -142,7 +146,8 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   const variables = createVariableStore(init.variables);
   const usage = createStore<UsageState>()(() => ({ byKey: new Map(), ready: false }));
   const config = createStore<RootConfig>()(() => ({
-    readOnly: init.readOnly ?? false,
+    readOnly: (init.readOnly ?? false) || (init.held ?? false),
+    held: (init.held ?? false) && !init.readOnly,
     baseline: init.baseline ?? null,
     requiredSections: init.requiredSections ?? NO_SECTIONS,
     requiredNote: init.requiredNote ?? DEFAULT_REQUIRED_NOTE,

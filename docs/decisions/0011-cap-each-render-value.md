@@ -1,6 +1,10 @@
 # 0011. Each render value is at most 1,000 characters
 
 Status: Accepted
+Amended 2026-10-11: `MAX_VALUE_LENGTH` is now defined in `src/editor/model/variables.ts` and re-exported from
+`render/types.ts`, and the CMS's sample inputs (the values editor and the variable form's Sample field) now stop
+typing at 1,000 characters, so the last Consequences line below no longer holds: a sample longer than that is refused
+by `validateValue` with its own sentence (PR #54).
 Date: 2026-10-09
 
 ## Context

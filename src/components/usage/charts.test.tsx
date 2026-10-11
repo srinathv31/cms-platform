@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HeatCell, UsageHeatmap } from "@/domain/golive-types";
-import { ChannelMix, Heatmap, RateLine, SERIES, StackedBars, type RatePoint, type StackDatum, type StackSeries } from "./charts";
+import { ChannelMix, HBars, HeatLegend, Heatmap, RateLine, SERIES, heatLegendLevels, StackedBars, type RatePoint, type StackDatum, type StackSeries } from "./charts";
 
 // No chart value is hover-only: every chart is followed by an sr-only table of its values, its marks are
 // one Tab stop with arrow keys between them, and series are told apart by hue.
@@ -143,6 +143,71 @@ describe("series are told apart by hue", () => {
     const host = html(<StackedBars label="x" periodHeader="Week of" series={CHANNELS} data={WEEKS.slice(0, 1)} />);
     const fills = [...host.querySelectorAll("rect:not([data-mark])")].map((r) => r.getAttribute("class"));
     expect(fills).toEqual(["fill-series-1", "fill-series-2", "fill-series-3"]);
+  });
+
+  it("the bars of a ranking are one colour: the length is the value, and a shade would read as a category", () => {
+    const rows = [
+      { key: "a", label: "Spring Travel", value: 40, share: 0.5 },
+      { key: "b", label: "Card Abroad", value: 24, share: 0.3 },
+      { key: "c", label: "Welcome", value: 16, share: 0.2 },
+    ];
+    for (const labelSide of ["top", "right"] as const) {
+      const host = html(<HBars rows={rows} labelSide={labelSide} />);
+      const fills = [...host.querySelectorAll("li div[style]")].map((bar) => [...bar.classList].filter((c) => /^(bg|text)-/.test(c)).join(" "));
+      expect(fills).toHaveLength(3);
+      expect(new Set(fills).size, `one fill and one ink on the ${labelSide}-labelled bars`).toBe(1);
+    }
+  });
+});
+
+describe("the heatmap's legend prints the renders a day each shade means", () => {
+  const legend = (thresholds: UsageHeatmap["thresholds"]) => {
+    const host = html(<HeatLegend thresholds={thresholds} />);
+    const items = [...host.querySelectorAll("li")];
+    return {
+      host,
+      items,
+      printed: items.map((li) => li.querySelector("[aria-hidden]")?.textContent),
+      spoken: items.map((li) => li.querySelector(".sr-only")?.textContent),
+    };
+  };
+
+  it("one range per shade, least to most, printed in the swatch and spoken as words", () => {
+    const { host, items, printed, spoken } = legend([1, 3, 9, 24]);
+    expect(printed).toEqual(["0", "1", "2–3", "4–9", "10–24"]);
+    expect(spoken).toEqual(["0", "1", "2 to 3", "4 to 9", "10 to 24"]);
+    expect(host.querySelector("ul")?.getAttribute("aria-label")).toBe("Renders in a day");
+    // Each swatch is the shade its range is for, in the heat steps' order, with text that reads on it.
+    expect(items.map((li) => /\b(bg-[\w-]+)/.exec(li.className)?.[1])).toEqual([
+      "bg-heat-empty",
+      "bg-brand-1",
+      "bg-brand-2",
+      "bg-brand-3",
+      "bg-brand-4",
+    ]);
+    expect(items.map((li) => /\btext-(?:text|white)\b/.exec(li.className)?.[0])).toEqual(["text-text", "text-text", "text-text", "text-text", "text-white"]);
+  });
+
+  it("counts with the thousands separator the rest of the page uses", () => {
+    expect(legend([40, 1200, 2500, 12000]).printed).toEqual(["0", "1–40", "41–1,200", "1,201–2,500", "2,501–12,000"]);
+  });
+
+  it("leaves out a shade no day can wear, where thresholds tie", () => {
+    expect(legend([3, 3, 5, 5]).spoken).toEqual(["0", "1 to 3", "4 to 5"]);
+    expect(legend([2, 2, 2, 2]).spoken).toEqual(["0", "1 to 2"]);
+    expect(legend([1, 1, 1, 1]).spoken).toEqual(["0", "1"]);
+    expect(legend([0, 0, 0, 0]).spoken, "no renders at all").toEqual(["0"]);
+  });
+
+  it("agrees with the levels the heatmap gives each day", () => {
+    // Every count from 1 to the top falls in the range printed for its level.
+    const thresholds: UsageHeatmap["thresholds"] = [2, 2, 7, 12];
+    const printed = heatLegendLevels(thresholds);
+    const levelOf = (count: number) => (count <= thresholds[0] ? 1 : count <= thresholds[1] ? 2 : count <= thresholds[2] ? 3 : 4);
+    for (let count = 1; count <= thresholds[3]; count++) {
+      const { from, to } = printed.find((p) => p.level === levelOf(count))!;
+      expect(count >= from && count <= to, `${count} in ${from} to ${to}`).toBe(true);
+    }
   });
 });
 

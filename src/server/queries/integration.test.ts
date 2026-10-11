@@ -14,7 +14,7 @@ import { getIntegrationPanel, loadIntegrationPanel } from "./integration";
 // The integration panel's data and its viewer-checked loader (the GET route's read) against a temporary database
 // filled by the real seed. Balance Transfer: v2 Active (pdf, web), v1 Superseded with a sunset.
 
-const env = vi.hoisted(() => ({ dir: "", host: "localhost:3001", proto: null as string | null }));
+const env = vi.hoisted(() => ({ dir: "", host: "localhost:3001", proto: null as string | null, now: new Date("2026-10-04T12:00:00.000Z") }));
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
@@ -22,6 +22,7 @@ vi.mock("@/server/db/client", async () => {
   env.dir = temp.dir;
   return temp;
 });
+vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Headers({ host: env.host, ...(env.proto ? { "x-forwarded-proto": env.proto } : {}) })),
 }));
@@ -96,12 +97,26 @@ describe("getIntegrationPanel", () => {
         state: "superseded",
         // Its sunset's day in the business time zone (Eastern until changed).
         sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        sunsetPassed: false,
         diff: { breaking: false, items: [{ kind: "added", key: "offer_end_date", breaking: false, text: "v2 adds optional `offer_end_date` (Date)." }] },
       },
     ]);
     const holiday = (await getIntegrationPanel(id("holiday-points"), ORIGIN))!;
     expect(holiday.since.map((s) => [s.number, s.state])).toEqual([[1, "revoked"]]);
     expect((await getIntegrationPanel(id("rate-change-notice"), ORIGIN))!.since).toEqual([]);
+  });
+
+  it("'since' says a sunset has passed once the clock is past it (the badge reads \"Sunset passed\")", async () => {
+    const [v1] = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!.since;
+    expect(v1).toMatchObject({ number: 1, sunsetPassed: false });
+    // v1's sunset is Oct 25, 00:00 Eastern.
+    env.now = new Date(BASE.getTime() + 22 * 86_400_000);
+    try {
+      const [later] = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!.since;
+      expect(later).toMatchObject({ number: 1, state: "superseded", sunsetDay: v1!.sunsetDay, sunsetPassed: true });
+    } finally {
+      env.now = BASE;
+    }
   });
 
   it("versions in review don't count: Cash Back's panel is v2's", async () => {

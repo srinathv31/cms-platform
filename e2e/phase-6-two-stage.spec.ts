@@ -3,6 +3,11 @@ import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { click, closeSettings, escapeRe, openBell, openSettings, resetDemoData, settingsDialog, strip, switchPersona } from "./helpers/access";
 import { asPersona, beat, demoTimeout, expect, hydrated, liveEditor, openLibrary, shoot, test } from "./helpers/scenario";
+import { viewEveryOutput } from "./helpers/review";
+
+// Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
+// scripts into them ("Blocked script execution").
+test.use({ trace: "off" });
 
 // Phase 6 gate: the two-stage approval, end to end in the UI.
 //
@@ -39,7 +44,11 @@ type Row = Record<string, InValue>;
 
 let db: Client;
 
+// The first test counts what waits on Jordan in the seed, so it starts from the seed: the specs that run before
+// this one (those that also turn the trace off) may leave versions of their own in review.
 test.beforeAll(() => {
+  test.setTimeout(90_000);
+  resetDemoData();
   db = openDb();
 });
 
@@ -122,6 +131,7 @@ async function seededInReview() {
  * "Approve v4"); at the last stage, wait out the go-live moment.
  */
 async function approveOnScreen(page: Page, label: string, outcome: "live" | "next") {
+  await viewEveryOutput(page);
   await click(approveButton(page));
   const dialog = page.getByRole("dialog", { name: `Approve ${label}`, exact: true });
   await expect(dialog).toBeVisible();
@@ -279,6 +289,7 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(step(page, "current")).toContainText("Team approver");
       await expect(step(page, "waiting")).toContainText(STAGE);
       await expect(step(page, "waiting")).toContainText("After Team approver");
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await beat(page, 900);
       await shoot(page, "jordan-stage-1");
@@ -372,6 +383,7 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(step(page, "done")).toContainText("Team approver");
       await expect(step(page, "done")).toContainText("Jordan Ellis");
       await expect(step(page, "current")).toContainText(STAGE);
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await beat(page, 900);
       await shoot(page, "dana-stage-2");
@@ -455,6 +467,7 @@ test.describe("phase 6: two-stage approval", () => {
       await page.goto(`/${TEAM}/review/${templateId}/${number}`);
       await expectReviewScreen(page, number);
       await expect(decision(page)).toContainText("Stage 1 of 2");
+      await viewEveryOutput(page);
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
       await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText(
@@ -480,6 +493,7 @@ test.describe("phase 6: two-stage approval", () => {
       await page.goto(`/${TEAM}/review/${templateId}/${number}`);
       await expectReviewScreen(page, number);
       await expect(decision(page)).toContainText("Stage 2 of 2");
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
@@ -573,6 +587,7 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(step(page, "done")).toContainText(STAGE);
       await expect(step(page, "done")).toContainText("Dana Park");
       await expect(step(page, "current")).toContainText("Team approver");
+      await viewEveryOutput(page);
       await expect(approveButton(page)).toBeEnabled();
       await beat(page, 900);
       await shoot(page, "jordan-after-reorder");

@@ -69,6 +69,7 @@ import { plural } from "./plural";
 import { refusal, refuse, type Refusal, type Refused } from "./refusals";
 import { characterLabel, joinWithAnd, PLATFORM_LABELS } from "./render/errors";
 import { longSampleValues, resolveMessage } from "./render/message";
+import { outputsRefusal, viewedOutputs } from "./review-outputs";
 import {
   compareRounds,
   isReleased,
@@ -960,9 +961,10 @@ export type ApproveResult = Outcome<Approved>;
  * The caller checks who may act on the stage (`canActOnStage`); this refuses anyone who wrote the
  * version (maker-checker: its `writers` and submitter), a version no longer in review, someone who
  * already approved a stage of it (`approvedThisRound`: two stages need two people), a stage missing
- * from the chain, and a sunset date that isn't after today in the business time zone. The next stage's
- * "review requested" goes to nobody who approved a stage of it, this approver included.
- * `sampleSetsSeen` records which sample sets the approver previewed.
+ * from the chain, an output of the version the approver hasn't viewed (`outputsRefusal`, decision 0037),
+ * and a sunset date that isn't after today in the business time zone. The next stage's "review requested"
+ * goes to nobody who approved a stage of it, this approver included. `sampleSetsSeen` records which
+ * sample sets the approver previewed, and the audit row the outputs they viewed (keys only).
  */
 export function approve(input: {
   version: ReviewVersion;
@@ -980,6 +982,11 @@ export function approve(input: {
   /** The business time zone (`business-zone.ts`): what the sunset day and "today" are read in. */
   zone: string;
   sampleSetsSeen: readonly string[];
+  /**
+   * The outputs the approver has had rendered on screen in the Preview for this round (`OutputKey`s:
+   * "pdf", "push.ios", …). Every output the version's channels have must be among them.
+   */
+  outputsViewed: readonly string[];
   templateName: string;
   /**
    * The round's decisions so far (its approvals rows). A row is one round: a change request sends the
@@ -1001,7 +1008,11 @@ export function approve(input: {
   const isLast = index === stages.length - 1;
   const next = isLast ? null : stageOf(stages, index + 1, chain);
   if (!isLast && !next) return refuse(REFUSALS.stageMissing);
+  const unseen = outputsRefusal(version.channels, input.outputsViewed);
+  if (unseen) return refuse(unseen);
   if (sunsetPrevious !== null && !isAfterToday(sunsetPrevious, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
+  // What the approver looked at, for the audit row: output keys, never a value.
+  const outputsViewed = viewedOutputs(version.channels, input.outputsViewed);
 
   const reviewed = roundOf(version);
   const { number, round } = reviewed;
@@ -1025,7 +1036,7 @@ export function approve(input: {
       {
         kind: "audit",
         action: "version.stage_approved",
-        details: { number, round, stage: stage.name, stagePosition: stage.position, next: next.name },
+        details: { number, round, stage: stage.name, stagePosition: stage.position, next: next.name, outputsViewed },
       },
     ];
     // Not anyone who has approved a stage of this round, this approver included: they can't take this one.
@@ -1071,7 +1082,7 @@ export function approve(input: {
     {
       kind: "audit",
       action: "version.activated",
-      details: { number, round, supersedes: active?.number ?? null, stage: stage.name },
+      details: { number, round, supersedes: active?.number ?? null, stage: stage.name, outputsViewed },
     },
   ];
   if (active) {

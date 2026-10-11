@@ -1,6 +1,9 @@
 # 0002. A passed sunset is final
 
 Status: Accepted
+Amended 2026-10-11: the Consequences line below that says five other places still test "sunset passed" themselves no
+longer holds: `sunsetPassed` is the one test now ([0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md), handoff
+review D7, PR #36).
 Date: 2026-10-08
 
 ## Context

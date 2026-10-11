@@ -1,6 +1,9 @@
 # 0003. Undo and redo are always shown, greyed out when idle, before the save status
 
 Status: Accepted
+Amended 2026-10-11: the save status keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the
+chevron after it no longer moves as a save lands, which the second Consequences line below says it does; only a long
+error message can still lengthen it (handoff review N10, PR #54).
 Date: 2026-10-08
 
 ## Context

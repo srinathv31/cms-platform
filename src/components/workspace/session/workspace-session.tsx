@@ -139,6 +139,15 @@ export function useInert(): boolean {
   return useSyncExternalStore(session.subscribe, session.getInert, () => false);
 }
 
+/**
+ * A tab of the workspace is showing its error (`TabError`). The tab bar sits in the layout, above the tab's
+ * error boundary, so it reads this to show its actions blocked: they act on a tab that didn't load.
+ */
+export function useTabFailed(): boolean {
+  const session = useWorkspaceSession();
+  return useSyncExternalStore(session.subscribe, session.getTabFailed, () => false);
+}
+
 /** Some part of the page on screen can show other values of every one of `fields` (the Content tab, editable, for the content fields). */
 export function useOwnsFields(fields: readonly string[]): boolean {
   const session = useWorkspaceSession();

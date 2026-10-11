@@ -53,21 +53,21 @@ Feature folders:
 | `audit/` | Audit log view, filters, table, Export link. | `/[team]/audit` |
 | `comments/` | Review threads: `ThreadList`, gutter markers, `useReviewThreads` (barrel `index.ts`). A thread anchors to a block, or on a message to a channel field (`fieldTextOf` names it on its card). | `workspace/`, `review/` |
 | `demo/` | The Demo pill (reset, advance clock, open simulator) and "Back to Stencil". | `app-shell/app-frame.tsx`, `(simulator)/layout.tsx` |
-| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `/design/device`, `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
+| `device/` | The phone kit: a push notification or a text message on an iOS-style or Android-style phone, from resolved strings, with truncation measured from the rendered phone. Lint-held to `ui/`, `primitives/` and `motion/`, so Coral can use it ([README](device/README.md)). | `preview/` (Push and SMS), `workspace/content/push-fit.tsx` (the composer's cut warnings); Coral's customer drawer (`src/simulator/ui/customer-drawer.tsx`) |
 | `import/` | Viewer for an imported template's original file (.docx, .pdf, .txt). | `preview/`, `workspace/` |
 | `integration/` | Content of the SHARE integration panel: contract, sample request, responses, changes. | `workspace/workspace-share.tsx` |
-| `library/` | Library view and browser, New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
+| `library/` | Library view and browser (search, and a status filter that is a `Segmented`, counts in its labels), New template dialog, starter gallery (Document · Alert, then that kind's starters), file upload. | `/[team]/library`, and under the settings dialog |
 | `palette/` | ⌘K items as pure data (`commands.ts`), and the search: `usePaletteResults` asks `/api/palette/{space}` when the palette opens and as the viewer types, keeping the answers in one viewer's cache (`palette-cache.ts`). | `app-shell/command-palette.tsx` |
 | `preview/` | The preview rail: channel and device controls, sample sets, and the output on its well. PDF, Web and Email come from the render route (`render-preview.ts`, `use-preview-render.ts`; pdf.js viewer in `pdf/`). Push and SMS render in the browser on every keystroke through the route's own `renderMessage` (`message-preview.ts`, [decision 0036](../../docs/decisions/0036-message-previews-resolve-in-the-browser.md)) and show on the phone kit (`phone-output.tsx`), with iPhone · Android and the Device options in the controls row (`phone-controls.tsx`). See [The preview](#the-preview). | `workspace/`, `review/` |
 | `redline/` | `RedlineDocument`, a version diff painted like the document; `FieldsDocument`, a version's channel fields painted as the composer shows them (a message's push and SMS under display headings, a document's email details under a caps label), clean or with their redline (`diffChannelFields`); and `NameChangeLine`, a rename (the name is versioned). | `review/`, `submit/`, `versions/compare-panel.tsx` |
-| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. The Document view is a document's body under its email details, or a message's fields alone (`fields-view.tsx`), each with its redline and comments. | `/[team]/review/[templateId]/[version]` |
+| `review/` | The approver's review screen for one round (`?round=N`, else the number's head): views, decision rail, approve and request-changes dialogs (each names the round it decides), go-live. The Document view is a document's body under its email details, or a message's fields alone (`fields-view.tsx`), each with its redline and comments. `review-workspace.tsx` only lays the screen out; each kind of client state has a hook: `use-review-view.ts` (which view, `previewVisited`, the Preview's channels), `use-review-changes.ts`, `use-preview-sets.ts`, `use-review-comments.ts`, `use-review-decision.ts` (Approve, Request changes and their dialogs' props), `use-viewed-outputs.ts` (the outputs the approver has had on screen in the Preview, per viewer, version and round, kept in sessionStorage) and `use-go-live.ts`. The channel and phone platform picked in the Preview live in `preview-view.tsx`, which reports each output once it has rendered (`onViewed`) and each the route refuses (`onFailed`, kept in memory by `use-viewed-outputs.ts`). Approve waits until every output has been viewed: blocked with the domain's sentence (`outputsRefusal`, through `approveWaitsOn` in `decision-model.ts`: "Preview PDF first.", or "The PDF can't be shown. Request changes." for a refused one), while Request changes never waits ([decision 0037](../../docs/decisions/0037-an-approver-views-every-output-before-approving.md)). | `/[team]/review/[templateId]/[version]` |
 | `review-queue/` | Review queue tabs and rows; a row links to its own round. | `/[team]/review` |
 | `settings/` | Settings dialog and nav; Team sections in `team/`, Platform sections in `platform/`, and the consequence strip both use (`strip.tsx`). | `/[team]/settings/[section]` and its `@modal/(.)settings` intercept |
 | `signature/` | `ShareRing`, the SHARE signature. | `workspace/`, `review/` |
 | `submit/` | Submit-for-review dialog and its contract lines. | `workspace/workspace-actions.tsx` |
 | `usage/` | Usage dashboard and the template Usage tab. | `/[team]/usage`, `/[team]/templates/[templateId]/usage` |
 | `versions/` | Versions timeline (one entry per version number, its rounds in a folded review history), compare (every round, opening on the two newest versions), sunset and revoke dialogs. Also two shared modules: `action-dialog.tsx` and `format.ts`. | `/[team]/templates/[templateId]/versions` |
-| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
+| `workspace/` | The template workspace: header, tab bar, grid (`workspace-grid.ts`), Content tab (`content/`: the document editor, or for a message template the message composer, `message-composer.tsx`), autosave, session store and live draft (`session/`), Copilot prompt (greyed on an alert, with why), save status, SHARE, and the error a failed tab shows (`tab-error.tsx`; while it is on screen the tab bar's Edit, Submit for review, Preview and rail toggle are greyed with the reason, through the session's `failTab`). See [The message composer](#the-message-composer). | `/[team]/templates/[templateId]` layout, Content page and `error.tsx` |
 
 ## Building blocks
 
@@ -82,7 +82,9 @@ the `render` prop, not `asChild`. A link styled as a button also needs `nativeBu
 <Button variant="ghost" render={<Link href={basePath as Route} scroll={false} />} nativeButton={false}>
 ```
 
-Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` is in `Providers`.
+Icons come from `lucide-react`. Toasts use `toast` from `sonner`; the `Toaster` is in `Providers`, which also
+styles a toast's action (Undo) as an outline button through `toastOptions.classNames.actionButton`: a screen has
+one black button, and sonner's default is filled near-black.
 
 One generated file is edited on purpose. `ui/sidebar.tsx` has no window-level ⌘B / Ctrl+B listener: shadcn's
 toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` cookie, though the app's sidebar is
@@ -94,15 +96,15 @@ toggled the sidebar on every Bold in the editor and wrote the `sidebar_state` co
 
 | Export | File | Purpose |
 | --- | --- | --- |
-| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). A Superseded version's `sunsetDay` (the read model's YYYY-MM-DD, in the business time zone) shows as "Sunset Mar 1". Server-safe. |
+| `StatusBadge` | [status-badge.tsx](primitives/status-badge.tsx) | The one way to show a lifecycle state (wording and tone from `src/domain/status.ts`). A Superseded version's `sunsetDay` (the read model's YYYY-MM-DD, in the business time zone) shows as "Sunset Mar 1", and as "Sunset passed Mar 1" when the read model's `sunsetPassed` (the domain's one test) says it has: every screen that shows the badge passes both. Server-safe. |
 | `PageHeader` | [page-header.tsx](primitives/page-header.tsx) | Serif page title, optional caps eyebrow, a slot for the screen's one primary action. |
 | `Stream` | [stream.tsx](primitives/stream.tsx) | The streaming boundary: `Suspense` plus `ViewTransition`, skeleton out, content in. It catches no errors; the route's `error.tsx` does ([decision 0013](../../docs/decisions/0013-errors-are-caught-per-route-not-per-stream.md)). |
 | `Keycap`, `Shortcut` | [keycap.tsx](primitives/keycap.tsx) | Keyboard keycaps on a sunken fill. |
 | `TemplateId` | [template-id.tsx](primitives/template-id.tsx) | A template ID with a copy button (client). |
 | `LinkPending`, `LinkPendingLabel` | [link-pending.tsx](primitives/link-pending.tsx) | Acknowledge a slow link click (`useLinkStatus`) without shifting layout. |
 | `useActionRun`, `runAction` | [use-action-run.ts](primitives/use-action-run.ts) | Running a server action: one at a time, in a transition, with the refusal's sentence (`error`) and `onOk` / `onRefused`. A call that throws becomes the code `failed` with the screen's sentence; Next's redirect is handed back to Next (client). |
-| `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, the Versions tab's passed sunset (client). |
-| `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon, New template's Document · Alert), `disabled` while what it switches is busy; `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
+| `BlockedButton` | [blocked-button.tsx](primitives/blocked-button.tsx) | An action the viewer can't take: in place, greyed (`data-disabled:`), still focusable, its reason a tooltip and its accessible description. The review screen's blocked Approve and Request changes, and Approve alone while an output hasn't been viewed; the Versions tab's passed sunset (client), the workspace's Submit for review once saving has stopped. |
+| `Segmented`, `SegmentedRadio` | [segmented.tsx](primitives/segmented.tsx) | The one segmented control: a white 32px track, `bg-selected` under the chosen segment, icon-only segments allowed. `Segmented` is a view control (toggle buttons, `aria-pressed`: the preview's channel and device, the Usage filter, the team icon, New template's Document · Alert), `disabled` while what it switches is busy; an option's `done` draws a quiet check after its label (the review Preview's viewed outputs), its room kept while it is false so nothing moves; `SegmentedRadio` is a form field (a radio group: the role in Request access). Client. |
 | `Tabs`, `TabList`, `Tab`, `TabPanel`, `TabUnderline` | [tabs.tsx](primitives/tabs.tsx), [tab-styles.ts](primitives/tab-styles.ts) | View switches in the page: Base UI Tabs in the workspace tab bar's look (15px text, the 2px underline sliding on a hairline, the ring round the label). Usage, the review's Document and Preview, the review queue. Links that look like tabs (`workspace/workspace-tabs.tsx`) and skeletons take the classes from `tab-styles.ts`, which a server component can import. Client. |
 | `StatCard`, `StatValue`, `StatLabel`, `StatLines`, `StatTrend` | [stat-card.tsx](primitives/stat-card.tsx) | A stat card's parts: the tinted card (the Usage screens' `Panel` is this card), the big numeral with a trend pill, the caps label with an optional "i", plain lines under a hairline. They compose, so each screen sets their order: Usage puts the numeral first, Recertification the label. Server-safe. |
 | `copyText`, `useCopy` | [copy.ts](primitives/copy.ts) | Put text on the clipboard (the async API, else a hidden textarea; focus stays put) and show "Copied" for a moment only when it got there. `TemplateId`, the integration panel's Copy, the Copilot prompt. Browser only. |
@@ -117,10 +119,7 @@ never an `if` with a fallthrough: a new channel is then a compile error at each 
 these (the segmented track, a hand-rolled tablist, the clipboard, the stat numeral, the team icons, a channel label
 map).
 
-The `/design` gallery (`src/app/(dev)/design`) imports these, so a change shows there too. It also holds mock
-forks of real components on fixtures (its own `AuditTable`, `ThreadCard`, `GoLive`, preview controls, and usage
-charts). Never copy from or import them. The simulator's `PageHeader` (`src/simulator/ui/bits.tsx`) is
-deliberately separate: it uses the simulator's palette.
+The simulator's `PageHeader` (`src/simulator/ui/bits.tsx`) is deliberately separate: it uses the simulator's palette.
 
 ### Tokens
 
@@ -235,6 +234,9 @@ The same store holds the workspace still (`makeInert`, read with `useInert`): Su
 dialog closes without submitting, and every part that edits the draft shows read-only meanwhile, without remounting.
 A save the server refuses for good (a conflict) takes a hold that lasts as long as that draft is bound, and the
 header's `SaveStopped` says why and offers Reload. Anything else that has to stop edits takes a hold the same way.
+The tab bar is in the layout, above a tab's error boundary, so it learns of a failed tab the same way: `TabError` takes
+a `failTab` hold while it is on screen (read with `useTabFailed`), and Edit, Submit for review, Preview and the rail
+toggle show as `BlockedButton`s with `TAB_BLOCKED` until the hold is let go (Try again worked, or the person left the tab).
 The session also holds the controls that code sends focus to (`session.focusTargets`): the name field, the header's
 status row, the Preview toggle and the rail's Original tab register themselves while mounted (`useFocusTarget`), and
 an Esc, a submit or a revert asks for them by name, or waits for one to mount, rather than querying the page by label
@@ -261,7 +263,10 @@ same way, so its failure offers no button. A message the route would
 refuse (an SMS over 10 parts, a push over 4,096 bytes) still shows on the phone, from `resolveMessage`, with the route's
 sentence above it. That sentence carries the live size, so it is no live region: a polite one says a fixed sentence
 (`refusalNotice`: "The SMS is over 10 parts.") once, when the message turns refused. In the workspace the phone's settings and Push's screen live in the session's preview state
-(`phone`, `pushScreen`), like Web's `device`; the review keeps its own. The phone's sender is the team's app name
+(`phone`, `pushScreen`), like Web's `device`; the review keeps its own. On the review screen the controls also
+check off the outputs the approver has viewed (`viewed`): a channel once all its outputs have rendered, and on Push
+each phone. A PDF counts once pdf.js has drawn it, or, when pdf.js can't open the bytes, once the approver downloads the file from the viewer's fallback (`onPdfShown`); the others count once their output is on screen; never
+a failed render. A render the route refuses for a reason of the version's own (`outputCannotBeShown`) is reported as failed (`onFailed`), and Approve then says the output can't be shown and to request changes ([decision 0037](../../docs/decisions/0037-an-approver-views-every-output-before-approving.md)). The phone's sender is the team's app name
 (else its name) and short code (else none: the thread shows a muted "No sender", never a made-up number or the
 team's name), its date the demo clock's day (`preview-sender.ts`).
 
@@ -305,7 +310,7 @@ submit, and a footer that changed between the two versions struck and inserted (
 | When you need to… | Copy | Notes |
 | --- | --- | --- |
 | Run an action from a button | `EditButton` in [workspace/workspace-actions.tsx](workspace/workspace-actions.tsx) on [primitives/use-action-run.ts](primitives/use-action-run.ts) | `run(action, { onOk, onRefused })`; `pending` while it runs, `error` the refusal's sentence. |
-| Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain constant, as `access/request-access.tsx` does with `ACCESS_REASON_MAX`. |
+| Run an action from a dialog, with validation | [review/request-dialog.tsx](review/request-dialog.tsx) on [versions/action-dialog.tsx](versions/action-dialog.tsx) | Checks the field before sending. Its limit (`REASON_MAX` in `review/decision-model.ts`) duplicates the one in `src/server/actions/review.ts`; for a new limit, share a domain check, as `access/request-access.tsx` does with `validateAccessReason`. |
 | Show server-decided actions | [settings/team/members-table.tsx](settings/team/members-table.tsx) | Reads `m.can.*` and `m.consequences.*`; `rows.tsx` renders refusals and strips. |
 | Show an action the viewer can't take, with why | `BlockedButton` in [review/decision-rail.tsx](review/decision-rail.tsx) | Greyed and focusable; `describedBy` points at a visible reason when there is one. |
 | Make a chart readable without a pointer | `StackedBars` in [usage/charts.tsx](usage/charts.tsx) | `markProps` on each hit area inside `ChartKeys`, then a `ChartTable`. |
@@ -328,11 +333,8 @@ submit, and a footer that changed between the two versions struck and inserted (
   once, as `formatLastRender` in `usage/format.ts` does for a render's time); it never counts days itself.
 - **Permissions decided here.** `library/library-view.tsx` and `app-shell/top-bar-hole.tsx` call `can()`. Have the
   query return the result.
-- **Server code importing this folder.** `src/server/queries/submit-summary.ts` imports `preview/sample-sets/model.ts`
-  and `submit/types.ts`; `src/server/actions/create-template.ts` and `src/app/api/imports/route.ts` import
-  `workspace/just-created.ts`. Keep those modules free of React and directives; put new shared types in `src/domain`.
-- **Dead or off-contract.** `app-shell/page-placeholder.tsx` has no importers. `workspace/save-status.tsx` imports
-  `@/editor/lib/platform`, which is not in the editor's public API.
+- **Off-contract.** `workspace/save-status.tsx` imports `@/editor/lib/platform`, which is not in the editor's
+  public API.
 
 ## `src/hooks`, `src/lib`, `src/styles`
 
