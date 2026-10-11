@@ -651,8 +651,11 @@ export function describeChainChange(input: {
     );
   }
   const namedNow = new Set(current.flatMap((s) => (s.rule.kind === "user" ? [s.rule.userId] : [])));
+  const announced = new Set<string>();
   for (const s of input.next) {
-    if (s.rule.kind !== "user" || namedNow.has(s.rule.userId)) continue;
+    // A person newly named on two stages gets the line once.
+    if (s.rule.kind !== "user" || namedNow.has(s.rule.userId) || announced.has(s.rule.userId)) continue;
+    announced.add(s.rule.userId);
     const person = ruleLabel(s.rule, input.people);
     lines.push(`${person} will review ${type} submissions from every team, including teams they aren't a member of.`);
   }

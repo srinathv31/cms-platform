@@ -191,7 +191,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N12 · Low: The heatmap legend is hover-only, and HBars color by rank
 
-- **Status:** Open
+- **Status:** Fixed. The heatmap's key prints each shade's renders a day in its own swatch ("2–9", spoken as "2 to 9") under a "Renders in a day" list label and leaves out a shade no day can wear, with the date span moved under it so the card's footer keeps one fixed height; every `HBars` bar is one color. Tests in `charts.test.tsx`.
 - **Where:** `src/components/usage/charts.tsx` (`HeatLegend`, `HBars`)
 - **What happens:** The heatmap legend's swatches give the range each shade means ("2 to 9 renders in a day") only in a hover tooltip. They're `aria-hidden` and take no focus, so keyboard and screen-reader users never get the ranges. HBars draws the first row in the darkest brand step and the rest in a lighter one, so color encodes rank, which the bars' lengths already show, and reads as a category. Noticed while fixing I13 (PR #24).
 - **Fix:** Print the ranges with the legend, or add them as sr-only text, and draw every bar in one color.
@@ -199,7 +199,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N13 · Low: The Library's status filter is a third selected style
 
-- **Status:** Open
+- **Status:** Fixed. The filter is a `Segmented` (each count is part of its option's label, "Draft 3"), [decision 0030](decisions/0030-shared-primitives-have-one-home.md) records it, and `one-copy.test.ts` now also fails on a pill written inline that fills `bg-selected` when pressed.
 - **Where:** `src/components/library/library-browser.tsx` (the status filter's `ToggleGroupItem`)
 - **What happens:** H3 gave the segmented control and the tabs one look each in `src/components/primitives/`. The Library's status filter shows its pressed item a third way: rounded pills with no track, filled `bg-selected` when pressed, with the classes inline. `src/components/primitives/one-copy.test.ts` doesn't look for it. Noticed while fixing H3 (PR #40).
 - **Fix:** Use `Segmented` for the filter, or make the pill a primitive if the Library keeps pills on purpose, and record which in [decision 0030](decisions/0030-shared-primitives-have-one-home.md).
@@ -207,7 +207,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 
 #### N14 · Low: A chain change repeats a line for a person named on two stages
 
-- **Status:** Open
+- **Status:** Fixed. `describeChainChange` keeps the people it has already announced, so a person newly named on two stages gets the line once; a test names one person on two new stages.
 - **Where:** `src/domain/platform-config.ts` (`describeChainChange`)
 - **What happens:** It adds "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of." once per stage that names a new person, so a person newly named on two stages gets the line twice. `validateChain` refuses a person on two stages, and the chain editor shows no lines while Save is blocked, so nobody sees it today; a caller that shows the lines without validating first would. Noticed while fixing D4 (PR #14).
 - **Fix:** Add each person's line once.
@@ -268,6 +268,46 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 - **What happens:** Three accepted records state something a later record changed. [0002](decisions/0002-a-passed-sunset-is-final.md) says five other places still test "sunset passed" themselves; there is one test now, `sunsetPassed` ([decision 0026](decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)). [0007](decisions/0007-maker-checker-covers-every-writer.md) names the edit transition `editActive`; it is `editLatest` ([decision 0009](decisions/0009-correct-a-revoked-version-from-its-content.md)). [0025](decisions/0025-refusals-carry-stable-codes.md) says `startDraft` throws `planDraftStart`'s blocked reason; it returns it ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md)). Accepted records aren't rewritten, so someone reading one of them alone is misled. They went stale with D7 (PR #36), D1 (PR #16) and A3 (PR #39).
 - **Fix:** Under each record's Status, add a line naming the later record and what it changed, and leave the rest as written (or mark it "Superseded by" where the later record replaces it, as the decisions README describes).
 - **Evidence:** verified
+
+#### N22 · Low: A template's Usage tab has no per-channel split
+
+- **Status:** Open
+- **Where:** `src/components/usage/template-usage.tsx` (`TemplateUsageContent`); `src/domain/golive-types.ts` (`TemplateUsageData`); `src/server/queries/usage.ts` (`getTemplateUsage`)
+- **What happens:** The team's Usage Overview splits renders by channel (`UsageDashboard.byChannel` and `weekly[].channels`, drawn as the channel mix and "Renders over time, by channel"). A template's own Usage tab splits them only by version ("Renders by version"): `TemplateUsageData` has no channel field, `getTemplateUsage` groups the render log by day, version and outcome, and a channel shows only on a failed render in "Recent failures". So for one template nobody can see how many renders were PDF, Web or Email (or, for an alert, Push or SMS), or that one channel is the one failing. Noticed while building push and SMS (PR #46).
+- **Fix:** Add `byChannel` (the last 30 days) to `TemplateUsageData`, grouped by `renderLog.channel` in `getTemplateUsage`, and draw it on the tab with `ChannelMix`, for the channels the template's content type allows, in the channel hues of [decision 0014](decisions/0014-chart-values-never-hover-only.md). Test the query beside `getTemplateUsage`'s cases in `src/server/queries/usage.test.ts`.
+- **Evidence:** traced
+
+#### N23 · Low: The render log doesn't record which platform a push was for
+
+- **Status:** Open
+- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
+- **What happens:** A push is rendered for one platform, which the request names (`platform`, `ios` or `android`, `ApiPushPlatform` in `src/contracts/api-v1.ts`): iPhone shows a subtitle and Android never does, and the 4,096-byte limit is checked per platform (`push_payload_too_large` carries the platform). The log row keeps only `channel: "push"`, so Usage can't split pushes by iPhone and Android, and a failed push can't be traced to the platform it failed on. Rows already written can't gain it later. The platform is a setting, not a variable value, so the log's keys-only rule allows it. Noticed while building push and SMS (PR #46).
+- **Fix:** Add a nullable `platform` column to `render_log` (a migration; null for every channel but push) and `platform` to `RenderLogEntry`, set it where the render route builds the entry, and copy it by name in `writeRenderLog` like the other fields. Seed the push history with both platforms. Then show it wherever the channel split is drawn (the Push share, by iPhone and Android, with the split in N22) and in "Recent failures".
+- **Evidence:** traced
+
+#### N24 · Low: The Library doesn't say which templates are alerts and which are documents
+
+- **Status:** Open
+- **Where:** `src/server/queries/library.ts` (`LibraryRow`, `getLibraryRows`); `src/components/library/library-browser.tsx` (`TemplateRow`); `src/domain/types.ts` (`contentTypeFamily`, `TEMPLATE_KIND_LABELS`)
+- **What happens:** New template asks for a kind first, Document or Alert (`TEMPLATE_KIND_LABELS`), and a template keeps it for life (`contentTypeFamily`, from its content type's channels). A Library row shows the name, ID, status, active version, last edited and owner. `getLibraryRows` doesn't read the content type, so nothing tells a Push and SMS alert from a PDF, Web and Email document, and neither the search nor the status filter can narrow to one kind. The two are written, reviewed and rendered differently, so a team with both opens each template to find out which it is. Noticed while building push and SMS (PR #46).
+- **Fix:** Add the family to `LibraryRow` (`getLibraryRows` joins the content type and asks `contentTypeFamily`), print its `TEMPLATE_KIND_LABELS` word in the row's second line beside the ID, and, if the list wants it, add a second `Segmented` (All, Documents, Alerts) next to the status filter. Keep the row's height and columns as they are.
+- **Evidence:** traced
+
+#### N25 · Low: An email's subject can't take a review comment in the UI
+
+- **Status:** Open
+- **Where:** `src/components/review/document-view.tsx` (`DocumentView`, its `FieldsDocument layout="details"`); `src/components/redline/fields-document.tsx`; compare `src/components/review/fields-view.tsx`; `src/domain/comments.ts` (`commentAnchors`)
+- **What happens:** The domain lets a thread anchor to `email.subject` and `email.preheader`: `commentAnchors` lists the fields of every channel that is on, and `addComment` accepts them. The review screen takes comments on an alert's fields (`FieldsView` wraps `FieldsDocument` in a redline DOM handle and `GutterMarkers`) and on a document's body (its blocks and selected text). For a document, `DocumentView` draws the subject and preheader through a bare `FieldsDocument layout="details"`, outside both, so they have no Comment button and no gutter marker, and a thread on one would have no marker to open it from. A reviewer can comment on the body but not on the subject, which is customer-visible text approved with it. Noticed while building push and SMS (PR #46).
+- **Fix:** Give the document's subject and preheader what an alert's fields have: a handle and `GutterMarkers` over the `FieldsDocument`, as `FieldsView` does, with the field's id as the anchor, so they take, mark and scroll to comments like a block. Test it beside `src/components/redline/fields-document.test.tsx` and cover a comment on a subject in an e2e spec (`e2e/alerts.spec.ts` comments on an alert's fields).
+- **Evidence:** traced
+
+#### N26 · Low: The phone previews' line counts and type sizes haven't been checked on a real phone
+
+- **Status:** Open
+- **Where:** `src/components/device/ios/notification-card.tsx` (`IOS_LINES`); `src/components/device/android/notification-card.tsx` (`ANDROID_LINES`); `src/components/device/ios/type.ts` and `src/components/device/android/type.ts` (`RAMP`); `src/components/device/geometry.ts`
+- **What happens:** The kit's clamps (iOS: title 1, body 4 on the lock screen, 2 in a banner, about 7 expanded; Android: 1 and 1, about 8 expanded) and its type ramps (Apple's Dynamic Type table, Material 3's roles with Android 14's font scaling) come from the platforms' published guides, not from measuring a phone. iOS text is also set in Inter, a little wider than SF, so a cut can move by a word. The previews' "cut after …" warnings (`onMeasure`) are built on those numbers, so if one is off, an author is shown the wrong cut point. The push that is delivered isn't affected: the phone cuts it, not Stencil. Noticed while building push and SMS (PR #46).
+- **Fix:** The owner checks on a real iPhone and a real Pixel: send pushes of known lengths to each screen (lock screen, banner, expanded) at the default and the larger text sizes, and compare the line counts, cut points and type sizes with the previews. Adjust `IOS_LINES`, `ANDROID_LINES` and the ramps where they differ, and note the devices and OS versions in the device kit's README.
+- **Evidence:** not yet measured
 
 ## Waits for the enterprise work
 

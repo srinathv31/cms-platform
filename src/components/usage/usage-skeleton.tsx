@@ -2,7 +2,7 @@ import { TAB, TAB_ACTIVE, TAB_LABEL, TAB_UNDERLINE } from "@/components/primitiv
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { heatmapBox } from "./charts";
-import { BARS_HEIGHT, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
+import { BARS_HEIGHT, HEAT_FOOTER, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
 import { Panel } from "./panel";
 import { HEATMAP_WEEKS } from "@/domain/golive-types";
 
@@ -74,7 +74,7 @@ export function UsageSkeleton() {
               <Skeleton className="w-full" style={{ aspectRatio: `${heat.width} / ${heat.height}` }} />
             </div>
           </div>
-          <div className="h-5" />
+          <div className={HEAT_FOOTER} />
         </Panel>
         <Panel className="lg:col-span-4">
           <HeadSkeleton />

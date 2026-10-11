@@ -790,6 +790,28 @@ describe("describeChainChange (the Now / After cards)", () => {
     });
   });
 
+  it("says a person reviews every team once, though two new stages name them", () => {
+    const lines = describeChainChange({
+      contentTypeName: "Disclosure",
+      current: [TEAM],
+      next: [{ id: "stage_team", name: "Team approver", rule: TEAM.rule }, LEGAL, { name: "Final sign-off", rule: LEGAL.rule }],
+      people,
+    }).lines;
+    const everyTeam = lines.filter((line) => line.includes("from every team"));
+    expect(everyTeam).toEqual(["Dana Park will review Disclosure submissions from every team, including teams they aren't a member of."]);
+    // The stages themselves are still each described.
+    expect(lines.filter((line) => line.includes("will also wait on"))).toHaveLength(2);
+
+    // Two different people newly named each get their own line.
+    const two = describeChainChange({
+      contentTypeName: "Disclosure",
+      current: [TEAM],
+      next: [LEGAL, { name: "Final sign-off", rule: { kind: "user", userId: "alex" } }],
+      people,
+    }).lines.filter((line) => line.includes("from every team"));
+    expect(two.map((line) => line.split(" will review")[0])).toEqual(["Dana Park", "Alex Kim"]);
+  });
+
   it("marks removed, renamed and moved stages, with the waiting count on a removal", () => {
     const legal = { id: "stage_legal", position: 1, ...LEGAL };
     const change = describeChainChange({

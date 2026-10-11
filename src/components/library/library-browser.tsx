@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Search, X } from "lucide-react";
+import { Segmented } from "@/components/primitives/segmented";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { statusLabel } from "@/domain/status";
 import { VERSION_STATES, type VersionState } from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
@@ -178,27 +178,16 @@ export function LibraryBrowser({
         </InputGroup>
 
         {present.length > 1 ? (
-          <ToggleGroup
-            aria-label="Filter by status"
-            spacing={1}
-            value={[activeFilter]}
-            // Pressing the pressed filter again clears it: back to All.
-            onValueChange={(value) => setFilter((value[0] as Filter | undefined) ?? "all")}
-          >
-            {(["all", ...present] as Filter[]).map((state) => (
-              <ToggleGroupItem
-                key={state}
-                value={state}
-                className="h-8 gap-1.5 rounded-full px-3 text-[13px] font-normal text-text-muted hover:bg-hover hover:text-text aria-pressed:bg-selected aria-pressed:text-text data-pressed:bg-selected data-pressed:text-text"
-              >
-                {state === "all" ? "All" : statusLabel(state)}
-                {/* Subtle on the canvas; full text on the pressed pill (bg-selected), where subtle and muted fall under 4.5:1. */}
-                <span className="text-text-subtle tabular-nums in-aria-pressed:text-text in-data-pressed:text-text">
-                  {state === "all" ? rows.length : counts[state]}
-                </span>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <Segmented
+            label="Filter by status"
+            value={activeFilter}
+            onChange={setFilter}
+            options={(["all", ...present] as Filter[]).map((state) => ({
+              value: state,
+              // The name with its count: "Draft 3".
+              label: state === "all" ? `All ${rows.length}` : `${statusLabel(state)} ${counts[state]}`,
+            }))}
+          />
         ) : null}
       </div>
 
