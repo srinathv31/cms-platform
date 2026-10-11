@@ -201,7 +201,7 @@ test("an alert: Push counts on each phone, then SMS; the controls check off what
 
 test("an output the route refuses can't be previewed: Approve says it can't be shown and to request changes", async ({ page, problems }) => {
   await copyInReview(REFUSED);
-  await page.route(`**/api/v1/templates/${REFUSED.id}/render`, async (route) => {
+  await page.route(`**/api/templates/${REFUSED.id}/preview`, async (route) => {
     const asked = route.request().postDataJSON() as { channel?: string };
     if (asked.channel !== "pdf") return route.continue();
     await route.fulfill({
@@ -238,7 +238,7 @@ test("an output the route refuses can't be previewed: Approve says it can't be s
   });
 
   // The route's refusal is a 500, which Chrome logs: the console errors this test expects.
-  const refusals = problems.filter((p) => /status of 500/.test(p) && p.includes(`/api/v1/templates/${REFUSED.id}/render`));
+  const refusals = problems.filter((p) => /status of 500/.test(p) && p.includes(`/api/templates/${REFUSED.id}/preview`));
   expect(refusals.length).toBeGreaterThan(0);
   for (const refused of refusals) problems.splice(problems.indexOf(refused), 1);
 });
@@ -246,7 +246,7 @@ test("an output the route refuses can't be previewed: Approve says it can't be s
 test("a PDF pdf.js can't open counts as viewed once the approver downloads it from the viewer", async ({ page }) => {
   await copyInReview(UNDRAWABLE);
   // Valid response, bytes pdf.js can't open: the viewer falls back to offering the file.
-  await page.route(`**/api/v1/templates/${UNDRAWABLE.id}/render`, async (route) => {
+  await page.route(`**/api/templates/${UNDRAWABLE.id}/preview`, async (route) => {
     const asked = route.request().postDataJSON() as { channel?: string };
     if (asked.channel !== "pdf") return route.continue();
     await route.fulfill({

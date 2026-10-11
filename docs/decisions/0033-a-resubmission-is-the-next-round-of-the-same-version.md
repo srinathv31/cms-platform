@@ -1,6 +1,7 @@
 # 0033. A resubmission is the next round of the same version
 
 Status: Accepted
+Amended 2026-10-11: a preview names a `round` on Stencil's own `/api/templates/{id}/preview`; `/api/v1` has no `round` and ignores one (A1, [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 Date: 2026-10-09
 
 ## Context

@@ -17,10 +17,11 @@ import { RV } from "./review-grid";
 /**
  * The rendered output of the version under review: the Phase 3 preview's own pieces (the channel
  * control, Download PDF, Desktop / Mobile or the phone's controls, the output on its tinted well).
- * A document channel renders THIS round by number and round through the same route a consumer calls,
- * with `preview: true` (only a preview may name a round). Push and SMS render in the browser from the
- * round's stored fields, through the route's own function (decision 0036): what the approver sees is
- * what a consumer gets.
+ * A document channel renders THIS round by number and round through Stencil's own preview route
+ * (`POST /api/templates/{id}/preview`, which names a round and reads the session; decision 0047) and
+ * the engine a consumer's render uses. Push and SMS render in the browser from the round's stored
+ * fields, through the render function the engine uses (decision 0036): what the approver sees is what
+ * a consumer gets.
  *
  * Nothing here is saved or edited, so there is nothing to wait for before a request (`flush` is
  * instant) and no save tick. The sample set is chosen in the tab bar; `onSeen` says which sets the

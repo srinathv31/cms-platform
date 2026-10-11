@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
-import { allVersions, correlation, expectError, openDb, render, validValues } from "./api/helpers";
+import { allVersions, correlation, expectError, openDb, preview, render, validValues } from "./api/helpers";
 import {
   NAME,
   asPersona,
@@ -624,12 +624,11 @@ test.describe("scenario 2: create, preview, submit", () => {
         });
         await expectError(consumerCall.res, 409, "version_not_released", "Version 1 is in review. No version is active yet.");
 
-        const previewCall = await render(request, {
+        const previewCall = await preview(request, {
           templateId,
-          consumer: null,
           correlationId: correlation("scenario02-preview"),
           headers: { Cookie: "ucomp_persona=maya" },
-          body: { version: 1, channel: "web", values, preview: true },
+          body: { version: 1, channel: "web", values },
         });
         expect(previewCall.res.status(), "a preview of a version in review").toBe(200);
         expect(previewCall.res.headers()["content-type"]).toContain("text/html");
