@@ -54,6 +54,7 @@ decided and why, so it can be revisited without the person who made it.
 | [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md) | Stencil's preview is its own route, `POST /api/templates/{id}/preview`, which reads the session; `/api/v1` serves consumers only and never a draft or a version in review | Accepted |
 | [0048](0048-every-database-test-gets-its-own-database.md) | Every database-backed test gets its own database, copied from one seeded file; tests run in a random order; the mechanism is in `src/lib` so the simulator can use it | Accepted |
 | [0049](0049-the-demo-script-runs-only-in-the-demo-project.md) | The whole-demo script runs only in the opt-in `demo` project, and recording pacing lives in `e2e/media/`, not in the functional helpers | Accepted |
+| [0050](0050-each-e2e-worker-gets-its-own-server-and-database.md) | Spec files run in parallel, each worker with its own server, database and uploads folder; the worker's port comes from `TEST_PARALLEL_INDEX` | Accepted |
 
 Calls made while the prototype was built (Phases 5–7) are in [prototype-log.md](prototype-log.md). It's history:
 some entries have been superseded by later code, and it's not updated anymore.
