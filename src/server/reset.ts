@@ -63,7 +63,13 @@ async function emptyUploads() {
   const dir = defaultUploadsRoot();
   await mkdir(dir, { recursive: true });
   for (const entry of await readdir(dir)) {
-    await rm(join(dir, entry), { recursive: true, force: true });
+    // A few retries, as in `removeUpload`: on Windows a virus scanner can still hold a file it was just handed.
+    await rm(join(dir, entry), {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    });
   }
 }
 
