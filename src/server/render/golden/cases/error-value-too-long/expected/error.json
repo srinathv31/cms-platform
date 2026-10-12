@@ -1,0 +1,24 @@
+{
+  "code": "invalid_values",
+  "message": "memo must be at most 1,000 characters. balance must be at most 1,000 characters. account must be at most 1,000 characters.",
+  "details": {
+    "missing": [],
+    "invalid": [
+      {
+        "key": "memo",
+        "expected": "text",
+        "maxLength": 1000
+      },
+      {
+        "key": "balance",
+        "expected": "currency",
+        "maxLength": 1000
+      },
+      {
+        "key": "account",
+        "expected": "number",
+        "maxLength": 1000
+      }
+    ]
+  }
+}

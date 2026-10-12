@@ -1,0 +1,671 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Right-to-left and CJK text",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "balance",
+      "label": "Balance",
+      "type": "currency",
+      "required": true,
+      "sample": "-1234.50"
+    }
+  ],
+  "values": {
+    "first_name": "ماريا",
+    "balance": "-1234.50"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Other scripts"
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b2",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "العربية"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "يجب أن يكون الحد الأدنى للدفع 35.00 دولارًا بحلول 4 مارس 2027."
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "مرحبًا "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": "، رصيدك هو "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "balance"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Dear "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", your balance is "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "balance"
+            }
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "attrs": {
+          "id": "b5"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Mixed direction: your reference is مرجع 4417-AB (انظر المرفق) and the call is 800-555-0100."
+          }
+        ],
+        "attrs": {
+          "id": "b6"
+        }
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "قائمة عربية"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "A list item with عربي inside"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b7"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b8",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "עברית"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "התשלום המינימלי הוא 35.00 דולר עד 4 במרץ 2027."
+          }
+        ],
+        "attrs": {
+          "id": "b9"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Typed out of order: שָׁלוֹם."
+          }
+        ],
+        "attrs": {
+          "id": "b10"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b11",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "中文"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "最低还款额为 35.00 美元，应于 2027 年 3 月 4 日前支付。"
+          }
+        ],
+        "attrs": {
+          "id": "b12"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b13",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "日本語"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "　お支払い期日は2027年3月4日です。「最低支払額」は35.00ドルです。ガイドをご覧ください。"
+          }
+        ],
+        "attrs": {
+          "id": "b14"
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b15",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "𠮷野家のカード規約"
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b16",
+          "level": 2,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "한국어"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "최소 결제 금액은 35.00달러입니다. 한글 안내를 확인하세요."
+          }
+        ],
+        "attrs": {
+          "id": "b17"
+        }
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Language"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableHeader",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Greeting"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "العربية"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "مرحبًا بكم"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "עברית"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "ברוכים הבאים"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "中文"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "欢迎"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "日本語"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "ようこそ"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "한국어"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "환영합니다"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "A"
+                      },
+                      {
+                        "type": "hardBreak"
+                      },
+                      {
+                        "type": "text",
+                        "text": "𠮷野家"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "tableCell",
+                "attrs": {
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "x"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "id": "b18"
+        }
+      },
+      {
+        "type": "orderedList",
+        "attrs": {
+          "id": "b19",
+          "start": 1
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "中文列表"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "日本語のリスト"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "한국어 목록"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "channelFields": {},
+  "channels": [
+    "web",
+    "email"
+  ]
+}

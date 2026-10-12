@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The push couldn't be rendered. The push title, subtitle and body can hold only text and variables, with no line breaks.",
+  "details": {
+    "reason": "document"
+  }
+}

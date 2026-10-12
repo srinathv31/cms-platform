@@ -1,0 +1,7 @@
+{
+  "code": "render_failed",
+  "message": "The SMS couldn't be rendered. The SMS message can hold only text, line breaks and variables.",
+  "details": {
+    "reason": "document"
+  }
+}
